@@ -665,12 +665,72 @@ def render_division(con, div):
     out_path.write_text("\n".join(html), encoding="utf-8")
     return out_path
 
+
+def write_index():
+    """Generoi GitHub Pages -ystävällisen index.html:n output-hakemistoon."""
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Aikaleima
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # Rakennetaan yksinkertainen etusivu uudelleenkäyttäen samaa HTML-pohjaa
+    html = [HTML_HEAD.replace("{title}", f"CS2 Faceit Reports – generoitu {ts}")]
+    html.append('<div class="page">')
+    html.append(f"<h1>CS2 Faceit Reports <span class='muted'>(generoitu {ts})</span></h1>")
+
+    # Pieni ohjeistus
+    html.append("<p class='muted'>Valitse divisioona alta. Sivu linkittää valmiiksi generoituun raporttiin.</p>")
+
+    # Lista divisioonista
+    html.append('<div class="nav">')
+    for div in DIVISIONS:
+        # Huom: linkki suhteessa index.html → output/<slug>.html
+        html.append(f'<a href="output/{div["slug"]}.html">{div["name"]}</a>')
+    html.append('</div>')
+
+    # (Valinnainen) lista myös taulukkona
+    html.append("""
+    <table id="divisions" data-sort-col="0" data-sort-dir="asc">
+      <thead>
+        <tr>
+          <th onclick="sortTable('divisions',0,false)">Division</th>
+          <th onclick="sortTable('divisions',1,false)">Slug</th>
+          <th>Raportti</th>
+        </tr>
+      </thead>
+      <tbody>
+    """)
+    for div in DIVISIONS:
+        link = f'output/{div["slug"]}.html'
+        html.append(f"""
+          <tr>
+            <td>{div["name"]}</td>
+            <td>{div["slug"]}</td>
+            <td><a href="{link}">{link}</a></td>
+          </tr>
+        """)
+    html.append("</tbody></table>")
+
+    html.append("</div>")  # .page
+    html.append(HTML_FOOT)
+
+    # Kirjoita projektin juureen index.html (GitHub Pages yleensä näyttää tämän)
+    idx_path = Path(__file__).with_name("index.html")
+    idx_path.write_text("\n".join(html), encoding="utf-8")
+    print(f"[OK] Wrote {idx_path}")
+
+
+
+
 def main():
     con = get_conn(DB_PATH)
     for div in DIVISIONS:
         path = render_division(con, div)
         print(f"[OK] Wrote {path}")
     con.close()
+
+    # GENEROI GITHUB-INDEX
+    write_index()
 
 if __name__ == "__main__":
     main()
