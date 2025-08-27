@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>5 Divisioona S11</title>
+<style>
+:root{
+  --fg:#f5f5f5;
+  --muted:#aaa;
+  --border:#444;
+  --bg:#1b1b1b;
+  --table-bg:#222;
+  --table-alt:#2a2a2a;
+  --head:#333;
+  --chip-bg:#2a2a2a;
+  --nav-bg:#2a2a2a;
+  --accent:#4ade80;
+}
+
+html,body{height:100%;}
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.page{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 3rem;
+}
+
+/* Otsikot */
+h1{ font-size: 2rem; margin:.5rem 0 1rem; }
+h2{ font-size: 1.5rem; margin:1.25rem 0 .5rem; }
+h3{ font-size: 1.15rem; margin:1rem 0 .5rem; }
+
+/* Joukkue-navigaatio */
+.nav{ display:flex; flex-wrap:wrap; gap:.75rem; margin:.25rem 0 1rem; }
+.nav a{
+  color:#cfe1ff;
+  text-decoration:none;
+  border:1px solid var(--border);
+  padding:.25rem .5rem;
+  border-radius:999px;
+  background: var(--nav-bg);
+}
+.nav a:hover{ background:#3a3a3a; }
+
+/* Chipit */
+.chips { display:flex; gap:.5rem; flex-wrap:wrap; margin:.25rem 0 .75rem 0; }
+.chip  { font-size:.95rem; padding:.35rem .65rem; border-radius:999px; background: var(--chip-bg); border:1px solid var(--border); color:var(--fg); }
+
+/* Taulukot */
+table{ width:100%; border-collapse: collapse; margin:.5rem 0 1rem; background: var(--table-bg); }
+thead th{
+  position: sticky; top:0;
+  background: var(--head);
+  border-bottom:1px solid var(--border);
+  font-weight:600;
+  color: var(--fg);
+}
+th, td{ padding:.55rem .7rem; border-bottom:1px solid var(--border); }
+tbody tr:nth-child(even){ background: var(--table-alt); }
+th, td{ text-align:center; }
+th:first-child, td:first-child{ text-align:left; }
+
+/* Sticky 1. sarake ja hover-korostus */
+td:first-child, th:first-child{ position:sticky; left:0; z-index:1; background:var(--table-bg); }
+tbody tr:hover{ outline:1px solid #555; background:#292929; }
+
+/* progress bar WR-prosenteille */
+.bar { position:relative; background:#333; height:20px; border-radius:8px; overflow:hidden; }
+.bar > span { position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--accent); }
+.bar .val { position:relative; z-index:1; font-size:.9rem; padding-left:.5rem; color:#fff; }
+
+/* asteittainen väriskaala soluille */
+.cell-grad.good   { background:linear-gradient(90deg, rgba(34,197,94,.25), transparent); }
+.cell-grad.bad    { background:linear-gradient(90deg, rgba(239,68,68,.25), transparent); }
+.cell-muted { color:var(--muted); }
+
+/* tooltip otsikoissa */
+th[title] { text-decoration: underline dotted #777; text-underline-offset: 3px; cursor: help; }
+
+/* Joukkueosio + ohjeteksti */
+.team-section{ padding:.25rem 0 1.25rem; border-top:1px solid var(--border); margin-top:1rem; }
+.muted{ color:var(--muted); font-size:.95rem; margin:.25rem 0 1rem; }
+
+/* Toolbar (filter + CSV + columns) */
+.toolbar{ display:flex; gap:.75rem; align-items:center; margin:.4rem 0 .5rem; flex-wrap:wrap; }
+.toolbar .btn{ background:#3a3a3a; color:#fff; border:1px solid var(--border); padding:.35rem .6rem; border-radius:8px; cursor:pointer; }
+.toolbar .btn:hover{ background:#4a4a4a; }
+details.cols summary{ cursor:pointer; }
+details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
+
+/* Tulostus */
+@media print{
+  body{ background:#fff; color:#000; }
+  .page{ max-width:100%; padding:0; }
+  .nav, .toolbar{ display:none; }
+  .bar{ height:12px; }
+}
+</style>
+
+<script>
+// --- lajittelu ---
+function sortTable(tableId, n, numeric){
+  const table = document.getElementById(tableId);
+  const dirAttr = table.getAttribute('data-sort-dir') || 'asc';
+  const dir = dirAttr === 'asc' ? 1 : -1;
+  let rows = Array.from(table.tBodies[0].rows);
+  rows.sort((a,b)=>{
+    const x = a.cells[n].textContent.trim();
+    const y = b.cells[n].textContent.trim();
+    if(numeric){
+      const nx = parseFloat(x.replace(',', '.')) || 0;
+      const ny = parseFloat(y.replace(',', '.')) || 0;
+      return (nx - ny) * dir;
+    }
+    return x.localeCompare(y) * dir;
+  });
+  table.tBodies[0].append(...rows);
+  table.setAttribute('data-sort-dir', dirAttr === 'asc' ? 'desc' : 'asc');
+}
+
+function applyDefaultSort(tableId){
+  const t = document.getElementById(tableId);
+  if(!t) return;
+  const col = parseInt(t.getAttribute('data-sort-col') || '0',10);
+  const dir = (t.getAttribute('data-sort-dir') || 'asc') === 'asc';
+  sortTable(tableId, col, !dir);
+  sortTable(tableId, col, dir);
+}
+
+// --- Progress bar ---
+function renderBar(cell, value){
+  cell.innerHTML = '<div class="bar"><span></span><div class="val"></div></div>';
+  const span = cell.querySelector('.bar > span');
+  const val  = cell.querySelector('.bar .val');
+  val.textContent = (isFinite(value) ? value.toFixed(1) : 0) + '%';
+  const width = Math.max(0, Math.min(100, value));
+  span.style.width = width + '%';
+  const g = Math.round(120 * (width/100));
+  const r = Math.round(180 * (1 - width/100)) + 60;
+  span.style.background = `rgb(${r}, ${g+80}, 100)`;
+}
+
+// --- Väriskaalat ---
+function colorizeRange(tableId, colIdx, min, max, inverse=false){
+  const t = document.getElementById(tableId);
+  if(!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for(const tr of rows){
+    const td = tr.cells[colIdx];
+    let v = parseFloat((td.textContent||'').replace(',', '.'));
+    if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
+    const ratio = Math.max(0, Math.min(1, (v - min) / (max - min || 1)));
+    const good  = inverse ? (1 - ratio) : ratio;
+    if (good >= 0.55) td.classList.add('cell-grad','good');
+    else if (good <= 0.45) td.classList.add('cell-grad','bad');
+  }
+}
+function colorizeAuto(tableId, colIdx, inverse=false){
+  const t = document.getElementById(tableId); if(!t) return;
+  const vals = [...t.tBodies[0].rows].map(tr => parseFloat((tr.cells[colIdx].textContent||'').replace(',','.'))).filter(v=>isFinite(v));
+  if(!vals.length) return;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  colorizeRange(tableId, colIdx, min, max, inverse);
+}
+
+// --- Played only ---
+function bindPlayedOnly(tableId, chkId){
+  const chk = document.getElementById(chkId);
+  const t = document.getElementById(tableId);
+  if(!chk || !t) return;
+  const colPlayed = 1;
+  chk.addEventListener('change', ()=> {
+    for(const tr of t.tBodies[0].rows){
+      const played = parseInt(tr.cells[colPlayed].textContent||'0',10);
+      tr.style.display = (chk.checked && !played) ? 'none' : '';
+    }
+  });
+}
+
+// --- CSV-vienti ---
+function exportTableCSV(tableId, filename){
+  const t = document.getElementById(tableId);
+  let csv = [];
+  const rows = [...t.querySelectorAll('tr')];
+  for(const r of rows){
+    const cells = [...r.children].map(c => {
+      const val = c.querySelector('.bar .val')?.textContent || c.textContent;
+      return '"' + val.replace(/"/g,'""').trim() + '"';
+    });
+    csv.push(cells.join(','));
+  }
+  const blob = new Blob([csv.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// --- Saraketooglet ---
+function buildColumnToggles(tableId){
+  const t = document.getElementById(tableId);
+  const host = document.querySelector(`details.cols div[data-for="${tableId}"]`);
+  if(!t || !host) return;
+  const ths = [...t.tHead.rows[0].cells];
+  ths.forEach((th, idx)=>{
+    const id = `${tableId}-col-${idx}`;
+    const wrap = document.createElement('label');
+    wrap.innerHTML = `<input type="checkbox" id="${id}" checked> ${th.textContent}`;
+    host.appendChild(wrap);
+    wrap.querySelector('input').addEventListener('change', (e)=>{
+      const on = e.target.checked;
+      th.style.display = on ? '' : 'none';
+      for(const tr of t.tBodies[0].rows){
+        tr.cells[idx].style.display = on ? '' : 'none';
+      }
+    });
+  });
+}
+</script>
+</head>
+<body>
+
+<div class="page">
+<h1>5 Divisioona S11</h1>
+<div class="nav">
+</div>
+<div class="muted">Vinkki: klikkaa joukkueen otsikkoriviä avataksesi tai sulkeaksesi sen.</div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,3825 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>22 Divisioona S11</title>
+<style>
+:root{
+  --fg:#f5f5f5;
+  --muted:#aaa;
+  --border:#444;
+  --bg:#1b1b1b;
+  --table-bg:#222;
+  --table-alt:#2a2a2a;
+  --head:#333;
+  --chip-bg:#2a2a2a;
+  --nav-bg:#2a2a2a;
+  --accent:#4ade80;
+}
+
+html,body{height:100%;}
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 18px;
+  line-height: 1.45;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.page{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 3rem;
+}
+
+/* Otsikot */
+h1{ font-size: 2rem; margin:.5rem 0 1rem; }
+h2{ font-size: 1.5rem; margin:1.25rem 0 .5rem; }
+h3{ font-size: 1.15rem; margin:1rem 0 .5rem; }
+
+/* Joukkue-navigaatio */
+.nav{ display:flex; flex-wrap:wrap; gap:.75rem; margin:.25rem 0 1rem; }
+.nav a{
+  color:#cfe1ff;
+  text-decoration:none;
+  border:1px solid var(--border);
+  padding:.25rem .5rem;
+  border-radius:999px;
+  background: var(--nav-bg);
+}
+.nav a:hover{ background:#3a3a3a; }
+
+/* Chipit */
+.chips { display:flex; gap:.5rem; flex-wrap:wrap; margin:.25rem 0 .75rem 0; }
+.chip  { font-size:.95rem; padding:.35rem .65rem; border-radius:999px; background: var(--chip-bg); border:1px solid var(--border); color:var(--fg); }
+
+/* Taulukot */
+table{ width:100%; border-collapse: collapse; margin:.5rem 0 1rem; background: var(--table-bg); }
+thead th{
+  position: sticky; top:0;
+  background: var(--head);
+  border-bottom:1px solid var(--border);
+  font-weight:600;
+  color: var(--fg);
+}
+th, td{ padding:.55rem .7rem; border-bottom:1px solid var(--border); }
+tbody tr:nth-child(even){ background: var(--table-alt); }
+th, td{ text-align:center; }
+th:first-child, td:first-child{ text-align:left; }
+
+/* Sticky 1. sarake ja hover-korostus */
+td:first-child, th:first-child{ position:sticky; left:0; z-index:1; background:var(--table-bg); }
+tbody tr:hover{ outline:1px solid #555; background:#292929; }
+
+/* progress bar WR-prosenteille */
+.bar { position:relative; background:#333; height:20px; border-radius:8px; overflow:hidden; }
+.bar > span { position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--accent); }
+.bar .val { position:relative; z-index:1; font-size:.9rem; padding-left:.5rem; color:#fff; }
+
+/* asteittainen väriskaala soluille */
+.cell-grad.good   { background:linear-gradient(90deg, rgba(34,197,94,.25), transparent); }
+.cell-grad.bad    { background:linear-gradient(90deg, rgba(239,68,68,.25), transparent); }
+.cell-muted { color:var(--muted); }
+
+/* tooltip otsikoissa */
+th[title] { text-decoration: underline dotted #777; text-underline-offset: 3px; cursor: help; }
+
+/* Joukkueosio + ohjeteksti */
+.team-section{ padding:.25rem 0 1.25rem; border-top:1px solid var(--border); margin-top:1rem; }
+.muted{ color:var(--muted); font-size:.95rem; margin:.25rem 0 1rem; }
+
+/* Toolbar (filter + CSV + columns) */
+.toolbar{ display:flex; gap:.75rem; align-items:center; margin:.4rem 0 .5rem; flex-wrap:wrap; }
+.toolbar .btn{ background:#3a3a3a; color:#fff; border:1px solid var(--border); padding:.35rem .6rem; border-radius:8px; cursor:pointer; }
+.toolbar .btn:hover{ background:#4a4a4a; }
+details.cols summary{ cursor:pointer; }
+details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
+
+/* Tulostus */
+@media print{
+  body{ background:#fff; color:#000; }
+  .page{ max-width:100%; padding:0; }
+  .nav, .toolbar{ display:none; }
+  .bar{ height:12px; }
+}
+</style>
+
+<script>
+// --- lajittelu ---
+function sortTable(tableId, n, numeric){
+  const table = document.getElementById(tableId);
+  const dirAttr = table.getAttribute('data-sort-dir') || 'asc';
+  const dir = dirAttr === 'asc' ? 1 : -1;
+  let rows = Array.from(table.tBodies[0].rows);
+  rows.sort((a,b)=>{
+    const x = a.cells[n].textContent.trim();
+    const y = b.cells[n].textContent.trim();
+    if(numeric){
+      const nx = parseFloat(x.replace(',', '.')) || 0;
+      const ny = parseFloat(y.replace(',', '.')) || 0;
+      return (nx - ny) * dir;
+    }
+    return x.localeCompare(y) * dir;
+  });
+  table.tBodies[0].append(...rows);
+  table.setAttribute('data-sort-dir', dirAttr === 'asc' ? 'desc' : 'asc');
+}
+
+function applyDefaultSort(tableId){
+  const t = document.getElementById(tableId);
+  if(!t) return;
+  const col = parseInt(t.getAttribute('data-sort-col') || '0',10);
+  const dir = (t.getAttribute('data-sort-dir') || 'asc') === 'asc';
+  sortTable(tableId, col, !dir);
+  sortTable(tableId, col, dir);
+}
+
+// --- Progress bar ---
+function renderBar(cell, value){
+  cell.innerHTML = '<div class="bar"><span></span><div class="val"></div></div>';
+  const span = cell.querySelector('.bar > span');
+  const val  = cell.querySelector('.bar .val');
+  val.textContent = (isFinite(value) ? value.toFixed(1) : 0) + '%';
+  const width = Math.max(0, Math.min(100, value));
+  span.style.width = width + '%';
+  const g = Math.round(120 * (width/100));
+  const r = Math.round(180 * (1 - width/100)) + 60;
+  span.style.background = `rgb(${r}, ${g+80}, 100)`;
+}
+
+// --- Väriskaalat ---
+function colorizeRange(tableId, colIdx, min, max, inverse=false){
+  const t = document.getElementById(tableId);
+  if(!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for(const tr of rows){
+    const td = tr.cells[colIdx];
+    let v = parseFloat((td.textContent||'').replace(',', '.'));
+    if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
+    const ratio = Math.max(0, Math.min(1, (v - min) / (max - min || 1)));
+    const good  = inverse ? (1 - ratio) : ratio;
+    if (good >= 0.55) td.classList.add('cell-grad','good');
+    else if (good <= 0.45) td.classList.add('cell-grad','bad');
+  }
+}
+function colorizeAuto(tableId, colIdx, inverse=false){
+  const t = document.getElementById(tableId); if(!t) return;
+  const vals = [...t.tBodies[0].rows].map(tr => parseFloat((tr.cells[colIdx].textContent||'').replace(',','.'))).filter(v=>isFinite(v));
+  if(!vals.length) return;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  colorizeRange(tableId, colIdx, min, max, inverse);
+}
+
+// --- Played only ---
+function bindPlayedOnly(tableId, chkId){
+  const chk = document.getElementById(chkId);
+  const t = document.getElementById(tableId);
+  if(!chk || !t) return;
+  const colPlayed = 1;
+  chk.addEventListener('change', ()=> {
+    for(const tr of t.tBodies[0].rows){
+      const played = parseInt(tr.cells[colPlayed].textContent||'0',10);
+      tr.style.display = (chk.checked && !played) ? 'none' : '';
+    }
+  });
+}
+
+// --- CSV-vienti ---
+function exportTableCSV(tableId, filename){
+  const t = document.getElementById(tableId);
+  let csv = [];
+  const rows = [...t.querySelectorAll('tr')];
+  for(const r of rows){
+    const cells = [...r.children].map(c => {
+      const val = c.querySelector('.bar .val')?.textContent || c.textContent;
+      return '"' + val.replace(/"/g,'""').trim() + '"';
+    });
+    csv.push(cells.join(','));
+  }
+  const blob = new Blob([csv.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// --- Saraketooglet ---
+function buildColumnToggles(tableId){
+  const t = document.getElementById(tableId);
+  const host = document.querySelector(`details.cols div[data-for="${tableId}"]`);
+  if(!t || !host) return;
+  const ths = [...t.tHead.rows[0].cells];
+  ths.forEach((th, idx)=>{
+    const id = `${tableId}-col-${idx}`;
+    const wrap = document.createElement('label');
+    wrap.innerHTML = `<input type="checkbox" id="${id}" checked> ${th.textContent}`;
+    host.appendChild(wrap);
+    wrap.querySelector('input').addEventListener('change', (e)=>{
+      const on = e.target.checked;
+      th.style.display = on ? '' : 'none';
+      for(const tr of t.tBodies[0].rows){
+        tr.cells[idx].style.display = on ? '' : 'none';
+      }
+    });
+  });
+}
+</script>
+</head>
+<body>
+
+<div class="page">
+<h1>22 Divisioona S11</h1>
+<div class="nav">
+<a href="#team-1216f0ea-0b7b-400e-93e1-7bf8c125c9a0">RAYHA_CS</a>
+<a href="#team-553aa80a-6a5d-4167-88cf-f08316d0c623">Casetti Levis</a>
+<a href="#team-6b3e4bec-5f85-4878-9625-c74b1b5a38b3">piped0pe</a>
+<a href="#team-7114313c-7581-40d3-8c89-e4532e86b68d">LosBurritos</a>
+<a href="#team-7e8245ab-580a-43e3-a418-70034f35434f">Venga Chicos</a>
+<a href="#team-819b0708-dc44-4f9c-810a-17243698c01f">Gibbonit</a>
+<a href="#team-a40a6d87-ef57-45e2-818c-08c6f70f7e3b">Bonfire</a>
+<a href="#team-b9023f61-1fb0-4247-ae65-d73eacc44d41">Pain-Train</a>
+<a href="#team-d15cc43e-80ff-4f8d-a9ea-c93caa9a00a6">Hero-Fi U</a>
+<a href="#team-de3c5208-e0d5-437a-8e74-0ca2bc9ca603">SD Gaming</a>
+<a href="#team-e86a10a8-6cad-4396-8335-d2c51727f219">Savuiz</a>
+<a href="#team-f2500fae-e67c-4614-bbbc-cc5989cb0105">X-UwU Bon Bons</a>
+</div>
+<div class="muted">Vinkki: klikkaa joukkueen otsikkoriviä avataksesi tai sulkeaksesi sen.</div>
+<details class="team-section" id="team-1216f0ea-0b7b-400e-93e1-7bf8c125c9a0" open>
+<summary><h2>RAYHA_CS</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 4-2</span> <span class="chip">±RD 7</span> <span class="chip">KD 0.99</span> <span class="chip">KR 0.67</span> <span class="chip">ADR 74.1</span> <span class="chip">Util 2340</span></div>
+<h3>Players</h3>
+<table id="players-1" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-1',0,false)">Nickname</th>
+            <th onclick="sortTable('players-1',1,true)">Maps</th>
+            <th onclick="sortTable('players-1',2,true)">KD</th>
+            <th onclick="sortTable('players-1',3,true)">ADR</th>
+            <th onclick="sortTable('players-1',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-1',6,true)">HS%</th>
+            <th onclick="sortTable('players-1',7,true)">AWP</th>
+            <th onclick="sortTable('players-1',8,true)">3K</th>
+            <th onclick="sortTable('players-1',9,true)">4K</th>
+            <th onclick="sortTable('players-1',10,true)">5K</th>
+            <th onclick="sortTable('players-1',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>KING_JUT</td>
+                <td>6</td>
+                <td>1.55</td>
+                <td>97.0</td>
+                <td>0.94</td>
+                <td>121/78/29</td>
+                <td>34.0</td>
+                <td>3</td>
+                <td>11</td>
+                <td>0</td>
+                <td>0</td>
+                <td>543</td>
+            </tr>
+<tr>
+                <td>RotJa</td>
+                <td>6</td>
+                <td>0.96</td>
+                <td>82.0</td>
+                <td>0.73</td>
+                <td>95/99/46</td>
+                <td>32.7</td>
+                <td>0</td>
+                <td>6</td>
+                <td>1</td>
+                <td>0</td>
+                <td>291</td>
+            </tr>
+<tr>
+                <td>Shirunee</td>
+                <td>6</td>
+                <td>1.09</td>
+                <td>68.1</td>
+                <td>0.65</td>
+                <td>84/77/39</td>
+                <td>31.2</td>
+                <td>0</td>
+                <td>4</td>
+                <td>0</td>
+                <td>0</td>
+                <td>638</td>
+            </tr>
+<tr>
+                <td>slack-n-hash</td>
+                <td>6</td>
+                <td>0.55</td>
+                <td>54.5</td>
+                <td>0.44</td>
+                <td>56/101/36</td>
+                <td>44.0</td>
+                <td>0</td>
+                <td>2</td>
+                <td>1</td>
+                <td>0</td>
+                <td>484</td>
+            </tr>
+<tr>
+                <td>g0nsu</td>
+                <td>4</td>
+                <td>0.76</td>
+                <td>66.2</td>
+                <td>0.54</td>
+                <td>48/63/27</td>
+                <td>24.5</td>
+                <td>4</td>
+                <td>4</td>
+                <td>0</td>
+                <td>0</td>
+                <td>315</td>
+            </tr>
+<tr>
+                <td>AnimeRotta</td>
+                <td>2</td>
+                <td>1.43</td>
+                <td>74.3</td>
+                <td>0.74</td>
+                <td>30/21/9</td>
+                <td>20.5</td>
+                <td>0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>69</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-1', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-1', 3, 50, 120, false);</script>
+<script>colorizeRange('players-1', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-1');</script>
+<div class="chips">
+<span class="chip">Most banned: de_nuke (3×)</span>
+<span class="chip">Most picked: de_overpass (2×)</span>
+<span class="chip">Best WR: de_ancient (100%)</span>
+<span class="chip">Map to avoid: de_mirage (0%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-1-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-1', 'RAYHA_CS_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-1"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-1" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-1',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-1',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-1',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-1',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-1',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-1',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-1',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-1',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-1',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-1',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-1',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-1',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-1',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-1',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.32">1.31</td>
+            <td title="Δ vs div avg: +7.7">85.6</td>
+            <td>6</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -75.3">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.21">1.21</td>
+            <td title="Δ vs div avg: +2.3">77.2</td>
+            <td>5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.21">0.78</td>
+            <td title="Δ vs div avg: -6.2">66.7</td>
+            <td>-10</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -77.4">0.0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.02">0.98</td>
+            <td title="Δ vs div avg: -2.3">74.2</td>
+            <td>6</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>1</td>
+            <td>2</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-1');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-1', 7, false);  // KD
+  colorizeAuto('maps-1', 8, false);  // ADR
+  colorizeRange('maps-1', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-1');
+  bindPlayedOnly('maps-1', 'maps-1-played-only');
+  buildColumnToggles('maps-1');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-553aa80a-6a5d-4167-88cf-f08316d0c623" open>
+<summary><h2>Casetti Levis</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 0-6</span> <span class="chip">±RD -60</span> <span class="chip">KD 0.55</span> <span class="chip">KR 0.44</span> <span class="chip">ADR 51.7</span> <span class="chip">Util 1452</span></div>
+<h3>Players</h3>
+<table id="players-2" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-2',0,false)">Nickname</th>
+            <th onclick="sortTable('players-2',1,true)">Maps</th>
+            <th onclick="sortTable('players-2',2,true)">KD</th>
+            <th onclick="sortTable('players-2',3,true)">ADR</th>
+            <th onclick="sortTable('players-2',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-2',6,true)">HS%</th>
+            <th onclick="sortTable('players-2',7,true)">AWP</th>
+            <th onclick="sortTable('players-2',8,true)">3K</th>
+            <th onclick="sortTable('players-2',9,true)">4K</th>
+            <th onclick="sortTable('players-2',10,true)">5K</th>
+            <th onclick="sortTable('players-2',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>Jabban</td>
+                <td>4</td>
+                <td>0.97</td>
+                <td>71.6</td>
+                <td>0.69</td>
+                <td>56/58/14</td>
+                <td>54.8</td>
+                <td>2</td>
+                <td>3</td>
+                <td>1</td>
+                <td>0</td>
+                <td>244</td>
+            </tr>
+<tr>
+                <td>naukmam</td>
+                <td>2</td>
+                <td>1.44</td>
+                <td>106.0</td>
+                <td>1.07</td>
+                <td>52/36/15</td>
+                <td>51.0</td>
+                <td>1</td>
+                <td>6</td>
+                <td>0</td>
+                <td>0</td>
+                <td>386</td>
+            </tr>
+<tr>
+                <td>Kytkis</td>
+                <td>4</td>
+                <td>0.72</td>
+                <td>72.2</td>
+                <td>0.59</td>
+                <td>47/65/14</td>
+                <td>45.8</td>
+                <td>5</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td>476</td>
+            </tr>
+<tr>
+                <td>armpe</td>
+                <td>6</td>
+                <td>0.43</td>
+                <td>44.4</td>
+                <td>0.39</td>
+                <td>42/97/14</td>
+                <td>42.2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>67</td>
+            </tr>
+<tr>
+                <td>Hevarty</td>
+                <td>4</td>
+                <td>0.56</td>
+                <td>71.0</td>
+                <td>0.53</td>
+                <td>29/52/9</td>
+                <td>42.0</td>
+                <td>9</td>
+                <td>1</td>
+                <td>0</td>
+                <td>1</td>
+                <td>97</td>
+            </tr>
+<tr>
+                <td>Hi6hl4nder</td>
+                <td>6</td>
+                <td>0.18</td>
+                <td>22.2</td>
+                <td>0.16</td>
+                <td>17/93/7</td>
+                <td>41.7</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>33</td>
+            </tr>
+<tr>
+                <td>KalakukkoM</td>
+                <td>2</td>
+                <td>0.22</td>
+                <td>32.5</td>
+                <td>0.22</td>
+                <td>6/27/7</td>
+                <td>50.0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>120</td>
+            </tr>
+<tr>
+                <td>tiamarsu</td>
+                <td>2</td>
+                <td>0.00</td>
+                <td>7.6</td>
+                <td>0.00</td>
+                <td>0/27/0</td>
+                <td>0.0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>29</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-2', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-2', 3, 50, 120, false);</script>
+<script>colorizeRange('players-2', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-2');</script>
+<div class="chips">
+<span class="chip">Most banned: de_train (3×)</span>
+<span class="chip">Most picked: de_inferno (2×)</span>
+<span class="chip">Map to avoid: de_ancient (0%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-2-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-2', 'Casetti Levis_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-2"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-2" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-2',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-2',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-2',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-2',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-2',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-2',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-2',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-2',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-2',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-2',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-2',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-2',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-2',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-2',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.51">0.48</td>
+            <td title="Δ vs div avg: -24.0">53.9</td>
+            <td>-21</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.59">0.41</td>
+            <td title="Δ vs div avg: -31.1">44.2</td>
+            <td>-13</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.67">0.33</td>
+            <td title="Δ vs div avg: -33.7">41.2</td>
+            <td>-24</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.03">0.97</td>
+            <td title="Δ vs div avg: -1.7">75.8</td>
+            <td>-2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -76.5">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            <td>3</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-2');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-2', 7, false);  // KD
+  colorizeAuto('maps-2', 8, false);  // ADR
+  colorizeRange('maps-2', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-2');
+  bindPlayedOnly('maps-2', 'maps-2-played-only');
+  buildColumnToggles('maps-2');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-6b3e4bec-5f85-4878-9625-c74b1b5a38b3" open>
+<summary><h2>piped0pe</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 4-2</span> <span class="chip">±RD 14</span> <span class="chip">KD 1.14</span> <span class="chip">KR 0.74</span> <span class="chip">ADR 81.6</span> <span class="chip">Util 4852</span></div>
+<h3>Players</h3>
+<table id="players-3" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-3',0,false)">Nickname</th>
+            <th onclick="sortTable('players-3',1,true)">Maps</th>
+            <th onclick="sortTable('players-3',2,true)">KD</th>
+            <th onclick="sortTable('players-3',3,true)">ADR</th>
+            <th onclick="sortTable('players-3',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-3',6,true)">HS%</th>
+            <th onclick="sortTable('players-3',7,true)">AWP</th>
+            <th onclick="sortTable('players-3',8,true)">3K</th>
+            <th onclick="sortTable('players-3',9,true)">4K</th>
+            <th onclick="sortTable('players-3',10,true)">5K</th>
+            <th onclick="sortTable('players-3',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>somppa</td>
+                <td>6</td>
+                <td>1.11</td>
+                <td>80.0</td>
+                <td>0.73</td>
+                <td>88/79/35</td>
+                <td>43.5</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>998</td>
+            </tr>
+<tr>
+                <td>Tummetin</td>
+                <td>4</td>
+                <td>1.62</td>
+                <td>101.9</td>
+                <td>0.98</td>
+                <td>76/47/21</td>
+                <td>33.8</td>
+                <td>4</td>
+                <td>6</td>
+                <td>0</td>
+                <td>0</td>
+                <td>587</td>
+            </tr>
+<tr>
+                <td>klemppu</td>
+                <td>4</td>
+                <td>1.16</td>
+                <td>88.9</td>
+                <td>0.76</td>
+                <td>64/55/23</td>
+                <td>33.2</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>1205</td>
+            </tr>
+<tr>
+                <td>deviz84</td>
+                <td>4</td>
+                <td>1.23</td>
+                <td>92.5</td>
+                <td>0.84</td>
+                <td>64/52/29</td>
+                <td>42.0</td>
+                <td>8</td>
+                <td>3</td>
+                <td>1</td>
+                <td>0</td>
+                <td>235</td>
+            </tr>
+<tr>
+                <td>Carnivori</td>
+                <td>4</td>
+                <td>1.35</td>
+                <td>73.6</td>
+                <td>0.78</td>
+                <td>62/46/23</td>
+                <td>32.8</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>528</td>
+            </tr>
+<tr>
+                <td>Peppikoira</td>
+                <td>4</td>
+                <td>1.02</td>
+                <td>78.8</td>
+                <td>0.67</td>
+                <td>51/50/25</td>
+                <td>37.2</td>
+                <td>2</td>
+                <td>1</td>
+                <td>1</td>
+                <td>0</td>
+                <td>510</td>
+            </tr>
+<tr>
+                <td>Pekuelo</td>
+                <td>4</td>
+                <td>0.66</td>
+                <td>56.4</td>
+                <td>0.46</td>
+                <td>39/59/24</td>
+                <td>46.2</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>789</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-3', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-3', 3, 50, 120, false);</script>
+<script>colorizeRange('players-3', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-3');</script>
+<div class="chips">
+<span class="chip">Most banned: de_mirage (3×)</span>
+<span class="chip">Most picked: de_ancient (2×)</span>
+<span class="chip">Best WR: de_nuke (100%)</span>
+<span class="chip">Map to avoid: de_ancient (67%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-3-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-3', 'piped0pe_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-3"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-3" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-3',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-3',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-3',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-3',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-3',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-3',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-3',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-3',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-3',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-3',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-3',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-3',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-3',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-3',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>3</td>
+            <td>2</td>
+            <td>1</td>
+            <td>66.7</td>
+            <td>50.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.13">1.12</td>
+            <td title="Δ vs div avg: +4.3">82.2</td>
+            <td>9</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -75.3">0.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.17">0.83</td>
+            <td title="Δ vs div avg: -5.4">69.5</td>
+            <td>-5</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>3</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.45">1.45</td>
+            <td title="Δ vs div avg: +11.0">88.5</td>
+            <td>6</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.31">1.31</td>
+            <td title="Δ vs div avg: +8.7">85.3</td>
+            <td>4</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-3');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-3', 7, false);  // KD
+  colorizeAuto('maps-3', 8, false);  // ADR
+  colorizeRange('maps-3', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-3');
+  bindPlayedOnly('maps-3', 'maps-3-played-only');
+  buildColumnToggles('maps-3');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-7114313c-7581-40d3-8c89-e4532e86b68d" open>
+<summary><h2>LosBurritos</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 3-3</span> <span class="chip">±RD 11</span> <span class="chip">KD 1.11</span> <span class="chip">KR 0.74</span> <span class="chip">ADR 80.0</span> <span class="chip">Util 4345</span></div>
+<h3>Players</h3>
+<table id="players-4" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-4',0,false)">Nickname</th>
+            <th onclick="sortTable('players-4',1,true)">Maps</th>
+            <th onclick="sortTable('players-4',2,true)">KD</th>
+            <th onclick="sortTable('players-4',3,true)">ADR</th>
+            <th onclick="sortTable('players-4',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-4',6,true)">HS%</th>
+            <th onclick="sortTable('players-4',7,true)">AWP</th>
+            <th onclick="sortTable('players-4',8,true)">3K</th>
+            <th onclick="sortTable('players-4',9,true)">4K</th>
+            <th onclick="sortTable('players-4',10,true)">5K</th>
+            <th onclick="sortTable('players-4',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>-Ru1N3r-</td>
+                <td>6</td>
+                <td>1.15</td>
+                <td>92.9</td>
+                <td>0.84</td>
+                <td>105/91/47</td>
+                <td>33.7</td>
+                <td>0</td>
+                <td>5</td>
+                <td>1</td>
+                <td>0</td>
+                <td>865</td>
+            </tr>
+<tr>
+                <td>-Papacito-</td>
+                <td>4</td>
+                <td>2.08</td>
+                <td>103.2</td>
+                <td>0.99</td>
+                <td>79/38/30</td>
+                <td>59.0</td>
+                <td>11</td>
+                <td>4</td>
+                <td>3</td>
+                <td>1</td>
+                <td>1124</td>
+            </tr>
+<tr>
+                <td>_Eldwin_</td>
+                <td>6</td>
+                <td>0.87</td>
+                <td>74.2</td>
+                <td>0.60</td>
+                <td>71/82/48</td>
+                <td>28.0</td>
+                <td>0</td>
+                <td>5</td>
+                <td>0</td>
+                <td>0</td>
+                <td>752</td>
+            </tr>
+<tr>
+                <td>Mrui</td>
+                <td>4</td>
+                <td>1.65</td>
+                <td>96.2</td>
+                <td>0.92</td>
+                <td>71/43/29</td>
+                <td>42.8</td>
+                <td>0</td>
+                <td>3</td>
+                <td>2</td>
+                <td>1</td>
+                <td>650</td>
+            </tr>
+<tr>
+                <td>Mrs_JoRa</td>
+                <td>4</td>
+                <td>0.89</td>
+                <td>61.8</td>
+                <td>0.64</td>
+                <td>57/64/17</td>
+                <td>34.2</td>
+                <td>0</td>
+                <td>4</td>
+                <td>0</td>
+                <td>0</td>
+                <td>538</td>
+            </tr>
+<tr>
+                <td>Rumalapsi</td>
+                <td>4</td>
+                <td>0.86</td>
+                <td>63.0</td>
+                <td>0.58</td>
+                <td>43/50/18</td>
+                <td>38.8</td>
+                <td>2</td>
+                <td>3</td>
+                <td>1</td>
+                <td>0</td>
+                <td>336</td>
+            </tr>
+<tr>
+                <td>Tiivi_Taavi</td>
+                <td>2</td>
+                <td>0.62</td>
+                <td>50.5</td>
+                <td>0.46</td>
+                <td>20/32/8</td>
+                <td>33.0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>80</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-4', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-4', 3, 50, 120, false);</script>
+<script>colorizeRange('players-4', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-4');</script>
+<div class="chips">
+<span class="chip">Most banned: de_inferno (3×)</span>
+<span class="chip">Most picked: de_dust2 (1×)</span>
+<span class="chip">Best WR: de_dust2 (100%)</span>
+<span class="chip">Map to avoid: de_overpass (0%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-4-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-4', 'LosBurritos_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-4"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-4" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-4',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-4',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-4',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-4',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-4',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-4',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-4',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-4',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-4',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-4',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-4',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-4',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-4',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-4',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.21">0.78</td>
+            <td title="Δ vs div avg: -10.1">67.8</td>
+            <td>-5</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.45">1.45</td>
+            <td title="Δ vs div avg: +14.9">90.2</td>
+            <td>7</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -74.9">0.0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.19">1.19</td>
+            <td title="Δ vs div avg: +1.5">74.4</td>
+            <td>4</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +1.19">2.19</td>
+            <td title="Δ vs div avg: +17.1">94.5</td>
+            <td>11</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.07">0.93</td>
+            <td title="Δ vs div avg: +0.0">76.6</td>
+            <td>-6</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-4');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-4', 7, false);  // KD
+  colorizeAuto('maps-4', 8, false);  // ADR
+  colorizeRange('maps-4', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-4');
+  bindPlayedOnly('maps-4', 'maps-4-played-only');
+  buildColumnToggles('maps-4');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-7e8245ab-580a-43e3-a418-70034f35434f" open>
+<summary><h2>Venga Chicos</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 3-3</span> <span class="chip">±RD -7</span> <span class="chip">KD 0.95</span> <span class="chip">KR 0.68</span> <span class="chip">ADR 76.0</span> <span class="chip">Util 3123</span></div>
+<h3>Players</h3>
+<table id="players-5" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-5',0,false)">Nickname</th>
+            <th onclick="sortTable('players-5',1,true)">Maps</th>
+            <th onclick="sortTable('players-5',2,true)">KD</th>
+            <th onclick="sortTable('players-5',3,true)">ADR</th>
+            <th onclick="sortTable('players-5',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-5',6,true)">HS%</th>
+            <th onclick="sortTable('players-5',7,true)">AWP</th>
+            <th onclick="sortTable('players-5',8,true)">3K</th>
+            <th onclick="sortTable('players-5',9,true)">4K</th>
+            <th onclick="sortTable('players-5',10,true)">5K</th>
+            <th onclick="sortTable('players-5',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>Tiffmeister</td>
+                <td>4</td>
+                <td>1.60</td>
+                <td>118.1</td>
+                <td>1.11</td>
+                <td>96/60/24</td>
+                <td>46.2</td>
+                <td>5</td>
+                <td>10</td>
+                <td>3</td>
+                <td>0</td>
+                <td>369</td>
+            </tr>
+<tr>
+                <td>Kunbo</td>
+                <td>4</td>
+                <td>1.19</td>
+                <td>79.5</td>
+                <td>0.80</td>
+                <td>69/58/21</td>
+                <td>33.8</td>
+                <td>2</td>
+                <td>6</td>
+                <td>0</td>
+                <td>0</td>
+                <td>246</td>
+            </tr>
+<tr>
+                <td>janzuhhh</td>
+                <td>4</td>
+                <td>1.09</td>
+                <td>61.2</td>
+                <td>0.68</td>
+                <td>59/54/20</td>
+                <td>22.5</td>
+                <td>0</td>
+                <td>2</td>
+                <td>1</td>
+                <td>0</td>
+                <td>262</td>
+            </tr>
+<tr>
+                <td>DaGibber</td>
+                <td>4</td>
+                <td>0.79</td>
+                <td>81.8</td>
+                <td>0.63</td>
+                <td>54/68/22</td>
+                <td>39.2</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>561</td>
+            </tr>
+<tr>
+                <td>Heiskanen</td>
+                <td>4</td>
+                <td>0.84</td>
+                <td>77.0</td>
+                <td>0.63</td>
+                <td>48/57/24</td>
+                <td>52.2</td>
+                <td>5</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td>511</td>
+            </tr>
+<tr>
+                <td>Lainaamua</td>
+                <td>4</td>
+                <td>0.63</td>
+                <td>64.9</td>
+                <td>0.45</td>
+                <td>37/59/25</td>
+                <td>43.0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>648</td>
+            </tr>
+<tr>
+                <td>ALuHaRD808</td>
+                <td>2</td>
+                <td>0.96</td>
+                <td>60.0</td>
+                <td>0.59</td>
+                <td>24/25/13</td>
+                <td>12.0</td>
+                <td>2</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>260</td>
+            </tr>
+<tr>
+                <td>ALuHaRD</td>
+                <td>2</td>
+                <td>0.61</td>
+                <td>68.2</td>
+                <td>0.60</td>
+                <td>20/33/8</td>
+                <td>40.0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>36</td>
+            </tr>
+<tr>
+                <td>Uhinho</td>
+                <td>2</td>
+                <td>0.50</td>
+                <td>46.7</td>
+                <td>0.43</td>
+                <td>15/30/3</td>
+                <td>33.0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>230</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-5', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-5', 3, 50, 120, false);</script>
+<script>colorizeRange('players-5', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-5');</script>
+<div class="chips">
+<span class="chip">Most banned: de_ancient (2×)</span>
+<span class="chip">Most picked: de_nuke (2×)</span>
+<span class="chip">Best WR: de_inferno (100%)</span>
+<span class="chip">Map to avoid: de_nuke (0%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-5-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-5', 'Venga Chicos_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-5"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-5" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-5',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-5',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-5',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-5',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-5',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-5',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-5',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-5',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-5',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-5',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-5',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-5',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-5',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-5',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -77.9">0.0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>1</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            <td>50.0</td>
+            <td>0.0</td>
+            <td>50.0</td>
+            <td title="Δ vs div avg: -0.02">0.98</td>
+            <td title="Δ vs div avg: +4.5">79.8</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.16">1.15</td>
+            <td title="Δ vs div avg: +7.7">82.6</td>
+            <td>7</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>2</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.27">0.73</td>
+            <td title="Δ vs div avg: -11.8">65.7</td>
+            <td>-14</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -76.5">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-5');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-5', 7, false);  // KD
+  colorizeAuto('maps-5', 8, false);  // ADR
+  colorizeRange('maps-5', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-5');
+  bindPlayedOnly('maps-5', 'maps-5-played-only');
+  buildColumnToggles('maps-5');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-819b0708-dc44-4f9c-810a-17243698c01f" open>
+<summary><h2>Gibbonit</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 1-5</span> <span class="chip">±RD -28</span> <span class="chip">KD 0.78</span> <span class="chip">KR 0.58</span> <span class="chip">ADR 68.8</span> <span class="chip">Util 3556</span></div>
+<h3>Players</h3>
+<table id="players-6" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-6',0,false)">Nickname</th>
+            <th onclick="sortTable('players-6',1,true)">Maps</th>
+            <th onclick="sortTable('players-6',2,true)">KD</th>
+            <th onclick="sortTable('players-6',3,true)">ADR</th>
+            <th onclick="sortTable('players-6',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-6',6,true)">HS%</th>
+            <th onclick="sortTable('players-6',7,true)">AWP</th>
+            <th onclick="sortTable('players-6',8,true)">3K</th>
+            <th onclick="sortTable('players-6',9,true)">4K</th>
+            <th onclick="sortTable('players-6',10,true)">5K</th>
+            <th onclick="sortTable('players-6',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>Kytky</td>
+                <td>6</td>
+                <td>1.17</td>
+                <td>88.6</td>
+                <td>0.82</td>
+                <td>116/99/24</td>
+                <td>43.2</td>
+                <td>8</td>
+                <td>8</td>
+                <td>2</td>
+                <td>0</td>
+                <td>266</td>
+            </tr>
+<tr>
+                <td>Ribbels</td>
+                <td>6</td>
+                <td>0.91</td>
+                <td>78.2</td>
+                <td>0.66</td>
+                <td>85/93/35</td>
+                <td>40.5</td>
+                <td>3</td>
+                <td>2</td>
+                <td>3</td>
+                <td>1</td>
+                <td>1359</td>
+            </tr>
+<tr>
+                <td>keijoo7</td>
+                <td>6</td>
+                <td>0.74</td>
+                <td>75.1</td>
+                <td>0.60</td>
+                <td>78/106/31</td>
+                <td>52.7</td>
+                <td>0</td>
+                <td>6</td>
+                <td>1</td>
+                <td>0</td>
+                <td>687</td>
+            </tr>
+<tr>
+                <td>Jepari112</td>
+                <td>6</td>
+                <td>0.72</td>
+                <td>67.2</td>
+                <td>0.56</td>
+                <td>72/100/35</td>
+                <td>31.2</td>
+                <td>1</td>
+                <td>4</td>
+                <td>0</td>
+                <td>0</td>
+                <td>1049</td>
+            </tr>
+<tr>
+                <td>HunajaBalsam</td>
+                <td>6</td>
+                <td>0.37</td>
+                <td>35.1</td>
+                <td>0.26</td>
+                <td>38/103/19</td>
+                <td>54.0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>195</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-6', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-6', 3, 50, 120, false);</script>
+<script>colorizeRange('players-6', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-6');</script>
+<div class="chips">
+<span class="chip">Most banned: de_mirage (3×)</span>
+<span class="chip">Most picked: de_ancient (1×)</span>
+<span class="chip">Best WR: de_dust2 (50%)</span>
+<span class="chip">Map to avoid: de_inferno (0%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-6-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-6', 'Gibbonit_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-6"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-6" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-6',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-6',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-6',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-6',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-6',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-6',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-6',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-6',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-6',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-6',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-6',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-6',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-6',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-6',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.12">0.87</td>
+            <td title="Δ vs div avg: +2.1">80.1</td>
+            <td>-4</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>50.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.19">0.80</td>
+            <td title="Δ vs div avg: -8.7">66.6</td>
+            <td>-7</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.23">0.76</td>
+            <td title="Δ vs div avg: -8.0">66.9</td>
+            <td>-12</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>3</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -77.4">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.32">0.68</td>
+            <td title="Δ vs div avg: -10.6">66.0</td>
+            <td>-5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-6');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-6', 7, false);  // KD
+  colorizeAuto('maps-6', 8, false);  // ADR
+  colorizeRange('maps-6', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-6');
+  bindPlayedOnly('maps-6', 'maps-6-played-only');
+  buildColumnToggles('maps-6');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-a40a6d87-ef57-45e2-818c-08c6f70f7e3b" open>
+<summary><h2>Bonfire</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 2-4</span> <span class="chip">±RD -18</span> <span class="chip">KD 0.96</span> <span class="chip">KR 0.66</span> <span class="chip">ADR 73.8</span> <span class="chip">Util 4785</span></div>
+<h3>Players</h3>
+<table id="players-7" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-7',0,false)">Nickname</th>
+            <th onclick="sortTable('players-7',1,true)">Maps</th>
+            <th onclick="sortTable('players-7',2,true)">KD</th>
+            <th onclick="sortTable('players-7',3,true)">ADR</th>
+            <th onclick="sortTable('players-7',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-7',6,true)">HS%</th>
+            <th onclick="sortTable('players-7',7,true)">AWP</th>
+            <th onclick="sortTable('players-7',8,true)">3K</th>
+            <th onclick="sortTable('players-7',9,true)">4K</th>
+            <th onclick="sortTable('players-7',10,true)">5K</th>
+            <th onclick="sortTable('players-7',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>Go5h</td>
+                <td>6</td>
+                <td>1.24</td>
+                <td>87.9</td>
+                <td>0.87</td>
+                <td>117/94/38</td>
+                <td>42.5</td>
+                <td>6</td>
+                <td>8</td>
+                <td>1</td>
+                <td>1</td>
+                <td>1139</td>
+            </tr>
+<tr>
+                <td>DeviLz-</td>
+                <td>4</td>
+                <td>1.32</td>
+                <td>93.1</td>
+                <td>0.76</td>
+                <td>78/59/35</td>
+                <td>34.0</td>
+                <td>26</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td>503</td>
+            </tr>
+<tr>
+                <td>G41U5</td>
+                <td>6</td>
+                <td>0.76</td>
+                <td>54.8</td>
+                <td>0.49</td>
+                <td>68/89/36</td>
+                <td>50.5</td>
+                <td>0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>1008</td>
+            </tr>
+<tr>
+                <td>Markkoolio</td>
+                <td>4</td>
+                <td>0.88</td>
+                <td>65.1</td>
+                <td>0.59</td>
+                <td>58/66/22</td>
+                <td>29.5</td>
+                <td>13</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>385</td>
+            </tr>
+<tr>
+                <td>R0NSKI</td>
+                <td>4</td>
+                <td>0.73</td>
+                <td>63.1</td>
+                <td>0.57</td>
+                <td>53/73/27</td>
+                <td>33.0</td>
+                <td>5</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>753</td>
+            </tr>
+<tr>
+                <td>Ryitt</td>
+                <td>2</td>
+                <td>1.00</td>
+                <td>84.8</td>
+                <td>0.77</td>
+                <td>27/27/8</td>
+                <td>32.0</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>315</td>
+            </tr>
+<tr>
+                <td>HKTontto</td>
+                <td>2</td>
+                <td>1.00</td>
+                <td>74.9</td>
+                <td>0.65</td>
+                <td>27/27/9</td>
+                <td>71.0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>250</td>
+            </tr>
+<tr>
+                <td>Lemonmuffin</td>
+                <td>2</td>
+                <td>0.68</td>
+                <td>76.1</td>
+                <td>0.59</td>
+                <td>21/31/12</td>
+                <td>63.5</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td>432</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-7', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-7', 3, 50, 120, false);</script>
+<script>colorizeRange('players-7', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-7');</script>
+<div class="chips">
+<span class="chip">Most banned: de_train (3×)</span>
+<span class="chip">Most picked: de_ancient (1×)</span>
+<span class="chip">Best WR: de_inferno (100%)</span>
+<span class="chip">Map to avoid: de_dust2 (0%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-7-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-7', 'Bonfire_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-7"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-7" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-7',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-7',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-7',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-7',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-7',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-7',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-7',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-7',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-7',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-7',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-7',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-7',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-7',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-7',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.12">0.88</td>
+            <td title="Δ vs div avg: -1.0">76.9</td>
+            <td>-8</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.21">0.78</td>
+            <td title="Δ vs div avg: -10.1">65.2</td>
+            <td>-14</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.08">1.07</td>
+            <td title="Δ vs div avg: +2.7">77.6</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.35">1.34</td>
+            <td title="Δ vs div avg: +10.9">83.8</td>
+            <td>6</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -77.4">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.09">0.91</td>
+            <td title="Δ vs div avg: -2.6">73.9</td>
+            <td>-4</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>3</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-7');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-7', 7, false);  // KD
+  colorizeAuto('maps-7', 8, false);  // ADR
+  colorizeRange('maps-7', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-7');
+  bindPlayedOnly('maps-7', 'maps-7-played-only');
+  buildColumnToggles('maps-7');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-b9023f61-1fb0-4247-ae65-d73eacc44d41" open>
+<summary><h2>Pain-Train</h2></summary>
+<div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 3-5</span> <span class="chip">±RD -10</span> <span class="chip">KD 0.89</span> <span class="chip">KR 0.66</span> <span class="chip">ADR 74.1</span> <span class="chip">Util 4387</span></div>
+<h3>Players</h3>
+<table id="players-8" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-8',0,false)">Nickname</th>
+            <th onclick="sortTable('players-8',1,true)">Maps</th>
+            <th onclick="sortTable('players-8',2,true)">KD</th>
+            <th onclick="sortTable('players-8',3,true)">ADR</th>
+            <th onclick="sortTable('players-8',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-8',6,true)">HS%</th>
+            <th onclick="sortTable('players-8',7,true)">AWP</th>
+            <th onclick="sortTable('players-8',8,true)">3K</th>
+            <th onclick="sortTable('players-8',9,true)">4K</th>
+            <th onclick="sortTable('players-8',10,true)">5K</th>
+            <th onclick="sortTable('players-8',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>-klapi-</td>
+                <td>8</td>
+                <td>1.17</td>
+                <td>83.9</td>
+                <td>0.83</td>
+                <td>142/121/44</td>
+                <td>19.5</td>
+                <td>61</td>
+                <td>9</td>
+                <td>0</td>
+                <td>1</td>
+                <td>1407</td>
+            </tr>
+<tr>
+                <td>mlinkku</td>
+                <td>8</td>
+                <td>0.89</td>
+                <td>69.5</td>
+                <td>0.68</td>
+                <td>118/132/27</td>
+                <td>36.8</td>
+                <td>30</td>
+                <td>7</td>
+                <td>1</td>
+                <td>0</td>
+                <td>383</td>
+            </tr>
+<tr>
+                <td>Kakkig</td>
+                <td>6</td>
+                <td>0.86</td>
+                <td>73.8</td>
+                <td>0.65</td>
+                <td>89/103/39</td>
+                <td>43.0</td>
+                <td>0</td>
+                <td>4</td>
+                <td>1</td>
+                <td>0</td>
+                <td>810</td>
+            </tr>
+<tr>
+                <td>LeeLooH</td>
+                <td>6</td>
+                <td>0.75</td>
+                <td>72.5</td>
+                <td>0.58</td>
+                <td>73/97/23</td>
+                <td>43.8</td>
+                <td>1</td>
+                <td>1</td>
+                <td>1</td>
+                <td>0</td>
+                <td>216</td>
+            </tr>
+<tr>
+                <td>sup0r</td>
+                <td>6</td>
+                <td>0.64</td>
+                <td>76.1</td>
+                <td>0.51</td>
+                <td>68/106/46</td>
+                <td>40.7</td>
+                <td>0</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td>993</td>
+            </tr>
+<tr>
+                <td>_KuuKeppi_</td>
+                <td>4</td>
+                <td>0.95</td>
+                <td>66.3</td>
+                <td>0.63</td>
+                <td>57/60/22</td>
+                <td>33.0</td>
+                <td>3</td>
+                <td>2</td>
+                <td>1</td>
+                <td>0</td>
+                <td>497</td>
+            </tr>
+<tr>
+                <td>Sandels83</td>
+                <td>2</td>
+                <td>0.96</td>
+                <td>69.6</td>
+                <td>0.74</td>
+                <td>27/28/5</td>
+                <td>44.5</td>
+                <td>0</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td>81</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-8', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-8', 3, 50, 120, false);</script>
+<script>colorizeRange('players-8', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-8');</script>
+<div class="chips">
+<span class="chip">Most banned: de_ancient (2×)</span>
+<span class="chip">Most picked: de_train (2×)</span>
+<span class="chip">Best WR: de_train (100%)</span>
+<span class="chip">Map to avoid: de_overpass (0%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-8-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-8', 'Pain-Train_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-8"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-8" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-8',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-8',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-8',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-8',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-8',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-8',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-8',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-8',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-8',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-8',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-8',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-8',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-8',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-8',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.34">0.66</td>
+            <td title="Δ vs div avg: -8.3">69.6</td>
+            <td>-10</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -75.3">0.0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.08">0.91</td>
+            <td title="Δ vs div avg: +3.0">77.9</td>
+            <td>-2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>3</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            <td>50.0</td>
+            <td>0.0</td>
+            <td>50.0</td>
+            <td title="Δ vs div avg: -0.14">0.86</td>
+            <td title="Δ vs div avg: -3.7">73.7</td>
+            <td>-3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.22">0.78</td>
+            <td title="Δ vs div avg: -7.5">69.0</td>
+            <td>-5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.16">1.16</td>
+            <td title="Δ vs div avg: +2.0">80.0</td>
+            <td>10</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-8');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-8', 7, false);  // KD
+  colorizeAuto('maps-8', 8, false);  // ADR
+  colorizeRange('maps-8', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-8');
+  bindPlayedOnly('maps-8', 'maps-8-played-only');
+  buildColumnToggles('maps-8');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-d15cc43e-80ff-4f8d-a9ea-c93caa9a00a6" open>
+<summary><h2>Hero-Fi U</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 6-0</span> <span class="chip">±RD 59</span> <span class="chip">KD 1.70</span> <span class="chip">KR 0.89</span> <span class="chip">ADR 92.1</span> <span class="chip">Util 4705</span></div>
+<h3>Players</h3>
+<table id="players-9" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-9',0,false)">Nickname</th>
+            <th onclick="sortTable('players-9',1,true)">Maps</th>
+            <th onclick="sortTable('players-9',2,true)">KD</th>
+            <th onclick="sortTable('players-9',3,true)">ADR</th>
+            <th onclick="sortTable('players-9',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-9',6,true)">HS%</th>
+            <th onclick="sortTable('players-9',7,true)">AWP</th>
+            <th onclick="sortTable('players-9',8,true)">3K</th>
+            <th onclick="sortTable('players-9',9,true)">4K</th>
+            <th onclick="sortTable('players-9',10,true)">5K</th>
+            <th onclick="sortTable('players-9',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>Ullenaattori</td>
+                <td>6</td>
+                <td>1.98</td>
+                <td>98.6</td>
+                <td>1.05</td>
+                <td>101/51/41</td>
+                <td>45.2</td>
+                <td>10</td>
+                <td>7</td>
+                <td>3</td>
+                <td>0</td>
+                <td>1032</td>
+            </tr>
+<tr>
+                <td>TomppaE</td>
+                <td>6</td>
+                <td>1.52</td>
+                <td>84.6</td>
+                <td>0.77</td>
+                <td>73/48/32</td>
+                <td>45.3</td>
+                <td>0</td>
+                <td>7</td>
+                <td>0</td>
+                <td>0</td>
+                <td>743</td>
+            </tr>
+<tr>
+                <td>Jiiho0</td>
+                <td>4</td>
+                <td>1.66</td>
+                <td>104.0</td>
+                <td>1.00</td>
+                <td>68/41/23</td>
+                <td>27.2</td>
+                <td>18</td>
+                <td>5</td>
+                <td>1</td>
+                <td>1</td>
+                <td>491</td>
+            </tr>
+<tr>
+                <td>Rikkeri90</td>
+                <td>4</td>
+                <td>2.07</td>
+                <td>95.8</td>
+                <td>0.95</td>
+                <td>60/29/18</td>
+                <td>25.5</td>
+                <td>0</td>
+                <td>10</td>
+                <td>2</td>
+                <td>0</td>
+                <td>520</td>
+            </tr>
+<tr>
+                <td>Arslaaki</td>
+                <td>4</td>
+                <td>1.79</td>
+                <td>104.8</td>
+                <td>0.97</td>
+                <td>59/33/29</td>
+                <td>25.2</td>
+                <td>12</td>
+                <td>3</td>
+                <td>2</td>
+                <td>0</td>
+                <td>902</td>
+            </tr>
+<tr>
+                <td>Juustoleipa</td>
+                <td>4</td>
+                <td>1.70</td>
+                <td>75.6</td>
+                <td>0.74</td>
+                <td>46/27/15</td>
+                <td>23.2</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>1</td>
+                <td>709</td>
+            </tr>
+<tr>
+                <td>KustihQ</td>
+                <td>2</td>
+                <td>0.86</td>
+                <td>71.4</td>
+                <td>0.54</td>
+                <td>18/21/10</td>
+                <td>44.0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>308</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-9', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-9', 3, 50, 120, false);</script>
+<script>colorizeRange('players-9', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-9');</script>
+<div class="chips">
+<span class="chip">Most banned: de_nuke (2×)</span>
+<span class="chip">Most picked: de_dust2 (3×)</span>
+<span class="chip">Best WR: de_ancient (100%)</span>
+<span class="chip">Map to avoid: de_dust2 (100%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-9-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-9', 'Hero-Fi U_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-9"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-9" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-9',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-9',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-9',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-9',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-9',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-9',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-9',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-9',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-9',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-9',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-9',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-9',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-9',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-9',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.15">1.14</td>
+            <td title="Δ vs div avg: +11.8">89.7</td>
+            <td>8</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>3</td>
+            <td>3</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.87">1.87</td>
+            <td title="Δ vs div avg: +16.8">92.1</td>
+            <td>34</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +2.24">3.24</td>
+            <td title="Δ vs div avg: +23.5">98.4</td>
+            <td>12</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -77.4">0.0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.47">1.47</td>
+            <td title="Δ vs div avg: +11.6">88.2</td>
+            <td>5</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-9');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-9', 7, false);  // KD
+  colorizeAuto('maps-9', 8, false);  // ADR
+  colorizeRange('maps-9', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-9');
+  bindPlayedOnly('maps-9', 'maps-9-played-only');
+  buildColumnToggles('maps-9');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-de3c5208-e0d5-437a-8e74-0ca2bc9ca603" open>
+<summary><h2>SD Gaming</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 1-5</span> <span class="chip">±RD -25</span> <span class="chip">KD 0.87</span> <span class="chip">KR 0.65</span> <span class="chip">ADR 72.4</span> <span class="chip">Util 3648</span></div>
+<h3>Players</h3>
+<table id="players-10" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-10',0,false)">Nickname</th>
+            <th onclick="sortTable('players-10',1,true)">Maps</th>
+            <th onclick="sortTable('players-10',2,true)">KD</th>
+            <th onclick="sortTable('players-10',3,true)">ADR</th>
+            <th onclick="sortTable('players-10',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-10',6,true)">HS%</th>
+            <th onclick="sortTable('players-10',7,true)">AWP</th>
+            <th onclick="sortTable('players-10',8,true)">3K</th>
+            <th onclick="sortTable('players-10',9,true)">4K</th>
+            <th onclick="sortTable('players-10',10,true)">5K</th>
+            <th onclick="sortTable('players-10',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>Mambus24</td>
+                <td>6</td>
+                <td>1.38</td>
+                <td>94.1</td>
+                <td>0.93</td>
+                <td>121/88/32</td>
+                <td>45.7</td>
+                <td>0</td>
+                <td>15</td>
+                <td>1</td>
+                <td>0</td>
+                <td>688</td>
+            </tr>
+<tr>
+                <td>annihiLeight</td>
+                <td>6</td>
+                <td>1.06</td>
+                <td>73.4</td>
+                <td>0.74</td>
+                <td>94/89/27</td>
+                <td>47.0</td>
+                <td>4</td>
+                <td>5</td>
+                <td>1</td>
+                <td>1</td>
+                <td>847</td>
+            </tr>
+<tr>
+                <td>d0nkaments</td>
+                <td>4</td>
+                <td>0.90</td>
+                <td>79.5</td>
+                <td>0.73</td>
+                <td>64/71/22</td>
+                <td>58.8</td>
+                <td>0</td>
+                <td>4</td>
+                <td>2</td>
+                <td>0</td>
+                <td>667</td>
+            </tr>
+<tr>
+                <td>SoijaB</td>
+                <td>4</td>
+                <td>0.86</td>
+                <td>77.6</td>
+                <td>0.62</td>
+                <td>54/63/20</td>
+                <td>36.0</td>
+                <td>18</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td>725</td>
+            </tr>
+<tr>
+                <td>-d0p-</td>
+                <td>4</td>
+                <td>0.52</td>
+                <td>59.6</td>
+                <td>0.45</td>
+                <td>38/73/22</td>
+                <td>37.5</td>
+                <td>8</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>173</td>
+            </tr>
+<tr>
+                <td>pardoner123</td>
+                <td>4</td>
+                <td>0.48</td>
+                <td>43.7</td>
+                <td>0.37</td>
+                <td>30/62/14</td>
+                <td>42.8</td>
+                <td>0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>271</td>
+            </tr>
+<tr>
+                <td>simahayha</td>
+                <td>2</td>
+                <td>0.42</td>
+                <td>62.7</td>
+                <td>0.35</td>
+                <td>14/33/11</td>
+                <td>54.0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>0</td>
+                <td>277</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-10', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-10', 3, 50, 120, false);</script>
+<script>colorizeRange('players-10', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-10');</script>
+<div class="chips">
+<span class="chip">Most banned: de_ancient (2×)</span>
+<span class="chip">Most picked: de_dust2 (2×)</span>
+<span class="chip">Best WR: de_nuke (100%)</span>
+<span class="chip">Map to avoid: de_dust2 (0%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-10-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-10', 'SD Gaming_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-10"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-10" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-10',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-10',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-10',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-10',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-10',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-10',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-10',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-10',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-10',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-10',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-10',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-10',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-10',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-10',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -77.9">0.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.23">0.77</td>
+            <td title="Δ vs div avg: -5.8">69.5</td>
+            <td>-11</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>3</td>
+            <td>1</td>
+            <td>2</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.15">0.84</td>
+            <td title="Δ vs div avg: -3.0">71.8</td>
+            <td>-16</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.14">1.14</td>
+            <td title="Δ vs div avg: +2.5">79.9</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -76.5">0.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -1.00">0.00</td>
+            <td title="Δ vs div avg: -78.0">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-10');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-10', 7, false);  // KD
+  colorizeAuto('maps-10', 8, false);  // ADR
+  colorizeRange('maps-10', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-10');
+  bindPlayedOnly('maps-10', 'maps-10-played-only');
+  buildColumnToggles('maps-10');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-e86a10a8-6cad-4396-8335-d2c51727f219" open>
+<summary><h2>Savuiz</h2></summary>
+<div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 5-1</span> <span class="chip">±RD 19</span> <span class="chip">KD 1.14</span> <span class="chip">KR 0.75</span> <span class="chip">ADR 80.9</span> <span class="chip">Util 4038</span></div>
+<h3>Players</h3>
+<table id="players-11" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-11',0,false)">Nickname</th>
+            <th onclick="sortTable('players-11',1,true)">Maps</th>
+            <th onclick="sortTable('players-11',2,true)">KD</th>
+            <th onclick="sortTable('players-11',3,true)">ADR</th>
+            <th onclick="sortTable('players-11',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-11',6,true)">HS%</th>
+            <th onclick="sortTable('players-11',7,true)">AWP</th>
+            <th onclick="sortTable('players-11',8,true)">3K</th>
+            <th onclick="sortTable('players-11',9,true)">4K</th>
+            <th onclick="sortTable('players-11',10,true)">5K</th>
+            <th onclick="sortTable('players-11',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>prnd</td>
+                <td>6</td>
+                <td>1.52</td>
+                <td>109.5</td>
+                <td>1.05</td>
+                <td>137/90/39</td>
+                <td>58.8</td>
+                <td>1</td>
+                <td>14</td>
+                <td>1</td>
+                <td>0</td>
+                <td>761</td>
+            </tr>
+<tr>
+                <td>Spamm1</td>
+                <td>6</td>
+                <td>1.25</td>
+                <td>78.5</td>
+                <td>0.75</td>
+                <td>101/81/33</td>
+                <td>38.8</td>
+                <td>8</td>
+                <td>6</td>
+                <td>2</td>
+                <td>0</td>
+                <td>847</td>
+            </tr>
+<tr>
+                <td>ValioPlayMK</td>
+                <td>4</td>
+                <td>1.25</td>
+                <td>92.8</td>
+                <td>0.87</td>
+                <td>75/60/23</td>
+                <td>39.5</td>
+                <td>3</td>
+                <td>3</td>
+                <td>1</td>
+                <td>0</td>
+                <td>162</td>
+            </tr>
+<tr>
+                <td>Larbiz</td>
+                <td>6</td>
+                <td>0.89</td>
+                <td>59.5</td>
+                <td>0.56</td>
+                <td>73/82/31</td>
+                <td>43.7</td>
+                <td>0</td>
+                <td>4</td>
+                <td>0</td>
+                <td>0</td>
+                <td>738</td>
+            </tr>
+<tr>
+                <td>bRUTU55</td>
+                <td>2</td>
+                <td>1.37</td>
+                <td>101.7</td>
+                <td>0.95</td>
+                <td>41/30/13</td>
+                <td>43.5</td>
+                <td>0</td>
+                <td>5</td>
+                <td>0</td>
+                <td>0</td>
+                <td>198</td>
+            </tr>
+<tr>
+                <td>swagalee</td>
+                <td>4</td>
+                <td>0.68</td>
+                <td>59.7</td>
+                <td>0.45</td>
+                <td>38/56/31</td>
+                <td>19.0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>805</td>
+            </tr>
+<tr>
+                <td>Aspartaam1</td>
+                <td>2</td>
+                <td>0.86</td>
+                <td>64.4</td>
+                <td>0.57</td>
+                <td>25/29/12</td>
+                <td>11.5</td>
+                <td>0</td>
+                <td>1</td>
+                <td>2</td>
+                <td>0</td>
+                <td>527</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-11', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-11', 3, 50, 120, false);</script>
+<script>colorizeRange('players-11', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-11');</script>
+<div class="chips">
+<span class="chip">Most banned: de_mirage (3×)</span>
+<span class="chip">Most picked: de_ancient (1×)</span>
+<span class="chip">Best WR: de_ancient (100%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-11-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-11', 'Savuiz_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-11"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-11" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-11',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-11',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-11',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-11',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-11',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-11',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-11',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-11',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-11',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-11',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-11',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-11',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-11',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-11',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.46">1.45</td>
+            <td title="Δ vs div avg: +8.7">86.6</td>
+            <td>9</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.18">1.17</td>
+            <td title="Δ vs div avg: +6.0">81.3</td>
+            <td>4</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.43">1.42</td>
+            <td title="Δ vs div avg: +6.5">81.4</td>
+            <td>7</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>3</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.04">1.04</td>
+            <td title="Δ vs div avg: +5.4">82.9</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.27">1.27</td>
+            <td title="Δ vs div avg: +4.7">81.3</td>
+            <td>3</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.21">0.79</td>
+            <td title="Δ vs div avg: -6.1">71.9</td>
+            <td>-6</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-11');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-11', 7, false);  // KD
+  colorizeAuto('maps-11', 8, false);  // ADR
+  colorizeRange('maps-11', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-11');
+  bindPlayedOnly('maps-11', 'maps-11-played-only');
+  buildColumnToggles('maps-11');
+})();
+</script>
+
+</details>
+<details class="team-section" id="team-f2500fae-e67c-4614-bbbc-cc5989cb0105" open>
+<summary><h2>X-UwU Bon Bons</h2></summary>
+<div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 6-2</span> <span class="chip">±RD 38</span> <span class="chip">KD 1.28</span> <span class="chip">KR 0.81</span> <span class="chip">ADR 85.9</span> <span class="chip">Util 5047</span></div>
+<h3>Players</h3>
+<table id="players-12" data-sort-col="0" data-sort-dir="asc">
+<thead><tr>
+            <th onclick="sortTable('players-12',0,false)">Nickname</th>
+            <th onclick="sortTable('players-12',1,true)">Maps</th>
+            <th onclick="sortTable('players-12',2,true)">KD</th>
+            <th onclick="sortTable('players-12',3,true)">ADR</th>
+            <th onclick="sortTable('players-12',4,true)">KR</th>
+            <th>K/D/A</th>
+            <th onclick="sortTable('players-12',6,true)">HS%</th>
+            <th onclick="sortTable('players-12',7,true)">AWP</th>
+            <th onclick="sortTable('players-12',8,true)">3K</th>
+            <th onclick="sortTable('players-12',9,true)">4K</th>
+            <th onclick="sortTable('players-12',10,true)">5K</th>
+            <th onclick="sortTable('players-12',11,true)">Util</th>
+        </tr></thead><tbody>
+<tr>
+                <td>Arthuur</td>
+                <td>8</td>
+                <td>1.64</td>
+                <td>100.4</td>
+                <td>0.93</td>
+                <td>151/92/53</td>
+                <td>47.5</td>
+                <td>2</td>
+                <td>8</td>
+                <td>3</td>
+                <td>1</td>
+                <td>1348</td>
+            </tr>
+<tr>
+                <td>JAPE</td>
+                <td>8</td>
+                <td>1.37</td>
+                <td>93.9</td>
+                <td>0.92</td>
+                <td>141/103/33</td>
+                <td>45.9</td>
+                <td>46</td>
+                <td>6</td>
+                <td>0</td>
+                <td>0</td>
+                <td>1019</td>
+            </tr>
+<tr>
+                <td>Qrioz</td>
+                <td>8</td>
+                <td>1.25</td>
+                <td>84.0</td>
+                <td>0.82</td>
+                <td>121/97/38</td>
+                <td>47.0</td>
+                <td>2</td>
+                <td>7</td>
+                <td>2</td>
+                <td>0</td>
+                <td>1054</td>
+            </tr>
+<tr>
+                <td>NMT-GSM</td>
+                <td>6</td>
+                <td>1.10</td>
+                <td>82.4</td>
+                <td>0.74</td>
+                <td>87/79/39</td>
+                <td>29.2</td>
+                <td>0</td>
+                <td>5</td>
+                <td>1</td>
+                <td>0</td>
+                <td>704</td>
+            </tr>
+<tr>
+                <td>inra1n</td>
+                <td>6</td>
+                <td>1.12</td>
+                <td>77.9</td>
+                <td>0.72</td>
+                <td>75/67/31</td>
+                <td>30.2</td>
+                <td>1</td>
+                <td>3</td>
+                <td>1</td>
+                <td>0</td>
+                <td>427</td>
+            </tr>
+<tr>
+                <td>Mynttoni</td>
+                <td>4</td>
+                <td>0.98</td>
+                <td>62.5</td>
+                <td>0.59</td>
+                <td>50/51/19</td>
+                <td>37.0</td>
+                <td>0</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td>495</td>
+            </tr>
+</tbody></table>
+<script>colorizeRange('players-12', 2, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-12', 3, 50, 120, false);</script>
+<script>colorizeRange('players-12', 4, 0.6, 1.2, false);</script>
+<script>applyDefaultSort('players-12');</script>
+<div class="chips">
+<span class="chip">Most banned: de_dust2 (2×)</span>
+<span class="chip">Most picked: de_ancient (1×)</span>
+<span class="chip">Best WR: de_ancient (100%)</span>
+<span class="chip">Map to avoid: de_ancient (100%)</span>
+<span class="chip">Ban focus: 100%</span>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="maps-12-played-only"> Show played only</label>
+  <button class="btn" onclick="exportTableCSV('maps-12', 'X-UwU Bon Bons_maps.csv')">Download CSV</button>
+  <details class="cols">
+    <summary>Columns</summary>
+    <div data-for="maps-12"></div>
+  </details>
+</div>
+
+<h3>Map Stats</h3>
+<table id="maps-12" data-sort-col="1" data-sort-dir="desc">
+
+        <thead><tr>
+        <th title="Map name" onclick="sortTable('maps-12',0,false)">Map</th>
+        <th title="Maps played" onclick="sortTable('maps-12',1,true)">Played</th>
+        <th title="Matches this map was your pick" onclick="sortTable('maps-12',2,true)">Picks</th>
+        <th title="Matches this map was opponent pick" onclick="sortTable('maps-12',3,true)">Opp picks</th>
+        <th title="Winrate on this map" onclick="sortTable('maps-12',4,true)">WR %</th>
+        <th title="Winrate when you picked" onclick="sortTable('maps-12',5,true)">WR own pick %</th>
+        <th title="Winrate when opponent picked" onclick="sortTable('maps-12',6,true)">WR opp pick %</th>
+        <th title="Team K/D on this map" onclick="sortTable('maps-12',7,true)">KD</th>
+        <th title="Average Damage / Round" onclick="sortTable('maps-12',8,true)">ADR</th>
+        <th title="Round diff (won - lost)" onclick="sortTable('maps-12',9,true)">±RD</th>
+        <th title="Times this map was your first ban" onclick="sortTable('maps-12',10,true)">1st ban</th>
+        <th title="Times this map was your second ban" onclick="sortTable('maps-12',11,true)">2nd ban</th>
+        <th title="Matches where opponent banned this map" onclick="sortTable('maps-12',12,true)">Opp ban</th>
+        <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-12',13,true)">Total own ban</th>
+        </tr></thead><tbody>
+        
+<tr>
+            <td>de_ancient</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.57">1.57</td>
+            <td title="Δ vs div avg: +12.1">90.1</td>
+            <td>16</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_dust2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -75.3">0.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_inferno</td>
+            <td>3</td>
+            <td>1</td>
+            <td>2</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td title="Δ vs div avg: +0.55">1.55</td>
+            <td title="Δ vs div avg: +14.8">89.7</td>
+            <td>26</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            </tr>
+<tr>
+            <td>de_mirage</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.99">0.00</td>
+            <td title="Δ vs div avg: -72.9">0.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>2</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_nuke</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.13">0.87</td>
+            <td title="Δ vs div avg: -3.3">74.1</td>
+            <td>-2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+<tr>
+            <td>de_overpass</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>100.0</td>
+            <td>100.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: +0.28">1.28</td>
+            <td title="Δ vs div avg: +7.6">84.1</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>1</td>
+            <td>2</td>
+            </tr>
+<tr>
+            <td>de_train</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td>0.0</td>
+            <td title="Δ vs div avg: -0.07">0.93</td>
+            <td title="Δ vs div avg: +2.0">80.0</td>
+            <td>-4</td>
+            <td>0</td>
+            <td>1</td>
+            <td>1</td>
+            <td>1</td>
+            </tr>
+</tbody></table>
+
+<script>
+(function(){
+  const t = document.getElementById('maps-12');
+  if (!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+  for (const tr of rows) {
+    const played = parseInt(tr.cells[1].textContent||'0',10);
+    [4,5,6].forEach(function(i){
+      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+      renderBar(tr.cells[i], isFinite(num) ? num : 0);
+      const span = tr.cells[i].querySelector('.bar > span');
+      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      tr.cells[i].title = 'Played: ' + played;
+    });
+  }
+  colorizeAuto('maps-12', 7, false);  // KD
+  colorizeAuto('maps-12', 8, false);  // ADR
+  colorizeRange('maps-12', 9, -10, 10, false); // RD
+  applyDefaultSort('maps-12');
+  bindPlayedOnly('maps-12', 'maps-12-played-only');
+  buildColumnToggles('maps-12');
+})();
+</script>
+
+</details>
+</div>
+
+</body>
+</html>
