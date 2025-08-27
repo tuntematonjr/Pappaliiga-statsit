@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>19 Divisioona S11 – generoitu 2025-08-27 23:49</title>
+<title>19 Divisioona S11 – generoitu 2025-08-28 00:14</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -92,8 +92,6 @@ th[title] { text-decoration: underline dotted #777; text-underline-offset: 3px; 
 
 /* Toolbar (filter + CSV + columns) */
 .toolbar{ display:flex; gap:.75rem; align-items:center; margin:.4rem 0 .5rem; flex-wrap:wrap; }
-.toolbar .btn{ background:#3a3a3a; color:#fff; border:1px solid var(--border); padding:.35rem .6rem; border-radius:8px; cursor:pointer; }
-.toolbar .btn:hover{ background:#4a4a4a; }
 details.cols summary{ cursor:pointer; }
 details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
 
@@ -186,24 +184,6 @@ function bindPlayedOnly(tableId, chkId){
   });
 }
 
-// --- CSV-vienti ---
-function exportTableCSV(tableId, filename){
-  const t = document.getElementById(tableId);
-  let csv = [];
-  const rows = [...t.querySelectorAll('tr')];
-  for(const r of rows){
-    const cells = [...r.children].map(c => {
-      const val = c.querySelector('.bar .val')?.textContent || c.textContent;
-      return '"' + val.replace(/"/g,'""').trim() + '"';
-    });
-    csv.push(cells.join(','));
-  }
-  const blob = new Blob([csv.join('\n')], {type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 // --- Saraketooglet ---
 function buildColumnToggles(tableId){
   const t = document.getElementById(tableId);
@@ -229,7 +209,7 @@ function buildColumnToggles(tableId){
 <body>
 
 <div class="page">
-<h1>19 Divisioona S11 <span class='muted'>(generoitu 2025-08-27 23:49)</span></h1>
+<h1>19 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 00:14)</span></h1>
 <div class="nav">
 <a href="#team-03021da4-638d-4a91-b839-4a518ccd0ffc">C0mplete ASS</a>
 <a href="#team-3da6abe2-360b-4bc9-9abc-f7430d09141e">Ikkuna Savuis</a>
@@ -253,24 +233,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-1',0,false)">Nickname</th>
             <th onclick="sortTable('players-1',1,true)">Maps</th>
-            <th onclick="sortTable('players-1',2,true)">KD</th>
-            <th onclick="sortTable('players-1',3,true)">ADR</th>
-            <th onclick="sortTable('players-1',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-1',6,true)">HS%</th>
-            <th onclick="sortTable('players-1',7,true)">AWP</th>
-            <th onclick="sortTable('players-1',8,true)">3K</th>
-            <th onclick="sortTable('players-1',9,true)">4K</th>
-            <th onclick="sortTable('players-1',10,true)">5K</th>
-            <th onclick="sortTable('players-1',11,true)">Util</th>
+            <th onclick="sortTable('players-1',2,true)">Rounds</th>
+            <th onclick="sortTable('players-1',3,true)">KD</th>
+            <th onclick="sortTable('players-1',4,true)">ADR</th>
+            <th onclick="sortTable('players-1',5,true)">KR</th>
+            <th onclick="sortTable('players-1',6,true)">Kill</th>
+            <th onclick="sortTable('players-1',7,true)">Death</th>
+            <th onclick="sortTable('players-1',8,true)">Assists</th>
+            <th onclick="sortTable('players-1',9,true)">HS%</th>
+            <th onclick="sortTable('players-1',10,true)">AWP</th>
+            <th onclick="sortTable('players-1',11,true)">3K</th>
+            <th onclick="sortTable('players-1',12,true)">4K</th>
+            <th onclick="sortTable('players-1',13,true)">5K</th>
+            <th onclick="sortTable('players-1',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>snajdn</td>
                 <td>4</td>
+                <td>76</td>
                 <td>0.73</td>
                 <td>71.9</td>
                 <td>0.61</td>
-                <td>47/64/26</td>
+                <td>47</td>
+                <td>64</td>
+                <td>26</td>
                 <td>32.0</td>
                 <td>2</td>
                 <td>4</td>
@@ -281,10 +267,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>-HyRRa</td>
                 <td>2</td>
+                <td>37</td>
                 <td>1.74</td>
                 <td>123.1</td>
                 <td>1.25</td>
-                <td>47/27/4</td>
+                <td>47</td>
+                <td>27</td>
+                <td>4</td>
                 <td>45.0</td>
                 <td>2</td>
                 <td>3</td>
@@ -295,10 +284,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>IDKFA74</td>
                 <td>4</td>
+                <td>76</td>
                 <td>0.62</td>
                 <td>63.9</td>
                 <td>0.53</td>
-                <td>40/64/16</td>
+                <td>40</td>
+                <td>64</td>
+                <td>16</td>
                 <td>48.8</td>
                 <td>0</td>
                 <td>1</td>
@@ -309,10 +301,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Trollikaarle</td>
                 <td>4</td>
+                <td>76</td>
                 <td>0.56</td>
                 <td>57.8</td>
                 <td>0.49</td>
-                <td>38/68/15</td>
+                <td>38</td>
+                <td>68</td>
+                <td>15</td>
                 <td>24.0</td>
                 <td>0</td>
                 <td>4</td>
@@ -323,10 +318,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>TantuKon</td>
                 <td>4</td>
+                <td>76</td>
                 <td>0.47</td>
                 <td>47.7</td>
                 <td>0.39</td>
-                <td>31/66/18</td>
+                <td>31</td>
+                <td>66</td>
+                <td>18</td>
                 <td>24.0</td>
                 <td>0</td>
                 <td>0</td>
@@ -337,10 +335,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Kakkatam</td>
                 <td>2</td>
+                <td>39</td>
                 <td>0.53</td>
                 <td>58.0</td>
                 <td>0.41</td>
-                <td>16/30/7</td>
+                <td>16</td>
+                <td>30</td>
+                <td>7</td>
                 <td>50.0</td>
                 <td>0</td>
                 <td>1</td>
@@ -349,26 +350,25 @@ function buildColumnToggles(tableId){
                 <td>215</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-1', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-1', 3, 50, 120, false);</script>
-<script>colorizeRange('players-1', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-1', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-1', 4, 50, 120, false);</script>
+<script>colorizeRange('players-1', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-1');</script>
 <div class="chips">
-<span class="chip">Most banned: de_ancient (3×)</span>
-<span class="chip">Most picked: de_inferno (1×)</span>
-<span class="chip">Map to avoid: de_overpass (0%)</span>
+<span class="chip">Most banned: Ancient (3×)</span>
+<span class="chip">Most picked: Inferno (1×)</span>
+<span class="chip">Map to avoid: Overpass (0%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-1-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-1', 'C0mplete ASS_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-1"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-1-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-1"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-1" data-sort-col="1" data-sort-dir="desc">
 
@@ -390,7 +390,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -406,7 +406,7 @@ function buildColumnToggles(tableId){
             <td>3</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -422,7 +422,7 @@ function buildColumnToggles(tableId){
             <td>2</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -438,7 +438,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -454,7 +454,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -470,7 +470,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>2</td>
             <td>1</td>
             <td>2</td>
@@ -486,7 +486,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>1</td>
             <td>1</td>
             <td>1</td>
@@ -503,30 +503,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-1');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-1', 7, false);  // KD
-  colorizeAuto('maps-1', 8, false);  // ADR
-  colorizeRange('maps-1', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-1');
-  bindPlayedOnly('maps-1', 'maps-1-played-only');
-  buildColumnToggles('maps-1');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-1');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-1', 7, false);  // KD
+          colorizeAuto('maps-1', 8, false);  // ADR
+          colorizeRange('maps-1', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-1');
+          bindPlayedOnly('maps-1', 'maps-1-played-only');
+          buildColumnToggles('maps-1');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-3da6abe2-360b-4bc9-9abc-f7430d09141e" open>
 <summary><h2>Ikkuna Savuis</h2></summary>
@@ -536,24 +536,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-2',0,false)">Nickname</th>
             <th onclick="sortTable('players-2',1,true)">Maps</th>
-            <th onclick="sortTable('players-2',2,true)">KD</th>
-            <th onclick="sortTable('players-2',3,true)">ADR</th>
-            <th onclick="sortTable('players-2',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-2',6,true)">HS%</th>
-            <th onclick="sortTable('players-2',7,true)">AWP</th>
-            <th onclick="sortTable('players-2',8,true)">3K</th>
-            <th onclick="sortTable('players-2',9,true)">4K</th>
-            <th onclick="sortTable('players-2',10,true)">5K</th>
-            <th onclick="sortTable('players-2',11,true)">Util</th>
+            <th onclick="sortTable('players-2',2,true)">Rounds</th>
+            <th onclick="sortTable('players-2',3,true)">KD</th>
+            <th onclick="sortTable('players-2',4,true)">ADR</th>
+            <th onclick="sortTable('players-2',5,true)">KR</th>
+            <th onclick="sortTable('players-2',6,true)">Kill</th>
+            <th onclick="sortTable('players-2',7,true)">Death</th>
+            <th onclick="sortTable('players-2',8,true)">Assists</th>
+            <th onclick="sortTable('players-2',9,true)">HS%</th>
+            <th onclick="sortTable('players-2',10,true)">AWP</th>
+            <th onclick="sortTable('players-2',11,true)">3K</th>
+            <th onclick="sortTable('players-2',12,true)">4K</th>
+            <th onclick="sortTable('players-2',13,true)">5K</th>
+            <th onclick="sortTable('players-2',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>krisseM</td>
                 <td>8</td>
+                <td>154</td>
                 <td>1.59</td>
                 <td>88.3</td>
                 <td>0.87</td>
-                <td>130/82/51</td>
+                <td>130</td>
+                <td>82</td>
+                <td>51</td>
                 <td>43.0</td>
                 <td>2</td>
                 <td>5</td>
@@ -564,10 +570,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>LiimaLasse</td>
                 <td>8</td>
+                <td>154</td>
                 <td>1.29</td>
                 <td>82.8</td>
                 <td>0.81</td>
-                <td>120/93/35</td>
+                <td>120</td>
+                <td>93</td>
+                <td>35</td>
                 <td>36.1</td>
                 <td>18</td>
                 <td>5</td>
@@ -578,10 +587,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Mursutin</td>
                 <td>8</td>
+                <td>154</td>
                 <td>1.19</td>
                 <td>83.6</td>
                 <td>0.78</td>
-                <td>115/97/50</td>
+                <td>115</td>
+                <td>97</td>
+                <td>50</td>
                 <td>45.2</td>
                 <td>3</td>
                 <td>9</td>
@@ -592,10 +604,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Rautasd</td>
                 <td>6</td>
+                <td>111</td>
                 <td>1.39</td>
                 <td>99.2</td>
                 <td>0.90</td>
-                <td>99/71/40</td>
+                <td>99</td>
+                <td>71</td>
+                <td>40</td>
                 <td>56.7</td>
                 <td>0</td>
                 <td>7</td>
@@ -606,10 +621,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Kuskinen</td>
                 <td>6</td>
+                <td>111</td>
                 <td>1.37</td>
                 <td>90.1</td>
                 <td>0.83</td>
-                <td>89/65/35</td>
+                <td>89</td>
+                <td>65</td>
+                <td>35</td>
                 <td>40.8</td>
                 <td>2</td>
                 <td>6</td>
@@ -620,10 +638,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Skumbaggins</td>
                 <td>4</td>
+                <td>86</td>
                 <td>1.02</td>
                 <td>68.4</td>
                 <td>0.59</td>
-                <td>54/53/23</td>
+                <td>54</td>
+                <td>53</td>
+                <td>23</td>
                 <td>29.8</td>
                 <td>3</td>
                 <td>2</td>
@@ -632,27 +653,26 @@ function buildColumnToggles(tableId){
                 <td>436</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-2', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-2', 3, 50, 120, false);</script>
-<script>colorizeRange('players-2', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-2', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-2', 4, 50, 120, false);</script>
+<script>colorizeRange('players-2', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-2');</script>
 <div class="chips">
-<span class="chip">Most banned: de_inferno (4×)</span>
-<span class="chip">Most picked: de_ancient (2×)</span>
-<span class="chip">Best WR: de_ancient (100%)</span>
-<span class="chip">Map to avoid: de_ancient (100%)</span>
+<span class="chip">Most banned: Inferno (4×)</span>
+<span class="chip">Most picked: Ancient (2×)</span>
+<span class="chip">Best WR: Ancient (100%)</span>
+<span class="chip">Map to avoid: Ancient (100%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-2-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-2', 'Ikkuna Savuis_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-2"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-2-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-2"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-2" data-sort-col="1" data-sort-dir="desc">
 
@@ -674,7 +694,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>3</td>
             <td>2</td>
             <td>1</td>
@@ -690,7 +710,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -706,7 +726,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -722,7 +742,7 @@ function buildColumnToggles(tableId){
             <td>4</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>2</td>
             <td>0</td>
             <td>2</td>
@@ -738,7 +758,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -754,7 +774,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -770,7 +790,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -787,30 +807,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-2');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-2', 7, false);  // KD
-  colorizeAuto('maps-2', 8, false);  // ADR
-  colorizeRange('maps-2', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-2');
-  bindPlayedOnly('maps-2', 'maps-2-played-only');
-  buildColumnToggles('maps-2');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-2');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-2', 7, false);  // KD
+          colorizeAuto('maps-2', 8, false);  // ADR
+          colorizeRange('maps-2', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-2');
+          bindPlayedOnly('maps-2', 'maps-2-played-only');
+          buildColumnToggles('maps-2');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-47465487-1afa-482d-aac7-ec10a9c3c4b1" open>
 <summary><h2>FrAGGIN FOSSILS</h2></summary>
@@ -820,24 +840,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-3',0,false)">Nickname</th>
             <th onclick="sortTable('players-3',1,true)">Maps</th>
-            <th onclick="sortTable('players-3',2,true)">KD</th>
-            <th onclick="sortTable('players-3',3,true)">ADR</th>
-            <th onclick="sortTable('players-3',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-3',6,true)">HS%</th>
-            <th onclick="sortTable('players-3',7,true)">AWP</th>
-            <th onclick="sortTable('players-3',8,true)">3K</th>
-            <th onclick="sortTable('players-3',9,true)">4K</th>
-            <th onclick="sortTable('players-3',10,true)">5K</th>
-            <th onclick="sortTable('players-3',11,true)">Util</th>
+            <th onclick="sortTable('players-3',2,true)">Rounds</th>
+            <th onclick="sortTable('players-3',3,true)">KD</th>
+            <th onclick="sortTable('players-3',4,true)">ADR</th>
+            <th onclick="sortTable('players-3',5,true)">KR</th>
+            <th onclick="sortTable('players-3',6,true)">Kill</th>
+            <th onclick="sortTable('players-3',7,true)">Death</th>
+            <th onclick="sortTable('players-3',8,true)">Assists</th>
+            <th onclick="sortTable('players-3',9,true)">HS%</th>
+            <th onclick="sortTable('players-3',10,true)">AWP</th>
+            <th onclick="sortTable('players-3',11,true)">3K</th>
+            <th onclick="sortTable('players-3',12,true)">4K</th>
+            <th onclick="sortTable('players-3',13,true)">5K</th>
+            <th onclick="sortTable('players-3',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>Kaluzi</td>
                 <td>8</td>
+                <td>204</td>
                 <td>1.08</td>
                 <td>90.5</td>
                 <td>0.80</td>
-                <td>165/153/55</td>
+                <td>165</td>
+                <td>153</td>
+                <td>55</td>
                 <td>42.8</td>
                 <td>16</td>
                 <td>9</td>
@@ -848,10 +874,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>JuusOskari</td>
                 <td>8</td>
+                <td>204</td>
                 <td>0.99</td>
                 <td>83.2</td>
                 <td>0.74</td>
-                <td>145/146/54</td>
+                <td>145</td>
+                <td>146</td>
+                <td>54</td>
                 <td>45.9</td>
                 <td>0</td>
                 <td>8</td>
@@ -862,10 +891,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>P1uPaL1</td>
                 <td>8</td>
+                <td>204</td>
                 <td>0.84</td>
                 <td>67.0</td>
                 <td>0.59</td>
-                <td>123/146/39</td>
+                <td>123</td>
+                <td>146</td>
+                <td>39</td>
                 <td>37.2</td>
                 <td>30</td>
                 <td>7</td>
@@ -876,10 +908,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>topii</td>
                 <td>6</td>
+                <td>155</td>
                 <td>0.94</td>
                 <td>68.2</td>
                 <td>0.59</td>
-                <td>93/99/36</td>
+                <td>93</td>
+                <td>99</td>
+                <td>36</td>
                 <td>36.7</td>
                 <td>1</td>
                 <td>2</td>
@@ -890,10 +925,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Miksukiksu</td>
                 <td>6</td>
+                <td>136</td>
                 <td>0.88</td>
                 <td>63.9</td>
                 <td>0.63</td>
-                <td>88/100/30</td>
+                <td>88</td>
+                <td>100</td>
+                <td>30</td>
                 <td>47.2</td>
                 <td>0</td>
                 <td>4</td>
@@ -904,10 +942,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Falcoster</td>
                 <td>4</td>
+                <td>117</td>
                 <td>0.91</td>
                 <td>75.0</td>
                 <td>0.62</td>
-                <td>77/85/26</td>
+                <td>77</td>
+                <td>85</td>
+                <td>26</td>
                 <td>32.8</td>
                 <td>0</td>
                 <td>4</td>
@@ -916,27 +957,26 @@ function buildColumnToggles(tableId){
                 <td>1065</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-3', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-3', 3, 50, 120, false);</script>
-<script>colorizeRange('players-3', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-3', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-3', 4, 50, 120, false);</script>
+<script>colorizeRange('players-3', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-3');</script>
 <div class="chips">
-<span class="chip">Most banned: de_mirage (3×)</span>
-<span class="chip">Most picked: de_ancient (2×)</span>
-<span class="chip">Best WR: de_ancient (67%)</span>
-<span class="chip">Map to avoid: de_nuke (50%)</span>
+<span class="chip">Most banned: Mirage (3×)</span>
+<span class="chip">Most picked: Ancient (2×)</span>
+<span class="chip">Best WR: Ancient (67%)</span>
+<span class="chip">Map to avoid: Nuke (50%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-3-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-3', 'FrAGGIN FOSSILS_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-3"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-3-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-3"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-3" data-sort-col="1" data-sort-dir="desc">
 
@@ -958,7 +998,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>3</td>
             <td>2</td>
             <td>1</td>
@@ -974,7 +1014,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -990,7 +1030,7 @@ function buildColumnToggles(tableId){
             <td>2</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -1006,7 +1046,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -1022,7 +1062,7 @@ function buildColumnToggles(tableId){
             <td>3</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -1038,7 +1078,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -1054,7 +1094,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -1071,30 +1111,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-3');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-3', 7, false);  // KD
-  colorizeAuto('maps-3', 8, false);  // ADR
-  colorizeRange('maps-3', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-3');
-  bindPlayedOnly('maps-3', 'maps-3-played-only');
-  buildColumnToggles('maps-3');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-3');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-3', 7, false);  // KD
+          colorizeAuto('maps-3', 8, false);  // ADR
+          colorizeRange('maps-3', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-3');
+          bindPlayedOnly('maps-3', 'maps-3-played-only');
+          buildColumnToggles('maps-3');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-63dd475d-ce1a-4c2c-a17e-6773f0fed318" open>
 <summary><h2>WANHEIM</h2></summary>
@@ -1104,24 +1144,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-4',0,false)">Nickname</th>
             <th onclick="sortTable('players-4',1,true)">Maps</th>
-            <th onclick="sortTable('players-4',2,true)">KD</th>
-            <th onclick="sortTable('players-4',3,true)">ADR</th>
-            <th onclick="sortTable('players-4',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-4',6,true)">HS%</th>
-            <th onclick="sortTable('players-4',7,true)">AWP</th>
-            <th onclick="sortTable('players-4',8,true)">3K</th>
-            <th onclick="sortTable('players-4',9,true)">4K</th>
-            <th onclick="sortTable('players-4',10,true)">5K</th>
-            <th onclick="sortTable('players-4',11,true)">Util</th>
+            <th onclick="sortTable('players-4',2,true)">Rounds</th>
+            <th onclick="sortTable('players-4',3,true)">KD</th>
+            <th onclick="sortTable('players-4',4,true)">ADR</th>
+            <th onclick="sortTable('players-4',5,true)">KR</th>
+            <th onclick="sortTable('players-4',6,true)">Kill</th>
+            <th onclick="sortTable('players-4',7,true)">Death</th>
+            <th onclick="sortTable('players-4',8,true)">Assists</th>
+            <th onclick="sortTable('players-4',9,true)">HS%</th>
+            <th onclick="sortTable('players-4',10,true)">AWP</th>
+            <th onclick="sortTable('players-4',11,true)">3K</th>
+            <th onclick="sortTable('players-4',12,true)">4K</th>
+            <th onclick="sortTable('players-4',13,true)">5K</th>
+            <th onclick="sortTable('players-4',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>Tomppaxiit</td>
                 <td>8</td>
+                <td>175</td>
                 <td>1.32</td>
                 <td>90.2</td>
                 <td>0.84</td>
-                <td>147/111/59</td>
+                <td>147</td>
+                <td>111</td>
+                <td>59</td>
                 <td>37.8</td>
                 <td>16</td>
                 <td>9</td>
@@ -1132,10 +1178,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>-BeiZi-</td>
                 <td>8</td>
+                <td>175</td>
                 <td>1.01</td>
                 <td>86.3</td>
                 <td>0.73</td>
-                <td>127/126/55</td>
+                <td>127</td>
+                <td>126</td>
+                <td>55</td>
                 <td>41.0</td>
                 <td>30</td>
                 <td>8</td>
@@ -1146,10 +1195,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Andeeri</td>
                 <td>6</td>
+                <td>134</td>
                 <td>1.10</td>
                 <td>72.6</td>
                 <td>0.74</td>
-                <td>100/91/33</td>
+                <td>100</td>
+                <td>91</td>
+                <td>33</td>
                 <td>37.7</td>
                 <td>1</td>
                 <td>4</td>
@@ -1160,10 +1212,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>_OpuX_</td>
                 <td>6</td>
+                <td>136</td>
                 <td>0.87</td>
                 <td>70.8</td>
                 <td>0.65</td>
-                <td>86/99/41</td>
+                <td>86</td>
+                <td>99</td>
+                <td>41</td>
                 <td>39.5</td>
                 <td>0</td>
                 <td>3</td>
@@ -1174,10 +1229,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Roska</td>
                 <td>6</td>
+                <td>121</td>
                 <td>0.91</td>
                 <td>70.1</td>
                 <td>0.59</td>
-                <td>69/76/33</td>
+                <td>69</td>
+                <td>76</td>
+                <td>33</td>
                 <td>48.7</td>
                 <td>0</td>
                 <td>3</td>
@@ -1188,10 +1246,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>snny</td>
                 <td>4</td>
+                <td>80</td>
                 <td>1.10</td>
                 <td>75.4</td>
                 <td>0.68</td>
-                <td>55/50/24</td>
+                <td>55</td>
+                <td>50</td>
+                <td>24</td>
                 <td>39.0</td>
                 <td>7</td>
                 <td>1</td>
@@ -1202,10 +1263,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>pelg-</td>
                 <td>2</td>
+                <td>54</td>
                 <td>0.93</td>
                 <td>71.8</td>
                 <td>0.72</td>
-                <td>39/42/13</td>
+                <td>39</td>
+                <td>42</td>
+                <td>13</td>
                 <td>49.5</td>
                 <td>0</td>
                 <td>3</td>
@@ -1214,27 +1278,26 @@ function buildColumnToggles(tableId){
                 <td>171</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-4', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-4', 3, 50, 120, false);</script>
-<script>colorizeRange('players-4', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-4', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-4', 4, 50, 120, false);</script>
+<script>colorizeRange('players-4', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-4');</script>
 <div class="chips">
-<span class="chip">Most banned: de_inferno (4×)</span>
-<span class="chip">Most picked: de_overpass (2×)</span>
-<span class="chip">Best WR: de_ancient (100%)</span>
-<span class="chip">Map to avoid: de_dust2 (0%)</span>
+<span class="chip">Most banned: Inferno (4×)</span>
+<span class="chip">Most picked: Overpass (2×)</span>
+<span class="chip">Best WR: Ancient (100%)</span>
+<span class="chip">Map to avoid: Dust II (0%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-4-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-4', 'WANHEIM_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-4"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-4-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-4"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-4" data-sort-col="1" data-sort-dir="desc">
 
@@ -1256,7 +1319,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>2</td>
             <td>0</td>
             <td>2</td>
@@ -1272,7 +1335,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -1288,7 +1351,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -1304,7 +1367,7 @@ function buildColumnToggles(tableId){
             <td>4</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -1320,7 +1383,7 @@ function buildColumnToggles(tableId){
             <td>2</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -1336,7 +1399,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>2</td>
             <td>2</td>
             <td>0</td>
@@ -1352,7 +1415,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -1369,30 +1432,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-4');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-4', 7, false);  // KD
-  colorizeAuto('maps-4', 8, false);  // ADR
-  colorizeRange('maps-4', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-4');
-  bindPlayedOnly('maps-4', 'maps-4-played-only');
-  buildColumnToggles('maps-4');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-4');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-4', 7, false);  // KD
+          colorizeAuto('maps-4', 8, false);  // ADR
+          colorizeRange('maps-4', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-4');
+          bindPlayedOnly('maps-4', 'maps-4-played-only');
+          buildColumnToggles('maps-4');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-a061295f-5d19-4921-840a-f3715ed80220" open>
 <summary><h2>Mature Dolleri</h2></summary>
@@ -1402,24 +1465,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-5',0,false)">Nickname</th>
             <th onclick="sortTable('players-5',1,true)">Maps</th>
-            <th onclick="sortTable('players-5',2,true)">KD</th>
-            <th onclick="sortTable('players-5',3,true)">ADR</th>
-            <th onclick="sortTable('players-5',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-5',6,true)">HS%</th>
-            <th onclick="sortTable('players-5',7,true)">AWP</th>
-            <th onclick="sortTable('players-5',8,true)">3K</th>
-            <th onclick="sortTable('players-5',9,true)">4K</th>
-            <th onclick="sortTable('players-5',10,true)">5K</th>
-            <th onclick="sortTable('players-5',11,true)">Util</th>
+            <th onclick="sortTable('players-5',2,true)">Rounds</th>
+            <th onclick="sortTable('players-5',3,true)">KD</th>
+            <th onclick="sortTable('players-5',4,true)">ADR</th>
+            <th onclick="sortTable('players-5',5,true)">KR</th>
+            <th onclick="sortTable('players-5',6,true)">Kill</th>
+            <th onclick="sortTable('players-5',7,true)">Death</th>
+            <th onclick="sortTable('players-5',8,true)">Assists</th>
+            <th onclick="sortTable('players-5',9,true)">HS%</th>
+            <th onclick="sortTable('players-5',10,true)">AWP</th>
+            <th onclick="sortTable('players-5',11,true)">3K</th>
+            <th onclick="sortTable('players-5',12,true)">4K</th>
+            <th onclick="sortTable('players-5',13,true)">5K</th>
+            <th onclick="sortTable('players-5',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>Shrike7</td>
                 <td>6</td>
+                <td>131</td>
                 <td>1.24</td>
                 <td>100.9</td>
                 <td>0.87</td>
-                <td>115/93/39</td>
+                <td>115</td>
+                <td>93</td>
+                <td>39</td>
                 <td>45.8</td>
                 <td>20</td>
                 <td>6</td>
@@ -1430,10 +1499,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>aamosmasao</td>
                 <td>6</td>
+                <td>131</td>
                 <td>0.94</td>
                 <td>70.7</td>
                 <td>0.68</td>
-                <td>91/97/33</td>
+                <td>91</td>
+                <td>97</td>
+                <td>33</td>
                 <td>27.8</td>
                 <td>1</td>
                 <td>3</td>
@@ -1444,10 +1516,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Latexninja</td>
                 <td>4</td>
+                <td>95</td>
                 <td>1.28</td>
                 <td>83.8</td>
                 <td>0.82</td>
-                <td>77/60/24</td>
+                <td>77</td>
+                <td>60</td>
+                <td>24</td>
                 <td>44.0</td>
                 <td>0</td>
                 <td>3</td>
@@ -1458,10 +1533,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>TomOfOulu</td>
                 <td>4</td>
+                <td>85</td>
                 <td>0.89</td>
                 <td>76.6</td>
                 <td>0.66</td>
-                <td>56/63/25</td>
+                <td>56</td>
+                <td>63</td>
+                <td>25</td>
                 <td>32.2</td>
                 <td>1</td>
                 <td>0</td>
@@ -1472,10 +1550,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Jome_</td>
                 <td>4</td>
+                <td>85</td>
                 <td>0.75</td>
                 <td>62.4</td>
                 <td>0.58</td>
-                <td>47/63/19</td>
+                <td>47</td>
+                <td>63</td>
+                <td>19</td>
                 <td>42.8</td>
                 <td>1</td>
                 <td>1</td>
@@ -1486,10 +1567,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>RKelly</td>
                 <td>2</td>
+                <td>46</td>
                 <td>0.58</td>
                 <td>76.0</td>
                 <td>0.47</td>
-                <td>22/38/14</td>
+                <td>22</td>
+                <td>38</td>
+                <td>14</td>
                 <td>39.0</td>
                 <td>1</td>
                 <td>1</td>
@@ -1500,10 +1584,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>kettusteffe</td>
                 <td>2</td>
+                <td>46</td>
                 <td>0.61</td>
                 <td>48.8</td>
                 <td>0.43</td>
-                <td>20/33/4</td>
+                <td>20</td>
+                <td>33</td>
+                <td>4</td>
                 <td>56.0</td>
                 <td>0</td>
                 <td>0</td>
@@ -1514,10 +1601,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>DickForsberg</td>
                 <td>2</td>
+                <td>36</td>
                 <td>0.57</td>
                 <td>50.0</td>
                 <td>0.45</td>
-                <td>16/28/3</td>
+                <td>16</td>
+                <td>28</td>
+                <td>3</td>
                 <td>75.0</td>
                 <td>3</td>
                 <td>1</td>
@@ -1526,27 +1616,26 @@ function buildColumnToggles(tableId){
                 <td>28</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-5', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-5', 3, 50, 120, false);</script>
-<script>colorizeRange('players-5', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-5', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-5', 4, 50, 120, false);</script>
+<script>colorizeRange('players-5', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-5');</script>
 <div class="chips">
-<span class="chip">Most banned: de_inferno (2×)</span>
-<span class="chip">Most picked: de_mirage (1×)</span>
-<span class="chip">Best WR: de_dust2 (100%)</span>
-<span class="chip">Map to avoid: de_ancient (0%)</span>
+<span class="chip">Most banned: Inferno (2×)</span>
+<span class="chip">Most picked: Mirage (1×)</span>
+<span class="chip">Best WR: Dust II (100%)</span>
+<span class="chip">Map to avoid: Ancient (0%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-5-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-5', 'Mature Dolleri_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-5"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-5-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-5"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-5" data-sort-col="1" data-sort-dir="desc">
 
@@ -1568,7 +1657,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>2</td>
             <td>0</td>
             <td>2</td>
@@ -1584,7 +1673,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -1600,7 +1689,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -1616,7 +1705,7 @@ function buildColumnToggles(tableId){
             <td>2</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -1632,7 +1721,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -1648,7 +1737,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -1664,7 +1753,7 @@ function buildColumnToggles(tableId){
             <td>2</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -1681,30 +1770,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-5');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-5', 7, false);  // KD
-  colorizeAuto('maps-5', 8, false);  // ADR
-  colorizeRange('maps-5', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-5');
-  bindPlayedOnly('maps-5', 'maps-5-played-only');
-  buildColumnToggles('maps-5');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-5');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-5', 7, false);  // KD
+          colorizeAuto('maps-5', 8, false);  // ADR
+          colorizeRange('maps-5', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-5');
+          bindPlayedOnly('maps-5', 'maps-5-played-only');
+          buildColumnToggles('maps-5');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-a9d40f31-2337-4afd-9f7b-8c547b90066f" open>
 <summary><h2>tiistai</h2></summary>
@@ -1714,24 +1803,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-6',0,false)">Nickname</th>
             <th onclick="sortTable('players-6',1,true)">Maps</th>
-            <th onclick="sortTable('players-6',2,true)">KD</th>
-            <th onclick="sortTable('players-6',3,true)">ADR</th>
-            <th onclick="sortTable('players-6',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-6',6,true)">HS%</th>
-            <th onclick="sortTable('players-6',7,true)">AWP</th>
-            <th onclick="sortTable('players-6',8,true)">3K</th>
-            <th onclick="sortTable('players-6',9,true)">4K</th>
-            <th onclick="sortTable('players-6',10,true)">5K</th>
-            <th onclick="sortTable('players-6',11,true)">Util</th>
+            <th onclick="sortTable('players-6',2,true)">Rounds</th>
+            <th onclick="sortTable('players-6',3,true)">KD</th>
+            <th onclick="sortTable('players-6',4,true)">ADR</th>
+            <th onclick="sortTable('players-6',5,true)">KR</th>
+            <th onclick="sortTable('players-6',6,true)">Kill</th>
+            <th onclick="sortTable('players-6',7,true)">Death</th>
+            <th onclick="sortTable('players-6',8,true)">Assists</th>
+            <th onclick="sortTable('players-6',9,true)">HS%</th>
+            <th onclick="sortTable('players-6',10,true)">AWP</th>
+            <th onclick="sortTable('players-6',11,true)">3K</th>
+            <th onclick="sortTable('players-6',12,true)">4K</th>
+            <th onclick="sortTable('players-6',13,true)">5K</th>
+            <th onclick="sortTable('players-6',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>Roimanen</td>
                 <td>6</td>
+                <td>127</td>
                 <td>1.53</td>
                 <td>103.6</td>
                 <td>0.94</td>
-                <td>121/79/46</td>
+                <td>121</td>
+                <td>79</td>
+                <td>46</td>
                 <td>28.2</td>
                 <td>0</td>
                 <td>9</td>
@@ -1742,10 +1837,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Johtaja3</td>
                 <td>6</td>
+                <td>127</td>
                 <td>1.11</td>
                 <td>84.2</td>
                 <td>0.78</td>
-                <td>103/93/37</td>
+                <td>103</td>
+                <td>93</td>
+                <td>37</td>
                 <td>38.7</td>
                 <td>1</td>
                 <td>5</td>
@@ -1756,10 +1854,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>KaLaxKaLa</td>
                 <td>4</td>
+                <td>89</td>
                 <td>1.03</td>
                 <td>85.1</td>
                 <td>0.78</td>
-                <td>71/69/26</td>
+                <td>71</td>
+                <td>69</td>
+                <td>26</td>
                 <td>32.8</td>
                 <td>0</td>
                 <td>6</td>
@@ -1770,10 +1871,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>ziizaah</td>
                 <td>4</td>
+                <td>89</td>
                 <td>0.77</td>
                 <td>59.3</td>
                 <td>0.52</td>
-                <td>46/60/24</td>
+                <td>46</td>
+                <td>60</td>
+                <td>24</td>
                 <td>20.5</td>
                 <td>13</td>
                 <td>1</td>
@@ -1784,10 +1888,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>seppo-susi</td>
                 <td>4</td>
+                <td>81</td>
                 <td>0.71</td>
                 <td>52.7</td>
                 <td>0.41</td>
-                <td>37/52/23</td>
+                <td>37</td>
+                <td>52</td>
+                <td>23</td>
                 <td>31.2</td>
                 <td>1</td>
                 <td>1</td>
@@ -1798,10 +1905,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>jopecd</td>
                 <td>2</td>
+                <td>38</td>
                 <td>1.62</td>
                 <td>100.2</td>
                 <td>0.90</td>
-                <td>34/21/15</td>
+                <td>34</td>
+                <td>21</td>
+                <td>15</td>
                 <td>35.0</td>
                 <td>0</td>
                 <td>2</td>
@@ -1812,10 +1922,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Ronsulainen</td>
                 <td>2</td>
+                <td>38</td>
                 <td>1.00</td>
                 <td>54.7</td>
                 <td>0.54</td>
-                <td>21/21/9</td>
+                <td>21</td>
+                <td>21</td>
+                <td>9</td>
                 <td>45.0</td>
                 <td>0</td>
                 <td>0</td>
@@ -1826,10 +1939,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Baldtrick</td>
                 <td>2</td>
+                <td>46</td>
                 <td>0.50</td>
                 <td>44.0</td>
                 <td>0.37</td>
-                <td>17/34/8</td>
+                <td>17</td>
+                <td>34</td>
+                <td>8</td>
                 <td>23.0</td>
                 <td>0</td>
                 <td>0</td>
@@ -1838,27 +1954,26 @@ function buildColumnToggles(tableId){
                 <td>199</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-6', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-6', 3, 50, 120, false);</script>
-<script>colorizeRange('players-6', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-6', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-6', 4, 50, 120, false);</script>
+<script>colorizeRange('players-6', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-6');</script>
 <div class="chips">
-<span class="chip">Most banned: de_mirage (3×)</span>
-<span class="chip">Most picked: de_ancient (2×)</span>
-<span class="chip">Best WR: de_inferno (100%)</span>
-<span class="chip">Map to avoid: de_ancient (50%)</span>
+<span class="chip">Most banned: Mirage (3×)</span>
+<span class="chip">Most picked: Ancient (2×)</span>
+<span class="chip">Best WR: Inferno (100%)</span>
+<span class="chip">Map to avoid: Ancient (50%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-6-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-6', 'tiistai_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-6"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-6-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-6"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-6" data-sort-col="1" data-sort-dir="desc">
 
@@ -1880,7 +1995,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>2</td>
             <td>2</td>
             <td>0</td>
@@ -1896,7 +2011,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -1912,7 +2027,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -1928,7 +2043,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -1944,7 +2059,7 @@ function buildColumnToggles(tableId){
             <td>3</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -1960,7 +2075,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -1976,7 +2091,7 @@ function buildColumnToggles(tableId){
             <td>3</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -1993,30 +2108,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-6');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-6', 7, false);  // KD
-  colorizeAuto('maps-6', 8, false);  // ADR
-  colorizeRange('maps-6', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-6');
-  bindPlayedOnly('maps-6', 'maps-6-played-only');
-  buildColumnToggles('maps-6');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-6');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-6', 7, false);  // KD
+          colorizeAuto('maps-6', 8, false);  // ADR
+          colorizeRange('maps-6', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-6');
+          bindPlayedOnly('maps-6', 'maps-6-played-only');
+          buildColumnToggles('maps-6');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-be449a06-8332-4b53-9af6-9e7ab6371c89" open>
 <summary><h2>X-HOODS</h2></summary>
@@ -2026,24 +2141,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-7',0,false)">Nickname</th>
             <th onclick="sortTable('players-7',1,true)">Maps</th>
-            <th onclick="sortTable('players-7',2,true)">KD</th>
-            <th onclick="sortTable('players-7',3,true)">ADR</th>
-            <th onclick="sortTable('players-7',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-7',6,true)">HS%</th>
-            <th onclick="sortTable('players-7',7,true)">AWP</th>
-            <th onclick="sortTable('players-7',8,true)">3K</th>
-            <th onclick="sortTable('players-7',9,true)">4K</th>
-            <th onclick="sortTable('players-7',10,true)">5K</th>
-            <th onclick="sortTable('players-7',11,true)">Util</th>
+            <th onclick="sortTable('players-7',2,true)">Rounds</th>
+            <th onclick="sortTable('players-7',3,true)">KD</th>
+            <th onclick="sortTable('players-7',4,true)">ADR</th>
+            <th onclick="sortTable('players-7',5,true)">KR</th>
+            <th onclick="sortTable('players-7',6,true)">Kill</th>
+            <th onclick="sortTable('players-7',7,true)">Death</th>
+            <th onclick="sortTable('players-7',8,true)">Assists</th>
+            <th onclick="sortTable('players-7',9,true)">HS%</th>
+            <th onclick="sortTable('players-7',10,true)">AWP</th>
+            <th onclick="sortTable('players-7',11,true)">3K</th>
+            <th onclick="sortTable('players-7',12,true)">4K</th>
+            <th onclick="sortTable('players-7',13,true)">5K</th>
+            <th onclick="sortTable('players-7',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>Fukster</td>
                 <td>8</td>
+                <td>187</td>
                 <td>1.34</td>
                 <td>90.4</td>
                 <td>0.83</td>
-                <td>155/116/51</td>
+                <td>155</td>
+                <td>116</td>
+                <td>51</td>
                 <td>40.8</td>
                 <td>2</td>
                 <td>10</td>
@@ -2054,10 +2175,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>RockyFIN</td>
                 <td>8</td>
+                <td>187</td>
                 <td>0.88</td>
                 <td>77.8</td>
                 <td>0.66</td>
-                <td>126/144/55</td>
+                <td>126</td>
+                <td>144</td>
+                <td>55</td>
                 <td>34.6</td>
                 <td>1</td>
                 <td>8</td>
@@ -2068,10 +2192,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Cig_13</td>
                 <td>6</td>
+                <td>147</td>
                 <td>1.02</td>
                 <td>78.8</td>
                 <td>0.68</td>
-                <td>103/101/50</td>
+                <td>103</td>
+                <td>101</td>
+                <td>50</td>
                 <td>36.2</td>
                 <td>1</td>
                 <td>6</td>
@@ -2082,10 +2209,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Viisveto</td>
                 <td>6</td>
+                <td>140</td>
                 <td>1.10</td>
                 <td>76.3</td>
                 <td>0.69</td>
-                <td>97/88/34</td>
+                <td>97</td>
+                <td>88</td>
+                <td>34</td>
                 <td>27.7</td>
                 <td>4</td>
                 <td>5</td>
@@ -2096,10 +2226,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>htgw</td>
                 <td>4</td>
+                <td>87</td>
                 <td>1.12</td>
                 <td>78.5</td>
                 <td>0.77</td>
-                <td>66/59/19</td>
+                <td>66</td>
+                <td>59</td>
+                <td>19</td>
                 <td>52.0</td>
                 <td>0</td>
                 <td>6</td>
@@ -2110,10 +2243,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Jonezkinn</td>
                 <td>4</td>
+                <td>94</td>
                 <td>0.72</td>
                 <td>61.9</td>
                 <td>0.54</td>
-                <td>49/68/18</td>
+                <td>49</td>
+                <td>68</td>
+                <td>18</td>
                 <td>41.2</td>
                 <td>12</td>
                 <td>0</td>
@@ -2124,10 +2260,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>mmastoo</td>
                 <td>4</td>
+                <td>93</td>
                 <td>0.73</td>
                 <td>58.1</td>
                 <td>0.52</td>
-                <td>48/66/19</td>
+                <td>48</td>
+                <td>66</td>
+                <td>19</td>
                 <td>27.5</td>
                 <td>14</td>
                 <td>1</td>
@@ -2136,27 +2275,26 @@ function buildColumnToggles(tableId){
                 <td>394</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-7', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-7', 3, 50, 120, false);</script>
-<script>colorizeRange('players-7', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-7', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-7', 4, 50, 120, false);</script>
+<script>colorizeRange('players-7', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-7');</script>
 <div class="chips">
-<span class="chip">Most banned: de_mirage (4×)</span>
-<span class="chip">Most picked: de_ancient (4×)</span>
-<span class="chip">Best WR: de_nuke (100%)</span>
-<span class="chip">Map to avoid: de_dust2 (50%)</span>
+<span class="chip">Most banned: Mirage (4×)</span>
+<span class="chip">Most picked: Ancient (4×)</span>
+<span class="chip">Best WR: Nuke (100%)</span>
+<span class="chip">Map to avoid: Dust II (50%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-7-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-7', 'X-HOODS_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-7"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-7-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-7"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-7" data-sort-col="1" data-sort-dir="desc">
 
@@ -2178,7 +2316,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>4</td>
             <td>4</td>
             <td>0</td>
@@ -2194,7 +2332,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>2</td>
             <td>0</td>
             <td>2</td>
@@ -2210,7 +2348,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -2226,7 +2364,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2242,7 +2380,7 @@ function buildColumnToggles(tableId){
             <td>4</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -2258,7 +2396,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2274,7 +2412,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2291,30 +2429,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-7');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-7', 7, false);  // KD
-  colorizeAuto('maps-7', 8, false);  // ADR
-  colorizeRange('maps-7', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-7');
-  bindPlayedOnly('maps-7', 'maps-7-played-only');
-  buildColumnToggles('maps-7');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-7');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-7', 7, false);  // KD
+          colorizeAuto('maps-7', 8, false);  // ADR
+          colorizeRange('maps-7', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-7');
+          bindPlayedOnly('maps-7', 'maps-7-played-only');
+          buildColumnToggles('maps-7');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-c14f113d-5b4f-458a-a105-660a84e30192" open>
 <summary><h2>Marat myyrat</h2></summary>
@@ -2324,24 +2462,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-8',0,false)">Nickname</th>
             <th onclick="sortTable('players-8',1,true)">Maps</th>
-            <th onclick="sortTable('players-8',2,true)">KD</th>
-            <th onclick="sortTable('players-8',3,true)">ADR</th>
-            <th onclick="sortTable('players-8',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-8',6,true)">HS%</th>
-            <th onclick="sortTable('players-8',7,true)">AWP</th>
-            <th onclick="sortTable('players-8',8,true)">3K</th>
-            <th onclick="sortTable('players-8',9,true)">4K</th>
-            <th onclick="sortTable('players-8',10,true)">5K</th>
-            <th onclick="sortTable('players-8',11,true)">Util</th>
+            <th onclick="sortTable('players-8',2,true)">Rounds</th>
+            <th onclick="sortTable('players-8',3,true)">KD</th>
+            <th onclick="sortTable('players-8',4,true)">ADR</th>
+            <th onclick="sortTable('players-8',5,true)">KR</th>
+            <th onclick="sortTable('players-8',6,true)">Kill</th>
+            <th onclick="sortTable('players-8',7,true)">Death</th>
+            <th onclick="sortTable('players-8',8,true)">Assists</th>
+            <th onclick="sortTable('players-8',9,true)">HS%</th>
+            <th onclick="sortTable('players-8',10,true)">AWP</th>
+            <th onclick="sortTable('players-8',11,true)">3K</th>
+            <th onclick="sortTable('players-8',12,true)">4K</th>
+            <th onclick="sortTable('players-8',13,true)">5K</th>
+            <th onclick="sortTable('players-8',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>rrambou</td>
                 <td>8</td>
+                <td>211</td>
                 <td>1.46</td>
                 <td>95.7</td>
                 <td>0.88</td>
-                <td>195/134/68</td>
+                <td>195</td>
+                <td>134</td>
+                <td>68</td>
                 <td>37.5</td>
                 <td>2</td>
                 <td>16</td>
@@ -2352,10 +2496,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>andykka</td>
                 <td>8</td>
+                <td>211</td>
                 <td>1.24</td>
                 <td>86.5</td>
                 <td>0.82</td>
-                <td>177/143/49</td>
+                <td>177</td>
+                <td>143</td>
+                <td>49</td>
                 <td>49.9</td>
                 <td>2</td>
                 <td>13</td>
@@ -2366,10 +2513,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>k1mmotus</td>
                 <td>8</td>
+                <td>211</td>
                 <td>0.80</td>
                 <td>65.6</td>
                 <td>0.56</td>
-                <td>123/153/59</td>
+                <td>123</td>
+                <td>153</td>
+                <td>59</td>
                 <td>21.4</td>
                 <td>0</td>
                 <td>8</td>
@@ -2380,10 +2530,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Berreberre</td>
                 <td>8</td>
+                <td>211</td>
                 <td>0.84</td>
                 <td>68.5</td>
                 <td>0.58</td>
-                <td>123/146/48</td>
+                <td>123</td>
+                <td>146</td>
+                <td>48</td>
                 <td>32.9</td>
                 <td>26</td>
                 <td>5</td>
@@ -2394,10 +2547,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>poika6</td>
                 <td>8</td>
+                <td>211</td>
                 <td>0.62</td>
                 <td>55.9</td>
                 <td>0.44</td>
-                <td>100/160/56</td>
+                <td>100</td>
+                <td>160</td>
+                <td>56</td>
                 <td>39.1</td>
                 <td>3</td>
                 <td>2</td>
@@ -2406,27 +2562,26 @@ function buildColumnToggles(tableId){
                 <td>566</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-8', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-8', 3, 50, 120, false);</script>
-<script>colorizeRange('players-8', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-8', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-8', 4, 50, 120, false);</script>
+<script>colorizeRange('players-8', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-8');</script>
 <div class="chips">
-<span class="chip">Most banned: de_nuke (4×)</span>
-<span class="chip">Most picked: de_dust2 (2×)</span>
-<span class="chip">Best WR: de_dust2 (100%)</span>
-<span class="chip">Map to avoid: de_ancient (0%)</span>
+<span class="chip">Most banned: Nuke (4×)</span>
+<span class="chip">Most picked: Dust II (2×)</span>
+<span class="chip">Best WR: Dust II (100%)</span>
+<span class="chip">Map to avoid: Ancient (0%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-8-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-8', 'Marat myyrat_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-8"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-8-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-8"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-8" data-sort-col="1" data-sort-dir="desc">
 
@@ -2448,7 +2603,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>3</td>
             <td>0</td>
             <td>3</td>
@@ -2464,7 +2619,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>2</td>
             <td>2</td>
             <td>0</td>
@@ -2480,7 +2635,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -2496,7 +2651,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -2512,7 +2667,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2528,7 +2683,7 @@ function buildColumnToggles(tableId){
             <td>4</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2544,7 +2699,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2561,30 +2716,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-8');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-8', 7, false);  // KD
-  colorizeAuto('maps-8', 8, false);  // ADR
-  colorizeRange('maps-8', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-8');
-  bindPlayedOnly('maps-8', 'maps-8-played-only');
-  buildColumnToggles('maps-8');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-8');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-8', 7, false);  // KD
+          colorizeAuto('maps-8', 8, false);  // ADR
+          colorizeRange('maps-8', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-8');
+          bindPlayedOnly('maps-8', 'maps-8-played-only');
+          buildColumnToggles('maps-8');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-c4bf949c-e6e7-4fef-8020-d03013d26a0f" open>
 <summary><h2>semi Simoilijat</h2></summary>
@@ -2594,24 +2749,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-9',0,false)">Nickname</th>
             <th onclick="sortTable('players-9',1,true)">Maps</th>
-            <th onclick="sortTable('players-9',2,true)">KD</th>
-            <th onclick="sortTable('players-9',3,true)">ADR</th>
-            <th onclick="sortTable('players-9',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-9',6,true)">HS%</th>
-            <th onclick="sortTable('players-9',7,true)">AWP</th>
-            <th onclick="sortTable('players-9',8,true)">3K</th>
-            <th onclick="sortTable('players-9',9,true)">4K</th>
-            <th onclick="sortTable('players-9',10,true)">5K</th>
-            <th onclick="sortTable('players-9',11,true)">Util</th>
+            <th onclick="sortTable('players-9',2,true)">Rounds</th>
+            <th onclick="sortTable('players-9',3,true)">KD</th>
+            <th onclick="sortTable('players-9',4,true)">ADR</th>
+            <th onclick="sortTable('players-9',5,true)">KR</th>
+            <th onclick="sortTable('players-9',6,true)">Kill</th>
+            <th onclick="sortTable('players-9',7,true)">Death</th>
+            <th onclick="sortTable('players-9',8,true)">Assists</th>
+            <th onclick="sortTable('players-9',9,true)">HS%</th>
+            <th onclick="sortTable('players-9',10,true)">AWP</th>
+            <th onclick="sortTable('players-9',11,true)">3K</th>
+            <th onclick="sortTable('players-9',12,true)">4K</th>
+            <th onclick="sortTable('players-9',13,true)">5K</th>
+            <th onclick="sortTable('players-9',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>Kkakee</td>
                 <td>4</td>
+                <td>77</td>
                 <td>1.30</td>
                 <td>101.1</td>
                 <td>0.90</td>
-                <td>69/53/30</td>
+                <td>69</td>
+                <td>53</td>
+                <td>30</td>
                 <td>34.2</td>
                 <td>0</td>
                 <td>4</td>
@@ -2622,10 +2783,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>LalliONE</td>
                 <td>4</td>
+                <td>77</td>
                 <td>1.21</td>
                 <td>84.6</td>
                 <td>0.80</td>
-                <td>63/52/16</td>
+                <td>63</td>
+                <td>52</td>
+                <td>16</td>
                 <td>26.8</td>
                 <td>2</td>
                 <td>3</td>
@@ -2636,10 +2800,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>MelkoKettu</td>
                 <td>4</td>
+                <td>77</td>
                 <td>0.81</td>
                 <td>62.0</td>
                 <td>0.55</td>
-                <td>44/54/23</td>
+                <td>44</td>
+                <td>54</td>
+                <td>23</td>
                 <td>40.5</td>
                 <td>0</td>
                 <td>3</td>
@@ -2650,10 +2817,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Kuzaq</td>
                 <td>2</td>
+                <td>40</td>
                 <td>1.14</td>
                 <td>78.3</td>
                 <td>0.81</td>
-                <td>32/28/10</td>
+                <td>32</td>
+                <td>28</td>
+                <td>10</td>
                 <td>49.0</td>
                 <td>0</td>
                 <td>0</td>
@@ -2664,10 +2834,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>FATE13100</td>
                 <td>2</td>
+                <td>40</td>
                 <td>1.23</td>
                 <td>83.8</td>
                 <td>0.80</td>
-                <td>32/26/16</td>
+                <td>32</td>
+                <td>26</td>
+                <td>16</td>
                 <td>50.0</td>
                 <td>6</td>
                 <td>2</td>
@@ -2678,10 +2851,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>MildShake</td>
                 <td>2</td>
+                <td>37</td>
                 <td>0.90</td>
                 <td>61.3</td>
                 <td>0.65</td>
-                <td>26/29/11</td>
+                <td>26</td>
+                <td>29</td>
+                <td>11</td>
                 <td>26.0</td>
                 <td>1</td>
                 <td>1</td>
@@ -2692,10 +2868,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Studiolaeski</td>
                 <td>2</td>
+                <td>37</td>
                 <td>0.59</td>
                 <td>66.2</td>
                 <td>0.46</td>
-                <td>17/29/7</td>
+                <td>17</td>
+                <td>29</td>
+                <td>7</td>
                 <td>43.5</td>
                 <td>0</td>
                 <td>0</td>
@@ -2704,27 +2883,26 @@ function buildColumnToggles(tableId){
                 <td>277</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-9', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-9', 3, 50, 120, false);</script>
-<script>colorizeRange('players-9', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-9', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-9', 4, 50, 120, false);</script>
+<script>colorizeRange('players-9', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-9');</script>
 <div class="chips">
-<span class="chip">Most banned: de_inferno (3×)</span>
-<span class="chip">Most picked: de_train (2×)</span>
-<span class="chip">Best WR: de_ancient (100%)</span>
-<span class="chip">Map to avoid: de_ancient (100%)</span>
+<span class="chip">Most banned: Inferno (3×)</span>
+<span class="chip">Most picked: Train (2×)</span>
+<span class="chip">Best WR: Ancient (100%)</span>
+<span class="chip">Map to avoid: Ancient (100%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-9-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-9', 'semi Simoilijat_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-9"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-9-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-9"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-9" data-sort-col="1" data-sort-dir="desc">
 
@@ -2746,7 +2924,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -2762,7 +2940,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2778,7 +2956,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2794,7 +2972,7 @@ function buildColumnToggles(tableId){
             <td>3</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2810,7 +2988,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -2826,7 +3004,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>1</td>
             <td>0</td>
             <td>2</td>
@@ -2842,7 +3020,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>1</td>
             <td>2</td>
             <td>0</td>
@@ -2859,30 +3037,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-9');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-9', 7, false);  // KD
-  colorizeAuto('maps-9', 8, false);  // ADR
-  colorizeRange('maps-9', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-9');
-  bindPlayedOnly('maps-9', 'maps-9-played-only');
-  buildColumnToggles('maps-9');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-9');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-9', 7, false);  // KD
+          colorizeAuto('maps-9', 8, false);  // ADR
+          colorizeRange('maps-9', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-9');
+          bindPlayedOnly('maps-9', 'maps-9-played-only');
+          buildColumnToggles('maps-9');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-e1e38558-c4b6-4b39-be6a-a7d4c72a63f1" open>
 <summary><h2>Viejos Locos</h2></summary>
@@ -2892,24 +3070,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-10',0,false)">Nickname</th>
             <th onclick="sortTable('players-10',1,true)">Maps</th>
-            <th onclick="sortTable('players-10',2,true)">KD</th>
-            <th onclick="sortTable('players-10',3,true)">ADR</th>
-            <th onclick="sortTable('players-10',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-10',6,true)">HS%</th>
-            <th onclick="sortTable('players-10',7,true)">AWP</th>
-            <th onclick="sortTable('players-10',8,true)">3K</th>
-            <th onclick="sortTable('players-10',9,true)">4K</th>
-            <th onclick="sortTable('players-10',10,true)">5K</th>
-            <th onclick="sortTable('players-10',11,true)">Util</th>
+            <th onclick="sortTable('players-10',2,true)">Rounds</th>
+            <th onclick="sortTable('players-10',3,true)">KD</th>
+            <th onclick="sortTable('players-10',4,true)">ADR</th>
+            <th onclick="sortTable('players-10',5,true)">KR</th>
+            <th onclick="sortTable('players-10',6,true)">Kill</th>
+            <th onclick="sortTable('players-10',7,true)">Death</th>
+            <th onclick="sortTable('players-10',8,true)">Assists</th>
+            <th onclick="sortTable('players-10',9,true)">HS%</th>
+            <th onclick="sortTable('players-10',10,true)">AWP</th>
+            <th onclick="sortTable('players-10',11,true)">3K</th>
+            <th onclick="sortTable('players-10',12,true)">4K</th>
+            <th onclick="sortTable('players-10',13,true)">5K</th>
+            <th onclick="sortTable('players-10',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>Tops0n</td>
                 <td>8</td>
+                <td>185</td>
                 <td>1.50</td>
                 <td>102.5</td>
                 <td>0.94</td>
-                <td>170/113/66</td>
+                <td>170</td>
+                <td>113</td>
+                <td>66</td>
                 <td>47.0</td>
                 <td>16</td>
                 <td>11</td>
@@ -2920,10 +3104,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Chade</td>
                 <td>8</td>
+                <td>185</td>
                 <td>1.23</td>
                 <td>91.2</td>
                 <td>0.86</td>
-                <td>152/124/57</td>
+                <td>152</td>
+                <td>124</td>
+                <td>57</td>
                 <td>36.6</td>
                 <td>9</td>
                 <td>9</td>
@@ -2934,10 +3121,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>juqi94</td>
                 <td>8</td>
+                <td>185</td>
                 <td>1.13</td>
                 <td>81.7</td>
                 <td>0.80</td>
-                <td>139/123/41</td>
+                <td>139</td>
+                <td>123</td>
+                <td>41</td>
                 <td>33.0</td>
                 <td>4</td>
                 <td>7</td>
@@ -2948,10 +3138,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>NOTTAAA</td>
                 <td>8</td>
+                <td>185</td>
                 <td>1.01</td>
                 <td>76.3</td>
                 <td>0.68</td>
-                <td>123/122/40</td>
+                <td>123</td>
+                <td>122</td>
+                <td>40</td>
                 <td>35.6</td>
                 <td>0</td>
                 <td>2</td>
@@ -2962,10 +3155,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Nurkkala</td>
                 <td>6</td>
+                <td>138</td>
                 <td>0.83</td>
                 <td>65.1</td>
                 <td>0.59</td>
-                <td>81/98/37</td>
+                <td>81</td>
+                <td>98</td>
+                <td>37</td>
                 <td>31.7</td>
                 <td>1</td>
                 <td>2</td>
@@ -2976,10 +3172,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>GoachSintti</td>
                 <td>2</td>
+                <td>47</td>
                 <td>0.47</td>
                 <td>46.4</td>
                 <td>0.32</td>
-                <td>15/32/9</td>
+                <td>15</td>
+                <td>32</td>
+                <td>9</td>
                 <td>30.0</td>
                 <td>0</td>
                 <td>0</td>
@@ -2988,27 +3187,26 @@ function buildColumnToggles(tableId){
                 <td>100</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-10', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-10', 3, 50, 120, false);</script>
-<script>colorizeRange('players-10', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-10', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-10', 4, 50, 120, false);</script>
+<script>colorizeRange('players-10', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-10');</script>
 <div class="chips">
-<span class="chip">Most banned: de_train (3×)</span>
-<span class="chip">Most picked: de_dust2 (1×)</span>
-<span class="chip">Best WR: de_inferno (100%)</span>
-<span class="chip">Map to avoid: de_dust2 (50%)</span>
+<span class="chip">Most banned: Train (3×)</span>
+<span class="chip">Most picked: Dust II (1×)</span>
+<span class="chip">Best WR: Inferno (100%)</span>
+<span class="chip">Map to avoid: Dust II (50%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-10-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-10', 'Viejos Locos_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-10"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-10-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-10"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-10" data-sort-col="1" data-sort-dir="desc">
 
@@ -3030,7 +3228,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -3046,7 +3244,7 @@ function buildColumnToggles(tableId){
             <td>2</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -3062,7 +3260,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -3078,7 +3276,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>1</td>
             <td>1</td>
             <td>0</td>
@@ -3094,7 +3292,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3110,7 +3308,7 @@ function buildColumnToggles(tableId){
             <td>2</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -3126,7 +3324,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3143,30 +3341,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-10');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-10', 7, false);  // KD
-  colorizeAuto('maps-10', 8, false);  // ADR
-  colorizeRange('maps-10', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-10');
-  bindPlayedOnly('maps-10', 'maps-10-played-only');
-  buildColumnToggles('maps-10');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-10');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-10', 7, false);  // KD
+          colorizeAuto('maps-10', 8, false);  // ADR
+          colorizeRange('maps-10', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-10');
+          bindPlayedOnly('maps-10', 'maps-10-played-only');
+          buildColumnToggles('maps-10');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-e5cdd350-8cf1-4bf4-93c9-8339020a231b" open>
 <summary><h2>Ravavi</h2></summary>
@@ -3176,24 +3374,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-11',0,false)">Nickname</th>
             <th onclick="sortTable('players-11',1,true)">Maps</th>
-            <th onclick="sortTable('players-11',2,true)">KD</th>
-            <th onclick="sortTable('players-11',3,true)">ADR</th>
-            <th onclick="sortTable('players-11',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-11',6,true)">HS%</th>
-            <th onclick="sortTable('players-11',7,true)">AWP</th>
-            <th onclick="sortTable('players-11',8,true)">3K</th>
-            <th onclick="sortTable('players-11',9,true)">4K</th>
-            <th onclick="sortTable('players-11',10,true)">5K</th>
-            <th onclick="sortTable('players-11',11,true)">Util</th>
+            <th onclick="sortTable('players-11',2,true)">Rounds</th>
+            <th onclick="sortTable('players-11',3,true)">KD</th>
+            <th onclick="sortTable('players-11',4,true)">ADR</th>
+            <th onclick="sortTable('players-11',5,true)">KR</th>
+            <th onclick="sortTable('players-11',6,true)">Kill</th>
+            <th onclick="sortTable('players-11',7,true)">Death</th>
+            <th onclick="sortTable('players-11',8,true)">Assists</th>
+            <th onclick="sortTable('players-11',9,true)">HS%</th>
+            <th onclick="sortTable('players-11',10,true)">AWP</th>
+            <th onclick="sortTable('players-11',11,true)">3K</th>
+            <th onclick="sortTable('players-11',12,true)">4K</th>
+            <th onclick="sortTable('players-11',13,true)">5K</th>
+            <th onclick="sortTable('players-11',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>jkoo-</td>
                 <td>4</td>
+                <td>77</td>
                 <td>1.04</td>
                 <td>78.2</td>
                 <td>0.76</td>
-                <td>58/56/22</td>
+                <td>58</td>
+                <td>56</td>
+                <td>22</td>
                 <td>28.2</td>
                 <td>0</td>
                 <td>6</td>
@@ -3204,10 +3408,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>NikeZZ</td>
                 <td>4</td>
+                <td>75</td>
                 <td>1.12</td>
                 <td>86.8</td>
                 <td>0.78</td>
-                <td>58/52/25</td>
+                <td>58</td>
+                <td>52</td>
+                <td>25</td>
                 <td>46.2</td>
                 <td>0</td>
                 <td>5</td>
@@ -3218,10 +3425,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Kojootti-</td>
                 <td>4</td>
+                <td>77</td>
                 <td>0.98</td>
                 <td>84.8</td>
                 <td>0.74</td>
-                <td>56/57/22</td>
+                <td>56</td>
+                <td>57</td>
+                <td>22</td>
                 <td>48.8</td>
                 <td>4</td>
                 <td>1</td>
@@ -3232,10 +3442,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>FleexFix</td>
                 <td>4</td>
+                <td>75</td>
                 <td>0.81</td>
                 <td>69.9</td>
                 <td>0.63</td>
-                <td>47/58/17</td>
+                <td>47</td>
+                <td>58</td>
+                <td>17</td>
                 <td>35.5</td>
                 <td>0</td>
                 <td>0</td>
@@ -3246,10 +3459,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Lampiscsgo</td>
                 <td>4</td>
+                <td>75</td>
                 <td>0.74</td>
                 <td>61.4</td>
                 <td>0.53</td>
-                <td>40/54/16</td>
+                <td>40</td>
+                <td>54</td>
+                <td>16</td>
                 <td>32.8</td>
                 <td>0</td>
                 <td>1</td>
@@ -3260,10 +3476,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Mirkk1</td>
                 <td>2</td>
+                <td>40</td>
                 <td>0.88</td>
                 <td>72.0</td>
                 <td>0.75</td>
-                <td>30/34/8</td>
+                <td>30</td>
+                <td>34</td>
+                <td>8</td>
                 <td>36.0</td>
                 <td>0</td>
                 <td>1</td>
@@ -3274,10 +3493,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Ra1ppa</td>
                 <td>2</td>
+                <td>38</td>
                 <td>0.89</td>
                 <td>81.0</td>
                 <td>0.66</td>
-                <td>25/28/8</td>
+                <td>25</td>
+                <td>28</td>
+                <td>8</td>
                 <td>50.0</td>
                 <td>2</td>
                 <td>0</td>
@@ -3288,10 +3510,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>MELA</td>
                 <td>2</td>
+                <td>40</td>
                 <td>0.73</td>
                 <td>67.5</td>
                 <td>0.55</td>
-                <td>22/30/11</td>
+                <td>22</td>
+                <td>30</td>
+                <td>11</td>
                 <td>41.0</td>
                 <td>0</td>
                 <td>1</td>
@@ -3302,10 +3527,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>HeQuu</td>
                 <td>2</td>
+                <td>38</td>
                 <td>0.61</td>
                 <td>56.3</td>
                 <td>0.49</td>
-                <td>19/31/6</td>
+                <td>19</td>
+                <td>31</td>
+                <td>6</td>
                 <td>52.5</td>
                 <td>0</td>
                 <td>0</td>
@@ -3316,10 +3544,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Kustiiii</td>
                 <td>2</td>
+                <td>40</td>
                 <td>0.52</td>
                 <td>57.0</td>
                 <td>0.40</td>
-                <td>16/31/13</td>
+                <td>16</td>
+                <td>31</td>
+                <td>13</td>
                 <td>50.0</td>
                 <td>1</td>
                 <td>0</td>
@@ -3328,27 +3559,26 @@ function buildColumnToggles(tableId){
                 <td>316</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-11', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-11', 3, 50, 120, false);</script>
-<script>colorizeRange('players-11', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-11', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-11', 4, 50, 120, false);</script>
+<script>colorizeRange('players-11', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-11');</script>
 <div class="chips">
-<span class="chip">Most banned: de_nuke (3×)</span>
-<span class="chip">Most picked: de_inferno (2×)</span>
-<span class="chip">Best WR: de_overpass (50%)</span>
-<span class="chip">Map to avoid: de_ancient (0%)</span>
+<span class="chip">Most banned: Nuke (3×)</span>
+<span class="chip">Most picked: Inferno (2×)</span>
+<span class="chip">Best WR: Overpass (50%)</span>
+<span class="chip">Map to avoid: Ancient (0%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-11-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-11', 'Ravavi_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-11"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-11-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-11"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-11" data-sort-col="1" data-sort-dir="desc">
 
@@ -3370,7 +3600,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>2</td>
             <td>0</td>
             <td>2</td>
@@ -3386,7 +3616,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3402,7 +3632,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>2</td>
             <td>2</td>
             <td>0</td>
@@ -3418,7 +3648,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3434,7 +3664,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3450,7 +3680,7 @@ function buildColumnToggles(tableId){
             <td>3</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -3466,7 +3696,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3483,30 +3713,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-11');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-11', 7, false);  // KD
-  colorizeAuto('maps-11', 8, false);  // ADR
-  colorizeRange('maps-11', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-11');
-  bindPlayedOnly('maps-11', 'maps-11-played-only');
-  buildColumnToggles('maps-11');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-11');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-11', 7, false);  // KD
+          colorizeAuto('maps-11', 8, false);  // ADR
+          colorizeRange('maps-11', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-11');
+          bindPlayedOnly('maps-11', 'maps-11-played-only');
+          buildColumnToggles('maps-11');
+        })();
+        </script>
+        
 </details>
 <details class="team-section" id="team-ff44b70b-67fe-4dd9-bbf4-5f3374281e80" open>
 <summary><h2>Valoja Perkele</h2></summary>
@@ -3516,24 +3746,30 @@ function buildColumnToggles(tableId){
 <thead><tr>
             <th onclick="sortTable('players-12',0,false)">Nickname</th>
             <th onclick="sortTable('players-12',1,true)">Maps</th>
-            <th onclick="sortTable('players-12',2,true)">KD</th>
-            <th onclick="sortTable('players-12',3,true)">ADR</th>
-            <th onclick="sortTable('players-12',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('players-12',6,true)">HS%</th>
-            <th onclick="sortTable('players-12',7,true)">AWP</th>
-            <th onclick="sortTable('players-12',8,true)">3K</th>
-            <th onclick="sortTable('players-12',9,true)">4K</th>
-            <th onclick="sortTable('players-12',10,true)">5K</th>
-            <th onclick="sortTable('players-12',11,true)">Util</th>
+            <th onclick="sortTable('players-12',2,true)">Rounds</th>
+            <th onclick="sortTable('players-12',3,true)">KD</th>
+            <th onclick="sortTable('players-12',4,true)">ADR</th>
+            <th onclick="sortTable('players-12',5,true)">KR</th>
+            <th onclick="sortTable('players-12',6,true)">Kill</th>
+            <th onclick="sortTable('players-12',7,true)">Death</th>
+            <th onclick="sortTable('players-12',8,true)">Assists</th>
+            <th onclick="sortTable('players-12',9,true)">HS%</th>
+            <th onclick="sortTable('players-12',10,true)">AWP</th>
+            <th onclick="sortTable('players-12',11,true)">3K</th>
+            <th onclick="sortTable('players-12',12,true)">4K</th>
+            <th onclick="sortTable('players-12',13,true)">5K</th>
+            <th onclick="sortTable('players-12',14,true)">Util</th>
         </tr></thead><tbody>
 <tr>
                 <td>Jukezone</td>
                 <td>6</td>
+                <td>112</td>
                 <td>1.41</td>
                 <td>85.3</td>
                 <td>0.91</td>
-                <td>103/73/26</td>
+                <td>103</td>
+                <td>73</td>
+                <td>26</td>
                 <td>30.0</td>
                 <td>11</td>
                 <td>8</td>
@@ -3544,10 +3780,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>igetsu</td>
                 <td>6</td>
+                <td>112</td>
                 <td>0.99</td>
                 <td>91.6</td>
                 <td>0.71</td>
-                <td>83/84/44</td>
+                <td>83</td>
+                <td>84</td>
+                <td>44</td>
                 <td>39.0</td>
                 <td>5</td>
                 <td>5</td>
@@ -3558,10 +3797,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Jekkupatteri</td>
                 <td>6</td>
+                <td>112</td>
                 <td>0.82</td>
                 <td>88.9</td>
                 <td>0.72</td>
-                <td>79/96/38</td>
+                <td>79</td>
+                <td>96</td>
+                <td>38</td>
                 <td>43.5</td>
                 <td>0</td>
                 <td>7</td>
@@ -3572,10 +3814,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Posahh</td>
                 <td>4</td>
+                <td>72</td>
                 <td>0.73</td>
                 <td>59.9</td>
                 <td>0.51</td>
-                <td>38/52/19</td>
+                <td>38</td>
+                <td>52</td>
+                <td>19</td>
                 <td>18.5</td>
                 <td>1</td>
                 <td>0</td>
@@ -3586,10 +3831,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>futzieee</td>
                 <td>4</td>
+                <td>80</td>
                 <td>0.63</td>
                 <td>56.7</td>
                 <td>0.46</td>
-                <td>37/59/14</td>
+                <td>37</td>
+                <td>59</td>
+                <td>14</td>
                 <td>21.8</td>
                 <td>7</td>
                 <td>0</td>
@@ -3600,10 +3848,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>kuerkki</td>
                 <td>2</td>
+                <td>40</td>
                 <td>0.54</td>
                 <td>56.8</td>
                 <td>0.48</td>
-                <td>19/35/12</td>
+                <td>19</td>
+                <td>35</td>
+                <td>12</td>
                 <td>47.5</td>
                 <td>0</td>
                 <td>0</td>
@@ -3614,10 +3865,13 @@ function buildColumnToggles(tableId){
 <tr>
                 <td>Sharax3m</td>
                 <td>2</td>
+                <td>32</td>
                 <td>0.56</td>
                 <td>41.3</td>
                 <td>0.43</td>
-                <td>14/25/5</td>
+                <td>14</td>
+                <td>25</td>
+                <td>5</td>
                 <td>27.5</td>
                 <td>0</td>
                 <td>1</td>
@@ -3626,27 +3880,26 @@ function buildColumnToggles(tableId){
                 <td>138</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-12', 2, 0.6, 1.5, false);</script>
-<script>colorizeRange('players-12', 3, 50, 120, false);</script>
-<script>colorizeRange('players-12', 4, 0.6, 1.2, false);</script>
+<script>colorizeRange('players-12', 3, 0.6, 1.5, false);</script>
+<script>colorizeRange('players-12', 4, 50, 120, false);</script>
+<script>colorizeRange('players-12', 5, 0.6, 1.2, false);</script>
 <script>applyDefaultSort('players-12');</script>
 <div class="chips">
-<span class="chip">Most banned: de_mirage (3×)</span>
-<span class="chip">Most picked: de_ancient (2×)</span>
-<span class="chip">Best WR: de_inferno (100%)</span>
-<span class="chip">Map to avoid: de_ancient (0%)</span>
+<span class="chip">Most banned: Mirage (3×)</span>
+<span class="chip">Most picked: Ancient (2×)</span>
+<span class="chip">Best WR: Inferno (100%)</span>
+<span class="chip">Map to avoid: Ancient (0%)</span>
 <span class="chip">Ban focus: 100%</span>
 </div>
 
-<div class="toolbar">
-  <label><input type="checkbox" id="maps-12-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('maps-12', 'Valoja Perkele_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="maps-12"></div>
-  </details>
-</div>
-
+        <div class="toolbar">
+          <label><input type="checkbox" id="maps-12-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="maps-12"></div>
+          </details>
+        </div>
+        
 <h3>Map Stats</h3>
 <table id="maps-12" data-sort-col="1" data-sort-dir="desc">
 
@@ -3668,7 +3921,7 @@ function buildColumnToggles(tableId){
         </tr></thead><tbody>
         
 <tr>
-            <td>de_ancient</td>
+            <td>Ancient</td>
             <td>2</td>
             <td>2</td>
             <td>0</td>
@@ -3684,7 +3937,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_dust2</td>
+            <td>Dust II</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3700,7 +3953,7 @@ function buildColumnToggles(tableId){
             <td>1</td>
             </tr>
 <tr>
-            <td>de_inferno</td>
+            <td>Inferno</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -3716,7 +3969,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_mirage</td>
+            <td>Mirage</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3732,7 +3985,7 @@ function buildColumnToggles(tableId){
             <td>3</td>
             </tr>
 <tr>
-            <td>de_nuke</td>
+            <td>Nuke</td>
             <td>0</td>
             <td>0</td>
             <td>0</td>
@@ -3748,7 +4001,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_overpass</td>
+            <td>Overpass</td>
             <td>2</td>
             <td>1</td>
             <td>1</td>
@@ -3764,7 +4017,7 @@ function buildColumnToggles(tableId){
             <td>0</td>
             </tr>
 <tr>
-            <td>de_train</td>
+            <td>Train</td>
             <td>1</td>
             <td>0</td>
             <td>1</td>
@@ -3781,30 +4034,30 @@ function buildColumnToggles(tableId){
             </tr>
 </tbody></table>
 
-<script>
-(function(){
-  const t = document.getElementById('maps-12');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('maps-12', 7, false);  // KD
-  colorizeAuto('maps-12', 8, false);  // ADR
-  colorizeRange('maps-12', 9, -10, 10, false); // RD
-  applyDefaultSort('maps-12');
-  bindPlayedOnly('maps-12', 'maps-12-played-only');
-  buildColumnToggles('maps-12');
-})();
-</script>
-
+        <script>
+        (function(){
+          const t = document.getElementById('maps-12');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('maps-12', 7, false);  // KD
+          colorizeAuto('maps-12', 8, false);  // ADR
+          colorizeRange('maps-12', 9, -10, 10, false); // RD
+          applyDefaultSort('maps-12');
+          bindPlayedOnly('maps-12', 'maps-12-played-only');
+          buildColumnToggles('maps-12');
+        })();
+        </script>
+        
 </details>
 </div>
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>5 Divisioona S11 – generoitu 2025-08-27 23:49</title>
+<title>5 Divisioona S11 – generoitu 2025-08-28 00:14</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -92,8 +92,6 @@ th[title] { text-decoration: underline dotted #777; text-underline-offset: 3px; 
 
 /* Toolbar (filter + CSV + columns) */
 .toolbar{ display:flex; gap:.75rem; align-items:center; margin:.4rem 0 .5rem; flex-wrap:wrap; }
-.toolbar .btn{ background:#3a3a3a; color:#fff; border:1px solid var(--border); padding:.35rem .6rem; border-radius:8px; cursor:pointer; }
-.toolbar .btn:hover{ background:#4a4a4a; }
 details.cols summary{ cursor:pointer; }
 details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
 
@@ -186,24 +184,6 @@ function bindPlayedOnly(tableId, chkId){
   });
 }
 
-// --- CSV-vienti ---
-function exportTableCSV(tableId, filename){
-  const t = document.getElementById(tableId);
-  let csv = [];
-  const rows = [...t.querySelectorAll('tr')];
-  for(const r of rows){
-    const cells = [...r.children].map(c => {
-      const val = c.querySelector('.bar .val')?.textContent || c.textContent;
-      return '"' + val.replace(/"/g,'""').trim() + '"';
-    });
-    csv.push(cells.join(','));
-  }
-  const blob = new Blob([csv.join('\n')], {type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 // --- Saraketooglet ---
 function buildColumnToggles(tableId){
   const t = document.getElementById(tableId);
@@ -229,7 +209,7 @@ function buildColumnToggles(tableId){
 <body>
 
 <div class="page">
-<h1>5 Divisioona S11 <span class='muted'>(generoitu 2025-08-27 23:49)</span></h1>
+<h1>5 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 00:14)</span></h1>
 <div class="nav">
 </div>
 <div class="muted">Vinkki: klikkaa joukkueen otsikkoriviä avataksesi tai sulkeaksesi sen.</div>

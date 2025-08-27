@@ -106,8 +106,6 @@ th[title] { text-decoration: underline dotted #777; text-underline-offset: 3px; 
 
 /* Toolbar (filter + CSV + columns) */
 .toolbar{ display:flex; gap:.75rem; align-items:center; margin:.4rem 0 .5rem; flex-wrap:wrap; }
-.toolbar .btn{ background:#3a3a3a; color:#fff; border:1px solid var(--border); padding:.35rem .6rem; border-radius:8px; cursor:pointer; }
-.toolbar .btn:hover{ background:#4a4a4a; }
 details.cols summary{ cursor:pointer; }
 details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
 
@@ -200,24 +198,6 @@ function bindPlayedOnly(tableId, chkId){
   });
 }
 
-// --- CSV-vienti ---
-function exportTableCSV(tableId, filename){
-  const t = document.getElementById(tableId);
-  let csv = [];
-  const rows = [...t.querySelectorAll('tr')];
-  for(const r of rows){
-    const cells = [...r.children].map(c => {
-      const val = c.querySelector('.bar .val')?.textContent || c.textContent;
-      return '"' + val.replace(/"/g,'""').trim() + '"';
-    });
-    csv.push(cells.join(','));
-  }
-  const blob = new Blob([csv.join('\\n')], {type:'text/csv;charset=utf-8;'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 // --- Saraketooglet ---
 function buildColumnToggles(tableId){
   const t = document.getElementById(tableId);
@@ -251,6 +231,20 @@ HTML_FOOT = """
 # ------------------------------
 # DB helpers
 # ------------------------------
+
+MAP_NAME_DISPLAY = {
+    "de_nuke": "Nuke",
+    "de_inferno": "Inferno",
+    "de_mirage": "Mirage",
+    "de_overpass": "Overpass",
+    "de_dust2": "Dust II",
+    "de_ancient": "Ancient",
+    "de_train": "Train",
+}
+
+def pretty_map_name(raw: str) -> str:
+    return MAP_NAME_DISPLAY.get(raw, raw)
+
 def q(con, sql, params=()):
     cur = con.execute(sql, params)
     rows = [dict(r) for r in cur.fetchall()]
@@ -298,18 +292,23 @@ def compute_team_summary(con, division_id: int, team_id: str):
 
 def compute_player_table(con, division_id: int, team_id: str):
     rows = q(con, """
-    SELECT nickname,
-           COUNT(*) as maps_played,
-           SUM(kills) as k, SUM(deaths) as d, SUM(assists) as a,
-           AVG(adr) as adr, AVG(kr) as kr,
-           AVG(hs_pct) as hs_pct,
-           SUM(sniper_kills) as awp_kills,
-           SUM(mk_3k) as k3, SUM(mk_4k) as k4, SUM(mk_5k) as k5,
-           SUM(utility_damage) as util
+    SELECT ps.nickname AS nickname,
+           COUNT(*) AS maps_played,
+           SUM(ps.kills)  AS k,
+           SUM(ps.deaths) AS d,
+           SUM(ps.assists) AS a,
+           AVG(ps.adr) AS adr,
+           AVG(ps.kr)  AS kr,
+           AVG(ps.hs_pct) AS hs_pct,
+           SUM(ps.sniper_kills) AS awp_kills,
+           SUM(ps.mk_3k) AS k3, SUM(ps.mk_4k) AS k4, SUM(ps.mk_5k) AS k5,
+           SUM(ps.utility_damage) AS util,
+           SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds_played
     FROM player_stats ps
-    JOIN matches m ON m.match_id=ps.match_id
-    WHERE m.division_id=? AND ps.team_id=?
-    GROUP BY nickname
+    JOIN matches m ON m.match_id = ps.match_id
+    JOIN maps mp   ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+    WHERE m.division_id = ? AND ps.team_id = ?
+    GROUP BY ps.nickname
     ORDER BY k DESC
     """, (division_id, team_id))
     table = []
@@ -318,16 +317,20 @@ def compute_player_table(con, division_id: int, team_id: str):
         table.append({
             "nickname": r["nickname"],
             "maps_played": r["maps_played"],
+            "rounds": r["rounds_played"] or 0,
             "kd": kd,
             "adr": r["adr"] or 0.0,
             "kr": r["kr"] or 0.0,
-            "kda": f"{r['k']}/{r['d']}/{r['a']}",
+            "kill": f"{r['k']}",
+            "death": f"{r['d']}",
+            "assist": f"{r['a']}",
             "hs_pct": r["hs_pct"] or 0.0,
             "awp_kills": r["awp_kills"] or 0,
             "k3": r["k3"] or 0, "k4": r["k4"] or 0, "k5": r["k5"] or 0,
             "util": r["util"] or 0,
         })
     return table
+
 
 def compute_division_map_avgs(con, division_id: int):
     div_avg = {}
@@ -515,25 +518,32 @@ def render_division(con, div):
         html.append("""<thead><tr>
             <th onclick="sortTable('{tid}',0,false)">Nickname</th>
             <th onclick="sortTable('{tid}',1,true)">Maps</th>
-            <th onclick="sortTable('{tid}',2,true)">KD</th>
-            <th onclick="sortTable('{tid}',3,true)">ADR</th>
-            <th onclick="sortTable('{tid}',4,true)">KR</th>
-            <th>K/D/A</th>
-            <th onclick="sortTable('{tid}',6,true)">HS%</th>
-            <th onclick="sortTable('{tid}',7,true)">AWP</th>
-            <th onclick="sortTable('{tid}',8,true)">3K</th>
-            <th onclick="sortTable('{tid}',9,true)">4K</th>
-            <th onclick="sortTable('{tid}',10,true)">5K</th>
-            <th onclick="sortTable('{tid}',11,true)">Util</th>
+            <th onclick="sortTable('{tid}',2,true)">Rounds</th>
+            <th onclick="sortTable('{tid}',3,true)">KD</th>
+            <th onclick="sortTable('{tid}',4,true)">ADR</th>
+            <th onclick="sortTable('{tid}',5,true)">KR</th>
+            <th onclick="sortTable('{tid}',6,true)">Kill</th>
+            <th onclick="sortTable('{tid}',7,true)">Death</th>
+            <th onclick="sortTable('{tid}',8,true)">Assists</th>
+            <th onclick="sortTable('{tid}',9,true)">HS%</th>
+            <th onclick="sortTable('{tid}',10,true)">AWP</th>
+            <th onclick="sortTable('{tid}',11,true)">3K</th>
+            <th onclick="sortTable('{tid}',12,true)">4K</th>
+            <th onclick="sortTable('{tid}',13,true)">5K</th>
+            <th onclick="sortTable('{tid}',14,true)">Util</th>
         </tr></thead><tbody>""".replace("{tid}", tid))
+
         for p in players:
             html.append(f"""<tr>
                 <td>{p["nickname"]}</td>
                 <td>{p["maps_played"]}</td>
+                <td>{p["rounds"]}</td>
                 <td>{p["kd"]:.2f}</td>
                 <td>{p["adr"]:.1f}</td>
                 <td>{p["kr"]:.2f}</td>
-                <td>{p["kda"]}</td>
+                <td>{p["kill"]}</td>
+                <td>{p["death"]}</td>
+                <td>{p["assist"]}</td>
                 <td>{p["hs_pct"]:.1f}</td>
                 <td>{p["awp_kills"]}</td>
                 <td>{p["k3"]}</td>
@@ -541,10 +551,12 @@ def render_division(con, div):
                 <td>{p["k5"]}</td>
                 <td>{int(p["util"])}</td>
             </tr>""")
+
         html.append("</tbody></table>")
-        html.append(f"<script>colorizeRange('{tid}', 2, 0.6, 1.5, false);</script>")
-        html.append(f"<script>colorizeRange('{tid}', 3, 50, 120, false);</script>")
-        html.append(f"<script>colorizeRange('{tid}', 4, 0.6, 1.2, false);</script>")
+        html.append(f"<script>colorizeRange('{tid}', 3, 0.6, 1.5, false);</script>")
+        html.append(f"<script>colorizeRange('{tid}', 4, 50, 120, false);</script>")
+        html.append(f"<script>colorizeRange('{tid}', 5, 0.6, 1.2, false);</script>")
+
         html.append(f"<script>applyDefaultSort('{tid}');</script>")
 
         # Map stats
@@ -560,28 +572,28 @@ def render_division(con, div):
 
         html.append('<div class="chips">')
         if most_ban and most_ban["total_own_ban"]>0:
-            html.append(f'<span class="chip">Most banned: {most_ban["map"]} ({most_ban["total_own_ban"]}×)</span>')
+            html.append(f'<span class="chip">Most banned: {pretty_map_name(most_ban["map"])} ({most_ban["total_own_ban"]}×)</span>')
         if most_pick and most_pick["picks"]>0:
-            html.append(f'<span class="chip">Most picked: {most_pick["map"]} ({most_pick["picks"]}×)</span>')
+            html.append(f'<span class="chip">Most picked: {pretty_map_name(most_pick["map"])} ({most_pick["picks"]}×)</span>')
         if best_wr and best_wr["wr"]>0:
-            html.append(f'<span class="chip">Best WR: {best_wr["map"]} ({best_wr["wr"]:.0f}%)</span>')
+            html.append(f'<span class="chip">Best WR: {pretty_map_name(best_wr["map"])} ({best_wr["wr"]:.0f}%)</span>')
         if avoid:
-            html.append(f'<span class="chip">Map to avoid: {avoid["map"]} ({avoid["wr"]:.0f}%)</span>')
+            html.append(f'<span class="chip">Map to avoid: {pretty_map_name(avoid["map"])} ({avoid["wr"]:.0f}%)</span>')
         html.append(f'<span class="chip">Ban focus: {ban_focus:.0f}%</span>')
         html.append('</div>')
 
         # Toolbar (filter + CSV + column toggles)
         tid2 = f"maps-{ti}"
         html.append(f"""
-<div class="toolbar">
-  <label><input type="checkbox" id="{tid2}-played-only"> Show played only</label>
-  <button class="btn" onclick="exportTableCSV('{tid2}', '{team_name.replace("'", "")}_maps.csv')">Download CSV</button>
-  <details class="cols">
-    <summary>Columns</summary>
-    <div data-for="{tid2}"></div>
-  </details>
-</div>
-""")
+        <div class="toolbar">
+          <label><input type="checkbox" id="{tid2}-played-only"> Show played only</label>
+          <details class="cols">
+            <summary>Columns</summary>
+            <div data-for="{tid2}"></div>
+          </details>
+        </div>
+        """)
+
 
         html.append(f'<h3>Map Stats</h3>')
         html.append(f'<table id="{tid2}" data-sort-col="1" data-sort-dir="desc">')
@@ -612,7 +624,7 @@ def render_division(con, div):
                 dkd = (r["kd"] or 0.0) - div_avgs[r["map"]][0]
                 dadr= (r["adr"] or 0.0) - div_avgs[r["map"]][1]
             html.append(f"""<tr>
-            <td>{r["map"]}</td>
+            <td>{pretty_map_name(r["map"])}</td>
             <td>{r["played"]}</td>
             <td>{r["picks"]}</td>
             <td>{r["opp_picks"]}</td>
@@ -631,30 +643,30 @@ def render_division(con, div):
 
         # WR-bars + väritys + oletussorttaus + työkalut
         html.append("""
-<script>
-(function(){
-  const t = document.getElementById('{TID}');
-  if (!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-  for (const tr of rows) {
-    const played = parseInt(tr.cells[1].textContent||'0',10);
-    [4,5,6].forEach(function(i){
-      const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-      renderBar(tr.cells[i], isFinite(num) ? num : 0);
-      const span = tr.cells[i].querySelector('.bar > span');
-      span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-      tr.cells[i].title = 'Played: ' + played;
-    });
-  }
-  colorizeAuto('{TID}', 7, false);  // KD
-  colorizeAuto('{TID}', 8, false);  // ADR
-  colorizeRange('{TID}', 9, -10, 10, false); // RD
-  applyDefaultSort('{TID}');
-  bindPlayedOnly('{TID}', '{TID}-played-only');
-  buildColumnToggles('{TID}');
-})();
-</script>
-""".replace("{TID}", tid2))
+        <script>
+        (function(){
+          const t = document.getElementById('{TID}');
+          if (!t || !t.tBodies.length) return;
+          const rows = t.tBodies[0].rows;
+          for (const tr of rows) {
+            const played = parseInt(tr.cells[1].textContent||'0',10);
+            [4,5,6].forEach(function(i){
+              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+              renderBar(tr.cells[i], isFinite(num) ? num : 0);
+              const span = tr.cells[i].querySelector('.bar > span');
+              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+              tr.cells[i].title = 'Played: ' + played;
+            });
+          }
+          colorizeAuto('{TID}', 7, false);  // KD
+          colorizeAuto('{TID}', 8, false);  // ADR
+          colorizeRange('{TID}', 9, -10, 10, false); // RD
+          applyDefaultSort('{TID}');
+          bindPlayedOnly('{TID}', '{TID}-played-only');
+          buildColumnToggles('{TID}');
+        })();
+        </script>
+        """.replace("{TID}", tid2))
 
         html.append("</details>")  # team section
 
@@ -687,29 +699,6 @@ def write_index():
         # Huom: linkki suhteessa index.html → output/<slug>.html
         html.append(f'<a href="output/{div["slug"]}.html">{div["name"]}</a>')
     html.append('</div>')
-
-    # (Valinnainen) lista myös taulukkona
-    html.append("""
-    <table id="divisions" data-sort-col="0" data-sort-dir="asc">
-      <thead>
-        <tr>
-          <th onclick="sortTable('divisions',0,false)">Division</th>
-          <th onclick="sortTable('divisions',1,false)">Slug</th>
-          <th>Raportti</th>
-        </tr>
-      </thead>
-      <tbody>
-    """)
-    for div in DIVISIONS:
-        link = f'output/{div["slug"]}.html'
-        html.append(f"""
-          <tr>
-            <td>{div["name"]}</td>
-            <td>{div["slug"]}</td>
-            <td><a href="{link}">{link}</a></td>
-          </tr>
-        """)
-    html.append("</tbody></table>")
 
     html.append("</div>")  # .page
     html.append(HTML_FOOT)
