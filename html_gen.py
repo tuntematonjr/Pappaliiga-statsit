@@ -478,10 +478,10 @@ def render_division(con, div):
 
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    html = [HTML_HEAD.replace("{title}", div["name"])]
+    html = [HTML_HEAD.replace("{title}", f"{div['name']} – generoitu {ts}")]
     html.append('<div class="page">')
 
-    html.append(f"<h1>{div['name']}</h1>")
+    html.append(f"<h1>{div['name']} <span class='muted'>(generoitu {ts})</span></h1>")
     html.append('<div class="nav">')
     for t in teams:
         html.append(f'<a href="#team-{t["team_id"]}">{t["team_name"] or t["team_id"]}</a>')
