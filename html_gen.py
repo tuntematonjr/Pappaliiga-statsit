@@ -745,6 +745,7 @@ def render_division(con, div):
 
         # ---------- ADVANCED ----------
         tid_adv = f"players-adv-{ti}"
+        html.append(f'<div class="tab-panel" data-tab="advanced">')
         html.append(f'<table id="{tid_adv}" data-sort-col="7" data-sort-dir="desc">')  # oletus: UDPR
         html.append("<thead><tr>")
         html.append(f"<th onclick=\"sortTable('{tid_adv}',0,false)\">Nickname</th>")
@@ -796,12 +797,11 @@ def render_division(con, div):
         html.append("</tbody></table>")
 
         # Väritykset: WR:t vihreäksi kun korkea
-        html.append(f"<script>colorizeRange('{tid_adv}', 2, 0, 100, false);</script>")  # 1v1 WR
-        html.append(f"<script>colorizeRange('{tid_adv}', 3, 0, 100, false);</script>")  # 1v2 WR
-        html.append(f"<script>colorizeRange('{tid_adv}', 6, 0, 100, false);</script>")  # Entry WR
-        html.append(f"<script>colorizeRange('{tid_adv}', 7, 0.5, 15, false);</script>") # UDPR
-        html.append(f"<script>colorizeRange('{tid_adv}', 8, 0.6, 2.2, false);</script>") # Impact
-
+        html.append(f"<script>colorizeRange('{tid_adv}', 2, 0, 100, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_adv}', 3, 0, 100, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_adv}', 6, 0, 100, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_adv}', 7, 0.5, 15, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_adv}', 8, 0.6, 2.2, false);</script>")
         html.append(f"<script>applyDefaultSort('{tid_adv}');</script>")
         html.append("</div>")  # /tab-panel advanced
 
