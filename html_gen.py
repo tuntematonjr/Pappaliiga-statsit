@@ -254,9 +254,10 @@ function switchTab(containerId, tabName){
   buttons.forEach(b => b.classList.remove('active'));
   root.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
   root.querySelector(`[data-target="${tabName}"]`)?.classList.add('active');
+  initTabsAutoSort(containerId);
 }
 
-// Taulukon oletuslajittelu (jos haluat tabin vaihdossa uudelleenlajittelun)
+
 function initTabsAutoSort(rootId){
   const root = document.getElementById(rootId);
   if(!root) return;
@@ -264,11 +265,23 @@ function initTabsAutoSort(rootId){
   if(!activePanel) return;
   const table = activePanel.querySelector('table');
   if(!table) return;
-  const col = parseInt(table.getAttribute('data-sort-col') || '0',10);
-  const dir = (table.getAttribute('data-sort-dir') || 'asc') === 'asc';
-  sortTable(table.id, col, !dir);
-  sortTable(table.id, col, dir);
+
+  // Pakota nimen mukaan (kolumni 0), tekstilajittelu, nouseva
+  table.setAttribute('data-sort-col', '0');
+  table.setAttribute('data-sort-dir', 'desc'); // tehdään kaksi kutsua, jotta lopputulos on asc
+
+  // 1) sorttaa nimen mukaan (desc), 2) sorttaa uudelleen (asc)
+  sortTable(table.id, 0, /*numeric*/ false);
+  sortTable(table.id, 0, /*numeric*/ false);
 }
+
+// Aja nimen (kolumni 0) mukainen lajittelu kaikille pelaajataabeille heti sivun latauksen jälkeen
+document.addEventListener('DOMContentLoaded', () => {
+  // Valitse kaikki tab-kontainerit, joilla on id (esim. "tabs-xxxx")
+  document.querySelectorAll('.tabs[id]').forEach(root => {
+    initTabsAutoSort(root.id);
+  });
+});
 
 </script>
 </head>
@@ -691,11 +704,12 @@ def render_division(con, div):
           <div id="{tab_root_id}" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('{tab_root_id}','basic'); initTabsAutoSort('{tab_root_id}')">Basic</button>
+                      onclick="switchTab('{tab_root_id}','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('{tab_root_id}','advanced'); initTabsAutoSort('{tab_root_id}')">Advanced</button>
+                      onclick="switchTab('{tab_root_id}','advanced')">Advanced</button>
             </div>
-          """)
+        """)
+
 
         # ---------- BASIC ----------
         tid_basic = f"players-basic-{ti}"
@@ -814,7 +828,6 @@ def render_division(con, div):
         most_ban  = max(maps, key=lambda r: r["total_own_ban"], default=None)
         played_rows = [r for r in maps if r["played"]>=2]
         avoid = min(played_rows, key=lambda r: r["wr"], default=None)
-        ban_focus = (sum(r["total_own_ban"] for r in maps) / (2*s["matches_played"] if s["matches_played"] else 1)) * 100.0
 
         html.append('<div class="chips">')
         if most_ban and most_ban["total_own_ban"]>0:
@@ -825,7 +838,6 @@ def render_division(con, div):
             html.append(f'<span class="chip">Best WR: {pretty_map_name(best_wr["map"])} ({best_wr["wr"]:.0f}%)</span>')
         if avoid:
             html.append(f'<span class="chip">Map to avoid: {pretty_map_name(avoid["map"])} ({avoid["wr"]:.0f}%)</span>')
-        html.append(f'<span class="chip">Ban focus: {ban_focus:.0f}%</span>')
         html.append('</div>')
 
         # Toolbar (filter + CSV + column toggles)

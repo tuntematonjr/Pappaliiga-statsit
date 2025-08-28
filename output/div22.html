@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>22 Divisioona S11 – generoitu 2025-08-28 22:21</title>
+<title>22 Divisioona S11 – generoitu 2025-08-28 23:20</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -239,9 +239,10 @@ function switchTab(containerId, tabName){
   buttons.forEach(b => b.classList.remove('active'));
   root.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
   root.querySelector(`[data-target="${tabName}"]`)?.classList.add('active');
+  initTabsAutoSort(containerId);
 }
 
-// Taulukon oletuslajittelu (jos haluat tabin vaihdossa uudelleenlajittelun)
+
 function initTabsAutoSort(rootId){
   const root = document.getElementById(rootId);
   if(!root) return;
@@ -249,18 +250,30 @@ function initTabsAutoSort(rootId){
   if(!activePanel) return;
   const table = activePanel.querySelector('table');
   if(!table) return;
-  const col = parseInt(table.getAttribute('data-sort-col') || '0',10);
-  const dir = (table.getAttribute('data-sort-dir') || 'asc') === 'asc';
-  sortTable(table.id, col, !dir);
-  sortTable(table.id, col, dir);
+
+  // Pakota nimen mukaan (kolumni 0), tekstilajittelu, nouseva
+  table.setAttribute('data-sort-col', '0');
+  table.setAttribute('data-sort-dir', 'desc'); // tehdään kaksi kutsua, jotta lopputulos on asc
+
+  // 1) sorttaa nimen mukaan (desc), 2) sorttaa uudelleen (asc)
+  sortTable(table.id, 0, /*numeric*/ false);
+  sortTable(table.id, 0, /*numeric*/ false);
 }
+
+// Aja nimen (kolumni 0) mukainen lajittelu kaikille pelaajataabeille heti sivun latauksen jälkeen
+document.addEventListener('DOMContentLoaded', () => {
+  // Valitse kaikki tab-kontainerit, joilla on id (esim. "tabs-xxxx")
+  document.querySelectorAll('.tabs[id]').forEach(root => {
+    initTabsAutoSort(root.id);
+  });
+});
 
 </script>
 </head>
 <body>
 
 <div class="page">
-<h1>22 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 22:21)</span></h1>
+<h1>22 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 23:20)</span></h1>
 <div class="nav">
 <a href="#team-a40a6d87-ef57-45e2-818c-08c6f70f7e3b"><img class="logo" src="https://distribution.faceit-cdn.net/images/86877be5-d8db-4d56-aa69-8cde0304d5e0.jpeg" alt="">Bonfire</a>
 <a href="#team-553aa80a-6a5d-4167-88cf-f08316d0c623"><img class="logo" src="https://distribution.faceit-cdn.net/images/dffa18df-c335-4daa-9146-f56e52fae828.jpeg" alt="">Casetti Levis</a>
@@ -284,11 +297,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-a40a6d87" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-a40a6d87','basic'); initTabsAutoSort('tabs-a40a6d87')">Basic</button>
+                      onclick="switchTab('tabs-a40a6d87','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-a40a6d87','advanced'); initTabsAutoSort('tabs-a40a6d87')">Advanced</button>
+                      onclick="switchTab('tabs-a40a6d87','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-1" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -564,7 +577,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Ancient (1×)</span>
 <span class="chip">Best WR: Inferno (100%)</span>
 <span class="chip">Map to avoid: Dust II (0%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -742,11 +754,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-553aa80a" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-553aa80a','basic'); initTabsAutoSort('tabs-553aa80a')">Basic</button>
+                      onclick="switchTab('tabs-553aa80a','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-553aa80a','advanced'); initTabsAutoSort('tabs-553aa80a')">Advanced</button>
+                      onclick="switchTab('tabs-553aa80a','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-2" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -1021,7 +1033,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most banned: Train (3×)</span>
 <span class="chip">Most picked: Inferno (2×)</span>
 <span class="chip">Map to avoid: Ancient (0%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -1199,11 +1210,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-819b0708" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-819b0708','basic'); initTabsAutoSort('tabs-819b0708')">Basic</button>
+                      onclick="switchTab('tabs-819b0708','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-819b0708','advanced'); initTabsAutoSort('tabs-819b0708')">Advanced</button>
+                      onclick="switchTab('tabs-819b0708','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-3" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -1395,7 +1406,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Ancient (1×)</span>
 <span class="chip">Best WR: Dust II (50%)</span>
 <span class="chip">Map to avoid: Inferno (0%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -1573,11 +1583,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-d15cc43e" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-d15cc43e','basic'); initTabsAutoSort('tabs-d15cc43e')">Basic</button>
+                      onclick="switchTab('tabs-d15cc43e','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-d15cc43e','advanced'); initTabsAutoSort('tabs-d15cc43e')">Advanced</button>
+                      onclick="switchTab('tabs-d15cc43e','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-4" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -1825,7 +1835,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Dust II (3×)</span>
 <span class="chip">Best WR: Ancient (100%)</span>
 <span class="chip">Map to avoid: Dust II (100%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -2003,11 +2012,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-7114313c" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-7114313c','basic'); initTabsAutoSort('tabs-7114313c')">Basic</button>
+                      onclick="switchTab('tabs-7114313c','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-7114313c','advanced'); initTabsAutoSort('tabs-7114313c')">Advanced</button>
+                      onclick="switchTab('tabs-7114313c','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-5" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -2255,7 +2264,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Dust II (1×)</span>
 <span class="chip">Best WR: Dust II (100%)</span>
 <span class="chip">Map to avoid: Overpass (0%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -2433,11 +2441,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-b9023f61" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-b9023f61','basic'); initTabsAutoSort('tabs-b9023f61')">Basic</button>
+                      onclick="switchTab('tabs-b9023f61','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-b9023f61','advanced'); initTabsAutoSort('tabs-b9023f61')">Advanced</button>
+                      onclick="switchTab('tabs-b9023f61','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-6" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -2685,7 +2693,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Train (2×)</span>
 <span class="chip">Best WR: Train (100%)</span>
 <span class="chip">Map to avoid: Overpass (0%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -2863,11 +2870,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-6b3e4bec" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-6b3e4bec','basic'); initTabsAutoSort('tabs-6b3e4bec')">Basic</button>
+                      onclick="switchTab('tabs-6b3e4bec','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-6b3e4bec','advanced'); initTabsAutoSort('tabs-6b3e4bec')">Advanced</button>
+                      onclick="switchTab('tabs-6b3e4bec','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-7" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -3115,7 +3122,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Ancient (2×)</span>
 <span class="chip">Best WR: Nuke (100%)</span>
 <span class="chip">Map to avoid: Ancient (67%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -3293,11 +3299,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-1216f0ea" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-1216f0ea','basic'); initTabsAutoSort('tabs-1216f0ea')">Basic</button>
+                      onclick="switchTab('tabs-1216f0ea','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-1216f0ea','advanced'); initTabsAutoSort('tabs-1216f0ea')">Advanced</button>
+                      onclick="switchTab('tabs-1216f0ea','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-8" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -3517,7 +3523,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Overpass (2×)</span>
 <span class="chip">Best WR: Ancient (100%)</span>
 <span class="chip">Map to avoid: Mirage (0%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -3695,11 +3700,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-e86a10a8" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-e86a10a8','basic'); initTabsAutoSort('tabs-e86a10a8')">Basic</button>
+                      onclick="switchTab('tabs-e86a10a8','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-e86a10a8','advanced'); initTabsAutoSort('tabs-e86a10a8')">Advanced</button>
+                      onclick="switchTab('tabs-e86a10a8','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-9" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -3946,7 +3951,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most banned: Mirage (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
 <span class="chip">Best WR: Ancient (100%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -4124,11 +4128,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-de3c5208" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-de3c5208','basic'); initTabsAutoSort('tabs-de3c5208')">Basic</button>
+                      onclick="switchTab('tabs-de3c5208','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-de3c5208','advanced'); initTabsAutoSort('tabs-de3c5208')">Advanced</button>
+                      onclick="switchTab('tabs-de3c5208','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-10" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -4376,7 +4380,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Dust II (2×)</span>
 <span class="chip">Best WR: Nuke (100%)</span>
 <span class="chip">Map to avoid: Dust II (0%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -4554,11 +4557,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-7e8245ab" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-7e8245ab','basic'); initTabsAutoSort('tabs-7e8245ab')">Basic</button>
+                      onclick="switchTab('tabs-7e8245ab','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-7e8245ab','advanced'); initTabsAutoSort('tabs-7e8245ab')">Advanced</button>
+                      onclick="switchTab('tabs-7e8245ab','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-11" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -4834,7 +4837,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Nuke (2×)</span>
 <span class="chip">Best WR: Inferno (100%)</span>
 <span class="chip">Map to avoid: Nuke (0%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">
@@ -5012,11 +5014,11 @@ function initTabsAutoSort(rootId){
           <div id="tabs-f2500fae" class="tabs">
             <div class="tab-nav">
               <button class="tab-btn active" data-target="basic"
-                      onclick="switchTab('tabs-f2500fae','basic'); initTabsAutoSort('tabs-f2500fae')">Basic</button>
+                      onclick="switchTab('tabs-f2500fae','basic')">Basic</button>
               <button class="tab-btn" data-target="advanced"
-                      onclick="switchTab('tabs-f2500fae','advanced'); initTabsAutoSort('tabs-f2500fae')">Advanced</button>
+                      onclick="switchTab('tabs-f2500fae','advanced')">Advanced</button>
             </div>
-          
+        
 <div class="tab-panel active" data-tab="basic">
 <table id="players-basic-12" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
@@ -5236,7 +5238,6 @@ function initTabsAutoSort(rootId){
 <span class="chip">Most picked: Ancient (1×)</span>
 <span class="chip">Best WR: Ancient (100%)</span>
 <span class="chip">Map to avoid: Ancient (100%)</span>
-<span class="chip">Ban focus: 100%</span>
 </div>
 
         <div class="toolbar">

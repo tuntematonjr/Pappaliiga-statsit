@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>5 Divisioona S11 – generoitu 2025-08-28 22:21</title>
+<title>5 Divisioona S11 – generoitu 2025-08-28 23:20</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -239,9 +239,10 @@ function switchTab(containerId, tabName){
   buttons.forEach(b => b.classList.remove('active'));
   root.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
   root.querySelector(`[data-target="${tabName}"]`)?.classList.add('active');
+  initTabsAutoSort(containerId);
 }
 
-// Taulukon oletuslajittelu (jos haluat tabin vaihdossa uudelleenlajittelun)
+
 function initTabsAutoSort(rootId){
   const root = document.getElementById(rootId);
   if(!root) return;
@@ -249,18 +250,30 @@ function initTabsAutoSort(rootId){
   if(!activePanel) return;
   const table = activePanel.querySelector('table');
   if(!table) return;
-  const col = parseInt(table.getAttribute('data-sort-col') || '0',10);
-  const dir = (table.getAttribute('data-sort-dir') || 'asc') === 'asc';
-  sortTable(table.id, col, !dir);
-  sortTable(table.id, col, dir);
+
+  // Pakota nimen mukaan (kolumni 0), tekstilajittelu, nouseva
+  table.setAttribute('data-sort-col', '0');
+  table.setAttribute('data-sort-dir', 'desc'); // tehdään kaksi kutsua, jotta lopputulos on asc
+
+  // 1) sorttaa nimen mukaan (desc), 2) sorttaa uudelleen (asc)
+  sortTable(table.id, 0, /*numeric*/ false);
+  sortTable(table.id, 0, /*numeric*/ false);
 }
+
+// Aja nimen (kolumni 0) mukainen lajittelu kaikille pelaajataabeille heti sivun latauksen jälkeen
+document.addEventListener('DOMContentLoaded', () => {
+  // Valitse kaikki tab-kontainerit, joilla on id (esim. "tabs-xxxx")
+  document.querySelectorAll('.tabs[id]').forEach(root => {
+    initTabsAutoSort(root.id);
+  });
+});
 
 </script>
 </head>
 <body>
 
 <div class="page">
-<h1>5 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 22:21)</span></h1>
+<h1>5 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 23:20)</span></h1>
 <div class="nav">
 </div>
 <div class="muted">Vinkki: klikkaa joukkueen otsikkoriviä avataksesi tai sulkeaksesi sen.</div>
