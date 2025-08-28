@@ -1,6 +1,7 @@
 # Tiny SQLite helpers. Keep it simple and explicit.
 import sqlite3
 from pathlib import Path
+import time
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
@@ -123,8 +124,10 @@ def upsert_player_stat(con, ps):
             kills, deaths, assists, kd, kr, adr, hs_pct, mvps, sniper_kills,
             utility_damage, mk_3k, mk_4k, mk_5k,
             -- clutch-kentät:
-            clutch_kills, cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            clutch_kills, cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
+            -- entry-kentät:
+            entry_count, entry_wins
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(match_id, round_index, player_id, nickname) DO UPDATE SET
             kills=excluded.kills,
             deaths=excluded.deaths,
@@ -141,7 +144,9 @@ def upsert_player_stat(con, ps):
             cl_1v1_attempts=excluded.cl_1v1_attempts,
             cl_1v1_wins=excluded.cl_1v1_wins,
             cl_1v2_attempts=excluded.cl_1v2_attempts,
-            cl_1v2_wins=excluded.cl_1v2_wins
+            cl_1v2_wins=excluded.cl_1v2_wins,
+            entry_count=excluded.entry_count,
+            entry_wins=excluded.entry_wins
         """,
         (
             ps["match_id"], ps["round_index"], ps["player_id"], ps["nickname"],
@@ -151,7 +156,43 @@ def upsert_player_stat(con, ps):
             ps["mk_3k"], ps["mk_4k"], ps["mk_5k"],
             ps["clutch_kills"], ps["cl_1v1_attempts"], ps["cl_1v1_wins"],
             ps["cl_1v2_attempts"], ps["cl_1v2_wins"],
+            ps.get("entry_count"), ps.get("entry_wins"),
         )
+    )
+
+def upsert_player_identity(con, player_id: str, nickname: str):
+    # Lisää, tai päivitä vain jos nickname oikeasti muuttuu
+    con.execute("""
+        INSERT INTO players(player_id, nickname)
+        VALUES(?, ?)
+        ON CONFLICT(player_id) DO UPDATE SET
+          nickname=excluded.nickname,
+          updated_at=CURRENT_TIMESTAMP
+        WHERE players.nickname <> excluded.nickname
+    """, (player_id, nickname))
+
+def upsert_team_identity(con: sqlite3.Connection, team_id: str, name: str, avatar: str | None) -> None:
+    """
+    Päivittää teams-tauluun nimen ja logon. Päivittää vain jos arvo todella muuttuu.
+    """
+    now = int(time.time())
+    con.execute(
+        """
+        INSERT INTO teams(team_id, name, avatar, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(team_id) DO UPDATE SET
+          name       = excluded.name,
+          avatar     = CASE
+                         WHEN (excluded.avatar IS NOT NULL AND excluded.avatar <> '')
+                           THEN excluded.avatar
+                         ELSE teams.avatar
+                       END,
+          updated_at = excluded.updated_at
+        WHERE (teams.name   IS NULL OR teams.name   <> excluded.name)
+           OR (excluded.avatar IS NOT NULL AND excluded.avatar <> '' AND
+               (teams.avatar IS NULL OR teams.avatar <> excluded.avatar))
+        """,
+        (team_id, name, avatar or "", now)
     )
 
 def commit(con):

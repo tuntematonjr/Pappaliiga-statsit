@@ -3,13 +3,14 @@ import time
 from typing import Dict, Any, List, Tuple
 from pathlib import Path
 from collections import defaultdict
+from html import escape
 
 from faceit_config import DIVISIONS, RATE_LIMIT_SLEEP
 from faceit_client import list_championship_matches, get_match_details, get_match_stats, get_democracy_history
 from db import (
     get_conn, init_db, upsert_division, upsert_match, upsert_map,
     upsert_team_stat, upsert_player_stat, insert_vote, commit,
-    match_exists, match_fully_synced
+    match_exists, match_fully_synced, upsert_player_identity, upsert_team_identity
 )
 
 DB_PATH = str(Path(__file__).with_name("faceit_reports.sqlite"))
@@ -31,6 +32,16 @@ def safe_float(x, default=0.0):
             return float(str(x).replace(",", "."))
         except:
             return default
+
+def _upsert_teams_from_details(con, details: dict) -> None:
+    teams = (details or {}).get("teams", {}) or {}
+    for k in ("faction1", "faction2"):
+        info = teams.get(k) or {}
+        team_id = info.get("faction_id") or info.get("team_id")
+        name    = info.get("name")
+        avatar  = info.get("avatar") or ""
+        if team_id and name:
+            upsert_team_identity(con, team_id, name, avatar)
 
 def ratio(num, den):
     if den == 0:
@@ -201,10 +212,10 @@ def aggregate_team_stats_from_players(players: List[Dict[str, Any]], team_id: st
         "mk_5k": agg["mk_5k"],
     }
 
-def extract_player_row(match_id: str, round_index: int, pl: Dict[str, Any], team_id: str, team_name: str) -> Dict[str, Any]:
+def extract_player_row(con, match_id: str, round_index: int, pl: Dict[str, Any], team_id: str, team_name: str) -> Dict[str, Any]:
     ps = pl.get("player_stats", {}) or {}
     nickname = pl.get("nickname") or ps.get("Player") or ""
-    player_id = pl.get("player_id") or pl.get("player_id") or ""
+    player_id = pl.get("player_id") or ""
     kills = safe_int(ps.get("Kills", 0))
     deaths = safe_int(ps.get("Deaths", 0))
     assists = safe_int(ps.get("Assists", 0))
@@ -225,6 +236,12 @@ def extract_player_row(match_id: str, round_index: int, pl: Dict[str, Any], team
     c11_wins     = safe_int(ps.get("1v1Wins", 0))
     c12_attempts = safe_int(ps.get("1v2Count", 0))
     c12_wins     = safe_int(ps.get("1v2Wins", 0))
+    # --- Entryt ---
+    entry_count = safe_int(ps.get("Entry Count", 0))
+    entry_wins  = safe_int(ps.get("Entry Wins", 0))
+
+
+    upsert_player_identity(con, player_id, nickname)
 
     # Attempts unknown -> 0 by default
     return {
@@ -241,6 +258,8 @@ def extract_player_row(match_id: str, round_index: int, pl: Dict[str, Any], team
         "clutch_kills": clutch_kills,
         "cl_1v1_attempts": c11_attempts, "cl_1v1_wins": c11_wins,
         "cl_1v2_attempts": c12_attempts, "cl_1v2_wins": c12_wins,
+        "entry_count": entry_count,
+        "entry_wins":  entry_wins,
     }
 
 def sync_division(con, div):
@@ -264,6 +283,7 @@ def sync_division(con, div):
 
         # Vasta tässä vaiheessa haetaan API:sta
         details = get_match_details(match_id)
+        _upsert_teams_from_details(con, details)
 
         stats = {}
         try:
@@ -334,7 +354,7 @@ def sync_division(con, div):
 
                     # Tallenna pelaajat
                     for p in players:
-                        pr = extract_player_row(match_id, idx, p, tid, tname)
+                        pr = extract_player_row(con, match_id, idx, p, tid, tname)
                         upsert_player_stat(con, pr)
 
 

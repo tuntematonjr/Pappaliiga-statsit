@@ -113,8 +113,28 @@ CREATE TABLE IF NOT EXISTS player_stats (
   cl_1v1_wins             INTEGER DEFAULT 0,
   cl_1v2_attempts         INTEGER DEFAULT 0,
   cl_1v2_wins             INTEGER DEFAULT 0,
+  entry_count INTEGER,
+  entry_wins  INTEGER,
   UNIQUE(match_id, round_index, player_id, nickname),
   FOREIGN KEY (match_id) REFERENCES matches(match_id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_playerstats_team ON player_stats(team_id);
+
+
+CREATE TABLE IF NOT EXISTS players (
+  player_id   TEXT PRIMARY KEY,
+  nickname    TEXT NOT NULL,
+  updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_players_player_id ON players(player_id);
+
+CREATE TABLE IF NOT EXISTS teams (
+  team_id    TEXT PRIMARY KEY,
+  name       TEXT,
+  avatar     TEXT,
+  updated_at INTEGER
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_player_id ON teams(team_id);

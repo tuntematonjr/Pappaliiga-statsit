@@ -5,6 +5,7 @@ from collections import defaultdict
 from faceit_config import DIVISIONS
 from db import get_conn
 from datetime import datetime
+from html import escape
 
 DB_PATH = str(Path(__file__).with_name("faceit_reports.sqlite"))
 OUT_DIR = Path(__file__).with_name("output")
@@ -129,6 +130,16 @@ details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
 .tab-btn.active { background:#3a3a3a; }
 .tab-panel { display:none; }
 .tab-panel.active { display:block; }
+
+/* Joukkueen logot */
+.logo{
+  height:130px; width:130px; object-fit:cover;
+  vertical-align:middle; border-radius:4px; margin-right:.5rem;
+  background:#111; border:1px solid var(--border);
+}
+.nav .logo{
+  height:35px; width:35px; margin-right:.4rem;
+}
 
 </style>
 
@@ -296,13 +307,20 @@ def q(con, sql, params=()):
     return rows
 
 def get_teams_in_division(con, division_id: int):
-    sql = (
-        "SELECT DISTINCT team1_id as team_id, team1_name as team_name "
-        "FROM matches WHERE division_id=? AND team1_id IS NOT NULL "
-        "UNION "
-        "SELECT DISTINCT team2_id as team_id, team2_name as team_name "
-        "FROM matches WHERE division_id=? AND team2_id IS NOT NULL"
-    )
+    sql = """
+    SELECT x.team_id,
+           x.team_name,
+           t.avatar
+    FROM (
+      SELECT DISTINCT team1_id AS team_id, team1_name AS team_name
+      FROM matches WHERE division_id=? AND team1_id IS NOT NULL
+      UNION
+      SELECT DISTINCT team2_id AS team_id, team2_name AS team_name
+      FROM matches WHERE division_id=? AND team2_id IS NOT NULL
+    ) AS x
+    LEFT JOIN teams t ON t.team_id = x.team_id
+    ORDER BY x.team_name COLLATE NOCASE
+    """
     rows = q(con, sql, (division_id, division_id))
     return [r for r in rows if r["team_id"]]
 
@@ -336,16 +354,14 @@ def compute_team_summary(con, division_id: int, team_id: str):
     }
 
 def compute_player_table(con, division_id: int, team_id: str):
-    # Selvitetään dynaamisesti mitkä sarakkeet ovat käytettävissä:
-    HAS_PISTOL  = has_column(con, "player_stats", "pistol_kills")
-    HAS_FLASH   = has_column(con, "player_stats", "enemies_flashed") and has_column(con, "player_stats", "flash_count")
-    # Clutch-kentät oletusarvoisesti asennettu edellisissä muutoksissa
-    # (clutch_kills, cl_1v1_attempts/wins, cl_1v2_attempts/wins) – jos puuttuvat, SUM() palauttaa NULL -> käsitellään nollina.
+    # Selvitään dynaamiset kolumnit kuten ennen (HAS_PISTOL, HAS_FLASH ...)
+    HAS_PISTOL = has_column(con, "player_stats", "pistol_kills")
+    HAS_FLASH  = has_column(con, "player_stats", "enemies_flashed") and has_column(con, "player_stats", "flash_count")
 
-    # Perus- ja advanced-arvot samassa kyselyssä
     rows = q(con, f"""
     SELECT
-      ps.nickname AS nickname,
+      ps.player_id AS player_id,
+      COALESCE(pl.nickname, MAX(ps.nickname)) AS nickname_display, -- uusin nimi players-taulusta, fallbackina vanhin/viimeisin ps.nickname
       COUNT(*) AS maps_played,
 
       SUM(ps.kills)  AS k,
@@ -360,89 +376,88 @@ def compute_player_table(con, division_id: int, team_id: str):
       SUM(ps.mk_3k) AS k3, SUM(ps.mk_4k) AS k4, SUM(ps.mk_5k) AS k5,
       SUM(ps.utility_damage) AS util,
 
-      -- rounds per map (liittyy maps-tauluun)
+      -- kierrokset per map (maps-taulusta)
       SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds,
 
-      -- clutch
-      SUM(COALESCE(ps.clutch_kills,0)) AS clutch_kills,
-      SUM(COALESCE(ps.cl_1v1_attempts,0)) AS c11_att,
-      SUM(COALESCE(ps.cl_1v1_wins,0))     AS c11_win,
-      SUM(COALESCE(ps.cl_1v2_attempts,0)) AS c12_att,
-      SUM(COALESCE(ps.cl_1v2_wins,0))     AS c12_win
+      -- clutchit (jos sarakkeet ovat kannassa)
+      SUM(COALESCE(ps.clutch_kills,0))      AS clutch_kills,
+      SUM(COALESCE(ps.cl_1v1_attempts,0))   AS c11_att,
+      SUM(COALESCE(ps.cl_1v1_wins,0))       AS c11_win,
+      SUM(COALESCE(ps.cl_1v2_attempts,0))   AS c12_att,
+      SUM(COALESCE(ps.cl_1v2_wins,0))       AS c12_win,
+      SUM(COALESCE(ps.entry_count,0))       AS entry_att,
+      SUM(COALESCE(ps.entry_wins,0))        AS entry_win
 
       {", SUM(ps.pistol_kills) AS pistol_kills" if HAS_PISTOL else ""}
       {", SUM(ps.enemies_flashed) AS flashed, SUM(ps.flash_count) AS flash_count" if HAS_FLASH else ""}
 
     FROM player_stats ps
-    JOIN matches m ON m.match_id = ps.match_id
-    JOIN maps mp   ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+    JOIN matches m
+      ON m.match_id = ps.match_id
+    JOIN maps mp
+      ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+    LEFT JOIN players pl
+      ON pl.player_id = ps.player_id
     WHERE m.division_id = ? AND ps.team_id = ?
-    GROUP BY ps.nickname
+    GROUP BY ps.player_id
     ORDER BY k DESC
     """, (division_id, team_id))
 
+
     table = []
     for r in rows:
-        k  = r["k"] or 0
-        d  = r["d"] or 0
-        a  = r["a"] or 0
+        k = r["k"] or 0
+        d = r["d"] or 0
+        a = r["a"] or 0
         kd = (k / d) if d else float(k)
-        adr = r["adr"] or 0.0
-        kr  = r["kr"] or 0.0
-        hs  = r["hs_pct"] or 0.0
         rounds = r["rounds"] or 0
         maps_played = r["maps_played"] or 0
-        util = r["util"] or 0
-        awp = r["awp_kills"] or 0
-
-        # Johdannaiset
         rpm = (rounds / maps_played) if maps_played else 0.0
-        udpr = (util / rounds) if rounds else 0.0   # Utility damage per round
-        # Impact (kevyt proxy): 2*KR + 0.42*AR - 0.41*DR
-        ar = (a / rounds) if rounds else 0.0
-        dr = (d / rounds) if rounds else 0.0
-        impact = 2.0*kr + 0.42*ar - 0.41*dr
 
-        # Clutch WR
-        c11_att = r["c11_att"] or 0
-        c11_win = r["c11_win"] or 0
-        c12_att = r["c12_att"] or 0
-        c12_win = r["c12_win"] or 0
-        c11_wr = (100.0 * c11_win / c11_att) if c11_att else 0.0
-        c12_wr = (100.0 * c12_win / c12_att) if c12_att else 0.0
-
-        # Flash-metriikat (vain jos on talletettu)
-        enemies_per_flash = None
-        if HAS_FLASH:
-            flashed = r["flashed"] or 0
-            fcount  = r["flash_count"] or 0
-            enemies_per_flash = (flashed / fcount) if fcount else 0.0
-
-        # Pistol
-        pistol_kills = r["pistol_kills"] if HAS_PISTOL else None
-
-        table.append({
-            "nickname": r["nickname"],
-            # Basic
+        row = {
+            "player_id": r["player_id"],
+            "nickname": r["nickname_display"],           # näytetään aina uusin nimi
             "maps_played": maps_played,
             "rounds": rounds,
-            "kd": kd, "adr": adr, "kr": kr,
-            "kill": k, "death": d, "assist": a,
-            "hs_pct": hs, "awp_kills": awp,
-            "k3": r["k3"] or 0, "k4": r["k4"] or 0, "k5": r["k5"] or 0,
-            "util": util,
+            "rpm": rpm,                                   # <--- UUSI: rounds per map
+            "kd": kd,
+            "adr": r["adr"] or 0.0,
+            "kr": r["kr"] or 0.0,
 
-            # Advanced ydin
-            "rpm": rpm,
-            "udpr": udpr,
-            "impact": impact,
+            # kokonaismäärät erikseen, jotta HTML voi näyttää ne yksittäisinä sarakkeina
+            "kill": k,                                    # <--- UUSI
+            "death": d,                                   # <--- UUSI
+            "assist": a,                                  # <--- UUSI
+            "kda": f"{k}/{d}/{a}",
+
+            "hs_pct": r["hs_pct"] or 0.0,
+            "awp_kills": r["awp_kills"] or 0,
+            "k3": r["k3"] or 0,
+            "k4": r["k4"] or 0,
+            "k5": r["k5"] or 0,
+            "util": r["util"] or 0,
+
+            # Advanced
             "clutch_kills": r["clutch_kills"] or 0,
-            "c11_att": c11_att, "c11_win": c11_win, "c11_wr": c11_wr,
-            "c12_att": c12_att, "c12_win": c12_win, "c12_wr": c12_wr,
-            "enemies_per_flash": enemies_per_flash,
-            "pistol_kills": pistol_kills,
-        })
+            "c11_att": r["c11_att"] or 0,
+            "c11_win": r["c11_win"] or 0,
+            "c12_att": r["c12_att"] or 0,
+            "c12_win": r["c12_win"] or 0,
+            "entry_att": r["entry_att"] or 0,
+            "entry_win": r["entry_win"] or 0,
+        }
+
+        # Valinnaiset sarakkeet jos kannassa on
+        if "pistol_kills" in r.keys():
+            row["pistol_kills"] = r["pistol_kills"] or 0
+        if "flashed" in r.keys() and "flash_count" in r.keys():
+            row["flashed"] = r["flashed"] or 0
+            row["flash_count"] = r["flash_count"] or 0
+
+        table.append(row)
+
     return table
+
 
 
 def compute_division_map_avgs(con, division_id: int):
@@ -600,15 +615,23 @@ def render_division(con, div):
     html.append(f"<h1>{div['name']} <span class='muted'>(generoitu {ts})</span></h1>")
     html.append('<div class="nav">')
     for t in teams:
-        html.append(f'<a href="#team-{t["team_id"]}">{t["team_name"] or t["team_id"]}</a>')
+        name = t["team_name"] or t["team_id"]
+        avatar = t.get("avatar")
+        logo = f'<img class="logo" src="{avatar}" alt="">' if avatar else ''
+        html.append(f'<a href="#team-{t["team_id"]}">{logo}{escape(name)}</a>')
     html.append("</div>")
+
 
     html.append('<div class="muted">Vinkki: klikkaa joukkueen otsikkoriviä avataksesi tai sulkeaksesi sen.</div>')
 
     for ti, t in enumerate(teams, start=1):
         team_id = t["team_id"]; team_name = t["team_name"] or t["team_id"]
         html.append(f'<details class="team-section" id="team-{team_id}" open>')
-        html.append(f"<summary><h2>{team_name}</h2></summary>")
+        # hae avatar muistista (teams-listasta)
+        team_avatar = next((t.get("avatar") for t in teams if t["team_id"] == team_id), None)
+        logo = f'<img class="logo" src="{team_avatar}" alt="">' if team_avatar else ''
+        html.append(f"<summary><h2>{logo}{escape(team_name)}</h2></summary>")
+
 
         s = compute_team_summary(con, div["division_id"], team_id)
         chips = [
@@ -625,6 +648,42 @@ def render_division(con, div):
 
         # Players (TABS: Basic / Advanced)
         players = compute_player_table(con, div["division_id"], team_id)
+        # Johdetut mittarit + optiosarakkeiden tunnisteet
+        has_flash  = any(("flashed" in p and "flash_count" in p) for p in players)
+        has_pistol = any(("pistol_kills" in p) for p in players)
+
+        for p in players:
+            # Winratet (%)
+            c11_att = p.get("c11_att", 0) or 0
+            c11_win = p.get("c11_win", 0) or 0
+            p["c11_wr"] = (c11_win / c11_att * 100.0) if c11_att else 0.0
+
+            c12_att = p.get("c12_att", 0) or 0
+            c12_win = p.get("c12_win", 0) or 0
+            p["c12_wr"] = (c12_win / c12_att * 100.0) if c12_att else 0.0
+
+            entry_att = p.get("entry_att", 0) or 0
+            entry_win = p.get("entry_win", 0) or 0
+            p["entry_wr"] = (entry_win / entry_att * 100.0) if entry_att else 0.0
+
+            # Utility damage per round
+            rounds = p.get("rounds", 0) or 0
+            util   = p.get("util", 0) or 0
+            p["udpr"] = (util / rounds) if rounds else 0.0
+
+            # Impact-proxy: 2*KR + 0.42*AR - 0.41*DR
+            kr = p.get("kr", 0.0) or 0.0
+            ar = (p.get("assist", 0) or 0) / rounds if rounds else 0.0
+            dr = (p.get("death", 0)  or 0) / rounds if rounds else 0.0
+            p["impact"] = 2.0*kr + 0.42*ar - 0.41*dr
+
+            # Enemies per flash (jos dataa on)
+            if has_flash:
+                fc = p.get("flash_count", 0) or 0
+                p["enemies_per_flash"] = (p.get("flashed", 0) or 0) / fc if fc else 0.0
+            else:
+                p["enemies_per_flash"] = None
+
         tab_root_id = f"tabs-{team_id[:8]}"
 
         html.append('<h3>Players</h3>')
@@ -685,58 +744,66 @@ def render_division(con, div):
         html.append("</div>")  # /tab-panel basic
 
         # ---------- ADVANCED ----------
-        # Dynaamiset optiot: näytetään vain jos dataa on
-        opt_flash  = any(p["enemies_per_flash"] is not None for p in players)
-        opt_pistol = any(p["pistol_kills"] is not None for p in players)
-
         tid_adv = f"players-adv-{ti}"
-        html.append(f'<div class="tab-panel" data-tab="advanced">')
-        html.append(f'<table id="{tid_adv}" data-sort-col="5" data-sort-dir="desc">')
+        html.append(f'<table id="{tid_adv}" data-sort-col="7" data-sort-dir="desc">')  # oletus: UDPR
         html.append("<thead><tr>")
         html.append(f"<th onclick=\"sortTable('{tid_adv}',0,false)\">Nickname</th>")
         html.append(f"<th onclick=\"sortTable('{tid_adv}',1,true)\" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>")
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',2,true)\" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>")
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',3,true)\" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>")
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',4,true)\" title='Utility damage per round'>UDPR</th>")
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',5,true)\" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>")
-        col_idx = 6
-        if opt_flash:
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',2,true)\" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',3,true)\" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>")
+
+        # Entry stats
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',4,true)\" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',5,true)\" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',6,true)\" title='Entry win rate'>Entry WR%</th>")
+
+        # Utility-derivaatit
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',7,true)\" title='Utility damage per round'>UDPR</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',8,true)\" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>")
+
+        col_idx = 9
+        if has_flash:
             html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Enemies Flashed / Flash Count'>Enem/Flash</th>")
             col_idx += 1
-        if opt_pistol:
+        if has_pistol:
             html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\">Pistol K</th>")
         html.append("</tr></thead><tbody>")
 
         for p in players:
-            html.append("<tr>")
-            html.append(f"<td>{p['nickname']}</td>")
-            html.append(f"<td>{p['clutch_kills']}</td>")
-            html.append(f"<td data-sort=\"{p['c11_wr']:.1f}\" title=\"Attempts: {p['c11_att']}, Wins: {p['c11_win']}\">{p['c11_wr']:.0f}% ({p['c11_att']})</td>")
-            html.append(f"<td data-sort=\"{p['c12_wr']:.1f}\" title=\"Attempts: {p['c12_att']}, Wins: {p['c12_win']}\">{p['c12_wr']:.0f}% ({p['c12_att']})</td>")
-            html.append(f"<td>{p['udpr']:.2f}</td>")
-            html.append(f"<td>{p['impact']:.2f}</td>")
-            if opt_flash:
-                val = p['enemies_per_flash'] if p['enemies_per_flash'] is not None else 0.0
-                html.append(f"<td>{val:.2f}</td>")
-            if opt_pistol:
-                val = p['pistol_kills'] if p['pistol_kills'] is not None else 0
-                html.append(f"<td>{val}</td>")
-            html.append("</tr>")
+          html.append("<tr>")
+          html.append(f"<td>{p['nickname']}</td>")
+          html.append(f"<td>{p['clutch_kills']}</td>")
+          html.append(f"<td data-sort=\"{p['c11_wr']:.1f}\" title=\"Attempts: {p['c11_att']}, Wins: {p['c11_win']}\">{p['c11_wr']:.0f}% ({p['c11_att']})</td>")
+          html.append(f"<td data-sort=\"{p['c12_wr']:.1f}\" title=\"Attempts: {p['c12_att']}, Wins: {p['c12_win']}\">{p['c12_wr']:.0f}% ({p['c12_att']})</td>")
+
+          # Entryt
+          html.append(f"<td>{p['entry_att']}</td>")
+          html.append(f"<td>{p['entry_win']}</td>")
+          html.append(f"<td>{p['entry_wr']:.0f}</td>")
+
+          # Utility-derivaatit
+          html.append(f"<td>{p['udpr']:.2f}</td>")
+          html.append(f"<td>{p['impact']:.2f}</td>")
+
+          if has_flash:
+              val = p['enemies_per_flash'] if p['enemies_per_flash'] is not None else 0.0
+              html.append(f"<td>{val:.2f}</td>")
+          if has_pistol:
+              val = p.get('pistol_kills', 0) or 0
+              html.append(f"<td>{val}</td>")
+          html.append("</tr>")
 
         html.append("</tbody></table>")
-        # Väriskaalat (päivitä rajat liigatasoosi tarvittaessa)
+
+        # Väritykset: WR:t vihreäksi kun korkea
         html.append(f"<script>colorizeRange('{tid_adv}', 2, 0, 100, false);</script>")  # 1v1 WR
         html.append(f"<script>colorizeRange('{tid_adv}', 3, 0, 100, false);</script>")  # 1v2 WR
-        html.append(f"<script>colorizeRange('{tid_adv}', 4, 0.5, 15, false);</script>") # UDPR
-        html.append(f"<script>colorizeRange('{tid_adv}', 5, 0.6, 2.2, false);</script>") # Impact
-        if opt_flash:
-            # Enemies/Flash: tyypillinen hajonta ~0.2–1.2
-            html.append(f"<script>colorizeRange('{tid_adv}', 6, 0.2, 1.2, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_adv}', 6, 0, 100, false);</script>")  # Entry WR
+        html.append(f"<script>colorizeRange('{tid_adv}', 7, 0.5, 15, false);</script>") # UDPR
+        html.append(f"<script>colorizeRange('{tid_adv}', 8, 0.6, 2.2, false);</script>") # Impact
+
         html.append(f"<script>applyDefaultSort('{tid_adv}');</script>")
         html.append("</div>")  # /tab-panel advanced
-
-        html.append("</div>")  # /tabs root
-
 
         # Map stats
         maps = compute_map_stats_table(con, div["division_id"], team_id)
