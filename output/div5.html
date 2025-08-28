@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>5 Divisioona S11 – generoitu 2025-08-28 23:20</title>
+<title>5 Divisioona S11 – generoitu 2025-08-28 23:43</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -17,6 +17,8 @@
   --nav-bg:#2a2a2a;
   --accent:#4ade80;
 }
+
+
 
 html,body{height:100%;}
 body{
@@ -126,6 +128,37 @@ details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
   height:35px; width:35px; margin-right:.4rem;
 }
 
+/* Division summary */
+.div-summary{
+  display:grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1rem;
+  margin: .75rem 0 1rem;
+}
+.div-summary .card{
+  background: var(--table-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .75rem .9rem;
+}
+.summary-grid{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap:.6rem;
+}
+.summary-item{
+  background: var(--table-alt);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:.5rem .6rem;
+  text-align:center;
+}
+.summary-item .label{ color: var(--muted); font-size:.9rem; }
+.summary-item .val{ font-size:1.15rem; font-weight:600; }
+.leaders table{ width:100%; border-collapse:collapse; }
+.leaders th, .leaders td{ padding:.35rem .5rem; border-bottom:1px solid var(--border); text-align:left; }
+.leaders th{ color:var(--muted); font-weight:600; }
+
 </style>
 
 <script>
@@ -172,18 +205,39 @@ function renderBar(cell, value){
 }
 
 // --- Väriskaalat ---
-function colorizeRange(tableId, colIdx, min, max, inverse=false){
+/**
+ * Väritä vain, jos arvo on dynaamisen [lo,hi]-alueen ulkopuolella.
+ * bufferRatio kasvattaa neutraalia vyöhykettä lo/hi ympärille (0..0.5).
+ * Esim. 0.10 = jätetään 10 % lo..hi alueen leveydestä molemmin puolin täysin neutraaliksi.
+ */
+function colorizeRange(tableId, colIdx, lo, hi, inverse=false, bufferRatio=0.10){
   const t = document.getElementById(tableId);
   if(!t || !t.tBodies.length) return;
   const rows = t.tBodies[0].rows;
+
+  // varmistetaan järjestys
+  let minv = Math.min(lo, hi), maxv = Math.max(lo, hi);
+  // neutraalin alueen kasvatus
+  const span = maxv - minv || 1;
+  const innerLo = minv + span * bufferRatio;
+  const innerHi = maxv - span * bufferRatio;
+
   for(const tr of rows){
     const td = tr.cells[colIdx];
-    let v = parseFloat((td.textContent||'').replace(',', '.'));
+    let raw = (td.textContent || td.innerText || '').trim().replace(',', '.');
+    let v = parseFloat(raw);
     if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
-    const ratio = Math.max(0, Math.min(1, (v - min) / (max - min || 1)));
-    const good  = inverse ? (1 - ratio) : ratio;
-    if (good >= 0.55) td.classList.add('cell-grad','good');
-    else if (good <= 0.45) td.classList.add('cell-grad','bad');
+
+    // Inverssiä tarvitaan harvoin (pienempi parempi), mutta pidetään mukana
+    if(inverse){
+      if(v < innerLo) { td.classList.add('cell-grad','good'); }
+      else if(v > innerHi) { td.classList.add('cell-grad','bad'); }
+      // muuten ei väriä
+    }else{
+      if(v < innerLo) { td.classList.add('cell-grad','bad'); }
+      else if(v > innerHi) { td.classList.add('cell-grad','good'); }
+      // muuten ei väriä
+    }
   }
 }
 function colorizeAuto(tableId, colIdx, inverse=false){
@@ -273,8 +327,30 @@ document.addEventListener('DOMContentLoaded', () => {
 <body>
 
 <div class="page">
-<h1>5 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 23:20)</span></h1>
+<h1>5 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 23:43)</span></h1>
 <div class="nav">
+</div>
+<div class="div-summary">
+<div class="card">
+<h3>Division summary</h3>
+<div class="summary-grid">
+<div class="summary-item"><div class="label">Teams</div><div class="val">0</div></div>
+<div class="summary-item"><div class="label">Players</div><div class="val">0</div></div>
+<div class="summary-item"><div class="label">Maps</div><div class="val">0</div></div>
+<div class="summary-item"><div class="label">Rounds</div><div class="val">0</div></div>
+<div class="summary-item"><div class="label">Avg KD</div><div class="val">0.00</div></div>
+<div class="summary-item"><div class="label">Avg ADR</div><div class="val">0.0</div></div>
+<div class="summary-item"><div class="label">Avg KR</div><div class="val">0.00</div></div>
+</div>
+</div>
+<div class="card leaders">
+<h3>Leaders (min 20 rounds)</h3>
+<table><thead><tr><th>Metric</th><th>Player</th><th>Value</th></tr></thead><tbody>
+<tr><td>KD</td><td>– <span class="cell-muted">(–)</span></td><td>0.00</td></tr>
+<tr><td>ADR</td><td>– <span class="cell-muted">(–)</span></td><td>0.0</td></tr>
+<tr><td>KR</td><td>– <span class="cell-muted">(–)</span></td><td>0.00</td></tr>
+</tbody></table>
+</div>
 </div>
 <div class="muted">Vinkki: klikkaa joukkueen otsikkoriviä avataksesi tai sulkeaksesi sen.</div>
 </div>

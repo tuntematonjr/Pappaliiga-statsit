@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>22 Divisioona S11 – generoitu 2025-08-28 23:20</title>
+<title>22 Divisioona S11 – generoitu 2025-08-28 23:43</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -17,6 +17,8 @@
   --nav-bg:#2a2a2a;
   --accent:#4ade80;
 }
+
+
 
 html,body{height:100%;}
 body{
@@ -126,6 +128,37 @@ details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
   height:35px; width:35px; margin-right:.4rem;
 }
 
+/* Division summary */
+.div-summary{
+  display:grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1rem;
+  margin: .75rem 0 1rem;
+}
+.div-summary .card{
+  background: var(--table-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .75rem .9rem;
+}
+.summary-grid{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap:.6rem;
+}
+.summary-item{
+  background: var(--table-alt);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:.5rem .6rem;
+  text-align:center;
+}
+.summary-item .label{ color: var(--muted); font-size:.9rem; }
+.summary-item .val{ font-size:1.15rem; font-weight:600; }
+.leaders table{ width:100%; border-collapse:collapse; }
+.leaders th, .leaders td{ padding:.35rem .5rem; border-bottom:1px solid var(--border); text-align:left; }
+.leaders th{ color:var(--muted); font-weight:600; }
+
 </style>
 
 <script>
@@ -172,18 +205,39 @@ function renderBar(cell, value){
 }
 
 // --- Väriskaalat ---
-function colorizeRange(tableId, colIdx, min, max, inverse=false){
+/**
+ * Väritä vain, jos arvo on dynaamisen [lo,hi]-alueen ulkopuolella.
+ * bufferRatio kasvattaa neutraalia vyöhykettä lo/hi ympärille (0..0.5).
+ * Esim. 0.10 = jätetään 10 % lo..hi alueen leveydestä molemmin puolin täysin neutraaliksi.
+ */
+function colorizeRange(tableId, colIdx, lo, hi, inverse=false, bufferRatio=0.10){
   const t = document.getElementById(tableId);
   if(!t || !t.tBodies.length) return;
   const rows = t.tBodies[0].rows;
+
+  // varmistetaan järjestys
+  let minv = Math.min(lo, hi), maxv = Math.max(lo, hi);
+  // neutraalin alueen kasvatus
+  const span = maxv - minv || 1;
+  const innerLo = minv + span * bufferRatio;
+  const innerHi = maxv - span * bufferRatio;
+
   for(const tr of rows){
     const td = tr.cells[colIdx];
-    let v = parseFloat((td.textContent||'').replace(',', '.'));
+    let raw = (td.textContent || td.innerText || '').trim().replace(',', '.');
+    let v = parseFloat(raw);
     if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
-    const ratio = Math.max(0, Math.min(1, (v - min) / (max - min || 1)));
-    const good  = inverse ? (1 - ratio) : ratio;
-    if (good >= 0.55) td.classList.add('cell-grad','good');
-    else if (good <= 0.45) td.classList.add('cell-grad','bad');
+
+    // Inverssiä tarvitaan harvoin (pienempi parempi), mutta pidetään mukana
+    if(inverse){
+      if(v < innerLo) { td.classList.add('cell-grad','good'); }
+      else if(v > innerHi) { td.classList.add('cell-grad','bad'); }
+      // muuten ei väriä
+    }else{
+      if(v < innerLo) { td.classList.add('cell-grad','bad'); }
+      else if(v > innerHi) { td.classList.add('cell-grad','good'); }
+      // muuten ei väriä
+    }
   }
 }
 function colorizeAuto(tableId, colIdx, inverse=false){
@@ -273,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <body>
 
 <div class="page">
-<h1>22 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 23:20)</span></h1>
+<h1>22 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 23:43)</span></h1>
 <div class="nav">
 <a href="#team-a40a6d87-ef57-45e2-818c-08c6f70f7e3b"><img class="logo" src="https://distribution.faceit-cdn.net/images/86877be5-d8db-4d56-aa69-8cde0304d5e0.jpeg" alt="">Bonfire</a>
 <a href="#team-553aa80a-6a5d-4167-88cf-f08316d0c623"><img class="logo" src="https://distribution.faceit-cdn.net/images/dffa18df-c335-4daa-9146-f56e52fae828.jpeg" alt="">Casetti Levis</a>
@@ -287,6 +341,28 @@ document.addEventListener('DOMContentLoaded', () => {
 <a href="#team-de3c5208-e0d5-437a-8e74-0ca2bc9ca603"><img class="logo" src="https://distribution.faceit-cdn.net/images/86e7becb-48d9-4505-9814-fdf032ca8d83.jpeg" alt="">SD Gaming</a>
 <a href="#team-7e8245ab-580a-43e3-a418-70034f35434f"><img class="logo" src="https://distribution.faceit-cdn.net/images/5ce3dfc2-b698-4f3f-a239-c95f729f264e.jpeg" alt="">Venga Chicos</a>
 <a href="#team-f2500fae-e67c-4614-bbbc-cc5989cb0105"><img class="logo" src="https://distribution.faceit-cdn.net/images/7224836c-8cfa-428e-ba48-8109cf7ee0a8.jpeg" alt="">X-UwU Bon Bons</a>
+</div>
+<div class="div-summary">
+<div class="card">
+<h3>Division summary</h3>
+<div class="summary-grid">
+<div class="summary-item"><div class="label">Teams</div><div class="val">12</div></div>
+<div class="summary-item"><div class="label">Players</div><div class="val">83</div></div>
+<div class="summary-item"><div class="label">Maps</div><div class="val">38</div></div>
+<div class="summary-item"><div class="label">Rounds</div><div class="val">772</div></div>
+<div class="summary-item"><div class="label">Avg KD</div><div class="val">1.04</div></div>
+<div class="summary-item"><div class="label">Avg ADR</div><div class="val">76.3</div></div>
+<div class="summary-item"><div class="label">Avg KR</div><div class="val">0.69</div></div>
+</div>
+</div>
+<div class="card leaders">
+<h3>Leaders (min 20 rounds)</h3>
+<table><thead><tr><th>Metric</th><th>Player</th><th>Value</th></tr></thead><tbody>
+<tr><td>KD</td><td>-Papacito- <span class="cell-muted">(LosBurritos)</span></td><td>2.08</td></tr>
+<tr><td>ADR</td><td>Tiffmeister <span class="cell-muted">(Venga Chicos)</span></td><td>118.1</td></tr>
+<tr><td>KR</td><td>Tiffmeister <span class="cell-muted">(Venga Chicos)</span></td><td>1.11</td></tr>
+</tbody></table>
+</div>
 </div>
 <div class="muted">Vinkki: klikkaa joukkueen otsikkoriviä avataksesi tai sulkeaksesi sen.</div>
 <details class="team-section" id="team-a40a6d87-ef57-45e2-818c-08c6f70f7e3b" open>
@@ -458,9 +534,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>432</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-1', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-1', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-1', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-1', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-1', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-1', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-1');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -568,8 +644,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-1', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-1', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-1', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-1', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-1', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-1', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-1', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-1');</script>
 </div>
 <div class="chips">
@@ -915,9 +991,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>29</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-2', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-2', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-2', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-2', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-2', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-2', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-2');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -1025,8 +1101,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-2', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-2', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-2', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-2', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-2', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-2', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-2', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-2');</script>
 </div>
 <div class="chips">
@@ -1320,9 +1396,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>195</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-3', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-3', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-3', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-3', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-3', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-3', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-3');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -1397,8 +1473,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-3', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-3', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-3', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-3', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-3', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-3', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-3', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-3');</script>
 </div>
 <div class="chips">
@@ -1727,9 +1803,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>308</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-4', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-4', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-4', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-4', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-4', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-4', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-4');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -1826,8 +1902,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-4', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-4', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-4', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-4', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-4', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-4', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-4', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-4');</script>
 </div>
 <div class="chips">
@@ -2156,9 +2232,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>80</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-5', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-5', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-5', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-5', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-5', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-5', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-5');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -2255,8 +2331,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-5', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-5', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-5', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-5', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-5', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-5', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-5', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-5');</script>
 </div>
 <div class="chips">
@@ -2585,9 +2661,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>81</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-6', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-6', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-6', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-6', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-6', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-6', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-6');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -2684,8 +2760,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-6', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-6', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-6', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-6', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-6', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-6', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-6', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-6');</script>
 </div>
 <div class="chips">
@@ -3014,9 +3090,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>789</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-7', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-7', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-7', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-7', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-7', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-7', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-7');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -3113,8 +3189,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-7', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-7', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-7', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-7', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-7', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-7', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-7', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-7');</script>
 </div>
 <div class="chips">
@@ -3426,9 +3502,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>69</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-8', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-8', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-8', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-8', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-8', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-8', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-8');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -3514,8 +3590,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-8', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-8', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-8', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-8', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-8', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-8', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-8', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-8');</script>
 </div>
 <div class="chips">
@@ -3844,9 +3920,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>527</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-9', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-9', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-9', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-9', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-9', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-9', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-9');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -3943,8 +4019,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-9', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-9', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-9', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-9', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-9', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-9', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-9', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-9');</script>
 </div>
 <div class="chips">
@@ -4272,9 +4348,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>277</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-10', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-10', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-10', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-10', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-10', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-10', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-10');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -4371,8 +4447,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-10', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-10', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-10', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-10', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-10', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-10', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-10', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-10');</script>
 </div>
 <div class="chips">
@@ -4718,9 +4794,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>230</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-11', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-11', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-11', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-11', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-11', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-11', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-11');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -4828,8 +4904,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-11', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-11', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-11', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-11', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-11', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-11', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-11', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-11');</script>
 </div>
 <div class="chips">
@@ -5141,9 +5217,9 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>495</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-basic-12', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-basic-12', 4, 50, 120, false);</script>
-<script>colorizeRange('players-basic-12', 5, 0.2, 1.2, false);</script>
+<script>colorizeRange('players-basic-12', 3, 0.6951, 1.3680, false);</script>
+<script>colorizeRange('players-basic-12', 4, 62.5500, 92.8700, false);</script>
+<script>colorizeRange('players-basic-12', 5, 0.5320, 0.8578, false);</script>
 <script>applyDefaultSort('players-basic-12');</script>
 </div>
 <div class="tab-panel" data-tab="advanced">
@@ -5229,8 +5305,8 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>colorizeRange('players-adv-12', 2, 0, 100, false);</script>
 <script>colorizeRange('players-adv-12', 3, 0, 100, false);</script>
 <script>colorizeRange('players-adv-12', 6, 0, 100, false);</script>
-<script>colorizeRange('players-adv-12', 7, 0.5, 15, false);</script>
-<script>colorizeRange('players-adv-12', 8, 0.6, 2.2, false);</script>
+<script>colorizeRange('players-adv-12', 7, 3.1325, 8.2751, false);</script>
+<script>colorizeRange('players-adv-12', 8, 1.0640, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-12');</script>
 </div>
 <div class="chips">

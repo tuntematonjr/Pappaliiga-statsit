@@ -33,6 +33,8 @@ HTML_HEAD = """<!doctype html>
   --accent:#4ade80;
 }
 
+
+
 html,body{height:100%;}
 body{
   margin:0;
@@ -141,6 +143,37 @@ details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
   height:35px; width:35px; margin-right:.4rem;
 }
 
+/* Division summary */
+.div-summary{
+  display:grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 1rem;
+  margin: .75rem 0 1rem;
+}
+.div-summary .card{
+  background: var(--table-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .75rem .9rem;
+}
+.summary-grid{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap:.6rem;
+}
+.summary-item{
+  background: var(--table-alt);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:.5rem .6rem;
+  text-align:center;
+}
+.summary-item .label{ color: var(--muted); font-size:.9rem; }
+.summary-item .val{ font-size:1.15rem; font-weight:600; }
+.leaders table{ width:100%; border-collapse:collapse; }
+.leaders th, .leaders td{ padding:.35rem .5rem; border-bottom:1px solid var(--border); text-align:left; }
+.leaders th{ color:var(--muted); font-weight:600; }
+
 </style>
 
 <script>
@@ -187,18 +220,39 @@ function renderBar(cell, value){
 }
 
 // --- Väriskaalat ---
-function colorizeRange(tableId, colIdx, min, max, inverse=false){
+/**
+ * Väritä vain, jos arvo on dynaamisen [lo,hi]-alueen ulkopuolella.
+ * bufferRatio kasvattaa neutraalia vyöhykettä lo/hi ympärille (0..0.5).
+ * Esim. 0.10 = jätetään 10 % lo..hi alueen leveydestä molemmin puolin täysin neutraaliksi.
+ */
+function colorizeRange(tableId, colIdx, lo, hi, inverse=false, bufferRatio=0.10){
   const t = document.getElementById(tableId);
   if(!t || !t.tBodies.length) return;
   const rows = t.tBodies[0].rows;
+
+  // varmistetaan järjestys
+  let minv = Math.min(lo, hi), maxv = Math.max(lo, hi);
+  // neutraalin alueen kasvatus
+  const span = maxv - minv || 1;
+  const innerLo = minv + span * bufferRatio;
+  const innerHi = maxv - span * bufferRatio;
+
   for(const tr of rows){
     const td = tr.cells[colIdx];
-    let v = parseFloat((td.textContent||'').replace(',', '.'));
+    let raw = (td.textContent || td.innerText || '').trim().replace(',', '.');
+    let v = parseFloat(raw);
     if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
-    const ratio = Math.max(0, Math.min(1, (v - min) / (max - min || 1)));
-    const good  = inverse ? (1 - ratio) : ratio;
-    if (good >= 0.55) td.classList.add('cell-grad','good');
-    else if (good <= 0.45) td.classList.add('cell-grad','bad');
+
+    // Inverssiä tarvitaan harvoin (pienempi parempi), mutta pidetään mukana
+    if(inverse){
+      if(v < innerLo) { td.classList.add('cell-grad','good'); }
+      else if(v > innerHi) { td.classList.add('cell-grad','bad'); }
+      // muuten ei väriä
+    }else{
+      if(v < innerLo) { td.classList.add('cell-grad','bad'); }
+      else if(v > innerHi) { td.classList.add('cell-grad','good'); }
+      // muuten ei väriä
+    }
   }
 }
 function colorizeAuto(tableId, colIdx, inverse=false){
@@ -318,6 +372,197 @@ def q(con, sql, params=()):
     cur = con.execute(sql, params)
     rows = [dict(r) for r in cur.fetchall()]
     return rows
+
+def _safe_div(a, b):
+    return (a / b) if b else 0.0
+
+def compute_division_player_summary(con, division_id: int, min_rounds: int = 20):
+    """
+    Laskee pelaajatasolla (divisioonassa) perusmittarit ja johtajat.
+    - Painottaa keskiarvot kierrosmäärällä, jotta 1 mapin outlierit eivät dominoi.
+    - Poistaa leader-taulusta pelaajat, joilla alle min_rounds kierrosta.
+    Palauttaa:
+      {
+        'players': int, 'teams': int, 'maps': int, 'rounds': int,
+        'avg_kd': float, 'avg_adr': float, 'avg_kr': float,
+        'leaders': {'kd': (nickname, value), 'adr': (...), 'kr': (...)}
+      }
+    """
+    # Pelaajakohtaiset aggregaatit + kierrokset
+    rows = q(con, """
+      SELECT
+        ps.player_id,
+        COALESCE(pl.nickname, MAX(ps.nickname)) AS nick,
+        MAX(t.name) AS team_name,
+        SUM(ps.kills)                      AS k,
+        SUM(ps.deaths)                     AS d,
+        AVG(ps.adr)                        AS adr_avg,
+        AVG(ps.kr)                         AS kr_avg,
+        SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds
+      FROM player_stats ps
+      JOIN matches m  ON m.match_id = ps.match_id
+      JOIN maps mp    ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+      LEFT JOIN players pl ON pl.player_id = ps.player_id
+      LEFT JOIN teams t ON t.team_id = ps.team_id   -- otetaan mukaan joukkue
+      WHERE m.division_id = ?
+      GROUP BY ps.player_id
+    """, (division_id,))
+
+
+    # Joukkue- ja mappimäärät + kokonaiskierrokset
+    trow = q(con, """
+      SELECT
+        COUNT(DISTINCT COALESCE(team1_id,'')) + COUNT(DISTINCT COALESCE(team2_id,'')) AS teams_dummy
+      FROM matches WHERE division_id=?
+    """, (division_id,))
+    # tiimit tarkemmin
+    teams = q(con, """
+      SELECT COUNT(*) AS c FROM (
+        SELECT DISTINCT team1_id AS tid FROM matches WHERE division_id=? AND team1_id IS NOT NULL
+        UNION
+        SELECT DISTINCT team2_id AS tid FROM matches WHERE division_id=? AND team2_id IS NOT NULL
+      )
+    """, (division_id, division_id,))[0]["c"] or 0
+
+    maps_cnt = q(con, "SELECT COUNT(*) AS c FROM maps mp JOIN matches m ON m.match_id=mp.match_id WHERE m.division_id=?", (division_id,))[0]["c"] or 0
+    total_rounds = q(con, """
+      SELECT SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS r
+      FROM maps mp JOIN matches m ON m.match_id=mp.match_id
+      WHERE m.division_id=?
+    """, (division_id,))[0]["r"] or 0
+
+    # Painotetut keskiarvot
+    w_kd_sum = w_adr_sum = w_kr_sum = w_sum = 0.0
+    leaders_pool = []
+    for r in rows:
+        k = r["k"] or 0
+        d = r["d"] or 0
+        kd = _safe_div(k, d) if d else float(k)
+        adr = r["adr_avg"] or 0.0
+        kr  = r["kr_avg"]  or 0.0
+        rounds = r["rounds"] or 0
+
+        w_kd_sum  += kd  * rounds
+        w_adr_sum += adr * rounds
+        w_kr_sum  += kr  * rounds
+        w_sum     += rounds
+
+        if rounds >= min_rounds:
+            leaders_pool.append({
+                "nick": r["nick"] or r["player_id"],
+                "team": r["team_name"] or "–",
+                "kd": kd, "adr": adr, "kr": kr, "rounds": rounds
+            })
+
+    avg_kd  = _safe_div(w_kd_sum,  w_sum)
+    avg_adr = _safe_div(w_adr_sum, w_sum)
+    avg_kr  = _safe_div(w_kr_sum,  w_sum)
+
+    # Johtajat
+    def top(metric):
+        if not leaders_pool:
+            return ("–", "–", 0.0)
+        best = max(leaders_pool, key=lambda x: x[metric])
+        return (best["nick"], best["team"], best[metric])
+
+    leaders = {
+        "kd":  top("kd"),
+        "adr": top("adr"),
+        "kr":  top("kr"),
+    }
+
+
+    return {
+        "players": len(rows),
+        "teams": teams,
+        "maps": maps_cnt,
+        "rounds": total_rounds,
+        "avg_kd": avg_kd, "avg_adr": avg_adr, "avg_kr": avg_kr,
+        "leaders": leaders,
+    }
+
+def _percentile(vals, p):
+    """Pieni prosenttipiste-funktio ilman numpyä (p 0..100)."""
+    if not vals:
+        return None
+    vals = sorted(vals)
+    if len(vals) == 1:
+        return vals[0]
+    k = (len(vals)-1) * (p/100.0)
+    f = int(k)
+    c = min(f+1, len(vals)-1)
+    if f == c:
+        return vals[f]
+    d0 = vals[f] * (c - k)
+    d1 = vals[c] * (k - f)
+    return d0 + d1
+
+def compute_division_thresholds(con, division_id: int):
+    """
+    Laske divisioonatason dynaamiset värikynnykset pelaajametrisille.
+    Palauttaa dictin:
+      {'kd': (lo, hi), 'adr': (lo, hi), 'kr': (lo, hi), 'udpr': (lo, hi), 'impact': (lo, hi)}
+    jossa lo=p20 ja hi=p80. Jos dataa vähän, fallback min/maxiin tai kohtuullisiin oletuksiin.
+    """
+    # Haetaan pelaajakohtaiset aggregaatit divisioonasta
+    rows = q(con, """
+      SELECT
+        ps.player_id,
+        SUM(ps.kills)  AS k,
+        SUM(ps.deaths) AS d,
+        AVG(ps.adr)    AS adr,
+        AVG(ps.kr)     AS kr,
+        SUM(ps.utility_damage) AS util,
+        SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds
+      FROM player_stats ps
+      JOIN matches m ON m.match_id = ps.match_id
+      JOIN maps mp   ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+      WHERE m.division_id = ?
+      GROUP BY ps.player_id
+    """, (division_id,))
+
+    kd_vals, adr_vals, kr_vals, udpr_vals, impact_vals = [], [], [], [], []
+    for r in rows:
+        k  = r["k"] or 0
+        d  = r["d"] or 0
+        kd = (k / d) if d else float(k)
+        adr = r["adr"] or 0.0
+        kr  = r["kr"] or 0.0
+        rounds = r["rounds"] or 0
+        util   = r["util"] or 0
+        udpr = (util / rounds) if rounds else 0.0
+        # Impact-proxy sama kaava kuin sivulla
+        ar = 0.0  # assisteja/round ei ole tässä kyselyssä; proxyna käytetään pelkkää KR:ää (pidetään kaava samana ilman AR/DR:ää)
+        dr = 0.0
+        impact = 2.0*kr + 0.42*ar - 0.41*dr
+
+        kd_vals.append(kd)
+        adr_vals.append(adr)
+        kr_vals.append(kr)
+        udpr_vals.append(udpr)
+        impact_vals.append(impact)
+
+    def lo_hi(lst, fallback=(0.0, 1.0)):
+        lst = [v for v in lst if v is not None]
+        if not lst:
+            return fallback
+        if len(lst) == 1:
+            return (lst[0], lst[0])
+        lo = _percentile(lst, 20)
+        hi = _percentile(lst, 80)
+        if lo == hi:
+            # hajontaa ei ole; levitetään vähän ettei kaikki jää harmaaksi
+            lo = min(lo, lo*0.9)
+            hi = max(hi, hi*1.1 if hi != 0 else 0.1)
+        return (lo, hi)
+
+    return {
+        "kd":     lo_hi(kd_vals, (0.6, 1.4)),
+        "adr":    lo_hi(adr_vals, (50.0, 120.0)),
+        "kr":     lo_hi(kr_vals, (0.4, 1.0)),
+        "udpr":   lo_hi(udpr_vals, (1.0, 12.0)),
+        "impact": lo_hi(impact_vals, (0.4, 1.8)),
+    }
 
 def get_teams_in_division(con, division_id: int):
     sql = """
@@ -619,7 +864,8 @@ def render_division(con, div):
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     teams = get_teams_in_division(con, div["division_id"])
     div_avgs = compute_division_map_avgs(con, div["division_id"])
-
+    thresholds = compute_division_thresholds(con, div["division_id"])
+    
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     html = [HTML_HEAD.replace("{title}", f"{div['name']} – generoitu {ts}")]
@@ -633,6 +879,37 @@ def render_division(con, div):
         logo = f'<img class="logo" src="{avatar}" alt="">' if avatar else ''
         html.append(f'<a href="#team-{t["team_id"]}">{logo}{escape(name)}</a>')
     html.append("</div>")
+
+    # --- Divisioonan lyhyt yhteenveto pelaajista ---
+    divsum = compute_division_player_summary(con, div["division_id"], min_rounds=20)
+
+    html.append('<div class="div-summary">')
+
+    # Vasemman puolen "perusluvut" kortti
+    html.append('<div class="card">')
+    html.append('<h3>Division summary</h3>')
+    html.append('<div class="summary-grid">')
+    html.append(f'<div class="summary-item"><div class="label">Teams</div><div class="val">{divsum["teams"]}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Players</div><div class="val">{divsum["players"]}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Maps</div><div class="val">{divsum["maps"]}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Rounds</div><div class="val">{divsum["rounds"]}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Avg KD</div><div class="val">{divsum["avg_kd"]:.2f}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Avg ADR</div><div class="val">{divsum["avg_adr"]:.1f}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Avg KR</div><div class="val">{divsum["avg_kr"]:.2f}</div></div>')
+    html.append('</div>')  # /summary-grid
+    html.append('</div>')  # /card
+
+    # Oikean puolen "Leaders" kortti
+    html.append('<div class="card leaders">')
+    html.append('<h3>Leaders (min 20 rounds)</h3>')
+    html.append('<table><thead><tr><th>Metric</th><th>Player</th><th>Value</th></tr></thead><tbody>')
+    html.append(f'<tr><td>KD</td><td>{escape(divsum["leaders"]["kd"][0])} <span class="cell-muted">({escape(divsum["leaders"]["kd"][1])})</span></td><td>{divsum["leaders"]["kd"][2]:.2f}</td></tr>')
+    html.append(f'<tr><td>ADR</td><td>{escape(divsum["leaders"]["adr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["adr"][1])})</span></td><td>{divsum["leaders"]["adr"][2]:.1f}</td></tr>')
+    html.append(f'<tr><td>KR</td><td>{escape(divsum["leaders"]["kr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["kr"][1])})</span></td><td>{divsum["leaders"]["kr"][2]:.2f}</td></tr>')
+    html.append('</tbody></table>')
+    html.append('</div>')  # /card leaders
+
+    html.append('</div>')  # /div-summary
 
 
     html.append('<div class="muted">Vinkki: klikkaa joukkueen otsikkoriviä avataksesi tai sulkeaksesi sen.</div>')
@@ -751,9 +1028,11 @@ def render_division(con, div):
               <td>{int(p["util"])}</td>
             </tr>""")
         html.append("</tbody></table>")
-        html.append(f"<script>colorizeRange('{tid_basic}', 3, 0.3, 1.5, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_basic}', 4, 50, 120, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_basic}', 5, 0.2, 1.2, false);</script>")
+        # Basic-taulukon väritys dynaamisesti divisioonakynnyksillä
+        html.append(f"<script>colorizeRange('{tid_basic}', 3, {thresholds['kd'][0]:.4f}, {thresholds['kd'][1]:.4f}, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_basic}', 4, {thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_basic}', 5, {thresholds['kr'][0]:.4f}, {thresholds['kr'][1]:.4f}, false);</script>")
+
         html.append(f"<script>applyDefaultSort('{tid_basic}');</script>")
         html.append("</div>")  # /tab-panel basic
 
@@ -810,12 +1089,15 @@ def render_division(con, div):
 
         html.append("</tbody></table>")
 
-        # Väritykset: WR:t vihreäksi kun korkea
+        # Advanced-taulukon dynaamiset väritykset
+        # 2 = 1v1 WR, 3 = 1v2 WR, 6 = Entry WR%  -> jätetään edelleen 0..100
         html.append(f"<script>colorizeRange('{tid_adv}', 2, 0, 100, false);</script>")
         html.append(f"<script>colorizeRange('{tid_adv}', 3, 0, 100, false);</script>")
         html.append(f"<script>colorizeRange('{tid_adv}', 6, 0, 100, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_adv}', 7, 0.5, 15, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_adv}', 8, 0.6, 2.2, false);</script>")
+        # 7 = UDPR, 8 = Impact → dynaamiset kynnykset divisioonan mukaan
+        html.append(f"<script>colorizeRange('{tid_adv}', 7, {thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_adv}', 8, {thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, false);</script>")
+
         html.append(f"<script>applyDefaultSort('{tid_adv}');</script>")
         html.append("</div>")  # /tab-panel advanced
 
