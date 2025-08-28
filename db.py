@@ -101,36 +101,40 @@ def upsert_team_stat(con, ts):
 
 def upsert_player_stat(con, ps):
     con.execute(
-        """INSERT INTO player_stats(match_id, round_index, player_id, nickname, team_id, team_name, kills, deaths, assists,
-                                      kd, kr, adr, hs_pct, mvps, sniper_kills, utility_damage, flash_assists,
-                                      mk_3k, mk_4k, mk_5k,
-                                      cl_1v1_wins, cl_1v1_attempts, cl_1v2_wins, cl_1v2_attempts,
-                                      cl_1v3_wins, cl_1v3_attempts, cl_1v4_wins, cl_1v4_attempts,
-                                      cl_1v5_wins, cl_1v5_attempts)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """
+        INSERT INTO player_stats(
+            match_id, round_index, player_id, nickname, team_id, team_name,
+            kills, deaths, assists, kd, kr, adr, hs_pct, mvps, sniper_kills,
+            utility_damage, mk_3k, mk_4k, mk_5k,
+            -- clutch-kentät:
+            clutch_kills, cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(match_id, round_index, player_id, nickname) DO UPDATE SET
-            team_id=excluded.team_id, team_name=excluded.team_name,
-            kills=excluded.kills, deaths=excluded.deaths, assists=excluded.assists,
-            kd=excluded.kd, kr=excluded.kr, adr=excluded.adr, hs_pct=excluded.hs_pct,
-            mvps=excluded.mvps, sniper_kills=excluded.sniper_kills, utility_damage=excluded.utility_damage,
-            flash_assists=excluded.flash_assists, mk_3k=excluded.mk_3k, mk_4k=excluded.mk_4k, mk_5k=excluded.mk_5k,
-            cl_1v1_wins=excluded.cl_1v1_wins, cl_1v1_attempts=excluded.cl_1v1_attempts,
-            cl_1v2_wins=excluded.cl_1v2_wins, cl_1v2_attempts=excluded.cl_1v2_attempts,
-            cl_1v3_wins=excluded.cl_1v3_wins, cl_1v3_attempts=excluded.cl_1v3_attempts,
-            cl_1v4_wins=excluded.cl_1v4_wins, cl_1v4_attempts=excluded.cl_1v4_attempts,
-            cl_1v5_wins=excluded.cl_1v5_wins, cl_1v5_attempts=excluded.cl_1v5_attempts
-        """, (
-            ps["match_id"], ps["round_index"], ps.get("player_id"), ps.get("nickname"),
-            ps.get("team_id"), ps.get("team_name"),
-            ps.get("kills"), ps.get("deaths"), ps.get("assists"),
-            ps.get("kd"), ps.get("kr"), ps.get("adr"), ps.get("hs_pct"),
-            ps.get("mvps"), ps.get("sniper_kills"), ps.get("utility_damage"), ps.get("flash_assists"),
-            ps.get("mk_3k"), ps.get("mk_4k"), ps.get("mk_5k"),
-            ps.get("cl_1v1_wins"), ps.get("cl_1v1_attempts"),
-            ps.get("cl_1v2_wins"), ps.get("cl_1v2_attempts"),
-            ps.get("cl_1v3_wins"), ps.get("cl_1v3_attempts"),
-            ps.get("cl_1v4_wins"), ps.get("cl_1v4_attempts"),
-            ps.get("cl_1v5_wins"), ps.get("cl_1v5_attempts"),
+            kills=excluded.kills,
+            deaths=excluded.deaths,
+            assists=excluded.assists,
+            kd=excluded.kd,
+            kr=excluded.kr,
+            adr=excluded.adr,
+            hs_pct=excluded.hs_pct,
+            mvps=excluded.mvps,
+            sniper_kills=excluded.sniper_kills,
+            utility_damage=excluded.utility_damage,
+            mk_3k=excluded.mk_3k, mk_4k=excluded.mk_4k, mk_5k=excluded.mk_5k,
+            clutch_kills=excluded.clutch_kills,
+            cl_1v1_attempts=excluded.cl_1v1_attempts,
+            cl_1v1_wins=excluded.cl_1v1_wins,
+            cl_1v2_attempts=excluded.cl_1v2_attempts,
+            cl_1v2_wins=excluded.cl_1v2_wins
+        """,
+        (
+            ps["match_id"], ps["round_index"], ps["player_id"], ps["nickname"],
+            ps["team_id"], ps["team_name"],
+            ps["kills"], ps["deaths"], ps["assists"], ps["kd"], ps["kr"], ps["adr"], ps["hs_pct"],
+            ps["mvps"], ps["sniper_kills"], ps["utility_damage"],
+            ps["mk_3k"], ps["mk_4k"], ps["mk_5k"],
+            ps["clutch_kills"], ps["cl_1v1_attempts"], ps["cl_1v1_wins"],
+            ps["cl_1v2_attempts"], ps["cl_1v2_wins"],
         )
     )
 

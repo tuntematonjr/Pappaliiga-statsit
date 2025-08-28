@@ -215,12 +215,13 @@ def extract_player_row(match_id: str, round_index: int, pl: Dict[str, Any], team
     mk3 = safe_int(ps.get("Triple Kills", 0))
     mk4 = safe_int(ps.get("Quadro Kills", 0)) or safe_int(ps.get("Quadra Kills", 0))
     mk5 = safe_int(ps.get("Penta Kills", 0)) or safe_int(ps.get("ACE", 0))
-    # Clutches (best-effort; Faceit sometimes emits 1vX Wins / Clutches)
-    c11w = safe_int(ps.get("1v1", 0)) or safe_int(ps.get("1v1 Wins", 0))
-    c12w = safe_int(ps.get("1v2", 0)) or safe_int(ps.get("1v2 Wins", 0))
-    c13w = safe_int(ps.get("1v3", 0)) or safe_int(ps.get("1v3 Wins", 0))
-    c14w = safe_int(ps.get("1v4", 0)) or safe_int(ps.get("1v4 Wins", 0))
-    c15w = safe_int(ps.get("1v5", 0)) or safe_int(ps.get("1v5 Wins", 0))
+    # --- Clutches & clutch kills (suoraan Faceit-player_stats-kentistä) ---
+    clutch_kills = safe_int(ps.get("Clutch Kills", 0))
+    c11_attempts = safe_int(ps.get("1v1Count", 0))
+    c11_wins     = safe_int(ps.get("1v1Wins", 0))
+    c12_attempts = safe_int(ps.get("1v2Count", 0))
+    c12_wins     = safe_int(ps.get("1v2Wins", 0))
+
     # Attempts unknown -> 0 by default
     return {
         "match_id": match_id,
@@ -233,11 +234,9 @@ def extract_player_row(match_id: str, round_index: int, pl: Dict[str, Any], team
         "kd": kd_val, "kr": kr, "adr": adr, "hs_pct": hs_pct,
         "mvps": mvps, "sniper_kills": sniper_kills, "utility_damage": util, "flash_assists": flash_assists,
         "mk_3k": mk3, "mk_4k": mk4, "mk_5k": mk5,
-        "cl_1v1_wins": c11w, "cl_1v1_attempts": 0,
-        "cl_1v2_wins": c12w, "cl_1v2_attempts": 0,
-        "cl_1v3_wins": c13w, "cl_1v3_attempts": 0,
-        "cl_1v4_wins": c14w, "cl_1v4_attempts": 0,
-        "cl_1v5_wins": c15w, "cl_1v5_attempts": 0,
+        "clutch_kills": clutch_kills,
+        "cl_1v1_attempts": c11_attempts, "cl_1v1_wins": c11_wins,
+        "cl_1v2_attempts": c12_attempts, "cl_1v2_wins": c12_wins,
     }
 
 def sync_division(con, div):

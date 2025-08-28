@@ -292,18 +292,26 @@ def compute_team_summary(con, division_id: int, team_id: str):
 
 def compute_player_table(con, division_id: int, team_id: str):
     rows = q(con, """
-    SELECT ps.nickname AS nickname,
-           COUNT(*) AS maps_played,
-           SUM(ps.kills)  AS k,
-           SUM(ps.deaths) AS d,
-           SUM(ps.assists) AS a,
-           AVG(ps.adr) AS adr,
-           AVG(ps.kr)  AS kr,
-           AVG(ps.hs_pct) AS hs_pct,
-           SUM(ps.sniper_kills) AS awp_kills,
-           SUM(ps.mk_3k) AS k3, SUM(ps.mk_4k) AS k4, SUM(ps.mk_5k) AS k5,
-           SUM(ps.utility_damage) AS util,
-           SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds_played
+    SELECT
+      ps.nickname AS nickname,
+      COUNT(*) AS maps_played,
+      SUM(ps.kills)  AS k,
+      SUM(ps.deaths) AS d,
+      SUM(ps.assists) AS a,
+      AVG(ps.adr) AS adr,
+      AVG(ps.kr)  AS kr,
+      AVG(ps.hs_pct) AS hs_pct,
+      SUM(ps.sniper_kills) AS awp_kills,
+      SUM(ps.mk_3k) AS k3, SUM(ps.mk_4k) AS k4, SUM(ps.mk_5k) AS k5,
+      SUM(ps.utility_damage) AS util,
+      -- kierrokset kartalta (liity maps-tauluun kuten sinulla jo on)
+      SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
+      -- clutch-aggregaatit:
+      SUM(ps.clutch_kills) AS clutch_kills,
+      SUM(ps.cl_1v1_attempts) AS c11_att,
+      SUM(ps.cl_1v1_wins)     AS c11_win,
+      SUM(ps.cl_1v2_attempts) AS c12_att,
+      SUM(ps.cl_1v2_wins)     AS c12_win
     FROM player_stats ps
     JOIN matches m ON m.match_id = ps.match_id
     JOIN maps mp   ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
@@ -311,9 +319,13 @@ def compute_player_table(con, division_id: int, team_id: str):
     GROUP BY ps.nickname
     ORDER BY k DESC
     """, (division_id, team_id))
+
     table = []
     for r in rows:
         kd = (r["k"] / r["d"]) if r["d"] else float(r["k"])
+        # WR-laskenta turvallisesti
+        c11_wr = (100.0 * r["c11_win"] / r["c11_att"]) if r["c11_att"] else 0.0
+        c12_wr = (100.0 * r["c12_win"] / r["c12_att"]) if r["c12_att"] else 0.0
         table.append({
             "nickname": r["nickname"],
             "maps_played": r["maps_played"],
@@ -328,8 +340,13 @@ def compute_player_table(con, division_id: int, team_id: str):
             "awp_kills": r["awp_kills"] or 0,
             "k3": r["k3"] or 0, "k4": r["k4"] or 0, "k5": r["k5"] or 0,
             "util": r["util"] or 0,
+            # clutch
+            "clutch_kills": r["clutch_kills"] or 0,
+            "c11_att": r["c11_att"] or 0, "c11_win": r["c11_win"] or 0, "c11_wr": c11_wr,
+            "c12_att": r["c12_att"] or 0, "c12_win": r["c12_win"] or 0, "c12_wr": c12_wr,
         })
     return table
+
 
 
 def compute_division_map_avgs(con, division_id: int):
@@ -516,46 +533,60 @@ def render_division(con, div):
         html.append(f'<h3>Players</h3>')
         html.append(f'<table id="{tid}" data-sort-col="0" data-sort-dir="asc">')
         html.append("""<thead><tr>
-            <th onclick="sortTable('{tid}',0,false)">Nickname</th>
-            <th onclick="sortTable('{tid}',1,true)">Maps</th>
-            <th onclick="sortTable('{tid}',2,true)">Rounds</th>
-            <th onclick="sortTable('{tid}',3,true)">KD</th>
-            <th onclick="sortTable('{tid}',4,true)">ADR</th>
-            <th onclick="sortTable('{tid}',5,true)">KR</th>
-            <th onclick="sortTable('{tid}',6,true)">Kill</th>
-            <th onclick="sortTable('{tid}',7,true)">Death</th>
-            <th onclick="sortTable('{tid}',8,true)">Assists</th>
-            <th onclick="sortTable('{tid}',9,true)">HS%</th>
-            <th onclick="sortTable('{tid}',10,true)">AWP</th>
-            <th onclick="sortTable('{tid}',11,true)">3K</th>
-            <th onclick="sortTable('{tid}',12,true)">4K</th>
-            <th onclick="sortTable('{tid}',13,true)">5K</th>
-            <th onclick="sortTable('{tid}',14,true)">Util</th>
+          <th onclick="sortTable('{tid}',0,false)">Nickname</th>
+          <th onclick="sortTable('{tid}',1,true)">Maps</th>
+          <th onclick="sortTable('{tid}',2,true)">Rounds</th>
+          <th onclick="sortTable('{tid}',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('{tid}',4,true)">ADR</th>
+          <th onclick="sortTable('{tid}',5,true)">KR</th>
+          <th onclick="sortTable('{tid}',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
+          <th onclick="sortTable('{tid}',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
+          <th onclick="sortTable('{tid}',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
+          <th onclick="sortTable('{tid}',9,true)">K</th>
+          <th onclick="sortTable('{tid}',10,true)">D</th>
+          <th onclick="sortTable('{tid}',11,true)">A</th>
+          <th onclick="sortTable('{tid}',12,true)">HS%</th>
+          <th onclick="sortTable('{tid}',13,true)">AWP</th>
+          <th onclick="sortTable('{tid}',14,true)">3K</th>
+          <th onclick="sortTable('{tid}',15,true)">4K</th>
+          <th onclick="sortTable('{tid}',16,true)">5K</th>
+          <th onclick="sortTable('{tid}',17,true)">Util</th>
         </tr></thead><tbody>""".replace("{tid}", tid))
 
         for p in players:
             html.append(f"""<tr>
-                <td>{p["nickname"]}</td>
-                <td>{p["maps_played"]}</td>
-                <td>{p["rounds"]}</td>
-                <td>{p["kd"]:.2f}</td>
-                <td>{p["adr"]:.1f}</td>
-                <td>{p["kr"]:.2f}</td>
-                <td>{p["kill"]}</td>
-                <td>{p["death"]}</td>
-                <td>{p["assist"]}</td>
-                <td>{p["hs_pct"]:.1f}</td>
-                <td>{p["awp_kills"]}</td>
-                <td>{p["k3"]}</td>
-                <td>{p["k4"]}</td>
-                <td>{p["k5"]}</td>
-                <td>{int(p["util"])}</td>
+              <td>{p["nickname"]}</td>
+              <td>{p["maps_played"]}</td>
+              <td title="Rounds/Map: {(p['rounds']/p['maps_played']) if p['maps_played'] else 0:.1f}">{p["rounds"]}</td>
+
+              <td>{p["kd"]:.2f}</td>
+              <td>{p["adr"]:.1f}</td>
+              <td>{p["kr"]:.2f}</td>
+
+              <td>{p["clutch_kills"]}</td>
+              <td data-sort="{p['c11_wr']:.1f}" title="Attempts: {p['c11_att']}, Wins: {p['c11_win']}">{p["c11_wr"]:.0f}% ({p["c11_att"]})</td>
+              <td data-sort="{p['c12_wr']:.1f}" title="Attempts: {p['c12_att']}, Wins: {p['c12_win']}">{p["c12_wr"]:.0f}% ({p["c12_att"]})</td>
+
+              <td>{p["kill"]}</td>
+              <td>{p["death"]}</td>
+              <td>{p["assist"]}</td>
+              <td>{p["hs_pct"]:.1f}</td>
+              <td>{p["awp_kills"]}</td>
+              <td>{p["k3"]}</td>
+              <td>{p["k4"]}</td>
+              <td>{p["k5"]}</td>
+              <td>{int(p["util"])}</td>
             </tr>""")
 
         html.append("</tbody></table>")
-        html.append(f"<script>colorizeRange('{tid}', 3, 0.6, 1.5, false);</script>")
+        # KD, ADR, KR (sinulla ehkä jo nämä)
+        html.append(f"<script>colorizeRange('{tid}', 3, 0.3, 1.5, false);</script>")
         html.append(f"<script>colorizeRange('{tid}', 4, 50, 120, false);</script>")
-        html.append(f"<script>colorizeRange('{tid}', 5, 0.6, 1.2, false);</script>")
+        html.append(f"<script>colorizeRange('{tid}', 5, 0.2, 1.2, false);</script>")
+
+        # 1v1 WR% (col 7) ja 1v2 WR% (col 8)
+        html.append(f"<script>colorizeRange('{tid}', 7, 0, 100, false);</script>")
+        html.append(f"<script>colorizeRange('{tid}', 8, 0, 100, false);</script>")
 
         html.append(f"<script>applyDefaultSort('{tid}');</script>")
 
@@ -660,7 +691,7 @@ def render_division(con, div):
           }
           colorizeAuto('{TID}', 7, false);  // KD
           colorizeAuto('{TID}', 8, false);  // ADR
-          colorizeRange('{TID}', 9, -10, 10, false); // RD
+          colorizeRange('{TID}', 9, -15, 15, false); // RD
           applyDefaultSort('{TID}');
           bindPlayedOnly('{TID}', '{TID}-played-only');
           buildColumnToggles('{TID}');
