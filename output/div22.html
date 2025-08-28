@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>22 Divisioona S11 – generoitu 2025-08-28 13:56</title>
+<title>22 Divisioona S11 – generoitu 2025-08-28 18:25</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -29,7 +29,7 @@ body{
 }
 
 .page{
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 1.25rem 1.25rem 3rem;
 }
@@ -102,6 +102,20 @@ details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
   .nav, .toolbar{ display:none; }
   .bar{ height:12px; }
 }
+
+/* Tabs (Basic / Advanced) */
+.tabs { margin:.75rem 0 1rem; }
+.tab-nav { display:flex; gap:.5rem; }
+.tab-btn {
+  background: var(--chip-bg);
+  color: var(--fg);
+  border:1px solid var(--border);
+  padding:.35rem .7rem; border-radius:999px; cursor:pointer;
+}
+.tab-btn.active { background:#3a3a3a; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
 </style>
 
 <script>
@@ -204,12 +218,39 @@ function buildColumnToggles(tableId){
     });
   });
 }
+
+// Tabien vaihto
+function switchTab(containerId, tabName){
+  const root = document.getElementById(containerId);
+  if(!root) return;
+  const panels = root.querySelectorAll('.tab-panel');
+  const buttons = root.querySelectorAll('.tab-btn');
+  panels.forEach(p => p.classList.remove('active'));
+  buttons.forEach(b => b.classList.remove('active'));
+  root.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
+  root.querySelector(`[data-target="${tabName}"]`)?.classList.add('active');
+}
+
+// Taulukon oletuslajittelu (jos haluat tabin vaihdossa uudelleenlajittelun)
+function initTabsAutoSort(rootId){
+  const root = document.getElementById(rootId);
+  if(!root) return;
+  const activePanel = root.querySelector('.tab-panel.active');
+  if(!activePanel) return;
+  const table = activePanel.querySelector('table');
+  if(!table) return;
+  const col = parseInt(table.getAttribute('data-sort-col') || '0',10);
+  const dir = (table.getAttribute('data-sort-dir') || 'asc') === 'asc';
+  sortTable(table.id, col, !dir);
+  sortTable(table.id, col, dir);
+}
+
 </script>
 </head>
 <body>
 
 <div class="page">
-<h1>22 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 13:56)</span></h1>
+<h1>22 Divisioona S11 <span class='muted'>(generoitu 2025-08-28 18:25)</span></h1>
 <div class="nav">
 <a href="#team-1216f0ea-0b7b-400e-93e1-7bf8c125c9a0">RAYHA_CS</a>
 <a href="#team-553aa80a-6a5d-4167-88cf-f08316d0c623">Casetti Levis</a>
@@ -229,40 +270,41 @@ function buildColumnToggles(tableId){
 <summary><h2>RAYHA_CS</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 4-2</span> <span class="chip">±RD 7</span> <span class="chip">KD 0.99</span> <span class="chip">KR 0.67</span> <span class="chip">ADR 74.1</span> <span class="chip">Util 2340</span></div>
 <h3>Players</h3>
-<table id="players-1" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-1216f0ea" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-1216f0ea','basic'); initTabsAutoSort('tabs-1216f0ea')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-1216f0ea','advanced'); initTabsAutoSort('tabs-1216f0ea')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-1" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-1',0,false)">Nickname</th>
-          <th onclick="sortTable('players-1',1,true)">Maps</th>
-          <th onclick="sortTable('players-1',2,true)">Rounds</th>
-          <th onclick="sortTable('players-1',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-1',4,true)">ADR</th>
-          <th onclick="sortTable('players-1',5,true)">KR</th>
-          <th onclick="sortTable('players-1',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-1',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-1',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-1',9,true)">K</th>
-          <th onclick="sortTable('players-1',10,true)">D</th>
-          <th onclick="sortTable('players-1',11,true)">A</th>
-          <th onclick="sortTable('players-1',12,true)">HS%</th>
-          <th onclick="sortTable('players-1',13,true)">AWP</th>
-          <th onclick="sortTable('players-1',14,true)">3K</th>
-          <th onclick="sortTable('players-1',15,true)">4K</th>
-          <th onclick="sortTable('players-1',16,true)">5K</th>
-          <th onclick="sortTable('players-1',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-1',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-1',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-1',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-1',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-1',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-1',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-1',6,true)">K</th>
+          <th onclick="sortTable('players-basic-1',7,true)">D</th>
+          <th onclick="sortTable('players-basic-1',8,true)">A</th>
+          <th onclick="sortTable('players-basic-1',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-1',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-1',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-1',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-1',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-1',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>KING_JUT</td>
               <td>6</td>
               <td title="Rounds/Map: 21.5">129</td>
-
               <td>1.55</td>
               <td>97.0</td>
               <td>0.94</td>
-
-              <td>8</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>121</td>
               <td>78</td>
               <td>29</td>
@@ -277,15 +319,9 @@ function buildColumnToggles(tableId){
               <td>RotJa</td>
               <td>6</td>
               <td title="Rounds/Map: 21.5">129</td>
-
               <td>0.96</td>
               <td>82.0</td>
               <td>0.73</td>
-
-              <td>6</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-              <td data-sort="0.0" title="Attempts: 5, Wins: 0">0% (5)</td>
-
               <td>95</td>
               <td>99</td>
               <td>46</td>
@@ -300,15 +336,9 @@ function buildColumnToggles(tableId){
               <td>Shirunee</td>
               <td>6</td>
               <td title="Rounds/Map: 21.5">129</td>
-
               <td>1.09</td>
               <td>68.1</td>
               <td>0.65</td>
-
-              <td>5</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>84</td>
               <td>77</td>
               <td>39</td>
@@ -323,15 +353,9 @@ function buildColumnToggles(tableId){
               <td>slack-n-hash</td>
               <td>6</td>
               <td title="Rounds/Map: 21.5">129</td>
-
               <td>0.55</td>
               <td>54.5</td>
               <td>0.44</td>
-
-              <td>3</td>
-              <td data-sort="100.0" title="Attempts: 2, Wins: 2">100% (2)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>56</td>
               <td>101</td>
               <td>36</td>
@@ -346,15 +370,9 @@ function buildColumnToggles(tableId){
               <td>g0nsu</td>
               <td>4</td>
               <td title="Rounds/Map: 22.0">88</td>
-
               <td>0.76</td>
               <td>66.2</td>
               <td>0.54</td>
-
-              <td>1</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>48</td>
               <td>63</td>
               <td>27</td>
@@ -369,15 +387,9 @@ function buildColumnToggles(tableId){
               <td>AnimeRotta</td>
               <td>2</td>
               <td title="Rounds/Map: 20.5">41</td>
-
               <td>1.43</td>
               <td>74.3</td>
               <td>0.74</td>
-
-              <td>1</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>30</td>
               <td>21</td>
               <td>9</td>
@@ -389,12 +401,77 @@ function buildColumnToggles(tableId){
               <td>69</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-1', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-1', 4, 50, 120, false);</script>
-<script>colorizeRange('players-1', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-1', 7, 0, 100, false);</script>
-<script>colorizeRange('players-1', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-1');</script>
+<script>colorizeRange('players-basic-1', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-1', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-1', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-1');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-1" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-1',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-1',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-1',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-1',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-1',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-1',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>KING_JUT</td>
+<td>8</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>4.21</td>
+<td>1.73</td>
+</tr>
+<tr>
+<td>RotJa</td>
+<td>6</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td data-sort="0.0" title="Attempts: 5, Wins: 0">0% (5)</td>
+<td>2.26</td>
+<td>1.31</td>
+</tr>
+<tr>
+<td>Shirunee</td>
+<td>5</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>4.95</td>
+<td>1.18</td>
+</tr>
+<tr>
+<td>slack-n-hash</td>
+<td>3</td>
+<td data-sort="100.0" title="Attempts: 2, Wins: 2">100% (2)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>3.75</td>
+<td>0.68</td>
+</tr>
+<tr>
+<td>g0nsu</td>
+<td>1</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>3.58</td>
+<td>0.91</td>
+</tr>
+<tr>
+<td>AnimeRotta</td>
+<td>1</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>1.68</td>
+<td>1.35</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-1', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-1', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-1', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-1', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-1');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Nuke (3×)</span>
 <span class="chip">Most picked: Overpass (2×)</span>
@@ -574,40 +651,41 @@ function buildColumnToggles(tableId){
 <summary><h2>Casetti Levis</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 0-6</span> <span class="chip">±RD -60</span> <span class="chip">KD 0.55</span> <span class="chip">KR 0.44</span> <span class="chip">ADR 51.7</span> <span class="chip">Util 1452</span></div>
 <h3>Players</h3>
-<table id="players-2" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-553aa80a" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-553aa80a','basic'); initTabsAutoSort('tabs-553aa80a')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-553aa80a','advanced'); initTabsAutoSort('tabs-553aa80a')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-2" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-2',0,false)">Nickname</th>
-          <th onclick="sortTable('players-2',1,true)">Maps</th>
-          <th onclick="sortTable('players-2',2,true)">Rounds</th>
-          <th onclick="sortTable('players-2',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-2',4,true)">ADR</th>
-          <th onclick="sortTable('players-2',5,true)">KR</th>
-          <th onclick="sortTable('players-2',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-2',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-2',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-2',9,true)">K</th>
-          <th onclick="sortTable('players-2',10,true)">D</th>
-          <th onclick="sortTable('players-2',11,true)">A</th>
-          <th onclick="sortTable('players-2',12,true)">HS%</th>
-          <th onclick="sortTable('players-2',13,true)">AWP</th>
-          <th onclick="sortTable('players-2',14,true)">3K</th>
-          <th onclick="sortTable('players-2',15,true)">4K</th>
-          <th onclick="sortTable('players-2',16,true)">5K</th>
-          <th onclick="sortTable('players-2',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-2',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-2',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-2',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-2',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-2',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-2',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-2',6,true)">K</th>
+          <th onclick="sortTable('players-basic-2',7,true)">D</th>
+          <th onclick="sortTable('players-basic-2',8,true)">A</th>
+          <th onclick="sortTable('players-basic-2',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-2',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-2',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-2',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-2',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-2',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>Jabban</td>
               <td>4</td>
               <td title="Rounds/Map: 18.8">75</td>
-
               <td>0.97</td>
               <td>71.6</td>
               <td>0.69</td>
-
-              <td>15</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-
               <td>56</td>
               <td>58</td>
               <td>14</td>
@@ -622,15 +700,9 @@ function buildColumnToggles(tableId){
               <td>naukmam</td>
               <td>2</td>
               <td title="Rounds/Map: 23.5">47</td>
-
               <td>1.44</td>
               <td>106.0</td>
               <td>1.07</td>
-
-              <td>11</td>
-              <td data-sort="100.0" title="Attempts: 2, Wins: 2">100% (2)</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-
               <td>52</td>
               <td>36</td>
               <td>15</td>
@@ -645,15 +717,9 @@ function buildColumnToggles(tableId){
               <td>Kytkis</td>
               <td>4</td>
               <td title="Rounds/Map: 18.5">74</td>
-
               <td>0.72</td>
               <td>72.2</td>
               <td>0.59</td>
-
-              <td>11</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-
               <td>47</td>
               <td>65</td>
               <td>14</td>
@@ -668,15 +734,9 @@ function buildColumnToggles(tableId){
               <td>armpe</td>
               <td>6</td>
               <td title="Rounds/Map: 17.0">102</td>
-
               <td>0.43</td>
               <td>44.4</td>
               <td>0.39</td>
-
-              <td>3</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>42</td>
               <td>97</td>
               <td>14</td>
@@ -691,15 +751,9 @@ function buildColumnToggles(tableId){
               <td>Hevarty</td>
               <td>4</td>
               <td title="Rounds/Map: 13.8">55</td>
-
               <td>0.56</td>
               <td>71.0</td>
               <td>0.53</td>
-
-              <td>4</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-
               <td>29</td>
               <td>52</td>
               <td>9</td>
@@ -714,15 +768,9 @@ function buildColumnToggles(tableId){
               <td>Hi6hl4nder</td>
               <td>6</td>
               <td title="Rounds/Map: 17.0">102</td>
-
               <td>0.18</td>
               <td>22.2</td>
               <td>0.16</td>
-
-              <td>4</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>17</td>
               <td>93</td>
               <td>7</td>
@@ -737,15 +785,9 @@ function buildColumnToggles(tableId){
               <td>KalakukkoM</td>
               <td>2</td>
               <td title="Rounds/Map: 13.5">27</td>
-
               <td>0.22</td>
               <td>32.5</td>
               <td>0.22</td>
-
-              <td>2</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>6</td>
               <td>27</td>
               <td>7</td>
@@ -760,15 +802,9 @@ function buildColumnToggles(tableId){
               <td>tiamarsu</td>
               <td>2</td>
               <td title="Rounds/Map: 14.0">28</td>
-
               <td>0.00</td>
               <td>7.6</td>
               <td>0.00</td>
-
-              <td>0</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>0</td>
               <td>27</td>
               <td>0</td>
@@ -780,12 +816,93 @@ function buildColumnToggles(tableId){
               <td>29</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-2', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-2', 4, 50, 120, false);</script>
-<script>colorizeRange('players-2', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-2', 7, 0, 100, false);</script>
-<script>colorizeRange('players-2', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-2');</script>
+<script>colorizeRange('players-basic-2', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-2', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-2', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-2');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-2" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-2',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-2',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-2',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-2',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-2',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-2',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>Jabban</td>
+<td>15</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td>3.25</td>
+<td>1.14</td>
+</tr>
+<tr>
+<td>naukmam</td>
+<td>11</td>
+<td data-sort="100.0" title="Attempts: 2, Wins: 2">100% (2)</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td>8.21</td>
+<td>1.96</td>
+</tr>
+<tr>
+<td>Kytkis</td>
+<td>11</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td>6.43</td>
+<td>0.90</td>
+</tr>
+<tr>
+<td>armpe</td>
+<td>3</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>0.66</td>
+<td>0.45</td>
+</tr>
+<tr>
+<td>Hevarty</td>
+<td>4</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td>1.76</td>
+<td>0.74</td>
+</tr>
+<tr>
+<td>Hi6hl4nder</td>
+<td>4</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>0.32</td>
+<td>-0.03</td>
+</tr>
+<tr>
+<td>KalakukkoM</td>
+<td>2</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>4.44</td>
+<td>0.14</td>
+</tr>
+<tr>
+<td>tiamarsu</td>
+<td>0</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>1.04</td>
+<td>-0.40</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-2', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-2', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-2', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-2', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-2');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Train (3×)</span>
 <span class="chip">Most picked: Inferno (2×)</span>
@@ -964,40 +1081,41 @@ function buildColumnToggles(tableId){
 <summary><h2>piped0pe</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 4-2</span> <span class="chip">±RD 14</span> <span class="chip">KD 1.14</span> <span class="chip">KR 0.74</span> <span class="chip">ADR 81.6</span> <span class="chip">Util 4852</span></div>
 <h3>Players</h3>
-<table id="players-3" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-6b3e4bec" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-6b3e4bec','basic'); initTabsAutoSort('tabs-6b3e4bec')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-6b3e4bec','advanced'); initTabsAutoSort('tabs-6b3e4bec')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-3" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-3',0,false)">Nickname</th>
-          <th onclick="sortTable('players-3',1,true)">Maps</th>
-          <th onclick="sortTable('players-3',2,true)">Rounds</th>
-          <th onclick="sortTable('players-3',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-3',4,true)">ADR</th>
-          <th onclick="sortTable('players-3',5,true)">KR</th>
-          <th onclick="sortTable('players-3',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-3',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-3',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-3',9,true)">K</th>
-          <th onclick="sortTable('players-3',10,true)">D</th>
-          <th onclick="sortTable('players-3',11,true)">A</th>
-          <th onclick="sortTable('players-3',12,true)">HS%</th>
-          <th onclick="sortTable('players-3',13,true)">AWP</th>
-          <th onclick="sortTable('players-3',14,true)">3K</th>
-          <th onclick="sortTable('players-3',15,true)">4K</th>
-          <th onclick="sortTable('players-3',16,true)">5K</th>
-          <th onclick="sortTable('players-3',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-3',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-3',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-3',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-3',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-3',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-3',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-3',6,true)">K</th>
+          <th onclick="sortTable('players-basic-3',7,true)">D</th>
+          <th onclick="sortTable('players-basic-3',8,true)">A</th>
+          <th onclick="sortTable('players-basic-3',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-3',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-3',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-3',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-3',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-3',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>somppa</td>
               <td>6</td>
               <td title="Rounds/Map: 20.0">120</td>
-
               <td>1.11</td>
               <td>80.0</td>
               <td>0.73</td>
-
-              <td>7</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
-
               <td>88</td>
               <td>79</td>
               <td>35</td>
@@ -1012,15 +1130,9 @@ function buildColumnToggles(tableId){
               <td>Tummetin</td>
               <td>4</td>
               <td title="Rounds/Map: 19.8">79</td>
-
               <td>1.62</td>
               <td>101.9</td>
               <td>0.98</td>
-
-              <td>4</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-
               <td>76</td>
               <td>47</td>
               <td>21</td>
@@ -1035,15 +1147,9 @@ function buildColumnToggles(tableId){
               <td>klemppu</td>
               <td>4</td>
               <td title="Rounds/Map: 21.0">84</td>
-
               <td>1.16</td>
               <td>88.9</td>
               <td>0.76</td>
-
-              <td>8</td>
-              <td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-
               <td>64</td>
               <td>55</td>
               <td>23</td>
@@ -1058,15 +1164,9 @@ function buildColumnToggles(tableId){
               <td>deviz84</td>
               <td>4</td>
               <td title="Rounds/Map: 19.2">77</td>
-
               <td>1.23</td>
               <td>92.5</td>
               <td>0.84</td>
-
-              <td>3</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-
               <td>64</td>
               <td>52</td>
               <td>29</td>
@@ -1081,15 +1181,9 @@ function buildColumnToggles(tableId){
               <td>Carnivori</td>
               <td>4</td>
               <td title="Rounds/Map: 19.8">79</td>
-
               <td>1.35</td>
               <td>73.6</td>
               <td>0.78</td>
-
-              <td>7</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-
               <td>62</td>
               <td>46</td>
               <td>23</td>
@@ -1104,15 +1198,9 @@ function buildColumnToggles(tableId){
               <td>Peppikoira</td>
               <td>4</td>
               <td title="Rounds/Map: 19.2">77</td>
-
               <td>1.02</td>
               <td>78.8</td>
               <td>0.67</td>
-
-              <td>2</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-
               <td>51</td>
               <td>50</td>
               <td>25</td>
@@ -1127,15 +1215,9 @@ function buildColumnToggles(tableId){
               <td>Pekuelo</td>
               <td>4</td>
               <td title="Rounds/Map: 21.0">84</td>
-
               <td>0.66</td>
               <td>56.4</td>
               <td>0.46</td>
-
-              <td>1</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>39</td>
               <td>59</td>
               <td>24</td>
@@ -1147,12 +1229,85 @@ function buildColumnToggles(tableId){
               <td>789</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-3', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-3', 4, 50, 120, false);</script>
-<script>colorizeRange('players-3', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-3', 7, 0, 100, false);</script>
-<script>colorizeRange('players-3', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-3');</script>
+<script>colorizeRange('players-basic-3', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-3', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-3', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-3');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-3" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-3',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-3',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-3',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-3',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-3',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-3',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>somppa</td>
+<td>7</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
+<td>8.32</td>
+<td>1.32</td>
+</tr>
+<tr>
+<td>Tummetin</td>
+<td>4</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td>7.43</td>
+<td>1.82</td>
+</tr>
+<tr>
+<td>klemppu</td>
+<td>8</td>
+<td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td>14.35</td>
+<td>1.36</td>
+</tr>
+<tr>
+<td>deviz84</td>
+<td>3</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td>3.05</td>
+<td>1.56</td>
+</tr>
+<tr>
+<td>Carnivori</td>
+<td>7</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td>6.68</td>
+<td>1.45</td>
+</tr>
+<tr>
+<td>Peppikoira</td>
+<td>2</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td>6.62</td>
+<td>1.21</td>
+</tr>
+<tr>
+<td>Pekuelo</td>
+<td>1</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>9.39</td>
+<td>0.76</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-3', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-3', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-3', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-3', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-3');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Mirage (3×)</span>
 <span class="chip">Most picked: Ancient (2×)</span>
@@ -1332,40 +1487,41 @@ function buildColumnToggles(tableId){
 <summary><h2>LosBurritos</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 3-3</span> <span class="chip">±RD 11</span> <span class="chip">KD 1.11</span> <span class="chip">KR 0.74</span> <span class="chip">ADR 80.0</span> <span class="chip">Util 4345</span></div>
 <h3>Players</h3>
-<table id="players-4" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-7114313c" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-7114313c','basic'); initTabsAutoSort('tabs-7114313c')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-7114313c','advanced'); initTabsAutoSort('tabs-7114313c')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-4" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-4',0,false)">Nickname</th>
-          <th onclick="sortTable('players-4',1,true)">Maps</th>
-          <th onclick="sortTable('players-4',2,true)">Rounds</th>
-          <th onclick="sortTable('players-4',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-4',4,true)">ADR</th>
-          <th onclick="sortTable('players-4',5,true)">KR</th>
-          <th onclick="sortTable('players-4',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-4',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-4',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-4',9,true)">K</th>
-          <th onclick="sortTable('players-4',10,true)">D</th>
-          <th onclick="sortTable('players-4',11,true)">A</th>
-          <th onclick="sortTable('players-4',12,true)">HS%</th>
-          <th onclick="sortTable('players-4',13,true)">AWP</th>
-          <th onclick="sortTable('players-4',14,true)">3K</th>
-          <th onclick="sortTable('players-4',15,true)">4K</th>
-          <th onclick="sortTable('players-4',16,true)">5K</th>
-          <th onclick="sortTable('players-4',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-4',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-4',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-4',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-4',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-4',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-4',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-4',6,true)">K</th>
+          <th onclick="sortTable('players-basic-4',7,true)">D</th>
+          <th onclick="sortTable('players-basic-4',8,true)">A</th>
+          <th onclick="sortTable('players-basic-4',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-4',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-4',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-4',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-4',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-4',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>-Ru1N3r-</td>
               <td>6</td>
               <td title="Rounds/Map: 20.5">123</td>
-
               <td>1.15</td>
               <td>92.9</td>
               <td>0.84</td>
-
-              <td>9</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>105</td>
               <td>91</td>
               <td>47</td>
@@ -1380,15 +1536,9 @@ function buildColumnToggles(tableId){
               <td>-Papacito-</td>
               <td>4</td>
               <td title="Rounds/Map: 20.0">80</td>
-
               <td>2.08</td>
               <td>103.2</td>
               <td>0.99</td>
-
-              <td>3</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
-
               <td>79</td>
               <td>38</td>
               <td>30</td>
@@ -1403,15 +1553,9 @@ function buildColumnToggles(tableId){
               <td>_Eldwin_</td>
               <td>6</td>
               <td title="Rounds/Map: 20.5">123</td>
-
               <td>0.87</td>
               <td>74.2</td>
               <td>0.60</td>
-
-              <td>3</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>71</td>
               <td>82</td>
               <td>48</td>
@@ -1426,15 +1570,9 @@ function buildColumnToggles(tableId){
               <td>Mrui</td>
               <td>4</td>
               <td title="Rounds/Map: 20.0">80</td>
-
               <td>1.65</td>
               <td>96.2</td>
               <td>0.92</td>
-
-              <td>9</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-
               <td>71</td>
               <td>43</td>
               <td>29</td>
@@ -1449,15 +1587,9 @@ function buildColumnToggles(tableId){
               <td>Mrs_JoRa</td>
               <td>4</td>
               <td title="Rounds/Map: 22.2">89</td>
-
               <td>0.89</td>
               <td>61.8</td>
               <td>0.64</td>
-
-              <td>4</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>57</td>
               <td>64</td>
               <td>17</td>
@@ -1472,15 +1604,9 @@ function buildColumnToggles(tableId){
               <td>Rumalapsi</td>
               <td>4</td>
               <td title="Rounds/Map: 19.2">77</td>
-
               <td>0.86</td>
               <td>63.0</td>
               <td>0.58</td>
-
-              <td>3</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>43</td>
               <td>50</td>
               <td>18</td>
@@ -1495,15 +1621,9 @@ function buildColumnToggles(tableId){
               <td>Tiivi_Taavi</td>
               <td>2</td>
               <td title="Rounds/Map: 21.5">43</td>
-
               <td>0.62</td>
               <td>50.5</td>
               <td>0.46</td>
-
-              <td>3</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-
               <td>20</td>
               <td>32</td>
               <td>8</td>
@@ -1515,12 +1635,85 @@ function buildColumnToggles(tableId){
               <td>80</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-4', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-4', 4, 50, 120, false);</script>
-<script>colorizeRange('players-4', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-4', 7, 0, 100, false);</script>
-<script>colorizeRange('players-4', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-4');</script>
+<script>colorizeRange('players-basic-4', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-4', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-4', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-4');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-4" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-4',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-4',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-4',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-4',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-4',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-4',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>-Ru1N3r-</td>
+<td>9</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>7.03</td>
+<td>1.54</td>
+</tr>
+<tr>
+<td>-Papacito-</td>
+<td>3</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
+<td>14.05</td>
+<td>1.95</td>
+</tr>
+<tr>
+<td>_Eldwin_</td>
+<td>3</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>6.11</td>
+<td>1.09</td>
+</tr>
+<tr>
+<td>Mrui</td>
+<td>9</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td>8.12</td>
+<td>1.76</td>
+</tr>
+<tr>
+<td>Mrs_JoRa</td>
+<td>4</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>6.04</td>
+<td>1.06</td>
+</tr>
+<tr>
+<td>Rumalapsi</td>
+<td>3</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>4.36</td>
+<td>1.00</td>
+</tr>
+<tr>
+<td>Tiivi_Taavi</td>
+<td>3</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td>1.86</td>
+<td>0.70</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-4', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-4', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-4', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-4', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-4');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Inferno (3×)</span>
 <span class="chip">Most picked: Dust II (1×)</span>
@@ -1700,40 +1893,41 @@ function buildColumnToggles(tableId){
 <summary><h2>Venga Chicos</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 3-3</span> <span class="chip">±RD -7</span> <span class="chip">KD 0.95</span> <span class="chip">KR 0.68</span> <span class="chip">ADR 76.0</span> <span class="chip">Util 3123</span></div>
 <h3>Players</h3>
-<table id="players-5" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-7e8245ab" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-7e8245ab','basic'); initTabsAutoSort('tabs-7e8245ab')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-7e8245ab','advanced'); initTabsAutoSort('tabs-7e8245ab')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-5" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-5',0,false)">Nickname</th>
-          <th onclick="sortTable('players-5',1,true)">Maps</th>
-          <th onclick="sortTable('players-5',2,true)">Rounds</th>
-          <th onclick="sortTable('players-5',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-5',4,true)">ADR</th>
-          <th onclick="sortTable('players-5',5,true)">KR</th>
-          <th onclick="sortTable('players-5',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-5',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-5',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-5',9,true)">K</th>
-          <th onclick="sortTable('players-5',10,true)">D</th>
-          <th onclick="sortTable('players-5',11,true)">A</th>
-          <th onclick="sortTable('players-5',12,true)">HS%</th>
-          <th onclick="sortTable('players-5',13,true)">AWP</th>
-          <th onclick="sortTable('players-5',14,true)">3K</th>
-          <th onclick="sortTable('players-5',15,true)">4K</th>
-          <th onclick="sortTable('players-5',16,true)">5K</th>
-          <th onclick="sortTable('players-5',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-5',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-5',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-5',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-5',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-5',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-5',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-5',6,true)">K</th>
+          <th onclick="sortTable('players-basic-5',7,true)">D</th>
+          <th onclick="sortTable('players-basic-5',8,true)">A</th>
+          <th onclick="sortTable('players-basic-5',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-5',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-5',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-5',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-5',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-5',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>Tiffmeister</td>
               <td>4</td>
               <td title="Rounds/Map: 21.8">87</td>
-
               <td>1.60</td>
               <td>118.1</td>
               <td>1.11</td>
-
-              <td>6</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-              <td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
-
               <td>96</td>
               <td>60</td>
               <td>24</td>
@@ -1748,15 +1942,9 @@ function buildColumnToggles(tableId){
               <td>Kunbo</td>
               <td>4</td>
               <td title="Rounds/Map: 21.8">87</td>
-
               <td>1.19</td>
               <td>79.5</td>
               <td>0.80</td>
-
-              <td>8</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-              <td data-sort="16.7" title="Attempts: 6, Wins: 1">17% (6)</td>
-
               <td>69</td>
               <td>58</td>
               <td>21</td>
@@ -1771,15 +1959,9 @@ function buildColumnToggles(tableId){
               <td>janzuhhh</td>
               <td>4</td>
               <td title="Rounds/Map: 21.8">87</td>
-
               <td>1.09</td>
               <td>61.2</td>
               <td>0.68</td>
-
-              <td>7</td>
-              <td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-
               <td>59</td>
               <td>54</td>
               <td>20</td>
@@ -1794,15 +1976,9 @@ function buildColumnToggles(tableId){
               <td>DaGibber</td>
               <td>4</td>
               <td title="Rounds/Map: 20.2">81</td>
-
               <td>0.79</td>
               <td>81.8</td>
               <td>0.63</td>
-
-              <td>2</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="0.0" title="Attempts: 5, Wins: 0">0% (5)</td>
-
               <td>54</td>
               <td>68</td>
               <td>22</td>
@@ -1817,15 +1993,9 @@ function buildColumnToggles(tableId){
               <td>Heiskanen</td>
               <td>4</td>
               <td title="Rounds/Map: 18.5">74</td>
-
               <td>0.84</td>
               <td>77.0</td>
               <td>0.63</td>
-
-              <td>2</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>48</td>
               <td>57</td>
               <td>24</td>
@@ -1840,15 +2010,9 @@ function buildColumnToggles(tableId){
               <td>Lainaamua</td>
               <td>4</td>
               <td title="Rounds/Map: 20.2">81</td>
-
               <td>0.63</td>
               <td>64.9</td>
               <td>0.45</td>
-
-              <td>2</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>37</td>
               <td>59</td>
               <td>25</td>
@@ -1863,15 +2027,9 @@ function buildColumnToggles(tableId){
               <td>ALuHaRD808</td>
               <td>2</td>
               <td title="Rounds/Map: 20.0">40</td>
-
               <td>0.96</td>
               <td>60.0</td>
               <td>0.59</td>
-
-              <td>5</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="100.0" title="Attempts: 2, Wins: 2">100% (2)</td>
-
               <td>24</td>
               <td>25</td>
               <td>13</td>
@@ -1886,15 +2044,9 @@ function buildColumnToggles(tableId){
               <td>ALuHaRD</td>
               <td>2</td>
               <td title="Rounds/Map: 17.0">34</td>
-
               <td>0.61</td>
               <td>68.2</td>
               <td>0.60</td>
-
-              <td>2</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>20</td>
               <td>33</td>
               <td>8</td>
@@ -1909,15 +2061,9 @@ function buildColumnToggles(tableId){
               <td>Uhinho</td>
               <td>2</td>
               <td title="Rounds/Map: 17.0">34</td>
-
               <td>0.50</td>
               <td>46.7</td>
               <td>0.43</td>
-
-              <td>6</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-
               <td>15</td>
               <td>30</td>
               <td>3</td>
@@ -1929,12 +2075,101 @@ function buildColumnToggles(tableId){
               <td>230</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-5', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-5', 4, 50, 120, false);</script>
-<script>colorizeRange('players-5', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-5', 7, 0, 100, false);</script>
-<script>colorizeRange('players-5', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-5');</script>
+<script>colorizeRange('players-basic-5', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-5', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-5', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-5');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-5" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-5',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-5',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-5',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-5',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-5',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-5',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>Tiffmeister</td>
+<td>6</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
+<td>4.24</td>
+<td>2.06</td>
+</tr>
+<tr>
+<td>Kunbo</td>
+<td>8</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td data-sort="16.7" title="Attempts: 6, Wins: 1">17% (6)</td>
+<td>2.83</td>
+<td>1.43</td>
+</tr>
+<tr>
+<td>janzuhhh</td>
+<td>7</td>
+<td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td>3.01</td>
+<td>1.21</td>
+</tr>
+<tr>
+<td>DaGibber</td>
+<td>2</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="0.0" title="Attempts: 5, Wins: 0">0% (5)</td>
+<td>6.93</td>
+<td>1.02</td>
+</tr>
+<tr>
+<td>Heiskanen</td>
+<td>2</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>6.91</td>
+<td>1.09</td>
+</tr>
+<tr>
+<td>Lainaamua</td>
+<td>2</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>8.00</td>
+<td>0.73</td>
+</tr>
+<tr>
+<td>ALuHaRD808</td>
+<td>5</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="100.0" title="Attempts: 2, Wins: 2">100% (2)</td>
+<td>6.50</td>
+<td>1.06</td>
+</tr>
+<tr>
+<td>ALuHaRD</td>
+<td>2</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>1.06</td>
+<td>0.90</td>
+</tr>
+<tr>
+<td>Uhinho</td>
+<td>6</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td>6.76</td>
+<td>0.55</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-5', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-5', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-5', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-5', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-5');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Ancient (2×)</span>
 <span class="chip">Most picked: Nuke (2×)</span>
@@ -2114,40 +2349,41 @@ function buildColumnToggles(tableId){
 <summary><h2>Gibbonit</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 1-5</span> <span class="chip">±RD -28</span> <span class="chip">KD 0.78</span> <span class="chip">KR 0.58</span> <span class="chip">ADR 68.8</span> <span class="chip">Util 3556</span></div>
 <h3>Players</h3>
-<table id="players-6" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-819b0708" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-819b0708','basic'); initTabsAutoSort('tabs-819b0708')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-819b0708','advanced'); initTabsAutoSort('tabs-819b0708')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-6" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-6',0,false)">Nickname</th>
-          <th onclick="sortTable('players-6',1,true)">Maps</th>
-          <th onclick="sortTable('players-6',2,true)">Rounds</th>
-          <th onclick="sortTable('players-6',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-6',4,true)">ADR</th>
-          <th onclick="sortTable('players-6',5,true)">KR</th>
-          <th onclick="sortTable('players-6',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-6',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-6',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-6',9,true)">K</th>
-          <th onclick="sortTable('players-6',10,true)">D</th>
-          <th onclick="sortTable('players-6',11,true)">A</th>
-          <th onclick="sortTable('players-6',12,true)">HS%</th>
-          <th onclick="sortTable('players-6',13,true)">AWP</th>
-          <th onclick="sortTable('players-6',14,true)">3K</th>
-          <th onclick="sortTable('players-6',15,true)">4K</th>
-          <th onclick="sortTable('players-6',16,true)">5K</th>
-          <th onclick="sortTable('players-6',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-6',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-6',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-6',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-6',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-6',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-6',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-6',6,true)">K</th>
+          <th onclick="sortTable('players-basic-6',7,true)">D</th>
+          <th onclick="sortTable('players-basic-6',8,true)">A</th>
+          <th onclick="sortTable('players-basic-6',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-6',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-6',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-6',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-6',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-6',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>Kytky</td>
               <td>6</td>
               <td title="Rounds/Map: 21.7">130</td>
-
               <td>1.17</td>
               <td>88.6</td>
               <td>0.82</td>
-
-              <td>19</td>
-              <td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
-              <td data-sort="28.6" title="Attempts: 7, Wins: 2">29% (7)</td>
-
               <td>116</td>
               <td>99</td>
               <td>24</td>
@@ -2162,15 +2398,9 @@ function buildColumnToggles(tableId){
               <td>Ribbels</td>
               <td>6</td>
               <td title="Rounds/Map: 21.7">130</td>
-
               <td>0.91</td>
               <td>78.2</td>
               <td>0.66</td>
-
-              <td>14</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-
               <td>85</td>
               <td>93</td>
               <td>35</td>
@@ -2185,15 +2415,9 @@ function buildColumnToggles(tableId){
               <td>keijoo7</td>
               <td>6</td>
               <td title="Rounds/Map: 21.7">130</td>
-
               <td>0.74</td>
               <td>75.1</td>
               <td>0.60</td>
-
-              <td>3</td>
-              <td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-
               <td>78</td>
               <td>106</td>
               <td>31</td>
@@ -2208,15 +2432,9 @@ function buildColumnToggles(tableId){
               <td>Jepari112</td>
               <td>6</td>
               <td title="Rounds/Map: 21.7">130</td>
-
               <td>0.72</td>
               <td>67.2</td>
               <td>0.56</td>
-
-              <td>8</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
-
               <td>72</td>
               <td>100</td>
               <td>35</td>
@@ -2231,15 +2449,9 @@ function buildColumnToggles(tableId){
               <td>HunajaBalsam</td>
               <td>6</td>
               <td title="Rounds/Map: 21.7">130</td>
-
               <td>0.37</td>
               <td>35.1</td>
               <td>0.26</td>
-
-              <td>2</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
-
               <td>38</td>
               <td>103</td>
               <td>19</td>
@@ -2251,12 +2463,69 @@ function buildColumnToggles(tableId){
               <td>195</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-6', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-6', 4, 50, 120, false);</script>
-<script>colorizeRange('players-6', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-6', 7, 0, 100, false);</script>
-<script>colorizeRange('players-6', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-6');</script>
+<script>colorizeRange('players-basic-6', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-6', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-6', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-6');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-6" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-6',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-6',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-6',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-6',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-6',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-6',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>Kytky</td>
+<td>19</td>
+<td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
+<td data-sort="28.6" title="Attempts: 7, Wins: 2">29% (7)</td>
+<td>2.05</td>
+<td>1.41</td>
+</tr>
+<tr>
+<td>Ribbels</td>
+<td>14</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td>10.45</td>
+<td>1.14</td>
+</tr>
+<tr>
+<td>keijoo7</td>
+<td>3</td>
+<td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td>5.28</td>
+<td>0.96</td>
+</tr>
+<tr>
+<td>Jepari112</td>
+<td>8</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
+<td>8.07</td>
+<td>0.92</td>
+</tr>
+<tr>
+<td>HunajaBalsam</td>
+<td>2</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
+<td>1.50</td>
+<td>0.25</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-6', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-6', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-6', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-6', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-6');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Mirage (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -2436,40 +2705,41 @@ function buildColumnToggles(tableId){
 <summary><h2>Bonfire</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 2-4</span> <span class="chip">±RD -18</span> <span class="chip">KD 0.96</span> <span class="chip">KR 0.66</span> <span class="chip">ADR 73.8</span> <span class="chip">Util 4785</span></div>
 <h3>Players</h3>
-<table id="players-7" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-a40a6d87" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-a40a6d87','basic'); initTabsAutoSort('tabs-a40a6d87')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-a40a6d87','advanced'); initTabsAutoSort('tabs-a40a6d87')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-7" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-7',0,false)">Nickname</th>
-          <th onclick="sortTable('players-7',1,true)">Maps</th>
-          <th onclick="sortTable('players-7',2,true)">Rounds</th>
-          <th onclick="sortTable('players-7',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-7',4,true)">ADR</th>
-          <th onclick="sortTable('players-7',5,true)">KR</th>
-          <th onclick="sortTable('players-7',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-7',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-7',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-7',9,true)">K</th>
-          <th onclick="sortTable('players-7',10,true)">D</th>
-          <th onclick="sortTable('players-7',11,true)">A</th>
-          <th onclick="sortTable('players-7',12,true)">HS%</th>
-          <th onclick="sortTable('players-7',13,true)">AWP</th>
-          <th onclick="sortTable('players-7',14,true)">3K</th>
-          <th onclick="sortTable('players-7',15,true)">4K</th>
-          <th onclick="sortTable('players-7',16,true)">5K</th>
-          <th onclick="sortTable('players-7',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-7',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-7',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-7',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-7',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-7',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-7',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-7',6,true)">K</th>
+          <th onclick="sortTable('players-basic-7',7,true)">D</th>
+          <th onclick="sortTable('players-basic-7',8,true)">A</th>
+          <th onclick="sortTable('players-basic-7',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-7',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-7',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-7',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-7',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-7',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>Go5h</td>
               <td>6</td>
               <td title="Rounds/Map: 22.3">134</td>
-
               <td>1.24</td>
               <td>87.9</td>
               <td>0.87</td>
-
-              <td>18</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-              <td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
-
               <td>117</td>
               <td>94</td>
               <td>38</td>
@@ -2484,15 +2754,9 @@ function buildColumnToggles(tableId){
               <td>DeviLz-</td>
               <td>4</td>
               <td title="Rounds/Map: 24.8">99</td>
-
               <td>1.32</td>
               <td>93.1</td>
               <td>0.76</td>
-
-              <td>4</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-              <td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
-
               <td>78</td>
               <td>59</td>
               <td>35</td>
@@ -2507,15 +2771,9 @@ function buildColumnToggles(tableId){
               <td>G41U5</td>
               <td>6</td>
               <td title="Rounds/Map: 22.3">134</td>
-
               <td>0.76</td>
               <td>54.8</td>
               <td>0.49</td>
-
-              <td>5</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-
               <td>68</td>
               <td>89</td>
               <td>36</td>
@@ -2530,15 +2788,9 @@ function buildColumnToggles(tableId){
               <td>Markkoolio</td>
               <td>4</td>
               <td title="Rounds/Map: 24.8">99</td>
-
               <td>0.88</td>
               <td>65.1</td>
               <td>0.59</td>
-
-              <td>3</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>58</td>
               <td>66</td>
               <td>22</td>
@@ -2553,15 +2805,9 @@ function buildColumnToggles(tableId){
               <td>R0NSKI</td>
               <td>4</td>
               <td title="Rounds/Map: 23.0">92</td>
-
               <td>0.73</td>
               <td>63.1</td>
               <td>0.57</td>
-
-              <td>2</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>53</td>
               <td>73</td>
               <td>27</td>
@@ -2576,15 +2822,9 @@ function buildColumnToggles(tableId){
               <td>Ryitt</td>
               <td>2</td>
               <td title="Rounds/Map: 17.5">35</td>
-
               <td>1.00</td>
               <td>84.8</td>
               <td>0.77</td>
-
-              <td>4</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-
               <td>27</td>
               <td>27</td>
               <td>8</td>
@@ -2599,15 +2839,9 @@ function buildColumnToggles(tableId){
               <td>HKTontto</td>
               <td>2</td>
               <td title="Rounds/Map: 21.0">42</td>
-
               <td>1.00</td>
               <td>74.9</td>
               <td>0.65</td>
-
-              <td>4</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-
               <td>27</td>
               <td>27</td>
               <td>9</td>
@@ -2622,15 +2856,9 @@ function buildColumnToggles(tableId){
               <td>Lemonmuffin</td>
               <td>2</td>
               <td title="Rounds/Map: 17.5">35</td>
-
               <td>0.68</td>
               <td>76.1</td>
               <td>0.59</td>
-
-              <td>4</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>21</td>
               <td>31</td>
               <td>12</td>
@@ -2642,12 +2870,93 @@ function buildColumnToggles(tableId){
               <td>432</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-7', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-7', 4, 50, 120, false);</script>
-<script>colorizeRange('players-7', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-7', 7, 0, 100, false);</script>
-<script>colorizeRange('players-7', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-7');</script>
+<script>colorizeRange('players-basic-7', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-7', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-7', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-7');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-7" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-7',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-7',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-7',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-7',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-7',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-7',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>Go5h</td>
+<td>18</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
+<td>8.50</td>
+<td>1.57</td>
+</tr>
+<tr>
+<td>DeviLz-</td>
+<td>4</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
+<td>5.08</td>
+<td>1.42</td>
+</tr>
+<tr>
+<td>G41U5</td>
+<td>5</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td>7.52</td>
+<td>0.82</td>
+</tr>
+<tr>
+<td>Markkoolio</td>
+<td>3</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>3.89</td>
+<td>1.00</td>
+</tr>
+<tr>
+<td>R0NSKI</td>
+<td>2</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>8.18</td>
+<td>0.95</td>
+</tr>
+<tr>
+<td>Ryitt</td>
+<td>4</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td>9.00</td>
+<td>1.32</td>
+</tr>
+<tr>
+<td>HKTontto</td>
+<td>4</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td>5.95</td>
+<td>1.13</td>
+</tr>
+<tr>
+<td>Lemonmuffin</td>
+<td>4</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>12.34</td>
+<td>0.96</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-7', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-7', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-7', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-7', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-7');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Train (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -2827,40 +3136,41 @@ function buildColumnToggles(tableId){
 <summary><h2>Pain-Train</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 3-5</span> <span class="chip">±RD -10</span> <span class="chip">KD 0.89</span> <span class="chip">KR 0.66</span> <span class="chip">ADR 74.1</span> <span class="chip">Util 4387</span></div>
 <h3>Players</h3>
-<table id="players-8" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-b9023f61" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-b9023f61','basic'); initTabsAutoSort('tabs-b9023f61')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-b9023f61','advanced'); initTabsAutoSort('tabs-b9023f61')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-8" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-8',0,false)">Nickname</th>
-          <th onclick="sortTable('players-8',1,true)">Maps</th>
-          <th onclick="sortTable('players-8',2,true)">Rounds</th>
-          <th onclick="sortTable('players-8',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-8',4,true)">ADR</th>
-          <th onclick="sortTable('players-8',5,true)">KR</th>
-          <th onclick="sortTable('players-8',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-8',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-8',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-8',9,true)">K</th>
-          <th onclick="sortTable('players-8',10,true)">D</th>
-          <th onclick="sortTable('players-8',11,true)">A</th>
-          <th onclick="sortTable('players-8',12,true)">HS%</th>
-          <th onclick="sortTable('players-8',13,true)">AWP</th>
-          <th onclick="sortTable('players-8',14,true)">3K</th>
-          <th onclick="sortTable('players-8',15,true)">4K</th>
-          <th onclick="sortTable('players-8',16,true)">5K</th>
-          <th onclick="sortTable('players-8',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-8',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-8',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-8',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-8',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-8',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-8',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-8',6,true)">K</th>
+          <th onclick="sortTable('players-basic-8',7,true)">D</th>
+          <th onclick="sortTable('players-basic-8',8,true)">A</th>
+          <th onclick="sortTable('players-basic-8',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-8',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-8',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-8',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-8',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-8',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>-klapi-</td>
               <td>8</td>
               <td title="Rounds/Map: 21.5">172</td>
-
               <td>1.17</td>
               <td>83.9</td>
               <td>0.83</td>
-
-              <td>25</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-              <td data-sort="42.9" title="Attempts: 7, Wins: 3">43% (7)</td>
-
               <td>142</td>
               <td>121</td>
               <td>44</td>
@@ -2875,15 +3185,9 @@ function buildColumnToggles(tableId){
               <td>mlinkku</td>
               <td>8</td>
               <td title="Rounds/Map: 21.5">172</td>
-
               <td>0.89</td>
               <td>69.5</td>
               <td>0.68</td>
-
-              <td>13</td>
-              <td data-sort="50.0" title="Attempts: 10, Wins: 5">50% (10)</td>
-              <td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
-
               <td>118</td>
               <td>132</td>
               <td>27</td>
@@ -2898,15 +3202,9 @@ function buildColumnToggles(tableId){
               <td>Kakkig</td>
               <td>6</td>
               <td title="Rounds/Map: 22.7">136</td>
-
               <td>0.86</td>
               <td>73.8</td>
               <td>0.65</td>
-
-              <td>2</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>89</td>
               <td>103</td>
               <td>39</td>
@@ -2921,15 +3219,9 @@ function buildColumnToggles(tableId){
               <td>LeeLooH</td>
               <td>6</td>
               <td title="Rounds/Map: 20.8">125</td>
-
               <td>0.75</td>
               <td>72.5</td>
               <td>0.58</td>
-
-              <td>9</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>73</td>
               <td>97</td>
               <td>23</td>
@@ -2944,15 +3236,9 @@ function buildColumnToggles(tableId){
               <td>sup0r</td>
               <td>6</td>
               <td title="Rounds/Map: 21.5">129</td>
-
               <td>0.64</td>
               <td>76.1</td>
               <td>0.51</td>
-
-              <td>3</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>68</td>
               <td>106</td>
               <td>46</td>
@@ -2967,15 +3253,9 @@ function buildColumnToggles(tableId){
               <td>_KuuKeppi_</td>
               <td>4</td>
               <td title="Rounds/Map: 22.5">90</td>
-
               <td>0.95</td>
               <td>66.3</td>
               <td>0.63</td>
-
-              <td>12</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-
               <td>57</td>
               <td>60</td>
               <td>22</td>
@@ -2990,15 +3270,9 @@ function buildColumnToggles(tableId){
               <td>Sandels83</td>
               <td>2</td>
               <td title="Rounds/Map: 18.0">36</td>
-
               <td>0.96</td>
               <td>69.6</td>
               <td>0.74</td>
-
-              <td>7</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
-
               <td>27</td>
               <td>28</td>
               <td>5</td>
@@ -3010,12 +3284,85 @@ function buildColumnToggles(tableId){
               <td>81</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-8', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-8', 4, 50, 120, false);</script>
-<script>colorizeRange('players-8', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-8', 7, 0, 100, false);</script>
-<script>colorizeRange('players-8', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-8');</script>
+<script>colorizeRange('players-basic-8', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-8', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-8', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-8');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-8" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-8',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-8',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-8',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-8',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-8',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-8',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>-klapi-</td>
+<td>25</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td data-sort="42.9" title="Attempts: 7, Wins: 3">43% (7)</td>
+<td>8.18</td>
+<td>1.49</td>
+</tr>
+<tr>
+<td>mlinkku</td>
+<td>13</td>
+<td data-sort="50.0" title="Attempts: 10, Wins: 5">50% (10)</td>
+<td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
+<td>2.23</td>
+<td>1.12</td>
+</tr>
+<tr>
+<td>Kakkig</td>
+<td>2</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>5.96</td>
+<td>1.11</td>
+</tr>
+<tr>
+<td>LeeLooH</td>
+<td>9</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>1.73</td>
+<td>0.92</td>
+</tr>
+<tr>
+<td>sup0r</td>
+<td>3</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>7.70</td>
+<td>0.83</td>
+</tr>
+<tr>
+<td>_KuuKeppi_</td>
+<td>12</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td>5.52</td>
+<td>1.09</td>
+</tr>
+<tr>
+<td>Sandels83</td>
+<td>7</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 4, Wins: 0">0% (4)</td>
+<td>2.25</td>
+<td>1.23</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-8', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-8', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-8', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-8', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-8');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Ancient (2×)</span>
 <span class="chip">Most picked: Train (2×)</span>
@@ -3195,40 +3542,41 @@ function buildColumnToggles(tableId){
 <summary><h2>Hero-Fi U</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 6-0</span> <span class="chip">±RD 59</span> <span class="chip">KD 1.70</span> <span class="chip">KR 0.89</span> <span class="chip">ADR 92.1</span> <span class="chip">Util 4705</span></div>
 <h3>Players</h3>
-<table id="players-9" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-d15cc43e" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-d15cc43e','basic'); initTabsAutoSort('tabs-d15cc43e')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-d15cc43e','advanced'); initTabsAutoSort('tabs-d15cc43e')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-9" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-9',0,false)">Nickname</th>
-          <th onclick="sortTable('players-9',1,true)">Maps</th>
-          <th onclick="sortTable('players-9',2,true)">Rounds</th>
-          <th onclick="sortTable('players-9',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-9',4,true)">ADR</th>
-          <th onclick="sortTable('players-9',5,true)">KR</th>
-          <th onclick="sortTable('players-9',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-9',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-9',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-9',9,true)">K</th>
-          <th onclick="sortTable('players-9',10,true)">D</th>
-          <th onclick="sortTable('players-9',11,true)">A</th>
-          <th onclick="sortTable('players-9',12,true)">HS%</th>
-          <th onclick="sortTable('players-9',13,true)">AWP</th>
-          <th onclick="sortTable('players-9',14,true)">3K</th>
-          <th onclick="sortTable('players-9',15,true)">4K</th>
-          <th onclick="sortTable('players-9',16,true)">5K</th>
-          <th onclick="sortTable('players-9',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-9',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-9',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-9',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-9',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-9',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-9',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-9',6,true)">K</th>
+          <th onclick="sortTable('players-basic-9',7,true)">D</th>
+          <th onclick="sortTable('players-basic-9',8,true)">A</th>
+          <th onclick="sortTable('players-basic-9',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-9',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-9',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-9',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-9',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-9',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>Ullenaattori</td>
               <td>6</td>
               <td title="Rounds/Map: 16.2">97</td>
-
               <td>1.98</td>
               <td>98.6</td>
               <td>1.05</td>
-
-              <td>7</td>
-              <td data-sort="100.0" title="Attempts: 3, Wins: 3">100% (3)</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-
               <td>101</td>
               <td>51</td>
               <td>41</td>
@@ -3243,15 +3591,9 @@ function buildColumnToggles(tableId){
               <td>TomppaE</td>
               <td>6</td>
               <td title="Rounds/Map: 16.2">97</td>
-
               <td>1.52</td>
               <td>84.6</td>
               <td>0.77</td>
-
-              <td>3</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>73</td>
               <td>48</td>
               <td>32</td>
@@ -3266,15 +3608,9 @@ function buildColumnToggles(tableId){
               <td>Jiiho0</td>
               <td>4</td>
               <td title="Rounds/Map: 17.5">70</td>
-
               <td>1.66</td>
               <td>104.0</td>
               <td>1.00</td>
-
-              <td>4</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-
               <td>68</td>
               <td>41</td>
               <td>23</td>
@@ -3289,15 +3625,9 @@ function buildColumnToggles(tableId){
               <td>Rikkeri90</td>
               <td>4</td>
               <td title="Rounds/Map: 15.5">62</td>
-
               <td>2.07</td>
               <td>95.8</td>
               <td>0.95</td>
-
-              <td>3</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>60</td>
               <td>29</td>
               <td>18</td>
@@ -3312,15 +3642,9 @@ function buildColumnToggles(tableId){
               <td>Arslaaki</td>
               <td>4</td>
               <td title="Rounds/Map: 15.5">62</td>
-
               <td>1.79</td>
               <td>104.8</td>
               <td>0.97</td>
-
-              <td>4</td>
-              <td data-sort="50.0" title="Attempts: 4, Wins: 2">50% (4)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>59</td>
               <td>33</td>
               <td>29</td>
@@ -3335,15 +3659,9 @@ function buildColumnToggles(tableId){
               <td>Juustoleipa</td>
               <td>4</td>
               <td title="Rounds/Map: 15.5">62</td>
-
               <td>1.70</td>
               <td>75.6</td>
               <td>0.74</td>
-
-              <td>2</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
-
               <td>46</td>
               <td>27</td>
               <td>15</td>
@@ -3358,15 +3676,9 @@ function buildColumnToggles(tableId){
               <td>KustihQ</td>
               <td>2</td>
               <td title="Rounds/Map: 17.5">35</td>
-
               <td>0.86</td>
               <td>71.4</td>
               <td>0.54</td>
-
-              <td>0</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>18</td>
               <td>21</td>
               <td>10</td>
@@ -3378,12 +3690,85 @@ function buildColumnToggles(tableId){
               <td>308</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-9', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-9', 4, 50, 120, false);</script>
-<script>colorizeRange('players-9', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-9', 7, 0, 100, false);</script>
-<script>colorizeRange('players-9', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-9');</script>
+<script>colorizeRange('players-basic-9', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-9', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-9', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-9');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-9" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-9',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-9',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-9',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-9',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-9',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-9',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>Ullenaattori</td>
+<td>7</td>
+<td data-sort="100.0" title="Attempts: 3, Wins: 3">100% (3)</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td>10.64</td>
+<td>2.05</td>
+</tr>
+<tr>
+<td>TomppaE</td>
+<td>3</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>7.66</td>
+<td>1.47</td>
+</tr>
+<tr>
+<td>Jiiho0</td>
+<td>4</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td>7.01</td>
+<td>1.89</td>
+</tr>
+<tr>
+<td>Rikkeri90</td>
+<td>3</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>8.39</td>
+<td>1.83</td>
+</tr>
+<tr>
+<td>Arslaaki</td>
+<td>4</td>
+<td data-sort="50.0" title="Attempts: 4, Wins: 2">50% (4)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>14.55</td>
+<td>1.91</td>
+</tr>
+<tr>
+<td>Juustoleipa</td>
+<td>2</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="100.0" title="Attempts: 1, Wins: 1">100% (1)</td>
+<td>11.44</td>
+<td>1.41</td>
+</tr>
+<tr>
+<td>KustihQ</td>
+<td>0</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>8.80</td>
+<td>0.94</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-9', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-9', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-9', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-9', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-9');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Nuke (2×)</span>
 <span class="chip">Most picked: Dust II (3×)</span>
@@ -3563,40 +3948,41 @@ function buildColumnToggles(tableId){
 <summary><h2>SD Gaming</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 1-5</span> <span class="chip">±RD -25</span> <span class="chip">KD 0.87</span> <span class="chip">KR 0.65</span> <span class="chip">ADR 72.4</span> <span class="chip">Util 3648</span></div>
 <h3>Players</h3>
-<table id="players-10" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-de3c5208" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-de3c5208','basic'); initTabsAutoSort('tabs-de3c5208')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-de3c5208','advanced'); initTabsAutoSort('tabs-de3c5208')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-10" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-10',0,false)">Nickname</th>
-          <th onclick="sortTable('players-10',1,true)">Maps</th>
-          <th onclick="sortTable('players-10',2,true)">Rounds</th>
-          <th onclick="sortTable('players-10',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-10',4,true)">ADR</th>
-          <th onclick="sortTable('players-10',5,true)">KR</th>
-          <th onclick="sortTable('players-10',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-10',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-10',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-10',9,true)">K</th>
-          <th onclick="sortTable('players-10',10,true)">D</th>
-          <th onclick="sortTable('players-10',11,true)">A</th>
-          <th onclick="sortTable('players-10',12,true)">HS%</th>
-          <th onclick="sortTable('players-10',13,true)">AWP</th>
-          <th onclick="sortTable('players-10',14,true)">3K</th>
-          <th onclick="sortTable('players-10',15,true)">4K</th>
-          <th onclick="sortTable('players-10',16,true)">5K</th>
-          <th onclick="sortTable('players-10',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-10',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-10',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-10',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-10',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-10',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-10',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-10',6,true)">K</th>
+          <th onclick="sortTable('players-basic-10',7,true)">D</th>
+          <th onclick="sortTable('players-basic-10',8,true)">A</th>
+          <th onclick="sortTable('players-basic-10',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-10',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-10',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-10',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-10',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-10',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>Mambus24</td>
               <td>6</td>
               <td title="Rounds/Map: 21.2">127</td>
-
               <td>1.38</td>
               <td>94.1</td>
               <td>0.93</td>
-
-              <td>16</td>
-              <td data-sort="14.3" title="Attempts: 7, Wins: 1">14% (7)</td>
-              <td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
-
               <td>121</td>
               <td>88</td>
               <td>32</td>
@@ -3611,15 +3997,9 @@ function buildColumnToggles(tableId){
               <td>annihiLeight</td>
               <td>6</td>
               <td title="Rounds/Map: 21.2">127</td>
-
               <td>1.06</td>
               <td>73.4</td>
               <td>0.74</td>
-
-              <td>25</td>
-              <td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
-              <td data-sort="50.0" title="Attempts: 8, Wins: 4">50% (8)</td>
-
               <td>94</td>
               <td>89</td>
               <td>27</td>
@@ -3634,15 +4014,9 @@ function buildColumnToggles(tableId){
               <td>d0nkaments</td>
               <td>4</td>
               <td title="Rounds/Map: 21.8">87</td>
-
               <td>0.90</td>
               <td>79.5</td>
               <td>0.73</td>
-
-              <td>1</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>64</td>
               <td>71</td>
               <td>22</td>
@@ -3657,15 +4031,9 @@ function buildColumnToggles(tableId){
               <td>SoijaB</td>
               <td>4</td>
               <td title="Rounds/Map: 21.8">87</td>
-
               <td>0.86</td>
               <td>77.6</td>
               <td>0.62</td>
-
-              <td>1</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>54</td>
               <td>63</td>
               <td>20</td>
@@ -3680,15 +4048,9 @@ function buildColumnToggles(tableId){
               <td>-d0p-</td>
               <td>4</td>
               <td title="Rounds/Map: 21.5">86</td>
-
               <td>0.52</td>
               <td>59.6</td>
               <td>0.45</td>
-
-              <td>0</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>38</td>
               <td>73</td>
               <td>22</td>
@@ -3703,15 +4065,9 @@ function buildColumnToggles(tableId){
               <td>pardoner123</td>
               <td>4</td>
               <td title="Rounds/Map: 20.2">81</td>
-
               <td>0.48</td>
               <td>43.7</td>
               <td>0.37</td>
-
-              <td>3</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-
               <td>30</td>
               <td>62</td>
               <td>14</td>
@@ -3726,15 +4082,9 @@ function buildColumnToggles(tableId){
               <td>simahayha</td>
               <td>2</td>
               <td title="Rounds/Map: 20.0">40</td>
-
               <td>0.42</td>
               <td>62.7</td>
               <td>0.35</td>
-
-              <td>1</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-              <td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
-
               <td>14</td>
               <td>33</td>
               <td>11</td>
@@ -3746,12 +4096,85 @@ function buildColumnToggles(tableId){
               <td>277</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-10', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-10', 4, 50, 120, false);</script>
-<script>colorizeRange('players-10', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-10', 7, 0, 100, false);</script>
-<script>colorizeRange('players-10', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-10');</script>
+<script>colorizeRange('players-basic-10', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-10', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-10', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-10');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-10" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-10',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-10',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-10',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-10',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-10',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-10',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>Mambus24</td>
+<td>16</td>
+<td data-sort="14.3" title="Attempts: 7, Wins: 1">14% (7)</td>
+<td data-sort="33.3" title="Attempts: 3, Wins: 1">33% (3)</td>
+<td>5.42</td>
+<td>1.69</td>
+</tr>
+<tr>
+<td>annihiLeight</td>
+<td>25</td>
+<td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
+<td data-sort="50.0" title="Attempts: 8, Wins: 4">50% (8)</td>
+<td>6.67</td>
+<td>1.28</td>
+</tr>
+<tr>
+<td>d0nkaments</td>
+<td>1</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>7.67</td>
+<td>1.24</td>
+</tr>
+<tr>
+<td>SoijaB</td>
+<td>1</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>8.33</td>
+<td>1.04</td>
+</tr>
+<tr>
+<td>-d0p-</td>
+<td>0</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>2.01</td>
+<td>0.65</td>
+</tr>
+<tr>
+<td>pardoner123</td>
+<td>3</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td>3.35</td>
+<td>0.49</td>
+</tr>
+<tr>
+<td>simahayha</td>
+<td>1</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td data-sort="0.0" title="Attempts: 0, Wins: 0">0% (0)</td>
+<td>6.92</td>
+<td>0.49</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-10', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-10', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-10', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-10', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-10');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Ancient (2×)</span>
 <span class="chip">Most picked: Dust II (2×)</span>
@@ -3931,40 +4354,41 @@ function buildColumnToggles(tableId){
 <summary><h2>Savuiz</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 6</span> <span class="chip">W-L 5-1</span> <span class="chip">±RD 19</span> <span class="chip">KD 1.14</span> <span class="chip">KR 0.75</span> <span class="chip">ADR 80.9</span> <span class="chip">Util 4038</span></div>
 <h3>Players</h3>
-<table id="players-11" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-e86a10a8" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-e86a10a8','basic'); initTabsAutoSort('tabs-e86a10a8')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-e86a10a8','advanced'); initTabsAutoSort('tabs-e86a10a8')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-11" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-11',0,false)">Nickname</th>
-          <th onclick="sortTable('players-11',1,true)">Maps</th>
-          <th onclick="sortTable('players-11',2,true)">Rounds</th>
-          <th onclick="sortTable('players-11',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-11',4,true)">ADR</th>
-          <th onclick="sortTable('players-11',5,true)">KR</th>
-          <th onclick="sortTable('players-11',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-11',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-11',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-11',9,true)">K</th>
-          <th onclick="sortTable('players-11',10,true)">D</th>
-          <th onclick="sortTable('players-11',11,true)">A</th>
-          <th onclick="sortTable('players-11',12,true)">HS%</th>
-          <th onclick="sortTable('players-11',13,true)">AWP</th>
-          <th onclick="sortTable('players-11',14,true)">3K</th>
-          <th onclick="sortTable('players-11',15,true)">4K</th>
-          <th onclick="sortTable('players-11',16,true)">5K</th>
-          <th onclick="sortTable('players-11',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-11',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-11',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-11',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-11',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-11',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-11',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-11',6,true)">K</th>
+          <th onclick="sortTable('players-basic-11',7,true)">D</th>
+          <th onclick="sortTable('players-basic-11',8,true)">A</th>
+          <th onclick="sortTable('players-basic-11',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-11',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-11',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-11',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-11',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-11',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>prnd</td>
               <td>6</td>
               <td title="Rounds/Map: 21.8">131</td>
-
               <td>1.52</td>
               <td>109.5</td>
               <td>1.05</td>
-
-              <td>7</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-
               <td>137</td>
               <td>90</td>
               <td>39</td>
@@ -3979,15 +4403,9 @@ function buildColumnToggles(tableId){
               <td>Spamm1</td>
               <td>6</td>
               <td title="Rounds/Map: 21.8">131</td>
-
               <td>1.25</td>
               <td>78.5</td>
               <td>0.75</td>
-
-              <td>6</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-              <td data-sort="0.0" title="Attempts: 6, Wins: 0">0% (6)</td>
-
               <td>101</td>
               <td>81</td>
               <td>33</td>
@@ -4002,15 +4420,9 @@ function buildColumnToggles(tableId){
               <td>ValioPlayMK</td>
               <td>4</td>
               <td title="Rounds/Map: 22.0">88</td>
-
               <td>1.25</td>
               <td>92.8</td>
               <td>0.87</td>
-
-              <td>3</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>75</td>
               <td>60</td>
               <td>23</td>
@@ -4025,15 +4437,9 @@ function buildColumnToggles(tableId){
               <td>Larbiz</td>
               <td>6</td>
               <td title="Rounds/Map: 21.8">131</td>
-
               <td>0.89</td>
               <td>59.5</td>
               <td>0.56</td>
-
-              <td>3</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>73</td>
               <td>82</td>
               <td>31</td>
@@ -4048,15 +4454,9 @@ function buildColumnToggles(tableId){
               <td>bRUTU55</td>
               <td>2</td>
               <td title="Rounds/Map: 21.5">43</td>
-
               <td>1.37</td>
               <td>101.7</td>
               <td>0.95</td>
-
-              <td>7</td>
-              <td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>41</td>
               <td>30</td>
               <td>13</td>
@@ -4071,15 +4471,9 @@ function buildColumnToggles(tableId){
               <td>swagalee</td>
               <td>4</td>
               <td title="Rounds/Map: 22.0">88</td>
-
               <td>0.68</td>
               <td>59.7</td>
               <td>0.45</td>
-
-              <td>5</td>
-              <td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>38</td>
               <td>56</td>
               <td>31</td>
@@ -4094,15 +4488,9 @@ function buildColumnToggles(tableId){
               <td>Aspartaam1</td>
               <td>2</td>
               <td title="Rounds/Map: 21.5">43</td>
-
               <td>0.86</td>
               <td>64.4</td>
               <td>0.57</td>
-
-              <td>1</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-              <td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
-
               <td>25</td>
               <td>29</td>
               <td>12</td>
@@ -4114,12 +4502,85 @@ function buildColumnToggles(tableId){
               <td>527</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-11', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-11', 4, 50, 120, false);</script>
-<script>colorizeRange('players-11', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-11', 7, 0, 100, false);</script>
-<script>colorizeRange('players-11', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-11');</script>
+<script>colorizeRange('players-basic-11', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-11', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-11', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-11');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-11" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-11',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-11',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-11',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-11',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-11',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-11',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>prnd</td>
+<td>7</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td>5.81</td>
+<td>1.94</td>
+</tr>
+<tr>
+<td>Spamm1</td>
+<td>6</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td data-sort="0.0" title="Attempts: 6, Wins: 0">0% (6)</td>
+<td>6.47</td>
+<td>1.34</td>
+</tr>
+<tr>
+<td>ValioPlayMK</td>
+<td>3</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>1.84</td>
+<td>1.57</td>
+</tr>
+<tr>
+<td>Larbiz</td>
+<td>3</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>5.63</td>
+<td>0.96</td>
+</tr>
+<tr>
+<td>bRUTU55</td>
+<td>7</td>
+<td data-sort="25.0" title="Attempts: 4, Wins: 1">25% (4)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>4.60</td>
+<td>1.73</td>
+</tr>
+<tr>
+<td>swagalee</td>
+<td>5</td>
+<td data-sort="0.0" title="Attempts: 3, Wins: 0">0% (3)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>9.15</td>
+<td>0.79</td>
+</tr>
+<tr>
+<td>Aspartaam1</td>
+<td>1</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td data-sort="0.0" title="Attempts: 1, Wins: 0">0% (1)</td>
+<td>12.26</td>
+<td>0.99</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-11', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-11', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-11', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-11', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-11');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Mirage (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -4298,40 +4759,41 @@ function buildColumnToggles(tableId){
 <summary><h2>X-UwU Bon Bons</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 6-2</span> <span class="chip">±RD 38</span> <span class="chip">KD 1.28</span> <span class="chip">KR 0.81</span> <span class="chip">ADR 85.9</span> <span class="chip">Util 5047</span></div>
 <h3>Players</h3>
-<table id="players-12" data-sort-col="0" data-sort-dir="asc">
+
+          <div id="tabs-f2500fae" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('tabs-f2500fae','basic'); initTabsAutoSort('tabs-f2500fae')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('tabs-f2500fae','advanced'); initTabsAutoSort('tabs-f2500fae')">Advanced</button>
+            </div>
+          
+<div class="tab-panel active" data-tab="basic">
+<table id="players-basic-12" data-sort-col="3" data-sort-dir="desc">
 <thead><tr>
-          <th onclick="sortTable('players-12',0,false)">Nickname</th>
-          <th onclick="sortTable('players-12',1,true)">Maps</th>
-          <th onclick="sortTable('players-12',2,true)">Rounds</th>
-          <th onclick="sortTable('players-12',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('players-12',4,true)">ADR</th>
-          <th onclick="sortTable('players-12',5,true)">KR</th>
-          <th onclick="sortTable('players-12',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('players-12',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('players-12',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('players-12',9,true)">K</th>
-          <th onclick="sortTable('players-12',10,true)">D</th>
-          <th onclick="sortTable('players-12',11,true)">A</th>
-          <th onclick="sortTable('players-12',12,true)">HS%</th>
-          <th onclick="sortTable('players-12',13,true)">AWP</th>
-          <th onclick="sortTable('players-12',14,true)">3K</th>
-          <th onclick="sortTable('players-12',15,true)">4K</th>
-          <th onclick="sortTable('players-12',16,true)">5K</th>
-          <th onclick="sortTable('players-12',17,true)">Util</th>
+          <th onclick="sortTable('players-basic-12',0,false)">Nickname</th>
+          <th onclick="sortTable('players-basic-12',1,true)">Maps</th>
+          <th onclick="sortTable('players-basic-12',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('players-basic-12',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('players-basic-12',4,true)">ADR</th>
+          <th onclick="sortTable('players-basic-12',5,true)">KR</th>
+          <th onclick="sortTable('players-basic-12',6,true)">K</th>
+          <th onclick="sortTable('players-basic-12',7,true)">D</th>
+          <th onclick="sortTable('players-basic-12',8,true)">A</th>
+          <th onclick="sortTable('players-basic-12',9,true)">HS%</th>
+          <th onclick="sortTable('players-basic-12',10,true)">AWP</th>
+          <th onclick="sortTable('players-basic-12',11,true)">3K</th>
+          <th onclick="sortTable('players-basic-12',12,true)">4K</th>
+          <th onclick="sortTable('players-basic-12',13,true)">5K</th>
+          <th onclick="sortTable('players-basic-12',14,true)">Util dmg</th>
         </tr></thead><tbody>
 <tr>
               <td>Arthuur</td>
               <td>8</td>
               <td title="Rounds/Map: 19.8">158</td>
-
               <td>1.64</td>
               <td>100.4</td>
               <td>0.93</td>
-
-              <td>20</td>
-              <td data-sort="57.1" title="Attempts: 7, Wins: 4">57% (7)</td>
-              <td data-sort="60.0" title="Attempts: 5, Wins: 3">60% (5)</td>
-
               <td>151</td>
               <td>92</td>
               <td>53</td>
@@ -4346,15 +4808,9 @@ function buildColumnToggles(tableId){
               <td>JAPE</td>
               <td>8</td>
               <td title="Rounds/Map: 19.8">158</td>
-
               <td>1.37</td>
               <td>93.9</td>
               <td>0.92</td>
-
-              <td>4</td>
-              <td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
-              <td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
-
               <td>141</td>
               <td>103</td>
               <td>33</td>
@@ -4369,15 +4825,9 @@ function buildColumnToggles(tableId){
               <td>Qrioz</td>
               <td>8</td>
               <td title="Rounds/Map: 19.8">158</td>
-
               <td>1.25</td>
               <td>84.0</td>
               <td>0.82</td>
-
-              <td>14</td>
-              <td data-sort="37.5" title="Attempts: 8, Wins: 3">38% (8)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>121</td>
               <td>97</td>
               <td>38</td>
@@ -4392,15 +4842,9 @@ function buildColumnToggles(tableId){
               <td>NMT-GSM</td>
               <td>6</td>
               <td title="Rounds/Map: 20.0">120</td>
-
               <td>1.10</td>
               <td>82.4</td>
               <td>0.74</td>
-
-              <td>7</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>87</td>
               <td>79</td>
               <td>39</td>
@@ -4415,15 +4859,9 @@ function buildColumnToggles(tableId){
               <td>inra1n</td>
               <td>6</td>
               <td title="Rounds/Map: 18.7">112</td>
-
               <td>1.12</td>
               <td>77.9</td>
               <td>0.72</td>
-
-              <td>2</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-              <td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
-
               <td>75</td>
               <td>67</td>
               <td>31</td>
@@ -4438,15 +4876,9 @@ function buildColumnToggles(tableId){
               <td>Mynttoni</td>
               <td>4</td>
               <td title="Rounds/Map: 21.0">84</td>
-
               <td>0.98</td>
               <td>62.5</td>
               <td>0.59</td>
-
-              <td>7</td>
-              <td data-sort="50.0" title="Attempts: 4, Wins: 2">50% (4)</td>
-              <td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
-
               <td>50</td>
               <td>51</td>
               <td>19</td>
@@ -4458,12 +4890,77 @@ function buildColumnToggles(tableId){
               <td>495</td>
             </tr>
 </tbody></table>
-<script>colorizeRange('players-12', 3, 0.3, 1.5, false);</script>
-<script>colorizeRange('players-12', 4, 50, 120, false);</script>
-<script>colorizeRange('players-12', 5, 0.2, 1.2, false);</script>
-<script>colorizeRange('players-12', 7, 0, 100, false);</script>
-<script>colorizeRange('players-12', 8, 0, 100, false);</script>
-<script>applyDefaultSort('players-12');</script>
+<script>colorizeRange('players-basic-12', 3, 0.3, 1.5, false);</script>
+<script>colorizeRange('players-basic-12', 4, 50, 120, false);</script>
+<script>colorizeRange('players-basic-12', 5, 0.2, 1.2, false);</script>
+<script>applyDefaultSort('players-basic-12');</script>
+</div>
+<div class="tab-panel" data-tab="advanced">
+<table id="players-adv-12" data-sort-col="5" data-sort-dir="desc">
+<thead><tr>
+<th onclick="sortTable('players-adv-12',0,false)">Nickname</th>
+<th onclick="sortTable('players-adv-12',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
+<th onclick="sortTable('players-adv-12',2,true)" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>
+<th onclick="sortTable('players-adv-12',3,true)" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>
+<th onclick="sortTable('players-adv-12',4,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-12',5,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+</tr></thead><tbody>
+<tr>
+<td>Arthuur</td>
+<td>20</td>
+<td data-sort="57.1" title="Attempts: 7, Wins: 4">57% (7)</td>
+<td data-sort="60.0" title="Attempts: 5, Wins: 3">60% (5)</td>
+<td>8.53</td>
+<td>1.77</td>
+</tr>
+<tr>
+<td>JAPE</td>
+<td>4</td>
+<td data-sort="66.7" title="Attempts: 3, Wins: 2">67% (3)</td>
+<td data-sort="50.0" title="Attempts: 2, Wins: 1">50% (2)</td>
+<td>6.45</td>
+<td>1.66</td>
+</tr>
+<tr>
+<td>Qrioz</td>
+<td>14</td>
+<td data-sort="37.5" title="Attempts: 8, Wins: 3">38% (8)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>6.67</td>
+<td>1.49</td>
+</tr>
+<tr>
+<td>NMT-GSM</td>
+<td>7</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>5.87</td>
+<td>1.34</td>
+</tr>
+<tr>
+<td>inra1n</td>
+<td>2</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td data-sort="0.0" title="Attempts: 2, Wins: 0">0% (2)</td>
+<td>3.81</td>
+<td>1.32</td>
+</tr>
+<tr>
+<td>Mynttoni</td>
+<td>7</td>
+<td data-sort="50.0" title="Attempts: 4, Wins: 2">50% (4)</td>
+<td data-sort="20.0" title="Attempts: 5, Wins: 1">20% (5)</td>
+<td>5.89</td>
+<td>1.03</td>
+</tr>
+</tbody></table>
+<script>colorizeRange('players-adv-12', 2, 0, 100, false);</script>
+<script>colorizeRange('players-adv-12', 3, 0, 100, false);</script>
+<script>colorizeRange('players-adv-12', 4, 0.5, 15, false);</script>
+<script>colorizeRange('players-adv-12', 5, 0.6, 2.2, false);</script>
+<script>applyDefaultSort('players-adv-12');</script>
+</div>
+</div>
 <div class="chips">
 <span class="chip">Most banned: Dust II (2×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>

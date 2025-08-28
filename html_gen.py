@@ -43,7 +43,7 @@ body{
 }
 
 .page{
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 1.25rem 1.25rem 3rem;
 }
@@ -116,6 +116,20 @@ details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
   .nav, .toolbar{ display:none; }
   .bar{ height:12px; }
 }
+
+/* Tabs (Basic / Advanced) */
+.tabs { margin:.75rem 0 1rem; }
+.tab-nav { display:flex; gap:.5rem; }
+.tab-btn {
+  background: var(--chip-bg);
+  color: var(--fg);
+  border:1px solid var(--border);
+  padding:.35rem .7rem; border-radius:999px; cursor:pointer;
+}
+.tab-btn.active { background:#3a3a3a; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
 </style>
 
 <script>
@@ -218,6 +232,33 @@ function buildColumnToggles(tableId){
     });
   });
 }
+
+// Tabien vaihto
+function switchTab(containerId, tabName){
+  const root = document.getElementById(containerId);
+  if(!root) return;
+  const panels = root.querySelectorAll('.tab-panel');
+  const buttons = root.querySelectorAll('.tab-btn');
+  panels.forEach(p => p.classList.remove('active'));
+  buttons.forEach(b => b.classList.remove('active'));
+  root.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
+  root.querySelector(`[data-target="${tabName}"]`)?.classList.add('active');
+}
+
+// Taulukon oletuslajittelu (jos haluat tabin vaihdossa uudelleenlajittelun)
+function initTabsAutoSort(rootId){
+  const root = document.getElementById(rootId);
+  if(!root) return;
+  const activePanel = root.querySelector('.tab-panel.active');
+  if(!activePanel) return;
+  const table = activePanel.querySelector('table');
+  if(!table) return;
+  const col = parseInt(table.getAttribute('data-sort-col') || '0',10);
+  const dir = (table.getAttribute('data-sort-dir') || 'asc') === 'asc';
+  sortTable(table.id, col, !dir);
+  sortTable(table.id, col, dir);
+}
+
 </script>
 </head>
 <body>
@@ -244,6 +285,10 @@ MAP_NAME_DISPLAY = {
 
 def pretty_map_name(raw: str) -> str:
     return MAP_NAME_DISPLAY.get(raw, raw)
+
+def has_column(con, table: str, col: str) -> bool:
+    cur = con.execute(f"PRAGMA table_info({table})")
+    return any(r[1] == col for r in cur.fetchall())
 
 def q(con, sql, params=()):
     cur = con.execute(sql, params)
@@ -291,27 +336,43 @@ def compute_team_summary(con, division_id: int, team_id: str):
     }
 
 def compute_player_table(con, division_id: int, team_id: str):
-    rows = q(con, """
+    # Selvitetään dynaamisesti mitkä sarakkeet ovat käytettävissä:
+    HAS_PISTOL  = has_column(con, "player_stats", "pistol_kills")
+    HAS_FLASH   = has_column(con, "player_stats", "enemies_flashed") and has_column(con, "player_stats", "flash_count")
+    # Clutch-kentät oletusarvoisesti asennettu edellisissä muutoksissa
+    # (clutch_kills, cl_1v1_attempts/wins, cl_1v2_attempts/wins) – jos puuttuvat, SUM() palauttaa NULL -> käsitellään nollina.
+
+    # Perus- ja advanced-arvot samassa kyselyssä
+    rows = q(con, f"""
     SELECT
       ps.nickname AS nickname,
       COUNT(*) AS maps_played,
+
       SUM(ps.kills)  AS k,
       SUM(ps.deaths) AS d,
       SUM(ps.assists) AS a,
+
       AVG(ps.adr) AS adr,
       AVG(ps.kr)  AS kr,
       AVG(ps.hs_pct) AS hs_pct,
+
       SUM(ps.sniper_kills) AS awp_kills,
       SUM(ps.mk_3k) AS k3, SUM(ps.mk_4k) AS k4, SUM(ps.mk_5k) AS k5,
       SUM(ps.utility_damage) AS util,
-      -- kierrokset kartalta (liity maps-tauluun kuten sinulla jo on)
-      SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
-      -- clutch-aggregaatit:
-      SUM(ps.clutch_kills) AS clutch_kills,
-      SUM(ps.cl_1v1_attempts) AS c11_att,
-      SUM(ps.cl_1v1_wins)     AS c11_win,
-      SUM(ps.cl_1v2_attempts) AS c12_att,
-      SUM(ps.cl_1v2_wins)     AS c12_win
+
+      -- rounds per map (liittyy maps-tauluun)
+      SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds,
+
+      -- clutch
+      SUM(COALESCE(ps.clutch_kills,0)) AS clutch_kills,
+      SUM(COALESCE(ps.cl_1v1_attempts,0)) AS c11_att,
+      SUM(COALESCE(ps.cl_1v1_wins,0))     AS c11_win,
+      SUM(COALESCE(ps.cl_1v2_attempts,0)) AS c12_att,
+      SUM(COALESCE(ps.cl_1v2_wins,0))     AS c12_win
+
+      {", SUM(ps.pistol_kills) AS pistol_kills" if HAS_PISTOL else ""}
+      {", SUM(ps.enemies_flashed) AS flashed, SUM(ps.flash_count) AS flash_count" if HAS_FLASH else ""}
+
     FROM player_stats ps
     JOIN matches m ON m.match_id = ps.match_id
     JOIN maps mp   ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
@@ -322,31 +383,66 @@ def compute_player_table(con, division_id: int, team_id: str):
 
     table = []
     for r in rows:
-        kd = (r["k"] / r["d"]) if r["d"] else float(r["k"])
-        # WR-laskenta turvallisesti
-        c11_wr = (100.0 * r["c11_win"] / r["c11_att"]) if r["c11_att"] else 0.0
-        c12_wr = (100.0 * r["c12_win"] / r["c12_att"]) if r["c12_att"] else 0.0
+        k  = r["k"] or 0
+        d  = r["d"] or 0
+        a  = r["a"] or 0
+        kd = (k / d) if d else float(k)
+        adr = r["adr"] or 0.0
+        kr  = r["kr"] or 0.0
+        hs  = r["hs_pct"] or 0.0
+        rounds = r["rounds"] or 0
+        maps_played = r["maps_played"] or 0
+        util = r["util"] or 0
+        awp = r["awp_kills"] or 0
+
+        # Johdannaiset
+        rpm = (rounds / maps_played) if maps_played else 0.0
+        udpr = (util / rounds) if rounds else 0.0   # Utility damage per round
+        # Impact (kevyt proxy): 2*KR + 0.42*AR - 0.41*DR
+        ar = (a / rounds) if rounds else 0.0
+        dr = (d / rounds) if rounds else 0.0
+        impact = 2.0*kr + 0.42*ar - 0.41*dr
+
+        # Clutch WR
+        c11_att = r["c11_att"] or 0
+        c11_win = r["c11_win"] or 0
+        c12_att = r["c12_att"] or 0
+        c12_win = r["c12_win"] or 0
+        c11_wr = (100.0 * c11_win / c11_att) if c11_att else 0.0
+        c12_wr = (100.0 * c12_win / c12_att) if c12_att else 0.0
+
+        # Flash-metriikat (vain jos on talletettu)
+        enemies_per_flash = None
+        if HAS_FLASH:
+            flashed = r["flashed"] or 0
+            fcount  = r["flash_count"] or 0
+            enemies_per_flash = (flashed / fcount) if fcount else 0.0
+
+        # Pistol
+        pistol_kills = r["pistol_kills"] if HAS_PISTOL else None
+
         table.append({
             "nickname": r["nickname"],
-            "maps_played": r["maps_played"],
-            "rounds": r["rounds_played"] or 0,
-            "kd": kd,
-            "adr": r["adr"] or 0.0,
-            "kr": r["kr"] or 0.0,
-            "kill": f"{r['k']}",
-            "death": f"{r['d']}",
-            "assist": f"{r['a']}",
-            "hs_pct": r["hs_pct"] or 0.0,
-            "awp_kills": r["awp_kills"] or 0,
+            # Basic
+            "maps_played": maps_played,
+            "rounds": rounds,
+            "kd": kd, "adr": adr, "kr": kr,
+            "kill": k, "death": d, "assist": a,
+            "hs_pct": hs, "awp_kills": awp,
             "k3": r["k3"] or 0, "k4": r["k4"] or 0, "k5": r["k5"] or 0,
-            "util": r["util"] or 0,
-            # clutch
+            "util": util,
+
+            # Advanced ydin
+            "rpm": rpm,
+            "udpr": udpr,
+            "impact": impact,
             "clutch_kills": r["clutch_kills"] or 0,
-            "c11_att": r["c11_att"] or 0, "c11_win": r["c11_win"] or 0, "c11_wr": c11_wr,
-            "c12_att": r["c12_att"] or 0, "c12_win": r["c12_win"] or 0, "c12_wr": c12_wr,
+            "c11_att": c11_att, "c11_win": c11_win, "c11_wr": c11_wr,
+            "c12_att": c12_att, "c12_win": c12_win, "c12_wr": c12_wr,
+            "enemies_per_flash": enemies_per_flash,
+            "pistol_kills": pistol_kills,
         })
     return table
-
 
 
 def compute_division_map_avgs(con, division_id: int):
@@ -527,46 +623,50 @@ def render_division(con, div):
         ]
         html.append("<div>" + " ".join(chips) + "</div>")
 
-        # Players
+        # Players (TABS: Basic / Advanced)
         players = compute_player_table(con, div["division_id"], team_id)
-        tid = f"players-{ti}"
-        html.append(f'<h3>Players</h3>')
-        html.append(f'<table id="{tid}" data-sort-col="0" data-sort-dir="asc">')
-        html.append("""<thead><tr>
-          <th onclick="sortTable('{tid}',0,false)">Nickname</th>
-          <th onclick="sortTable('{tid}',1,true)">Maps</th>
-          <th onclick="sortTable('{tid}',2,true)">Rounds</th>
-          <th onclick="sortTable('{tid}',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('{tid}',4,true)">ADR</th>
-          <th onclick="sortTable('{tid}',5,true)">KR</th>
-          <th onclick="sortTable('{tid}',6,true)" title="Clutch-fragit (1vX tilanteissa)">Clutch K</th>
-          <th onclick="sortTable('{tid}',7,true)" title="1v1 winrate, suluissa yritykset">1v1 WR%</th>
-          <th onclick="sortTable('{tid}',8,true)" title="1v2 winrate, suluissa yritykset">1v2 WR%</th>
-          <th onclick="sortTable('{tid}',9,true)">K</th>
-          <th onclick="sortTable('{tid}',10,true)">D</th>
-          <th onclick="sortTable('{tid}',11,true)">A</th>
-          <th onclick="sortTable('{tid}',12,true)">HS%</th>
-          <th onclick="sortTable('{tid}',13,true)">AWP</th>
-          <th onclick="sortTable('{tid}',14,true)">3K</th>
-          <th onclick="sortTable('{tid}',15,true)">4K</th>
-          <th onclick="sortTable('{tid}',16,true)">5K</th>
-          <th onclick="sortTable('{tid}',17,true)">Util</th>
-        </tr></thead><tbody>""".replace("{tid}", tid))
+        tab_root_id = f"tabs-{team_id[:8]}"
 
+        html.append('<h3>Players</h3>')
+        html.append(f"""
+          <div id="{tab_root_id}" class="tabs">
+            <div class="tab-nav">
+              <button class="tab-btn active" data-target="basic"
+                      onclick="switchTab('{tab_root_id}','basic'); initTabsAutoSort('{tab_root_id}')">Basic</button>
+              <button class="tab-btn" data-target="advanced"
+                      onclick="switchTab('{tab_root_id}','advanced'); initTabsAutoSort('{tab_root_id}')">Advanced</button>
+            </div>
+          """)
+
+        # ---------- BASIC ----------
+        tid_basic = f"players-basic-{ti}"
+        html.append(f'<div class="tab-panel active" data-tab="basic">')
+        html.append(f'<table id="{tid_basic}" data-sort-col="3" data-sort-dir="desc">')
+        html.append(f"""<thead><tr>
+          <th onclick="sortTable('{tid_basic}',0,false)">Nickname</th>
+          <th onclick="sortTable('{tid_basic}',1,true)">Maps</th>
+          <th onclick="sortTable('{tid_basic}',2,true)" title="Total rounds">Rounds</th>
+          <th onclick="sortTable('{tid_basic}',3,true)" title="Kills/Deaths">KD</th>
+          <th onclick="sortTable('{tid_basic}',4,true)">ADR</th>
+          <th onclick="sortTable('{tid_basic}',5,true)">KR</th>
+          <th onclick="sortTable('{tid_basic}',6,true)">K</th>
+          <th onclick="sortTable('{tid_basic}',7,true)">D</th>
+          <th onclick="sortTable('{tid_basic}',8,true)">A</th>
+          <th onclick="sortTable('{tid_basic}',9,true)">HS%</th>
+          <th onclick="sortTable('{tid_basic}',10,true)">AWP</th>
+          <th onclick="sortTable('{tid_basic}',11,true)">3K</th>
+          <th onclick="sortTable('{tid_basic}',12,true)">4K</th>
+          <th onclick="sortTable('{tid_basic}',13,true)">5K</th>
+          <th onclick="sortTable('{tid_basic}',14,true)">Util dmg</th>
+        </tr></thead><tbody>""")
         for p in players:
             html.append(f"""<tr>
               <td>{p["nickname"]}</td>
               <td>{p["maps_played"]}</td>
-              <td title="Rounds/Map: {(p['rounds']/p['maps_played']) if p['maps_played'] else 0:.1f}">{p["rounds"]}</td>
-
+              <td title="Rounds/Map: {p['rpm']:.1f}">{p["rounds"]}</td>
               <td>{p["kd"]:.2f}</td>
               <td>{p["adr"]:.1f}</td>
               <td>{p["kr"]:.2f}</td>
-
-              <td>{p["clutch_kills"]}</td>
-              <td data-sort="{p['c11_wr']:.1f}" title="Attempts: {p['c11_att']}, Wins: {p['c11_win']}">{p["c11_wr"]:.0f}% ({p["c11_att"]})</td>
-              <td data-sort="{p['c12_wr']:.1f}" title="Attempts: {p['c12_att']}, Wins: {p['c12_win']}">{p["c12_wr"]:.0f}% ({p["c12_att"]})</td>
-
               <td>{p["kill"]}</td>
               <td>{p["death"]}</td>
               <td>{p["assist"]}</td>
@@ -577,18 +677,66 @@ def render_division(con, div):
               <td>{p["k5"]}</td>
               <td>{int(p["util"])}</td>
             </tr>""")
+        html.append("</tbody></table>")
+        html.append(f"<script>colorizeRange('{tid_basic}', 3, 0.3, 1.5, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_basic}', 4, 50, 120, false);</script>")
+        html.append(f"<script>colorizeRange('{tid_basic}', 5, 0.2, 1.2, false);</script>")
+        html.append(f"<script>applyDefaultSort('{tid_basic}');</script>")
+        html.append("</div>")  # /tab-panel basic
+
+        # ---------- ADVANCED ----------
+        # Dynaamiset optiot: näytetään vain jos dataa on
+        opt_flash  = any(p["enemies_per_flash"] is not None for p in players)
+        opt_pistol = any(p["pistol_kills"] is not None for p in players)
+
+        tid_adv = f"players-adv-{ti}"
+        html.append(f'<div class="tab-panel" data-tab="advanced">')
+        html.append(f'<table id="{tid_adv}" data-sort-col="5" data-sort-dir="desc">')
+        html.append("<thead><tr>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',0,false)\">Nickname</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',1,true)\" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',2,true)\" title='1v1 WR%, suluissa attempts'>1v1 WR%</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',3,true)\" title='1v2 WR%, suluissa attempts'>1v2 WR%</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',4,true)\" title='Utility damage per round'>UDPR</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',5,true)\" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>")
+        col_idx = 6
+        if opt_flash:
+            html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Enemies Flashed / Flash Count'>Enem/Flash</th>")
+            col_idx += 1
+        if opt_pistol:
+            html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\">Pistol K</th>")
+        html.append("</tr></thead><tbody>")
+
+        for p in players:
+            html.append("<tr>")
+            html.append(f"<td>{p['nickname']}</td>")
+            html.append(f"<td>{p['clutch_kills']}</td>")
+            html.append(f"<td data-sort=\"{p['c11_wr']:.1f}\" title=\"Attempts: {p['c11_att']}, Wins: {p['c11_win']}\">{p['c11_wr']:.0f}% ({p['c11_att']})</td>")
+            html.append(f"<td data-sort=\"{p['c12_wr']:.1f}\" title=\"Attempts: {p['c12_att']}, Wins: {p['c12_win']}\">{p['c12_wr']:.0f}% ({p['c12_att']})</td>")
+            html.append(f"<td>{p['udpr']:.2f}</td>")
+            html.append(f"<td>{p['impact']:.2f}</td>")
+            if opt_flash:
+                val = p['enemies_per_flash'] if p['enemies_per_flash'] is not None else 0.0
+                html.append(f"<td>{val:.2f}</td>")
+            if opt_pistol:
+                val = p['pistol_kills'] if p['pistol_kills'] is not None else 0
+                html.append(f"<td>{val}</td>")
+            html.append("</tr>")
 
         html.append("</tbody></table>")
-        # KD, ADR, KR (sinulla ehkä jo nämä)
-        html.append(f"<script>colorizeRange('{tid}', 3, 0.3, 1.5, false);</script>")
-        html.append(f"<script>colorizeRange('{tid}', 4, 50, 120, false);</script>")
-        html.append(f"<script>colorizeRange('{tid}', 5, 0.2, 1.2, false);</script>")
+        # Väriskaalat (päivitä rajat liigatasoosi tarvittaessa)
+        html.append(f"<script>colorizeRange('{tid_adv}', 2, 0, 100, false);</script>")  # 1v1 WR
+        html.append(f"<script>colorizeRange('{tid_adv}', 3, 0, 100, false);</script>")  # 1v2 WR
+        html.append(f"<script>colorizeRange('{tid_adv}', 4, 0.5, 15, false);</script>") # UDPR
+        html.append(f"<script>colorizeRange('{tid_adv}', 5, 0.6, 2.2, false);</script>") # Impact
+        if opt_flash:
+            # Enemies/Flash: tyypillinen hajonta ~0.2–1.2
+            html.append(f"<script>colorizeRange('{tid_adv}', 6, 0.2, 1.2, false);</script>")
+        html.append(f"<script>applyDefaultSort('{tid_adv}');</script>")
+        html.append("</div>")  # /tab-panel advanced
 
-        # 1v1 WR% (col 7) ja 1v2 WR% (col 8)
-        html.append(f"<script>colorizeRange('{tid}', 7, 0, 100, false);</script>")
-        html.append(f"<script>colorizeRange('{tid}', 8, 0, 100, false);</script>")
+        html.append("</div>")  # /tabs root
 
-        html.append(f"<script>applyDefaultSort('{tid}');</script>")
 
         # Map stats
         maps = compute_map_stats_table(con, div["division_id"], team_id)

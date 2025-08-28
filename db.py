@@ -4,6 +4,22 @@ from pathlib import Path
 
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
+def match_exists(con: sqlite3.Connection, match_id: str) -> bool:
+    cur = con.execute("SELECT 1 FROM matches WHERE match_id=? LIMIT 1", (match_id,))
+    return cur.fetchone() is not None
+
+def match_has_maps(con: sqlite3.Connection, match_id: str) -> bool:
+    cur = con.execute("SELECT 1 FROM maps WHERE match_id=? LIMIT 1", (match_id,))
+    return cur.fetchone() is not None
+
+def match_has_player_stats(con: sqlite3.Connection, match_id: str) -> bool:
+    cur = con.execute("SELECT 1 FROM player_stats WHERE match_id=? LIMIT 1", (match_id,))
+    return cur.fetchone() is not None
+
+def match_fully_synced(con: sqlite3.Connection, match_id: str) -> bool:
+    # “Fully synced” = meillä on ainakin yksi map *ja* pelaajadataa.
+    return match_has_maps(con, match_id) and match_has_player_stats(con, match_id)
+
 def get_conn(db_path: str):
     con = sqlite3.connect(db_path)
     con.row_factory = sqlite3.Row

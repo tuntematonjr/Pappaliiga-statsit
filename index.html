@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CS2 Faceit Reports – generoitu 2025-08-28 13:56</title>
+<title>CS2 Faceit Reports – generoitu 2025-08-28 18:25</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -29,7 +29,7 @@ body{
 }
 
 .page{
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 1.25rem 1.25rem 3rem;
 }
@@ -102,6 +102,20 @@ details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
   .nav, .toolbar{ display:none; }
   .bar{ height:12px; }
 }
+
+/* Tabs (Basic / Advanced) */
+.tabs { margin:.75rem 0 1rem; }
+.tab-nav { display:flex; gap:.5rem; }
+.tab-btn {
+  background: var(--chip-bg);
+  color: var(--fg);
+  border:1px solid var(--border);
+  padding:.35rem .7rem; border-radius:999px; cursor:pointer;
+}
+.tab-btn.active { background:#3a3a3a; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
 </style>
 
 <script>
@@ -204,12 +218,39 @@ function buildColumnToggles(tableId){
     });
   });
 }
+
+// Tabien vaihto
+function switchTab(containerId, tabName){
+  const root = document.getElementById(containerId);
+  if(!root) return;
+  const panels = root.querySelectorAll('.tab-panel');
+  const buttons = root.querySelectorAll('.tab-btn');
+  panels.forEach(p => p.classList.remove('active'));
+  buttons.forEach(b => b.classList.remove('active'));
+  root.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
+  root.querySelector(`[data-target="${tabName}"]`)?.classList.add('active');
+}
+
+// Taulukon oletuslajittelu (jos haluat tabin vaihdossa uudelleenlajittelun)
+function initTabsAutoSort(rootId){
+  const root = document.getElementById(rootId);
+  if(!root) return;
+  const activePanel = root.querySelector('.tab-panel.active');
+  if(!activePanel) return;
+  const table = activePanel.querySelector('table');
+  if(!table) return;
+  const col = parseInt(table.getAttribute('data-sort-col') || '0',10);
+  const dir = (table.getAttribute('data-sort-dir') || 'asc') === 'asc';
+  sortTable(table.id, col, !dir);
+  sortTable(table.id, col, dir);
+}
+
 </script>
 </head>
 <body>
 
 <div class="page">
-<h1>CS2 Faceit Reports <span class='muted'>(generoitu 2025-08-28 13:56)</span></h1>
+<h1>CS2 Faceit Reports <span class='muted'>(generoitu 2025-08-28 18:25)</span></h1>
 <p class='muted'>Valitse divisioona alta. Sivu linkittää valmiiksi generoituun raporttiin.</p>
 <div class="nav">
 <a href="output/div5.html">5 Divisioona S11</a>

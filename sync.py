@@ -6,7 +6,11 @@ from collections import defaultdict
 
 from faceit_config import DIVISIONS, RATE_LIMIT_SLEEP
 from faceit_client import list_championship_matches, get_match_details, get_match_stats, get_democracy_history
-from db import get_conn, init_db, upsert_division, upsert_match, upsert_map, upsert_team_stat, upsert_player_stat, insert_vote, commit
+from db import (
+    get_conn, init_db, upsert_division, upsert_match, upsert_map,
+    upsert_team_stat, upsert_player_stat, insert_vote, commit,
+    match_exists, match_fully_synced
+)
 
 DB_PATH = str(Path(__file__).with_name("faceit_reports.sqlite"))
 
@@ -248,12 +252,25 @@ def sync_division(con, div):
         match_id = m.get("match_id")
         if not match_id:
             continue
+
+        # 1) Jos ottelu on jo “fully synced”, skippaa heti
+        if match_fully_synced(con, match_id):
+            print(f"[SKIP] {match_id} on jo synkattu (maps + player_stats) – ei päivitystä.")
+            continue
+
+        # 2) Jos ottelu on kannassa mutta ei fully-synced, jatketaan varovasti (täydennetään puuttuvat osat)
+        if match_exists(con, match_id):
+            print(f"[RESUME] {match_id} löytyi matches-taulusta – täydennetään puuttuvat taulut.")
+
+        # Vasta tässä vaiheessa haetaan API:sta
         details = get_match_details(match_id)
+
         stats = {}
         try:
             stats = get_match_stats(match_id)
         except Exception as e:
             print(f"[WARN] stats fetch failed for {match_id}: {e}")
+
 
         # Insert match basic row
         match_row = parse_match_basic(div, m, details)
