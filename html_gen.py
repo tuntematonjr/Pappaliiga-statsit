@@ -277,6 +277,53 @@ function bindPlayedOnly(tableId, chkId){
   });
 }
 
+/**
+ * Jatkuva liukuva väritys p25-p50-p75 -kriteereillä.
+ * - lo = p25, mid = p50, hi = p75
+ * - inverse=false: hi parempi (vihreä), lo huonompi (punainen)
+ * - inverse=true: toisin päin
+ * Väri: HSL-hue 0..120 (punainen→vihreä), alpha kasvaa kun etäännytään medianista.
+ */
+function colorizeContinuous(tableId, colIdx, lo, mid, hi, inverse=false){
+  const t = document.getElementById(tableId);
+  if(!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+
+  // turvakaistat
+  if(lo > hi){ const tmp=lo; lo=hi; hi=tmp; }
+  if(mid < lo) mid = lo;
+  if(mid > hi) mid = hi;
+
+  const spanL = Math.max(mid - lo, 1e-9);
+  const spanR = Math.max(hi - mid, 1e-9);
+
+  for(const tr of rows){
+    const td = tr.cells[colIdx];
+    let v = parseFloat((td.textContent||'').replace(',', '.'));
+    if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
+
+    // normi 0..1 kriittisen alueen ympärillä: 0.5 = mediaani
+    let n;
+    if(v <= mid){
+      n = 0.5 * Math.max(0, Math.min(1, (v - lo) / spanL));
+    } else {
+      n = 0.5 + 0.5 * Math.max(0, Math.min(1, (v - mid) / spanR));
+    }
+
+    // etäisyys medi­aanista → alpha
+    const dist = Math.abs(n - 0.5) * 2;       // 0..1
+    const alpha = Math.pow(dist, 0.9) * 0.5;  // pehmeämpi käyrä, maksimi ~0.5
+
+    // väri: punainen (0) → vihreä (120)
+    let hue = 120 * (n); // 0=pun, 0.5=~keltainen, 1=vihreä
+    if(inverse) hue = 120 - hue;
+
+    // tausta kevyenä liukuna vasemmalta → läpinäkyvään
+    td.style.backgroundImage = `linear-gradient(90deg, hsla(${hue}, 70%, 40%, ${alpha}), transparent)`;
+    td.style.backgroundColor = ''; // varmuuden vuoksi, ettei jää vanhaa väriä
+  }
+}
+
 // --- Saraketooglet ---
 function buildColumnToggles(tableId){
   const t = document.getElementById(tableId);
@@ -350,6 +397,32 @@ HTML_FOOT = """
 # ------------------------------
 # DB helpers
 # ------------------------------
+
+def weighted_percentile(values, weights, p):
+    """
+    Painotettu prosenttipiste p (0..100) ilman numpyä.
+    values: lista arvoja
+    weights: vastaavat painot (>=0)
+    """
+    if not values:
+        return 0.0
+    pairs = sorted(zip(values, weights), key=lambda x: x[0])
+    total = sum(w for _, w in pairs)
+    if total <= 0:
+        # fallback: tavallinen mediaani
+        k = len(pairs) // 2
+        return pairs[k][0]
+    threshold = total * (p / 100.0)
+    acc = 0.0
+    for v, w in pairs:
+        acc += w
+        if acc >= threshold:
+            return v
+    return pairs[-1][0]
+
+def weighted_median(values, weights):
+    return weighted_percentile(values, weights, 50)
+
 
 MAP_NAME_DISPLAY = {
     "de_nuke": "Nuke",
@@ -432,12 +505,16 @@ def compute_division_player_summary(con, division_id: int, min_rounds: int = 20)
     """, (division_id,))[0]["r"] or 0
 
     # Painotetut keskiarvot
+    kd_vals, kd_w = [], []
+    adr_vals, adr_w = [], []
+    kr_vals,  kr_w  = [], []
+
     w_kd_sum = w_adr_sum = w_kr_sum = w_sum = 0.0
     leaders_pool = []
     for r in rows:
         k = r["k"] or 0
         d = r["d"] or 0
-        kd = _safe_div(k, d) if d else float(k)
+        kd = (k / d) if d else float(k)
         adr = r["adr_avg"] or 0.0
         kr  = r["kr_avg"]  or 0.0
         rounds = r["rounds"] or 0
@@ -447,21 +524,45 @@ def compute_division_player_summary(con, division_id: int, min_rounds: int = 20)
         w_kr_sum  += kr  * rounds
         w_sum     += rounds
 
+        # mediaania varten
+        if rounds > 0:
+            kd_vals.append(kd);  kd_w.append(rounds)
+            adr_vals.append(adr); adr_w.append(rounds)
+            kr_vals.append(kr);   kr_w.append(rounds)
+
         if rounds >= min_rounds:
             leaders_pool.append({
                 "nick": r["nick"] or r["player_id"],
-                "team": r["team_name"] or "–",
+                "team": r.get("team_name") or "-",
                 "kd": kd, "adr": adr, "kr": kr, "rounds": rounds
             })
 
+    # Painotetut “keskiarvot”
     avg_kd  = _safe_div(w_kd_sum,  w_sum)
     avg_adr = _safe_div(w_adr_sum, w_sum)
     avg_kr  = _safe_div(w_kr_sum,  w_sum)
 
+    # KD: painotettu mediaani + IQR (p25-p75)
+    # KD (painotettu)
+    kd_p50 = weighted_percentile(kd_vals, kd_w, 50) if kd_vals else 0.0
+    kd_p25 = weighted_percentile(kd_vals, kd_w, 25) if kd_vals else 0.0
+    kd_p75 = weighted_percentile(kd_vals, kd_w, 75) if kd_vals else 0.0
+
+    # ADR (painotettu)
+    adr_p50 = weighted_percentile(adr_vals, adr_w, 50) if adr_vals else 0.0
+    adr_p25 = weighted_percentile(adr_vals, adr_w, 25) if adr_vals else 0.0
+    adr_p75 = weighted_percentile(adr_vals, adr_w, 75) if adr_vals else 0.0
+
+    # KR (painotettu)
+    kr_p50 = weighted_percentile(kr_vals, kr_w, 50) if kr_vals else 0.0
+    kr_p25 = weighted_percentile(kr_vals, kr_w, 25) if kr_vals else 0.0
+    kr_p75 = weighted_percentile(kr_vals, kr_w, 75) if kr_vals else 0.0
+
+
     # Johtajat
     def top(metric):
         if not leaders_pool:
-            return ("–", "–", 0.0)
+            return ("-", "-", 0.0)
         best = max(leaders_pool, key=lambda x: x[metric])
         return (best["nick"], best["team"], best[metric])
 
@@ -478,6 +579,9 @@ def compute_division_player_summary(con, division_id: int, min_rounds: int = 20)
         "maps": maps_cnt,
         "rounds": total_rounds,
         "avg_kd": avg_kd, "avg_adr": avg_adr, "avg_kr": avg_kr,
+        "kd_p50": kd_p50, "kd_p25": kd_p25, "kd_p75": kd_p75,
+        "adr_p50": adr_p50, "adr_p25": adr_p25, "adr_p75": adr_p75,
+        "kr_p50": kr_p50,  "kr_p25": kr_p25,  "kr_p75": kr_p75,
         "leaders": leaders,
     }
 
@@ -542,26 +646,23 @@ def compute_division_thresholds(con, division_id: int):
         udpr_vals.append(udpr)
         impact_vals.append(impact)
 
-    def lo_hi(lst, fallback=(0.0, 1.0)):
+    def pack(lst, fallback=(0.0, 1.0, 0.5)):
         lst = [v for v in lst if v is not None]
-        if not lst:
-            return fallback
-        if len(lst) == 1:
-            return (lst[0], lst[0])
+        if not lst: return fallback
         lo = _percentile(lst, 20)
+        mid = _percentile(lst, 50)
         hi = _percentile(lst, 80)
         if lo == hi:
-            # hajontaa ei ole; levitetään vähän ettei kaikki jää harmaaksi
             lo = min(lo, lo*0.9)
             hi = max(hi, hi*1.1 if hi != 0 else 0.1)
-        return (lo, hi)
+        return (lo, mid, hi)
 
     return {
-        "kd":     lo_hi(kd_vals, (0.6, 1.4)),
-        "adr":    lo_hi(adr_vals, (50.0, 120.0)),
-        "kr":     lo_hi(kr_vals, (0.4, 1.0)),
-        "udpr":   lo_hi(udpr_vals, (1.0, 12.0)),
-        "impact": lo_hi(impact_vals, (0.4, 1.8)),
+        "kd":     pack(kd_vals,    (0.6, 1.0, 1.4)),
+        "adr":    pack(adr_vals,   (50.0, 85.0, 120.0)),
+        "kr":     pack(kr_vals,    (0.4, 0.7, 1.0)),
+        "udpr":   pack(udpr_vals,  (1.0, 6.0, 12.0)),
+        "impact": pack(impact_vals,(0.4, 1.1, 1.8)),
     }
 
 def get_teams_in_division(con, division_id: int):
@@ -868,7 +969,7 @@ def render_division(con, div):
     
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    html = [HTML_HEAD.replace("{title}", f"{div['name']} – generoitu {ts}")]
+    html = [HTML_HEAD.replace("{title}", f"{div['name']} - generoitu {ts}")]
     html.append('<div class="page">')
 
     html.append(f"<h1>{div['name']} <span class='muted'>(generoitu {ts})</span></h1>")
@@ -888,15 +989,50 @@ def render_division(con, div):
     # Vasemman puolen "perusluvut" kortti
     html.append('<div class="card">')
     html.append('<h3>Division summary</h3>')
+    TOOLTIP_WMED = (
+        "Painotettu mediaani: pelaajakohtaiset arvot lajitellaan, "
+        "paino = pelatut kierrokset divisioonassa. p50 on pienin arvo, "
+        "jossa kumulatiiviset painot ylittävät 50% (p25/p75 vastaavasti 25%/75%)."
+    )
+
     html.append('<div class="summary-grid">')
     html.append(f'<div class="summary-item"><div class="label">Teams</div><div class="val">{divsum["teams"]}</div></div>')
     html.append(f'<div class="summary-item"><div class="label">Players</div><div class="val">{divsum["players"]}</div></div>')
     html.append(f'<div class="summary-item"><div class="label">Maps</div><div class="val">{divsum["maps"]}</div></div>')
     html.append(f'<div class="summary-item"><div class="label">Rounds</div><div class="val">{divsum["rounds"]}</div></div>')
-    html.append(f'<div class="summary-item"><div class="label">Avg KD</div><div class="val">{divsum["avg_kd"]:.2f}</div></div>')
-    html.append(f'<div class="summary-item"><div class="label">Avg ADR</div><div class="val">{divsum["avg_adr"]:.1f}</div></div>')
-    html.append(f'<div class="summary-item"><div class="label">Avg KR</div><div class="val">{divsum["avg_kr"]:.2f}</div></div>')
+
+    # KD: mediaani + IQR
+    html.append(
+        f'<div class="summary-item" title="{TOOLTIP_WMED}">'
+        f'  <div class="label">Median KD (p50)</div>'
+        f'  <div class="val">{divsum["kd_p50"]:.2f}</div>'
+        f'  <div class="label">p25-p75</div>'
+        f'  <span class="cell-muted" style="font-weight:400;">{divsum["kd_p25"]:.2f}-{divsum["kd_p75"]:.2f}</span>'
+        f'</div>'
+    )
+
+    # ADR: mediaani + IQR
+    html.append(
+        f'<div class="summary-item" title="{TOOLTIP_WMED}">'
+        f'<div class="label">Median ADR (p50)</div>'
+        f'<div class="val">{divsum["adr_p50"]:.1f} '
+        f'<div class="label">p25-p75</div>'
+        f'<span class="cell-muted" style="font-weight:400;">{divsum["adr_p25"]:.1f}-{divsum["adr_p75"]:.1f}</span>'
+        f'</div></div>'
+    )
+
+    # KR: mediaani + IQR
+    html.append(
+        f'<div class="summary-item" title="{TOOLTIP_WMED}">'
+        f'<div class="label">Median KR (p50)</div>'
+        f'<div class="val">{divsum["kr_p50"]:.2f} '
+        f'<div class="label">p25-p75</div>'
+        f'<span class="cell-muted" style="font-weight:400;">{divsum["kr_p25"]:.2f}-{divsum["kr_p75"]:.2f}</span>'
+        f'</div></div>'
+    )
+
     html.append('</div>')  # /summary-grid
+
     html.append('</div>')  # /card
 
     # Oikean puolen "Leaders" kortti
@@ -1028,10 +1164,16 @@ def render_division(con, div):
               <td>{int(p["util"])}</td>
             </tr>""")
         html.append("</tbody></table>")
-        # Basic-taulukon väritys dynaamisesti divisioonakynnyksillä
-        html.append(f"<script>colorizeRange('{tid_basic}', 3, {thresholds['kd'][0]:.4f}, {thresholds['kd'][1]:.4f}, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_basic}', 4, {thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_basic}', 5, {thresholds['kr'][0]:.4f}, {thresholds['kr'][1]:.4f}, false);</script>")
+
+        # 2,3,6 ovat %-mittareita → näille pysyy 0..100 (voivat käyttää jatkuvaa yhtä lailla)
+        html.append(f"""
+        <script>
+          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
+          colorizeContinuous('{tid_basic}', 3, {thresholds['kd'][0]:.4f},  {thresholds['kd'][1]:.4f},  {thresholds['kd'][2]:.4f},  false);
+          colorizeContinuous('{tid_basic}', 4, {thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, {thresholds['adr'][2]:.4f}, false);
+          colorizeContinuous('{tid_basic}', 5, {thresholds['kr'][0]:.4f},  {thresholds['kr'][1]:.4f},  {thresholds['kr'][2]:.4f},  false);
+        </script>
+        """)
 
         html.append(f"<script>applyDefaultSort('{tid_basic}');</script>")
         html.append("</div>")  # /tab-panel basic
@@ -1094,9 +1236,9 @@ def render_division(con, div):
         html.append(f"<script>colorizeRange('{tid_adv}', 2, 0, 100, false);</script>")
         html.append(f"<script>colorizeRange('{tid_adv}', 3, 0, 100, false);</script>")
         html.append(f"<script>colorizeRange('{tid_adv}', 6, 0, 100, false);</script>")
-        # 7 = UDPR, 8 = Impact → dynaamiset kynnykset divisioonan mukaan
-        html.append(f"<script>colorizeRange('{tid_adv}', 7, {thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_adv}', 8, {thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, false);</script>")
+        # 7 = UDPR, 8 = Impact → divisioonan mukaan (lo,mid,hi)
+        html.append(f"<script>colorizeContinuous('{tid_adv}', 7, {thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, {thresholds['udpr'][2]:.4f}, false);</script>")
+        html.append(f"<script>colorizeContinuous('{tid_adv}', 8, {thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, {thresholds['impact'][2]:.4f}, false);</script>")
 
         html.append(f"<script>applyDefaultSort('{tid_adv}');</script>")
         html.append("</div>")  # /tab-panel advanced
@@ -1189,7 +1331,7 @@ def render_division(con, div):
           if (!t || !t.tBodies.length) return;
           const rows = t.tBodies[0].rows;
           for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent||'0',10);
+            const played = parseInt(tr.cells[1].textContent || '0', 10);
             [4,5,6].forEach(function(i){
               const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
               renderBar(tr.cells[i], isFinite(num) ? num : 0);
@@ -1198,15 +1340,28 @@ def render_division(con, div):
               tr.cells[i].title = 'Played: ' + played;
             });
           }
-          colorizeAuto('{TID}', 7, false);  // KD
-          colorizeAuto('{TID}', 8, false);  // ADR
-          colorizeRange('{TID}', 9, -15, 15, false); // RD
+
+          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
+          colorizeContinuous('{TID}', 7, {KD_LO},  {KD_MD},  {KD_HI},  false);
+          colorizeContinuous('{TID}', 8, {ADR_LO}, {ADR_MD}, {ADR_HI}, false);
+
+          // RD: jätetään symmetriseksi haarukaksi
+          colorizeRange('{TID}', 9, -15, 15, false);
+
           applyDefaultSort('{TID}');
           bindPlayedOnly('{TID}', '{TID}-played-only');
           buildColumnToggles('{TID}');
         })();
         </script>
-        """.replace("{TID}", tid2))
+        """.replace("{TID}", tid2)
+          .replace("{KD_LO}",  f"{thresholds['kd'][0]:.4f}")
+          .replace("{KD_MD}",  f"{thresholds['kd'][1]:.4f}")
+          .replace("{KD_HI}",  f"{thresholds['kd'][2]:.4f}")
+          .replace("{ADR_LO}", f"{thresholds['adr'][0]:.4f}")
+          .replace("{ADR_MD}", f"{thresholds['adr'][1]:.4f}")
+          .replace("{ADR_HI}", f"{thresholds['adr'][2]:.4f}")
+        )
+
 
         html.append("</details>")  # team section
 
@@ -1226,7 +1381,7 @@ def write_index():
     ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     # Rakennetaan yksinkertainen etusivu uudelleenkäyttäen samaa HTML-pohjaa
-    html = [HTML_HEAD.replace("{title}", f"CS2 Faceit Reports – generoitu {ts}")]
+    html = [HTML_HEAD.replace("{title}", f"CS2 Faceit Reports - generoitu {ts}")]
     html.append('<div class="page">')
     html.append(f"<h1>CS2 Faceit Reports <span class='muted'>(generoitu {ts})</span></h1>")
 

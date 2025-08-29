@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CS2 Faceit Reports – generoitu 2025-08-28 23:43</title>
+<title>CS2 Faceit Reports - generoitu 2025-08-30 00:26</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -262,6 +262,53 @@ function bindPlayedOnly(tableId, chkId){
   });
 }
 
+/**
+ * Jatkuva liukuva väritys p25-p50-p75 -kriteereillä.
+ * - lo = p25, mid = p50, hi = p75
+ * - inverse=false: hi parempi (vihreä), lo huonompi (punainen)
+ * - inverse=true: toisin päin
+ * Väri: HSL-hue 0..120 (punainen→vihreä), alpha kasvaa kun etäännytään medianista.
+ */
+function colorizeContinuous(tableId, colIdx, lo, mid, hi, inverse=false){
+  const t = document.getElementById(tableId);
+  if(!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+
+  // turvakaistat
+  if(lo > hi){ const tmp=lo; lo=hi; hi=tmp; }
+  if(mid < lo) mid = lo;
+  if(mid > hi) mid = hi;
+
+  const spanL = Math.max(mid - lo, 1e-9);
+  const spanR = Math.max(hi - mid, 1e-9);
+
+  for(const tr of rows){
+    const td = tr.cells[colIdx];
+    let v = parseFloat((td.textContent||'').replace(',', '.'));
+    if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
+
+    // normi 0..1 kriittisen alueen ympärillä: 0.5 = mediaani
+    let n;
+    if(v <= mid){
+      n = 0.5 * Math.max(0, Math.min(1, (v - lo) / spanL));
+    } else {
+      n = 0.5 + 0.5 * Math.max(0, Math.min(1, (v - mid) / spanR));
+    }
+
+    // etäisyys medi­aanista → alpha
+    const dist = Math.abs(n - 0.5) * 2;       // 0..1
+    const alpha = Math.pow(dist, 0.9) * 0.5;  // pehmeämpi käyrä, maksimi ~0.5
+
+    // väri: punainen (0) → vihreä (120)
+    let hue = 120 * (n); // 0=pun, 0.5=~keltainen, 1=vihreä
+    if(inverse) hue = 120 - hue;
+
+    // tausta kevyenä liukuna vasemmalta → läpinäkyvään
+    td.style.backgroundImage = `linear-gradient(90deg, hsla(${hue}, 70%, 40%, ${alpha}), transparent)`;
+    td.style.backgroundColor = ''; // varmuuden vuoksi, ettei jää vanhaa väriä
+  }
+}
+
 // --- Saraketooglet ---
 function buildColumnToggles(tableId){
   const t = document.getElementById(tableId);
@@ -327,10 +374,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <body>
 
 <div class="page">
-<h1>CS2 Faceit Reports <span class='muted'>(generoitu 2025-08-28 23:43)</span></h1>
+<h1>CS2 Faceit Reports <span class='muted'>(generoitu 2025-08-30 00:26)</span></h1>
 <p class='muted'>Valitse divisioona alta. Sivu linkittää valmiiksi generoituun raporttiin.</p>
 <div class="nav">
 <a href="output/div5.html">5 Divisioona S11</a>
+<a href="output/div7.html">7 Divisioona S11</a>
 <a href="output/div19.html">19 Divisioona S11</a>
 <a href="output/div20.html">20 Divisioona S11</a>
 <a href="output/div22.html">22 Divisioona S11</a>

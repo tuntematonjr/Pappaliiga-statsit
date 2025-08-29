@@ -33,6 +33,12 @@ DIVISIONS = [
         "name": "5 Divisioona S11",
         "slug": "div5",
         "championship_id": "2357bf41-ba0c-4405-aa2e-2c63d252d3f",
+    }, 
+    {
+        "division_id": 7,
+        "name": "7 Divisioona S11",
+        "slug": "div7",
+        "championship_id": "b5222580-50b6-4d5b-ae51-01b381581ed1",
     },
     {
         "division_id": 19,
@@ -58,4 +64,3 @@ DIVISIONS = [
 REQUEST_TIMEOUT = 25  # seconds
 RATE_LIMIT_SLEEP = 0.4  # seconds between calls, be a good citizen
 MAX_RETRIES = 3
-
