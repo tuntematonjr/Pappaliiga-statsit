@@ -219,50 +219,6 @@ function renderBar(cell, value){
   span.style.background = `rgb(${r}, ${g+80}, 100)`;
 }
 
-// --- Väriskaalat ---
-/**
- * Väritä vain, jos arvo on dynaamisen [lo,hi]-alueen ulkopuolella.
- * bufferRatio kasvattaa neutraalia vyöhykettä lo/hi ympärille (0..0.5).
- * Esim. 0.10 = jätetään 10 % lo..hi alueen leveydestä molemmin puolin täysin neutraaliksi.
- */
-function colorizeRange(tableId, colIdx, lo, hi, inverse=false, bufferRatio=0.10){
-  const t = document.getElementById(tableId);
-  if(!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-
-  // varmistetaan järjestys
-  let minv = Math.min(lo, hi), maxv = Math.max(lo, hi);
-  // neutraalin alueen kasvatus
-  const span = maxv - minv || 1;
-  const innerLo = minv + span * bufferRatio;
-  const innerHi = maxv - span * bufferRatio;
-
-  for(const tr of rows){
-    const td = tr.cells[colIdx];
-    let raw = (td.textContent || td.innerText || '').trim().replace(',', '.');
-    let v = parseFloat(raw);
-    if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
-
-    // Inverssiä tarvitaan harvoin (pienempi parempi), mutta pidetään mukana
-    if(inverse){
-      if(v < innerLo) { td.classList.add('cell-grad','good'); }
-      else if(v > innerHi) { td.classList.add('cell-grad','bad'); }
-      // muuten ei väriä
-    }else{
-      if(v < innerLo) { td.classList.add('cell-grad','bad'); }
-      else if(v > innerHi) { td.classList.add('cell-grad','good'); }
-      // muuten ei väriä
-    }
-  }
-}
-function colorizeAuto(tableId, colIdx, inverse=false){
-  const t = document.getElementById(tableId); if(!t) return;
-  const vals = [...t.tBodies[0].rows].map(tr => parseFloat((tr.cells[colIdx].textContent||'').replace(',','.'))).filter(v=>isFinite(v));
-  if(!vals.length) return;
-  const min = Math.min(...vals), max = Math.max(...vals);
-  colorizeRange(tableId, colIdx, min, max, inverse);
-}
-
 // --- Played only ---
 function bindPlayedOnly(tableId, chkId){
   const chk = document.getElementById(chkId);
@@ -284,45 +240,66 @@ function bindPlayedOnly(tableId, chkId){
  * - inverse=true: toisin päin
  * Väri: HSL-hue 0..120 (punainen→vihreä), alpha kasvaa kun etäännytään medianista.
  */
-function colorizeContinuous(tableId, colIdx, lo, mid, hi, inverse=false){
+function colorizeContinuous(tableId, colIdx, p25, p50, p75, inverse=false){
   const t = document.getElementById(tableId);
   if(!t || !t.tBodies.length) return;
   const rows = t.tBodies[0].rows;
-
-  // turvakaistat
-  if(lo > hi){ const tmp=lo; lo=hi; hi=tmp; }
-  if(mid < lo) mid = lo;
-  if(mid > hi) mid = hi;
-
-  const spanL = Math.max(mid - lo, 1e-9);
-  const spanR = Math.max(hi - mid, 1e-9);
 
   for(const tr of rows){
     const td = tr.cells[colIdx];
     let v = parseFloat((td.textContent||'').replace(',', '.'));
     if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
 
-    // normi 0..1 kriittisen alueen ympärillä: 0.5 = mediaani
-    let n;
-    if(v <= mid){
-      n = 0.5 * Math.max(0, Math.min(1, (v - lo) / spanL));
-    } else {
-      n = 0.5 + 0.5 * Math.max(0, Math.min(1, (v - mid) / spanR));
-    }
+    // Skaalaus p25..p75: alle p25 punertava, yli p75 vihertävä
+    let ratio;
+    if (v <= p25) ratio = 0;
+    else if (v >= p75) ratio = 1;
+    else ratio = (v - p25) / (p75 - p25 || 1);
 
-    // etäisyys medi­aanista → alpha
-    const dist = Math.abs(n - 0.5) * 2;       // 0..1
-    const alpha = Math.pow(dist, 0.9) * 0.5;  // pehmeämpi käyrä, maksimi ~0.5
+    if (inverse) ratio = 1 - ratio;
 
-    // väri: punainen (0) → vihreä (120)
-    let hue = 120 * (n); // 0=pun, 0.5=~keltainen, 1=vihreä
-    if(inverse) hue = 120 - hue;
-
-    // tausta kevyenä liukuna vasemmalta → läpinäkyvään
-    td.style.backgroundImage = `linear-gradient(90deg, hsla(${hue}, 70%, 40%, ${alpha}), transparent)`;
-    td.style.backgroundColor = ''; // varmuuden vuoksi, ettei jää vanhaa väriä
+    // Punaisesta vihreään
+    const r = Math.round(220 * (1 - ratio));
+    const g = Math.round(220 * ratio);
+    const b = 0;
+    td.style.background = `rgba(${r},${g},${b},0.25)`;
   }
 }
+
+function postProcessTable(tableId, opts){
+  const t = document.getElementById(tableId);
+  if(!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+
+  // Progress bar -sarakkeet (esim. WR%)
+  if(opts.bars){
+    for(const tr of rows){
+      const played = parseInt(tr.cells[1].textContent||'0',10); // kolumni 1 = Played
+      opts.bars.forEach(i => {
+        const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+        renderBar(tr.cells[i], isFinite(num) ? num : 0);
+        const span = tr.cells[i].querySelector('.bar > span');
+        if(span) span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      });
+    }
+  }
+
+  // Väritykset p25-p50-p75
+  if(opts.color){
+    opts.color.forEach(c => {
+      colorizeContinuous(tableId, c.col, c.p[0], c.p[1], c.p[2], c.inverse||false);
+    });
+  }
+
+  // Oletuslajittelu
+  if(opts.defaultSort){
+    sortTable(tableId, opts.defaultSort.col, opts.defaultSort.dir === 'asc');
+  }
+
+  // Sarake-toggle
+  if(opts.toggles) buildColumnToggles(tableId);
+}
+
 
 // --- Saraketooglet ---
 function buildColumnToggles(tableId){
@@ -713,54 +690,70 @@ def compute_team_summary(con, division_id: int, team_id: str):
     }
 
 def compute_player_table(con, division_id: int, team_id: str):
-    # Selvitään dynaamiset kolumnit kuten ennen (HAS_PISTOL, HAS_FLASH ...)
     HAS_PISTOL = has_column(con, "player_stats", "pistol_kills")
-    HAS_FLASH  = has_column(con, "player_stats", "enemies_flashed") and has_column(con, "player_stats", "flash_count")
+    HAS_FLASH  = (has_column(con, "player_stats", "enemies_flashed")
+                  and has_column(con, "player_stats", "flash_count"))
+    HAS_FLASH_SUCC = has_column(con, "player_stats", "flash_successes")
+    HAS_MVPS  = has_column(con, "player_stats", "mvps")
 
-    rows = q(con, f"""
-    SELECT
-      ps.player_id AS player_id,
-      COALESCE(pl.nickname, MAX(ps.nickname)) AS nickname_display, -- uusin nimi players-taulusta, fallbackina vanhin/viimeisin ps.nickname
-      COUNT(*) AS maps_played,
+    select_cols = [
+        "ps.player_id AS player_id",
+        "COALESCE(pl.nickname, MAX(ps.nickname)) AS nickname_display",
+        "COUNT(*) AS maps_played",
 
-      SUM(ps.kills)  AS k,
-      SUM(ps.deaths) AS d,
-      SUM(ps.assists) AS a,
+        "SUM(ps.kills) AS k",
+        "SUM(ps.deaths) AS d",
+        "SUM(ps.assists) AS a",
 
-      AVG(ps.adr) AS adr,
-      AVG(ps.kr)  AS kr,
-      AVG(ps.hs_pct) AS hs_pct,
+        "AVG(ps.adr) AS adr",
+        "AVG(ps.kr) AS kr",
+        "AVG(ps.hs_pct) AS hs_pct",
 
-      SUM(ps.sniper_kills) AS awp_kills,
-      SUM(ps.mk_3k) AS k3, SUM(ps.mk_4k) AS k4, SUM(ps.mk_5k) AS k5,
-      SUM(ps.utility_damage) AS util,
+        "SUM(ps.sniper_kills) AS awp_kills",
+        "SUM(ps.mk_3k) AS k3",
+        "SUM(ps.mk_4k) AS k4",
+        "SUM(ps.mk_5k) AS k5",
+        "SUM(ps.utility_damage) AS util",
+    ]
+    if HAS_MVPS:
+        select_cols.append("SUM(ps.mvps) AS mvps")
+    if HAS_FLASH:
+        select_cols += [
+            "SUM(ps.enemies_flashed) AS flashed",
+            "SUM(ps.flash_count) AS flash_count",
+        ]
+    if HAS_FLASH_SUCC:
+        select_cols.append("SUM(ps.flash_successes) AS flash_successes")
 
-      -- kierrokset per map (maps-taulusta)
-      SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds,
+    # kierrokset + clutch/entry
+    select_cols += [
+        "SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds",
+        "SUM(COALESCE(ps.clutch_kills,0))    AS clutch_kills",
+        "SUM(COALESCE(ps.cl_1v1_attempts,0)) AS c11_att",
+        "SUM(COALESCE(ps.cl_1v1_wins,0))     AS c11_win",
+        "SUM(COALESCE(ps.cl_1v2_attempts,0)) AS c12_att",
+        "SUM(COALESCE(ps.cl_1v2_wins,0))     AS c12_win",
+        "SUM(COALESCE(ps.entry_count,0))     AS entry_att",
+        "SUM(COALESCE(ps.entry_wins,0))      AS entry_win",
+    ]
+    if HAS_PISTOL:
+        select_cols.append("SUM(ps.pistol_kills) AS pistol_kills")
 
-      -- clutchit (jos sarakkeet ovat kannassa)
-      SUM(COALESCE(ps.clutch_kills,0))      AS clutch_kills,
-      SUM(COALESCE(ps.cl_1v1_attempts,0))   AS c11_att,
-      SUM(COALESCE(ps.cl_1v1_wins,0))       AS c11_win,
-      SUM(COALESCE(ps.cl_1v2_attempts,0))   AS c12_att,
-      SUM(COALESCE(ps.cl_1v2_wins,0))       AS c12_win,
-      SUM(COALESCE(ps.entry_count,0))       AS entry_att,
-      SUM(COALESCE(ps.entry_wins,0))        AS entry_win
-
-      {", SUM(ps.pistol_kills) AS pistol_kills" if HAS_PISTOL else ""}
-      {", SUM(ps.enemies_flashed) AS flashed, SUM(ps.flash_count) AS flash_count" if HAS_FLASH else ""}
-
-    FROM player_stats ps
-    JOIN matches m
-      ON m.match_id = ps.match_id
-    JOIN maps mp
-      ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-    LEFT JOIN players pl
-      ON pl.player_id = ps.player_id
-    WHERE m.division_id = ? AND ps.team_id = ?
-    GROUP BY ps.player_id
-    ORDER BY k DESC
-    """, (division_id, team_id))
+    sql = f"""
+      SELECT
+        {", ".join(select_cols)}
+      FROM player_stats ps
+      JOIN matches m
+        ON m.match_id = ps.match_id
+      JOIN maps mp
+        ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+      LEFT JOIN players pl
+        ON pl.player_id = ps.player_id
+      WHERE m.division_id = ? AND ps.team_id = ?
+      GROUP BY ps.player_id
+      ORDER BY k DESC
+    """
+    rows = q(con, sql, (division_id, team_id))
 
 
     table = []
@@ -778,16 +771,17 @@ def compute_player_table(con, division_id: int, team_id: str):
             "nickname": r["nickname_display"],           # näytetään aina uusin nimi
             "maps_played": maps_played,
             "rounds": rounds,
-            "rpm": rpm,                                   # <--- UUSI: rounds per map
+            "rpm": rpm,
             "kd": kd,
             "adr": r["adr"] or 0.0,
             "kr": r["kr"] or 0.0,
 
             # kokonaismäärät erikseen, jotta HTML voi näyttää ne yksittäisinä sarakkeina
-            "kill": k,                                    # <--- UUSI
-            "death": d,                                   # <--- UUSI
-            "assist": a,                                  # <--- UUSI
+            "kill": k,
+            "death": d,
+            "assist": a,
             "kda": f"{k}/{d}/{a}",
+            "mvps": r.get("mvps", 0) or 0,
 
             "hs_pct": r["hs_pct"] or 0.0,
             "awp_kills": r["awp_kills"] or 0,
@@ -809,9 +803,10 @@ def compute_player_table(con, division_id: int, team_id: str):
         # Valinnaiset sarakkeet jos kannassa on
         if "pistol_kills" in r.keys():
             row["pistol_kills"] = r["pistol_kills"] or 0
-        if "flashed" in r.keys() and "flash_count" in r.keys():
-            row["flashed"] = r["flashed"] or 0
-            row["flash_count"] = r["flash_count"] or 0
+        if "flashed" in r.keys():        row["flashed"] = r["flashed"] or 0
+        if "flash_count" in r.keys():    row["flash_count"] = r["flash_count"] or 0
+        if "flash_successes" in r.keys():row["flash_successes"] = r["flash_successes"] or 0
+
 
         table.append(row)
 
@@ -1143,7 +1138,7 @@ def render_division(con, div):
           <th onclick="sortTable('{tid_basic}',11,true)">3K</th>
           <th onclick="sortTable('{tid_basic}',12,true)">4K</th>
           <th onclick="sortTable('{tid_basic}',13,true)">5K</th>
-          <th onclick="sortTable('{tid_basic}',14,true)">Util dmg</th>
+          <th onclick="sortTable('{tid_basic}',14,true)">MVPs</th>
         </tr></thead><tbody>""")
         for p in players:
             html.append(f"""<tr>
@@ -1161,17 +1156,22 @@ def render_division(con, div):
               <td>{p["k3"]}</td>
               <td>{p["k4"]}</td>
               <td>{p["k5"]}</td>
-              <td>{int(p["util"])}</td>
+              <td>{p["mvps"]}</td>
             </tr>""")
         html.append("</tbody></table>")
 
-        # 2,3,6 ovat %-mittareita → näille pysyy 0..100 (voivat käyttää jatkuvaa yhtä lailla)
         html.append(f"""
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('{tid_basic}', 3, {thresholds['kd'][0]:.4f},  {thresholds['kd'][1]:.4f},  {thresholds['kd'][2]:.4f},  false);
-          colorizeContinuous('{tid_basic}', 4, {thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, {thresholds['adr'][2]:.4f}, false);
-          colorizeContinuous('{tid_basic}', 5, {thresholds['kr'][0]:.4f},  {thresholds['kr'][1]:.4f},  {thresholds['kr'][2]:.4f},  false);
+        postProcessTable('{tid_basic}', {{
+          // ei barreja basicissa
+          color: [
+            {{col:3, p:[{thresholds['kd'][0]:.4f}, {thresholds['kd'][1]:.4f}, {thresholds['kd'][2]:.4f}]}},
+            {{col:4, p:[{thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, {thresholds['adr'][2]:.4f}]}},
+            {{col:5, p:[{thresholds['kr'][0]:.4f}, {thresholds['kr'][1]:.4f}, {thresholds['kr'][2]:.4f}]}}
+          ],
+          defaultSort: {{col:0, dir:'asc'}},
+          toggles: true
+        }});
         </script>
         """)
 
@@ -1181,28 +1181,33 @@ def render_division(con, div):
         # ---------- ADVANCED ----------
         tid_adv = f"players-adv-{ti}"
         html.append(f'<div class="tab-panel" data-tab="advanced">')
-        html.append(f'<table id="{tid_adv}" data-sort-col="7" data-sort-dir="desc">')  # oletus: UDPR
+        html.append(f'<table id="{tid_adv}" data-sort-col="7" data-sort-dir="desc">')
         html.append("<thead><tr>")
         html.append(f"<th onclick=\"sortTable('{tid_adv}',0,false)\">Nickname</th>")
         html.append(f"<th onclick=\"sortTable('{tid_adv}',1,true)\" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>")
         html.append(f"<th onclick=\"sortTable('{tid_adv}',2,true)\" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>")
         html.append(f"<th onclick=\"sortTable('{tid_adv}',3,true)\" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>")
-
-        # Entry stats
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',4,true)\" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>")
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',5,true)\" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',4,true)\" title='Entry attempts'>Entry Att</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',5,true)\" title='Entry wins'>Entry Win</th>")
         html.append(f"<th onclick=\"sortTable('{tid_adv}',6,true)\" title='Entry win rate'>Entry WR%</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',7,true)\" title='Utility damage (total)'>Util dmg</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',8,true)\" title='Utility damage per round'>UDPR</th>")
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',9,true)\" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>")
 
-        # Utility-derivaatit
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',7,true)\" title='Utility damage per round'>UDPR</th>")
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',8,true)\" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>")
-
-        col_idx = 9
+        col_idx = 10
         if has_flash:
-            html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Enemies Flashed / Flash Count'>Enem/Flash</th>")
-            col_idx += 1
+            html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\"title='Total flashes thorown'>Flash Cnt</th>"); col_idx += 1
+            html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\"title='Enemies flashed'>Flashed</th>");   col_idx += 1
+            if any('flash_successes' in p for p in players):
+                html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\"title='How many flashes at least hit one enemy'>Flash Succ</th>"); col_idx += 1
+            html.append(
+                f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" "
+                f"title='Enemies Flashed / Flash Count'>Enem/Flash</th>"
+            ); col_idx += 1
+
         if has_pistol:
-            html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\">Pistol K</th>")
+            html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\">Pistol K</th>"); col_idx += 1
+
         html.append("</tr></thead><tbody>")
 
         for p in players:
@@ -1211,37 +1216,45 @@ def render_division(con, div):
           html.append(f"<td>{p['clutch_kills']}</td>")
           html.append(f"<td data-sort=\"{p['c11_wr']:.1f}\" title=\"Attempts: {p['c11_att']}, Wins: {p['c11_win']}\">{p['c11_wr']:.0f}% ({p['c11_att']})</td>")
           html.append(f"<td data-sort=\"{p['c12_wr']:.1f}\" title=\"Attempts: {p['c12_att']}, Wins: {p['c12_win']}\">{p['c12_wr']:.0f}% ({p['c12_att']})</td>")
-
-          # Entryt
           html.append(f"<td>{p['entry_att']}</td>")
           html.append(f"<td>{p['entry_win']}</td>")
           html.append(f"<td>{p['entry_wr']:.0f}</td>")
 
-          # Utility-derivaatit
+          # Utility: total + per round + impact
+          html.append(f"<td>{int(p['util'])}</td>")
           html.append(f"<td>{p['udpr']:.2f}</td>")
           html.append(f"<td>{p['impact']:.2f}</td>")
 
+          # Flash-sarakkeet (jos dataa)
           if has_flash:
+              html.append(f"<td>{p.get('flash_count',0)}</td>")
+              html.append(f"<td>{p.get('flashed',0)}</td>")
+              if any('flash_successes' in pp for pp in players):
+                  html.append(f"<td>{p.get('flash_successes',0)}</td>")
               val = p['enemies_per_flash'] if p['enemies_per_flash'] is not None else 0.0
               html.append(f"<td>{val:.2f}</td>")
+
           if has_pistol:
-              val = p.get('pistol_kills', 0) or 0
-              html.append(f"<td>{val}</td>")
+              html.append(f"<td>{p.get('pistol_kills',0)}</td>")
           html.append("</tr>")
 
         html.append("</tbody></table>")
 
-        # Advanced-taulukon dynaamiset väritykset
-        # 2 = 1v1 WR, 3 = 1v2 WR, 6 = Entry WR%  -> jätetään edelleen 0..100
-        html.append(f"<script>colorizeRange('{tid_adv}', 2, 0, 100, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_adv}', 3, 0, 100, false);</script>")
-        html.append(f"<script>colorizeRange('{tid_adv}', 6, 0, 100, false);</script>")
-        # 7 = UDPR, 8 = Impact → divisioonan mukaan (lo,mid,hi)
-        html.append(f"<script>colorizeContinuous('{tid_adv}', 7, {thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, {thresholds['udpr'][2]:.4f}, false);</script>")
-        html.append(f"<script>colorizeContinuous('{tid_adv}', 8, {thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, {thresholds['impact'][2]:.4f}, false);</script>")
-
         html.append(f"<script>applyDefaultSort('{tid_adv}');</script>")
         html.append("</div>")  # /tab-panel advanced
+
+        html.append(f"""
+        <script>
+        postProcessTable('{tid_adv}', {{
+          color: [
+            {{col:8, p:[{thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, {thresholds['udpr'][2]:.4f}]}},
+            {{col:9, p:[{thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, {thresholds['impact'][2]:.4f}]}}
+          ],
+          defaultSort: {{col:0, dir:'asc'}},
+          toggles: true
+        }});
+        </script>
+        """)
 
         # Map stats
         maps = compute_map_stats_table(con, div["division_id"], team_id)
@@ -1323,44 +1336,21 @@ def render_division(con, div):
             </tr>""")
         html.append("</tbody></table>")
 
-        # WR-bars + väritys + oletussorttaus + työkalut
-        html.append("""
+        html.append(f"""
         <script>
-        (function(){
-          const t = document.getElementById('{TID}');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('{TID}', 7, {KD_LO},  {KD_MD},  {KD_HI},  false);
-          colorizeContinuous('{TID}', 8, {ADR_LO}, {ADR_MD}, {ADR_HI}, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('{TID}', 9, -15, 15, false);
-
-          applyDefaultSort('{TID}');
-          bindPlayedOnly('{TID}', '{TID}-played-only');
-          buildColumnToggles('{TID}');
-        })();
+        postProcessTable('{tid2}', {{
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {{col:7, p:[{thresholds['kd'][0]:.4f}, {thresholds['kd'][1]:.4f}, {thresholds['kd'][2]:.4f}]}},   // KD
+            {{col:8, p:[{thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, {thresholds['adr'][2]:.4f}]}} // ADR
+          ],
+          defaultSort: {{col:1, dir:'desc'}}, // Played
+          toggles: true
+        }});
+        bindPlayedOnly('{tid2}', '{tid2}-played-only');
         </script>
-        """.replace("{TID}", tid2)
-          .replace("{KD_LO}",  f"{thresholds['kd'][0]:.4f}")
-          .replace("{KD_MD}",  f"{thresholds['kd'][1]:.4f}")
-          .replace("{KD_HI}",  f"{thresholds['kd'][2]:.4f}")
-          .replace("{ADR_LO}", f"{thresholds['adr'][0]:.4f}")
-          .replace("{ADR_MD}", f"{thresholds['adr'][1]:.4f}")
-          .replace("{ADR_HI}", f"{thresholds['adr'][2]:.4f}")
-        )
+        """)
+
 
 
         html.append("</details>")  # team section

@@ -144,7 +144,6 @@ def aggregate_team_stats_from_players(players: List[Dict[str, Any]], team_id: st
         assists = safe_int(ps.get("Assists", 0))
         mvps = safe_int(ps.get("MVPs", 0))
         sniper_kills = safe_int(ps.get("Sniper Kills", 0)) or safe_int(ps.get("AWP Kills", 0))
-        flash_assists = safe_int(ps.get("Flash Assists", 0))
 
         # Utility
         util = safe_int(ps.get("Utility Damage", 0))
@@ -167,7 +166,6 @@ def aggregate_team_stats_from_players(players: List[Dict[str, Any]], team_id: st
         agg["mvps"] += mvps
         agg["sniper_kills"] += sniper_kills
         agg["utility_damage"] += util
-        agg["flash_assists"] += flash_assists
         agg["mk_2k"] += mk2
         agg["mk_3k"] += mk3
         agg["mk_4k"] += mk4
@@ -203,7 +201,6 @@ def aggregate_team_stats_from_players(players: List[Dict[str, Any]], team_id: st
         "mvps": agg["mvps"],
         "sniper_kills": agg["sniper_kills"],
         "utility_damage": agg["utility_damage"],
-        "flash_assists": agg["flash_assists"],
         "entry_count": agg["entry_count"],
         "entry_wins": agg["entry_wins"],
         "mk_2k": agg["mk_2k"],
@@ -226,7 +223,6 @@ def extract_player_row(con, match_id: str, round_index: int, pl: Dict[str, Any],
     mvps = safe_int(ps.get("MVPs", 0))
     sniper_kills = safe_int(ps.get("Sniper Kills", 0)) or safe_int(ps.get("AWP Kills", 0))
     util = safe_int(ps.get("Utility Damage", 0))
-    flash_assists = safe_int(ps.get("Flash Assists", 0))
     mk3 = safe_int(ps.get("Triple Kills", 0))
     mk4 = safe_int(ps.get("Quadro Kills", 0)) or safe_int(ps.get("Quadra Kills", 0))
     mk5 = safe_int(ps.get("Penta Kills", 0)) or safe_int(ps.get("ACE", 0))
@@ -239,7 +235,10 @@ def extract_player_row(con, match_id: str, round_index: int, pl: Dict[str, Any],
     # --- Entryt ---
     entry_count = safe_int(ps.get("Entry Count", 0))
     entry_wins  = safe_int(ps.get("Entry Wins", 0))
-
+    # flash-metrikat
+    enemies_flashed = safe_int(ps.get("Enemies Flashed", 0))
+    flash_count     = safe_int(ps.get("Flash Count", 0))
+    flash_successes = safe_int(ps.get("Flash Successes", 0))
 
     upsert_player_identity(con, player_id, nickname)
 
@@ -253,13 +252,16 @@ def extract_player_row(con, match_id: str, round_index: int, pl: Dict[str, Any],
         "team_name": team_name,
         "kills": kills, "deaths": deaths, "assists": assists,
         "kd": kd_val, "kr": kr, "adr": adr, "hs_pct": hs_pct,
-        "mvps": mvps, "sniper_kills": sniper_kills, "utility_damage": util, "flash_assists": flash_assists,
+        "mvps": mvps, "sniper_kills": sniper_kills, "utility_damage": util,
         "mk_3k": mk3, "mk_4k": mk4, "mk_5k": mk5,
         "clutch_kills": clutch_kills,
         "cl_1v1_attempts": c11_attempts, "cl_1v1_wins": c11_wins,
         "cl_1v2_attempts": c12_attempts, "cl_1v2_wins": c12_wins,
         "entry_count": entry_count,
         "entry_wins":  entry_wins,
+        "enemies_flashed": enemies_flashed,
+        "flash_count": flash_count,
+        "flash_successes": flash_successes,
     }
 
 def sync_division(con, div):

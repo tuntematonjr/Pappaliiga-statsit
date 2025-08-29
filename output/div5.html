@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>5 Divisioona S11 - generoitu 2025-08-30 00:26</title>
+<title>5 Divisioona S11 - generoitu 2025-08-30 01:31</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -204,50 +204,6 @@ function renderBar(cell, value){
   span.style.background = `rgb(${r}, ${g+80}, 100)`;
 }
 
-// --- Väriskaalat ---
-/**
- * Väritä vain, jos arvo on dynaamisen [lo,hi]-alueen ulkopuolella.
- * bufferRatio kasvattaa neutraalia vyöhykettä lo/hi ympärille (0..0.5).
- * Esim. 0.10 = jätetään 10 % lo..hi alueen leveydestä molemmin puolin täysin neutraaliksi.
- */
-function colorizeRange(tableId, colIdx, lo, hi, inverse=false, bufferRatio=0.10){
-  const t = document.getElementById(tableId);
-  if(!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-
-  // varmistetaan järjestys
-  let minv = Math.min(lo, hi), maxv = Math.max(lo, hi);
-  // neutraalin alueen kasvatus
-  const span = maxv - minv || 1;
-  const innerLo = minv + span * bufferRatio;
-  const innerHi = maxv - span * bufferRatio;
-
-  for(const tr of rows){
-    const td = tr.cells[colIdx];
-    let raw = (td.textContent || td.innerText || '').trim().replace(',', '.');
-    let v = parseFloat(raw);
-    if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
-
-    // Inverssiä tarvitaan harvoin (pienempi parempi), mutta pidetään mukana
-    if(inverse){
-      if(v < innerLo) { td.classList.add('cell-grad','good'); }
-      else if(v > innerHi) { td.classList.add('cell-grad','bad'); }
-      // muuten ei väriä
-    }else{
-      if(v < innerLo) { td.classList.add('cell-grad','bad'); }
-      else if(v > innerHi) { td.classList.add('cell-grad','good'); }
-      // muuten ei väriä
-    }
-  }
-}
-function colorizeAuto(tableId, colIdx, inverse=false){
-  const t = document.getElementById(tableId); if(!t) return;
-  const vals = [...t.tBodies[0].rows].map(tr => parseFloat((tr.cells[colIdx].textContent||'').replace(',','.'))).filter(v=>isFinite(v));
-  if(!vals.length) return;
-  const min = Math.min(...vals), max = Math.max(...vals);
-  colorizeRange(tableId, colIdx, min, max, inverse);
-}
-
 // --- Played only ---
 function bindPlayedOnly(tableId, chkId){
   const chk = document.getElementById(chkId);
@@ -269,45 +225,66 @@ function bindPlayedOnly(tableId, chkId){
  * - inverse=true: toisin päin
  * Väri: HSL-hue 0..120 (punainen→vihreä), alpha kasvaa kun etäännytään medianista.
  */
-function colorizeContinuous(tableId, colIdx, lo, mid, hi, inverse=false){
+function colorizeContinuous(tableId, colIdx, p25, p50, p75, inverse=false){
   const t = document.getElementById(tableId);
   if(!t || !t.tBodies.length) return;
   const rows = t.tBodies[0].rows;
-
-  // turvakaistat
-  if(lo > hi){ const tmp=lo; lo=hi; hi=tmp; }
-  if(mid < lo) mid = lo;
-  if(mid > hi) mid = hi;
-
-  const spanL = Math.max(mid - lo, 1e-9);
-  const spanR = Math.max(hi - mid, 1e-9);
 
   for(const tr of rows){
     const td = tr.cells[colIdx];
     let v = parseFloat((td.textContent||'').replace(',', '.'));
     if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
 
-    // normi 0..1 kriittisen alueen ympärillä: 0.5 = mediaani
-    let n;
-    if(v <= mid){
-      n = 0.5 * Math.max(0, Math.min(1, (v - lo) / spanL));
-    } else {
-      n = 0.5 + 0.5 * Math.max(0, Math.min(1, (v - mid) / spanR));
-    }
+    // Skaalaus p25..p75: alle p25 punertava, yli p75 vihertävä
+    let ratio;
+    if (v <= p25) ratio = 0;
+    else if (v >= p75) ratio = 1;
+    else ratio = (v - p25) / (p75 - p25 || 1);
 
-    // etäisyys medi­aanista → alpha
-    const dist = Math.abs(n - 0.5) * 2;       // 0..1
-    const alpha = Math.pow(dist, 0.9) * 0.5;  // pehmeämpi käyrä, maksimi ~0.5
+    if (inverse) ratio = 1 - ratio;
 
-    // väri: punainen (0) → vihreä (120)
-    let hue = 120 * (n); // 0=pun, 0.5=~keltainen, 1=vihreä
-    if(inverse) hue = 120 - hue;
-
-    // tausta kevyenä liukuna vasemmalta → läpinäkyvään
-    td.style.backgroundImage = `linear-gradient(90deg, hsla(${hue}, 70%, 40%, ${alpha}), transparent)`;
-    td.style.backgroundColor = ''; // varmuuden vuoksi, ettei jää vanhaa väriä
+    // Punaisesta vihreään
+    const r = Math.round(220 * (1 - ratio));
+    const g = Math.round(220 * ratio);
+    const b = 0;
+    td.style.background = `rgba(${r},${g},${b},0.25)`;
   }
 }
+
+function postProcessTable(tableId, opts){
+  const t = document.getElementById(tableId);
+  if(!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+
+  // Progress bar -sarakkeet (esim. WR%)
+  if(opts.bars){
+    for(const tr of rows){
+      const played = parseInt(tr.cells[1].textContent||'0',10); // kolumni 1 = Played
+      opts.bars.forEach(i => {
+        const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+        renderBar(tr.cells[i], isFinite(num) ? num : 0);
+        const span = tr.cells[i].querySelector('.bar > span');
+        if(span) span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      });
+    }
+  }
+
+  // Väritykset p25-p50-p75
+  if(opts.color){
+    opts.color.forEach(c => {
+      colorizeContinuous(tableId, c.col, c.p[0], c.p[1], c.p[2], c.inverse||false);
+    });
+  }
+
+  // Oletuslajittelu
+  if(opts.defaultSort){
+    sortTable(tableId, opts.defaultSort.col, opts.defaultSort.dir === 'asc');
+  }
+
+  // Sarake-toggle
+  if(opts.toggles) buildColumnToggles(tableId);
+}
+
 
 // --- Saraketooglet ---
 function buildColumnToggles(tableId){
@@ -374,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <body>
 
 <div class="page">
-<h1>5 Divisioona S11 <span class='muted'>(generoitu 2025-08-30 00:26)</span></h1>
+<h1>5 Divisioona S11 <span class='muted'>(generoitu 2025-08-30 01:31)</span></h1>
 <div class="nav">
 </div>
 <div class="div-summary">

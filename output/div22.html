@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>22 Divisioona S11 - generoitu 2025-08-30 00:26</title>
+<title>22 Divisioona S11 - generoitu 2025-08-30 01:31</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -204,50 +204,6 @@ function renderBar(cell, value){
   span.style.background = `rgb(${r}, ${g+80}, 100)`;
 }
 
-// --- Väriskaalat ---
-/**
- * Väritä vain, jos arvo on dynaamisen [lo,hi]-alueen ulkopuolella.
- * bufferRatio kasvattaa neutraalia vyöhykettä lo/hi ympärille (0..0.5).
- * Esim. 0.10 = jätetään 10 % lo..hi alueen leveydestä molemmin puolin täysin neutraaliksi.
- */
-function colorizeRange(tableId, colIdx, lo, hi, inverse=false, bufferRatio=0.10){
-  const t = document.getElementById(tableId);
-  if(!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-
-  // varmistetaan järjestys
-  let minv = Math.min(lo, hi), maxv = Math.max(lo, hi);
-  // neutraalin alueen kasvatus
-  const span = maxv - minv || 1;
-  const innerLo = minv + span * bufferRatio;
-  const innerHi = maxv - span * bufferRatio;
-
-  for(const tr of rows){
-    const td = tr.cells[colIdx];
-    let raw = (td.textContent || td.innerText || '').trim().replace(',', '.');
-    let v = parseFloat(raw);
-    if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
-
-    // Inverssiä tarvitaan harvoin (pienempi parempi), mutta pidetään mukana
-    if(inverse){
-      if(v < innerLo) { td.classList.add('cell-grad','good'); }
-      else if(v > innerHi) { td.classList.add('cell-grad','bad'); }
-      // muuten ei väriä
-    }else{
-      if(v < innerLo) { td.classList.add('cell-grad','bad'); }
-      else if(v > innerHi) { td.classList.add('cell-grad','good'); }
-      // muuten ei väriä
-    }
-  }
-}
-function colorizeAuto(tableId, colIdx, inverse=false){
-  const t = document.getElementById(tableId); if(!t) return;
-  const vals = [...t.tBodies[0].rows].map(tr => parseFloat((tr.cells[colIdx].textContent||'').replace(',','.'))).filter(v=>isFinite(v));
-  if(!vals.length) return;
-  const min = Math.min(...vals), max = Math.max(...vals);
-  colorizeRange(tableId, colIdx, min, max, inverse);
-}
-
 // --- Played only ---
 function bindPlayedOnly(tableId, chkId){
   const chk = document.getElementById(chkId);
@@ -269,45 +225,66 @@ function bindPlayedOnly(tableId, chkId){
  * - inverse=true: toisin päin
  * Väri: HSL-hue 0..120 (punainen→vihreä), alpha kasvaa kun etäännytään medianista.
  */
-function colorizeContinuous(tableId, colIdx, lo, mid, hi, inverse=false){
+function colorizeContinuous(tableId, colIdx, p25, p50, p75, inverse=false){
   const t = document.getElementById(tableId);
   if(!t || !t.tBodies.length) return;
   const rows = t.tBodies[0].rows;
-
-  // turvakaistat
-  if(lo > hi){ const tmp=lo; lo=hi; hi=tmp; }
-  if(mid < lo) mid = lo;
-  if(mid > hi) mid = hi;
-
-  const spanL = Math.max(mid - lo, 1e-9);
-  const spanR = Math.max(hi - mid, 1e-9);
 
   for(const tr of rows){
     const td = tr.cells[colIdx];
     let v = parseFloat((td.textContent||'').replace(',', '.'));
     if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
 
-    // normi 0..1 kriittisen alueen ympärillä: 0.5 = mediaani
-    let n;
-    if(v <= mid){
-      n = 0.5 * Math.max(0, Math.min(1, (v - lo) / spanL));
-    } else {
-      n = 0.5 + 0.5 * Math.max(0, Math.min(1, (v - mid) / spanR));
-    }
+    // Skaalaus p25..p75: alle p25 punertava, yli p75 vihertävä
+    let ratio;
+    if (v <= p25) ratio = 0;
+    else if (v >= p75) ratio = 1;
+    else ratio = (v - p25) / (p75 - p25 || 1);
 
-    // etäisyys medi­aanista → alpha
-    const dist = Math.abs(n - 0.5) * 2;       // 0..1
-    const alpha = Math.pow(dist, 0.9) * 0.5;  // pehmeämpi käyrä, maksimi ~0.5
+    if (inverse) ratio = 1 - ratio;
 
-    // väri: punainen (0) → vihreä (120)
-    let hue = 120 * (n); // 0=pun, 0.5=~keltainen, 1=vihreä
-    if(inverse) hue = 120 - hue;
-
-    // tausta kevyenä liukuna vasemmalta → läpinäkyvään
-    td.style.backgroundImage = `linear-gradient(90deg, hsla(${hue}, 70%, 40%, ${alpha}), transparent)`;
-    td.style.backgroundColor = ''; // varmuuden vuoksi, ettei jää vanhaa väriä
+    // Punaisesta vihreään
+    const r = Math.round(220 * (1 - ratio));
+    const g = Math.round(220 * ratio);
+    const b = 0;
+    td.style.background = `rgba(${r},${g},${b},0.25)`;
   }
 }
+
+function postProcessTable(tableId, opts){
+  const t = document.getElementById(tableId);
+  if(!t || !t.tBodies.length) return;
+  const rows = t.tBodies[0].rows;
+
+  // Progress bar -sarakkeet (esim. WR%)
+  if(opts.bars){
+    for(const tr of rows){
+      const played = parseInt(tr.cells[1].textContent||'0',10); // kolumni 1 = Played
+      opts.bars.forEach(i => {
+        const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
+        renderBar(tr.cells[i], isFinite(num) ? num : 0);
+        const span = tr.cells[i].querySelector('.bar > span');
+        if(span) span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      });
+    }
+  }
+
+  // Väritykset p25-p50-p75
+  if(opts.color){
+    opts.color.forEach(c => {
+      colorizeContinuous(tableId, c.col, c.p[0], c.p[1], c.p[2], c.inverse||false);
+    });
+  }
+
+  // Oletuslajittelu
+  if(opts.defaultSort){
+    sortTable(tableId, opts.defaultSort.col, opts.defaultSort.dir === 'asc');
+  }
+
+  // Sarake-toggle
+  if(opts.toggles) buildColumnToggles(tableId);
+}
+
 
 // --- Saraketooglet ---
 function buildColumnToggles(tableId){
@@ -374,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <body>
 
 <div class="page">
-<h1>22 Divisioona S11 <span class='muted'>(generoitu 2025-08-30 00:26)</span></h1>
+<h1>22 Divisioona S11 <span class='muted'>(generoitu 2025-08-30 01:31)</span></h1>
 <div class="nav">
 <a href="#team-a40a6d87-ef57-45e2-818c-08c6f70f7e3b"><img class="logo" src="https://distribution.faceit-cdn.net/images/86877be5-d8db-4d56-aa69-8cde0304d5e0.jpeg" alt="">Bonfire</a>
 <a href="#team-553aa80a-6a5d-4167-88cf-f08316d0c623"><img class="logo" src="https://distribution.faceit-cdn.net/images/dffa18df-c335-4daa-9146-f56e52fae828.jpeg" alt="">Casetti Levis</a>
@@ -442,7 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-1',11,true)">3K</th>
           <th onclick="sortTable('players-basic-1',12,true)">4K</th>
           <th onclick="sortTable('players-basic-1',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-1',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-1',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>Go5h</td>
@@ -459,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>8</td>
               <td>1</td>
               <td>1</td>
-              <td>1139</td>
+              <td>15</td>
             </tr>
 <tr>
               <td>DeviLz-</td>
@@ -476,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>0</td>
               <td>0</td>
-              <td>503</td>
+              <td>12</td>
             </tr>
 <tr>
               <td>G41U5</td>
@@ -493,7 +470,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>1008</td>
+              <td>8</td>
             </tr>
 <tr>
               <td>Markkoolio</td>
@@ -510,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>0</td>
-              <td>385</td>
+              <td>8</td>
             </tr>
 <tr>
               <td>R0NSKI</td>
@@ -527,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>753</td>
+              <td>7</td>
             </tr>
 <tr>
               <td>Ryitt</td>
@@ -544,7 +521,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>0</td>
-              <td>315</td>
+              <td>4</td>
             </tr>
 <tr>
               <td>HKTontto</td>
@@ -561,7 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>250</td>
+              <td>3</td>
             </tr>
 <tr>
               <td>Lemonmuffin</td>
@@ -578,15 +555,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>0</td>
-              <td>432</td>
+              <td>1</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-1', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-1', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-1', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-1', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-1');</script>
@@ -598,11 +581,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-1',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-1',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-1',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-1',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-1',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-1',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-1',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-1',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-1',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-1',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-1',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-1',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-1',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-1',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-1',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-1',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-1',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>Go5h</td>
@@ -612,8 +600,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>22</td>
 <td>13</td>
 <td>59</td>
+<td>1139</td>
 <td>8.50</td>
 <td>1.57</td>
+<td>74</td>
+<td>55</td>
+<td>37</td>
+<td>0.74</td>
 </tr>
 <tr>
 <td>DeviLz-</td>
@@ -623,8 +616,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>26</td>
 <td>18</td>
 <td>69</td>
+<td>503</td>
 <td>5.08</td>
 <td>1.42</td>
+<td>35</td>
+<td>30</td>
+<td>16</td>
+<td>0.86</td>
 </tr>
 <tr>
 <td>G41U5</td>
@@ -634,8 +632,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>22</td>
 <td>9</td>
 <td>41</td>
+<td>1008</td>
 <td>7.52</td>
 <td>0.82</td>
+<td>76</td>
+<td>52</td>
+<td>38</td>
+<td>0.68</td>
 </tr>
 <tr>
 <td>Markkoolio</td>
@@ -645,8 +648,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>17</td>
 <td>8</td>
 <td>47</td>
+<td>385</td>
 <td>3.89</td>
 <td>1.00</td>
+<td>25</td>
+<td>15</td>
+<td>8</td>
+<td>0.60</td>
 </tr>
 <tr>
 <td>R0NSKI</td>
@@ -656,8 +664,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>17</td>
 <td>2</td>
 <td>12</td>
+<td>753</td>
 <td>8.18</td>
 <td>0.95</td>
+<td>60</td>
+<td>47</td>
+<td>29</td>
+<td>0.78</td>
 </tr>
 <tr>
 <td>Ryitt</td>
@@ -667,8 +680,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>9</td>
 <td>4</td>
 <td>44</td>
+<td>315</td>
 <td>9.00</td>
 <td>1.32</td>
+<td>5</td>
+<td>3</td>
+<td>3</td>
+<td>0.60</td>
 </tr>
 <tr>
 <td>HKTontto</td>
@@ -678,8 +696,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>7</td>
 <td>5</td>
 <td>71</td>
+<td>250</td>
 <td>5.95</td>
 <td>1.13</td>
+<td>5</td>
+<td>12</td>
+<td>5</td>
+<td>2.40</td>
 </tr>
 <tr>
 <td>Lemonmuffin</td>
@@ -689,17 +712,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>13</td>
 <td>3</td>
 <td>23</td>
+<td>432</td>
 <td>12.34</td>
 <td>0.96</td>
+<td>6</td>
+<td>6</td>
+<td>3</td>
+<td>1.00</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-1', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-1', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-1', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-1', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-1', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-1');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-1', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Train (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -850,32 +885,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-1');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-1', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-1', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-1', 9, -15, 15, false);
-
-          applyDefaultSort('maps-1');
-          bindPlayedOnly('maps-1', 'maps-1-played-only');
-          buildColumnToggles('maps-1');
-        })();
+        postProcessTable('maps-1', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-1', 'maps-1-played-only');
         </script>
         
 </details>
@@ -909,7 +928,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-2',11,true)">3K</th>
           <th onclick="sortTable('players-basic-2',12,true)">4K</th>
           <th onclick="sortTable('players-basic-2',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-2',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-2',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>Jabban</td>
@@ -926,7 +945,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>1</td>
               <td>0</td>
-              <td>244</td>
+              <td>3</td>
             </tr>
 <tr>
               <td>naukmam</td>
@@ -943,7 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>6</td>
               <td>0</td>
               <td>0</td>
-              <td>386</td>
+              <td>7</td>
             </tr>
 <tr>
               <td>Kytkis</td>
@@ -960,7 +979,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>0</td>
               <td>0</td>
-              <td>476</td>
+              <td>6</td>
             </tr>
 <tr>
               <td>armpe</td>
@@ -977,7 +996,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>67</td>
+              <td>2</td>
             </tr>
 <tr>
               <td>Hevarty</td>
@@ -994,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>1</td>
-              <td>97</td>
+              <td>2</td>
             </tr>
 <tr>
               <td>Hi6hl4nder</td>
@@ -1011,7 +1030,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>33</td>
+              <td>1</td>
             </tr>
 <tr>
               <td>KalakukkoM</td>
@@ -1028,7 +1047,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>120</td>
+              <td>0</td>
             </tr>
 <tr>
               <td>tiamarsu</td>
@@ -1045,15 +1064,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>29</td>
+              <td>0</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-2', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-2', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-2', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-2', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-2');</script>
@@ -1065,11 +1090,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-2',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-2',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-2',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-2',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-2',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-2',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-2',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-2',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-2',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-2',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-2',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-2',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-2',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-2',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-2',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-2',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-2',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>Jabban</td>
@@ -1079,8 +1109,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>12</td>
 <td>4</td>
 <td>33</td>
+<td>244</td>
 <td>3.25</td>
 <td>1.14</td>
+<td>6</td>
+<td>2</td>
+<td>1</td>
+<td>0.33</td>
 </tr>
 <tr>
 <td>naukmam</td>
@@ -1090,8 +1125,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>8</td>
 <td>4</td>
 <td>50</td>
+<td>386</td>
 <td>8.21</td>
 <td>1.96</td>
+<td>29</td>
+<td>20</td>
+<td>15</td>
+<td>0.69</td>
 </tr>
 <tr>
 <td>Kytkis</td>
@@ -1101,8 +1141,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>17</td>
 <td>6</td>
 <td>35</td>
+<td>476</td>
 <td>6.43</td>
 <td>0.90</td>
+<td>26</td>
+<td>22</td>
+<td>14</td>
+<td>0.85</td>
 </tr>
 <tr>
 <td>armpe</td>
@@ -1112,8 +1157,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>22</td>
 <td>6</td>
 <td>27</td>
+<td>67</td>
 <td>0.66</td>
 <td>0.45</td>
+<td>17</td>
+<td>18</td>
+<td>11</td>
+<td>1.06</td>
 </tr>
 <tr>
 <td>Hevarty</td>
@@ -1123,8 +1173,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>25</td>
 <td>7</td>
 <td>28</td>
+<td>97</td>
 <td>1.76</td>
 <td>0.74</td>
+<td>2</td>
+<td>1</td>
+<td>1</td>
+<td>0.50</td>
 </tr>
 <tr>
 <td>Hi6hl4nder</td>
@@ -1134,8 +1189,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>10</td>
 <td>1</td>
 <td>10</td>
+<td>33</td>
 <td>0.32</td>
 <td>-0.03</td>
+<td>7</td>
+<td>10</td>
+<td>6</td>
+<td>1.43</td>
 </tr>
 <tr>
 <td>KalakukkoM</td>
@@ -1145,8 +1205,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>5</td>
 <td>0</td>
 <td>0</td>
+<td>120</td>
 <td>4.44</td>
 <td>0.14</td>
+<td>6</td>
+<td>5</td>
+<td>4</td>
+<td>0.83</td>
 </tr>
 <tr>
 <td>tiamarsu</td>
@@ -1156,17 +1221,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>2</td>
 <td>0</td>
 <td>0</td>
+<td>29</td>
 <td>1.04</td>
 <td>-0.40</td>
+<td>7</td>
+<td>2</td>
+<td>2</td>
+<td>0.29</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-2', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-2', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-2', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-2', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-2', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-2');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-2', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Train (3×)</span>
 <span class="chip">Most picked: Inferno (2×)</span>
@@ -1316,32 +1393,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-2');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-2', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-2', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-2', 9, -15, 15, false);
-
-          applyDefaultSort('maps-2');
-          bindPlayedOnly('maps-2', 'maps-2-played-only');
-          buildColumnToggles('maps-2');
-        })();
+        postProcessTable('maps-2', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-2', 'maps-2-played-only');
         </script>
         
 </details>
@@ -1375,7 +1436,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-3',11,true)">3K</th>
           <th onclick="sortTable('players-basic-3',12,true)">4K</th>
           <th onclick="sortTable('players-basic-3',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-3',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-3',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>Kytky</td>
@@ -1392,7 +1453,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>8</td>
               <td>2</td>
               <td>0</td>
-              <td>266</td>
+              <td>17</td>
             </tr>
 <tr>
               <td>Ribbels</td>
@@ -1409,7 +1470,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>3</td>
               <td>1</td>
-              <td>1359</td>
+              <td>12</td>
             </tr>
 <tr>
               <td>keijoo7</td>
@@ -1426,7 +1487,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>6</td>
               <td>1</td>
               <td>0</td>
-              <td>687</td>
+              <td>12</td>
             </tr>
 <tr>
               <td>Jepari112</td>
@@ -1443,7 +1504,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>4</td>
               <td>0</td>
               <td>0</td>
-              <td>1049</td>
+              <td>6</td>
             </tr>
 <tr>
               <td>HunajaBalsam</td>
@@ -1460,15 +1521,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>195</td>
+              <td>4</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-3', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-3', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-3', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-3', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-3');</script>
@@ -1480,11 +1547,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-3',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-3',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-3',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-3',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-3',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-3',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-3',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-3',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-3',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-3',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-3',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-3',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-3',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-3',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-3',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-3',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-3',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>Kytky</td>
@@ -1494,8 +1566,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>26</td>
 <td>18</td>
 <td>69</td>
+<td>266</td>
 <td>2.05</td>
 <td>1.41</td>
+<td>118</td>
+<td>105</td>
+<td>67</td>
+<td>0.89</td>
 </tr>
 <tr>
 <td>Ribbels</td>
@@ -1505,8 +1582,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>28</td>
 <td>14</td>
 <td>50</td>
+<td>1359</td>
 <td>10.45</td>
 <td>1.14</td>
+<td>54</td>
+<td>52</td>
+<td>30</td>
+<td>0.96</td>
 </tr>
 <tr>
 <td>keijoo7</td>
@@ -1516,8 +1598,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>33</td>
 <td>12</td>
 <td>36</td>
+<td>687</td>
 <td>5.28</td>
 <td>0.96</td>
+<td>94</td>
+<td>77</td>
+<td>48</td>
+<td>0.82</td>
 </tr>
 <tr>
 <td>Jepari112</td>
@@ -1527,8 +1614,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>26</td>
 <td>13</td>
 <td>50</td>
+<td>1049</td>
 <td>8.07</td>
 <td>0.92</td>
+<td>77</td>
+<td>88</td>
+<td>46</td>
+<td>1.14</td>
 </tr>
 <tr>
 <td>HunajaBalsam</td>
@@ -1538,17 +1630,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>16</td>
 <td>6</td>
 <td>38</td>
+<td>195</td>
 <td>1.50</td>
 <td>0.25</td>
+<td>25</td>
+<td>16</td>
+<td>10</td>
+<td>0.64</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-3', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-3', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-3', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-3', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-3', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-3');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-3', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Mirage (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -1699,32 +1803,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-3');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-3', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-3', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-3', 9, -15, 15, false);
-
-          applyDefaultSort('maps-3');
-          bindPlayedOnly('maps-3', 'maps-3-played-only');
-          buildColumnToggles('maps-3');
-        })();
+        postProcessTable('maps-3', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-3', 'maps-3-played-only');
         </script>
         
 </details>
@@ -1758,7 +1846,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-4',11,true)">3K</th>
           <th onclick="sortTable('players-basic-4',12,true)">4K</th>
           <th onclick="sortTable('players-basic-4',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-4',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-4',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>Ullenaattori</td>
@@ -1775,7 +1863,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>7</td>
               <td>3</td>
               <td>0</td>
-              <td>1032</td>
+              <td>19</td>
             </tr>
 <tr>
               <td>TomppaE</td>
@@ -1792,7 +1880,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>7</td>
               <td>0</td>
               <td>0</td>
-              <td>743</td>
+              <td>12</td>
             </tr>
 <tr>
               <td>Jiiho0</td>
@@ -1809,7 +1897,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>5</td>
               <td>1</td>
               <td>1</td>
-              <td>491</td>
+              <td>13</td>
             </tr>
 <tr>
               <td>Rikkeri90</td>
@@ -1826,7 +1914,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>10</td>
               <td>2</td>
               <td>0</td>
-              <td>520</td>
+              <td>15</td>
             </tr>
 <tr>
               <td>Arslaaki</td>
@@ -1843,7 +1931,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>2</td>
               <td>0</td>
-              <td>902</td>
+              <td>13</td>
             </tr>
 <tr>
               <td>Juustoleipa</td>
@@ -1860,7 +1948,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>1</td>
-              <td>709</td>
+              <td>5</td>
             </tr>
 <tr>
               <td>KustihQ</td>
@@ -1877,15 +1965,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>308</td>
+              <td>1</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-4', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-4', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-4', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-4', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-4');</script>
@@ -1897,11 +1991,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-4',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-4',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-4',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-4',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-4',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-4',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-4',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-4',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-4',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-4',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-4',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-4',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-4',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-4',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-4',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-4',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-4',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>Ullenaattori</td>
@@ -1911,8 +2010,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>19</td>
 <td>14</td>
 <td>74</td>
+<td>1032</td>
 <td>10.64</td>
 <td>2.05</td>
+<td>111</td>
+<td>117</td>
+<td>68</td>
+<td>1.05</td>
 </tr>
 <tr>
 <td>TomppaE</td>
@@ -1922,8 +2026,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>23</td>
 <td>10</td>
 <td>43</td>
+<td>743</td>
 <td>7.66</td>
 <td>1.47</td>
+<td>27</td>
+<td>29</td>
+<td>16</td>
+<td>1.07</td>
 </tr>
 <tr>
 <td>Jiiho0</td>
@@ -1933,8 +2042,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>18</td>
 <td>15</td>
 <td>83</td>
+<td>491</td>
 <td>7.01</td>
 <td>1.89</td>
+<td>16</td>
+<td>12</td>
+<td>9</td>
+<td>0.75</td>
 </tr>
 <tr>
 <td>Rikkeri90</td>
@@ -1944,8 +2058,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>11</td>
 <td>9</td>
 <td>82</td>
+<td>520</td>
 <td>8.39</td>
 <td>1.83</td>
+<td>48</td>
+<td>45</td>
+<td>26</td>
+<td>0.94</td>
 </tr>
 <tr>
 <td>Arslaaki</td>
@@ -1955,8 +2074,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>12</td>
 <td>11</td>
 <td>92</td>
+<td>902</td>
 <td>14.55</td>
 <td>1.91</td>
+<td>28</td>
+<td>29</td>
+<td>18</td>
+<td>1.04</td>
 </tr>
 <tr>
 <td>Juustoleipa</td>
@@ -1966,8 +2090,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>7</td>
 <td>5</td>
 <td>71</td>
+<td>709</td>
 <td>11.44</td>
 <td>1.41</td>
+<td>22</td>
+<td>15</td>
+<td>11</td>
+<td>0.68</td>
 </tr>
 <tr>
 <td>KustihQ</td>
@@ -1977,17 +2106,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>7</td>
 <td>5</td>
 <td>71</td>
+<td>308</td>
 <td>8.80</td>
 <td>0.94</td>
+<td>12</td>
+<td>20</td>
+<td>10</td>
+<td>1.67</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-4', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-4', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-4', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-4', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-4', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-4');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-4', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Nuke (2×)</span>
 <span class="chip">Most picked: Dust II (3×)</span>
@@ -2138,32 +2279,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-4');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-4', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-4', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-4', 9, -15, 15, false);
-
-          applyDefaultSort('maps-4');
-          bindPlayedOnly('maps-4', 'maps-4-played-only');
-          buildColumnToggles('maps-4');
-        })();
+        postProcessTable('maps-4', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-4', 'maps-4-played-only');
         </script>
         
 </details>
@@ -2197,7 +2322,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-5',11,true)">3K</th>
           <th onclick="sortTable('players-basic-5',12,true)">4K</th>
           <th onclick="sortTable('players-basic-5',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-5',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-5',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>-Ru1N3r-</td>
@@ -2214,7 +2339,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>5</td>
               <td>1</td>
               <td>0</td>
-              <td>865</td>
+              <td>7</td>
             </tr>
 <tr>
               <td>-Papacito-</td>
@@ -2231,7 +2356,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>4</td>
               <td>3</td>
               <td>1</td>
-              <td>1124</td>
+              <td>14</td>
             </tr>
 <tr>
               <td>Mrui</td>
@@ -2248,7 +2373,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>2</td>
               <td>1</td>
-              <td>650</td>
+              <td>10</td>
             </tr>
 <tr>
               <td>_Eldwin_</td>
@@ -2265,7 +2390,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>5</td>
               <td>0</td>
               <td>0</td>
-              <td>752</td>
+              <td>13</td>
             </tr>
 <tr>
               <td>Mrs_JoRa</td>
@@ -2282,7 +2407,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>4</td>
               <td>0</td>
               <td>0</td>
-              <td>538</td>
+              <td>14</td>
             </tr>
 <tr>
               <td>Rumalapsi</td>
@@ -2299,7 +2424,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>1</td>
               <td>0</td>
-              <td>336</td>
+              <td>8</td>
             </tr>
 <tr>
               <td>Tiivi_Taavi</td>
@@ -2316,15 +2441,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>80</td>
+              <td>1</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-5', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-5', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-5', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-5', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-5');</script>
@@ -2336,11 +2467,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-5',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-5',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-5',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-5',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-5',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-5',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-5',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-5',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-5',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-5',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-5',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-5',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-5',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-5',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-5',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-5',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-5',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>-Ru1N3r-</td>
@@ -2350,8 +2486,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>34</td>
 <td>19</td>
 <td>56</td>
+<td>865</td>
 <td>7.03</td>
 <td>1.54</td>
+<td>115</td>
+<td>130</td>
+<td>74</td>
+<td>1.13</td>
 </tr>
 <tr>
 <td>-Papacito-</td>
@@ -2361,8 +2502,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>8</td>
 <td>7</td>
 <td>88</td>
+<td>1124</td>
 <td>14.05</td>
 <td>1.95</td>
+<td>30</td>
+<td>29</td>
+<td>15</td>
+<td>0.97</td>
 </tr>
 <tr>
 <td>Mrui</td>
@@ -2372,8 +2518,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>17</td>
 <td>9</td>
 <td>53</td>
+<td>650</td>
 <td>8.12</td>
 <td>1.76</td>
+<td>40</td>
+<td>27</td>
+<td>17</td>
+<td>0.68</td>
 </tr>
 <tr>
 <td>_Eldwin_</td>
@@ -2383,8 +2534,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>26</td>
 <td>12</td>
 <td>46</td>
+<td>752</td>
 <td>6.11</td>
 <td>1.09</td>
+<td>49</td>
+<td>53</td>
+<td>26</td>
+<td>1.08</td>
 </tr>
 <tr>
 <td>Mrs_JoRa</td>
@@ -2394,8 +2550,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>24</td>
 <td>7</td>
 <td>29</td>
+<td>538</td>
 <td>6.04</td>
 <td>1.06</td>
+<td>4</td>
+<td>0</td>
+<td>0</td>
+<td>0.00</td>
 </tr>
 <tr>
 <td>Rumalapsi</td>
@@ -2405,8 +2566,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>10</td>
 <td>7</td>
 <td>70</td>
+<td>336</td>
 <td>4.36</td>
 <td>1.00</td>
+<td>25</td>
+<td>29</td>
+<td>15</td>
+<td>1.16</td>
 </tr>
 <tr>
 <td>Tiivi_Taavi</td>
@@ -2416,17 +2582,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>4</td>
 <td>2</td>
 <td>50</td>
+<td>80</td>
 <td>1.86</td>
 <td>0.70</td>
+<td>20</td>
+<td>19</td>
+<td>14</td>
+<td>0.95</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-5', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-5', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-5', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-5', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-5', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-5');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-5', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Inferno (3×)</span>
 <span class="chip">Most picked: Dust II (1×)</span>
@@ -2577,32 +2755,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-5');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-5', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-5', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-5', 9, -15, 15, false);
-
-          applyDefaultSort('maps-5');
-          bindPlayedOnly('maps-5', 'maps-5-played-only');
-          buildColumnToggles('maps-5');
-        })();
+        postProcessTable('maps-5', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-5', 'maps-5-played-only');
         </script>
         
 </details>
@@ -2636,7 +2798,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-6',11,true)">3K</th>
           <th onclick="sortTable('players-basic-6',12,true)">4K</th>
           <th onclick="sortTable('players-basic-6',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-6',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-6',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>-klapi-</td>
@@ -2653,7 +2815,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>9</td>
               <td>0</td>
               <td>1</td>
-              <td>1407</td>
+              <td>23</td>
             </tr>
 <tr>
               <td>mlinkku</td>
@@ -2670,7 +2832,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>7</td>
               <td>1</td>
               <td>0</td>
-              <td>383</td>
+              <td>16</td>
             </tr>
 <tr>
               <td>Kakkig</td>
@@ -2687,7 +2849,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>4</td>
               <td>1</td>
               <td>0</td>
-              <td>810</td>
+              <td>13</td>
             </tr>
 <tr>
               <td>LeeLooH</td>
@@ -2704,7 +2866,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>1</td>
               <td>0</td>
-              <td>216</td>
+              <td>13</td>
             </tr>
 <tr>
               <td>sup0r</td>
@@ -2721,7 +2883,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>0</td>
               <td>0</td>
-              <td>993</td>
+              <td>7</td>
             </tr>
 <tr>
               <td>_KuuKeppi_</td>
@@ -2738,7 +2900,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>1</td>
               <td>0</td>
-              <td>497</td>
+              <td>6</td>
             </tr>
 <tr>
               <td>Sandels83</td>
@@ -2755,15 +2917,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>0</td>
               <td>0</td>
-              <td>81</td>
+              <td>3</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-6', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-6', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-6', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-6', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-6');</script>
@@ -2775,11 +2943,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-6',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-6',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-6',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-6',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-6',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-6',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-6',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-6',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-6',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-6',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-6',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-6',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-6',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-6',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-6',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-6',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-6',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>-klapi-</td>
@@ -2789,8 +2962,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>34</td>
 <td>20</td>
 <td>59</td>
+<td>1407</td>
 <td>8.18</td>
 <td>1.49</td>
+<td>38</td>
+<td>36</td>
+<td>22</td>
+<td>0.95</td>
 </tr>
 <tr>
 <td>mlinkku</td>
@@ -2800,8 +2978,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>44</td>
 <td>23</td>
 <td>52</td>
+<td>383</td>
 <td>2.23</td>
 <td>1.12</td>
+<td>111</td>
+<td>91</td>
+<td>55</td>
+<td>0.82</td>
 </tr>
 <tr>
 <td>Kakkig</td>
@@ -2811,8 +2994,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>25</td>
 <td>12</td>
 <td>48</td>
+<td>810</td>
 <td>5.96</td>
 <td>1.11</td>
+<td>54</td>
+<td>64</td>
+<td>34</td>
+<td>1.19</td>
 </tr>
 <tr>
 <td>LeeLooH</td>
@@ -2822,8 +3010,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>31</td>
 <td>10</td>
 <td>32</td>
+<td>216</td>
 <td>1.73</td>
 <td>0.92</td>
+<td>9</td>
+<td>2</td>
+<td>2</td>
+<td>0.22</td>
 </tr>
 <tr>
 <td>sup0r</td>
@@ -2833,8 +3026,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>21</td>
 <td>9</td>
 <td>43</td>
+<td>993</td>
 <td>7.70</td>
 <td>0.83</td>
+<td>83</td>
+<td>73</td>
+<td>47</td>
+<td>0.88</td>
 </tr>
 <tr>
 <td>_KuuKeppi_</td>
@@ -2844,8 +3042,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>14</td>
 <td>4</td>
 <td>29</td>
+<td>497</td>
 <td>5.52</td>
 <td>1.09</td>
+<td>48</td>
+<td>27</td>
+<td>19</td>
+<td>0.56</td>
 </tr>
 <tr>
 <td>Sandels83</td>
@@ -2855,17 +3058,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>3</td>
 <td>0</td>
 <td>0</td>
+<td>81</td>
 <td>2.25</td>
 <td>1.23</td>
+<td>30</td>
+<td>22</td>
+<td>15</td>
+<td>0.73</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-6', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-6', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-6', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-6', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-6', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-6');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-6', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Ancient (2×)</span>
 <span class="chip">Most picked: Train (2×)</span>
@@ -3016,32 +3231,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-6');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-6', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-6', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-6', 9, -15, 15, false);
-
-          applyDefaultSort('maps-6');
-          bindPlayedOnly('maps-6', 'maps-6-played-only');
-          buildColumnToggles('maps-6');
-        })();
+        postProcessTable('maps-6', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-6', 'maps-6-played-only');
         </script>
         
 </details>
@@ -3075,7 +3274,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-7',11,true)">3K</th>
           <th onclick="sortTable('players-basic-7',12,true)">4K</th>
           <th onclick="sortTable('players-basic-7',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-7',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-7',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>somppa</td>
@@ -3092,7 +3291,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>0</td>
-              <td>998</td>
+              <td>10</td>
             </tr>
 <tr>
               <td>Tummetin</td>
@@ -3109,7 +3308,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>6</td>
               <td>0</td>
               <td>0</td>
-              <td>587</td>
+              <td>14</td>
             </tr>
 <tr>
               <td>deviz84</td>
@@ -3126,7 +3325,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>1</td>
               <td>0</td>
-              <td>235</td>
+              <td>11</td>
             </tr>
 <tr>
               <td>klemppu</td>
@@ -3143,7 +3342,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>0</td>
-              <td>1205</td>
+              <td>12</td>
             </tr>
 <tr>
               <td>Carnivori</td>
@@ -3160,7 +3359,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>0</td>
-              <td>528</td>
+              <td>8</td>
             </tr>
 <tr>
               <td>Peppikoira</td>
@@ -3177,7 +3376,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>1</td>
               <td>0</td>
-              <td>510</td>
+              <td>6</td>
             </tr>
 <tr>
               <td>Pekuelo</td>
@@ -3194,15 +3393,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>0</td>
-              <td>789</td>
+              <td>6</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-7', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-7', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-7', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-7', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-7');</script>
@@ -3214,11 +3419,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-7',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-7',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-7',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-7',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-7',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-7',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-7',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-7',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-7',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-7',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-7',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-7',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-7',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-7',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-7',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-7',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-7',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>somppa</td>
@@ -3228,8 +3438,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>15</td>
 <td>10</td>
 <td>67</td>
+<td>998</td>
 <td>8.32</td>
 <td>1.32</td>
+<td>52</td>
+<td>58</td>
+<td>37</td>
+<td>1.12</td>
 </tr>
 <tr>
 <td>Tummetin</td>
@@ -3239,8 +3454,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>14</td>
 <td>10</td>
 <td>71</td>
+<td>587</td>
 <td>7.43</td>
 <td>1.82</td>
+<td>25</td>
+<td>12</td>
+<td>11</td>
+<td>0.48</td>
 </tr>
 <tr>
 <td>deviz84</td>
@@ -3250,8 +3470,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>23</td>
 <td>15</td>
 <td>65</td>
+<td>235</td>
 <td>3.05</td>
 <td>1.56</td>
+<td>30</td>
+<td>26</td>
+<td>16</td>
+<td>0.87</td>
 </tr>
 <tr>
 <td>klemppu</td>
@@ -3261,8 +3486,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>19</td>
 <td>10</td>
 <td>53</td>
+<td>1205</td>
 <td>14.35</td>
 <td>1.36</td>
+<td>16</td>
+<td>12</td>
+<td>10</td>
+<td>0.75</td>
 </tr>
 <tr>
 <td>Carnivori</td>
@@ -3272,8 +3502,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>15</td>
 <td>9</td>
 <td>60</td>
+<td>528</td>
 <td>6.68</td>
 <td>1.45</td>
+<td>38</td>
+<td>19</td>
+<td>15</td>
+<td>0.50</td>
 </tr>
 <tr>
 <td>Peppikoira</td>
@@ -3283,8 +3518,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>13</td>
 <td>7</td>
 <td>54</td>
+<td>510</td>
 <td>6.62</td>
 <td>1.21</td>
+<td>41</td>
+<td>19</td>
+<td>15</td>
+<td>0.46</td>
 </tr>
 <tr>
 <td>Pekuelo</td>
@@ -3294,17 +3534,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>21</td>
 <td>8</td>
 <td>38</td>
+<td>789</td>
 <td>9.39</td>
 <td>0.76</td>
+<td>29</td>
+<td>26</td>
+<td>17</td>
+<td>0.90</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-7', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-7', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-7', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-7', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-7', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-7');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-7', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Mirage (3×)</span>
 <span class="chip">Most picked: Ancient (2×)</span>
@@ -3455,32 +3707,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-7');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-7', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-7', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-7', 9, -15, 15, false);
-
-          applyDefaultSort('maps-7');
-          bindPlayedOnly('maps-7', 'maps-7-played-only');
-          buildColumnToggles('maps-7');
-        })();
+        postProcessTable('maps-7', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-7', 'maps-7-played-only');
         </script>
         
 </details>
@@ -3514,7 +3750,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-8',11,true)">3K</th>
           <th onclick="sortTable('players-basic-8',12,true)">4K</th>
           <th onclick="sortTable('players-basic-8',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-8',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-8',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>KING_JUT</td>
@@ -3531,7 +3767,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>11</td>
               <td>0</td>
               <td>0</td>
-              <td>543</td>
+              <td>16</td>
             </tr>
 <tr>
               <td>RotJa</td>
@@ -3548,7 +3784,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>6</td>
               <td>1</td>
               <td>0</td>
-              <td>291</td>
+              <td>11</td>
             </tr>
 <tr>
               <td>Shirunee</td>
@@ -3565,7 +3801,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>4</td>
               <td>0</td>
               <td>0</td>
-              <td>638</td>
+              <td>20</td>
             </tr>
 <tr>
               <td>slack-n-hash</td>
@@ -3582,7 +3818,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>1</td>
               <td>0</td>
-              <td>484</td>
+              <td>12</td>
             </tr>
 <tr>
               <td>g0nsu</td>
@@ -3599,7 +3835,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>4</td>
               <td>0</td>
               <td>0</td>
-              <td>315</td>
+              <td>6</td>
             </tr>
 <tr>
               <td>AnimeRotta</td>
@@ -3616,15 +3852,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>69</td>
+              <td>3</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-8', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-8', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-8', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-8', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-8');</script>
@@ -3636,11 +3878,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-8',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-8',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-8',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-8',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-8',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-8',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-8',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-8',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-8',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-8',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-8',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-8',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-8',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-8',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-8',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-8',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-8',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>KING_JUT</td>
@@ -3650,8 +3897,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>31</td>
 <td>24</td>
 <td>77</td>
+<td>543</td>
 <td>4.21</td>
 <td>1.73</td>
+<td>76</td>
+<td>65</td>
+<td>45</td>
+<td>0.86</td>
 </tr>
 <tr>
 <td>RotJa</td>
@@ -3661,8 +3913,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>25</td>
 <td>14</td>
 <td>56</td>
+<td>291</td>
 <td>2.26</td>
 <td>1.31</td>
+<td>130</td>
+<td>123</td>
+<td>77</td>
+<td>0.95</td>
 </tr>
 <tr>
 <td>Shirunee</td>
@@ -3672,8 +3929,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>19</td>
 <td>8</td>
 <td>42</td>
+<td>638</td>
 <td>4.95</td>
 <td>1.18</td>
+<td>11</td>
+<td>9</td>
+<td>7</td>
+<td>0.82</td>
 </tr>
 <tr>
 <td>slack-n-hash</td>
@@ -3683,8 +3945,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>31</td>
 <td>7</td>
 <td>23</td>
+<td>484</td>
 <td>3.75</td>
 <td>0.68</td>
+<td>13</td>
+<td>12</td>
+<td>8</td>
+<td>0.92</td>
 </tr>
 <tr>
 <td>g0nsu</td>
@@ -3694,8 +3961,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>17</td>
 <td>4</td>
 <td>24</td>
+<td>315</td>
 <td>3.58</td>
 <td>0.91</td>
+<td>63</td>
+<td>56</td>
+<td>30</td>
+<td>0.89</td>
 </tr>
 <tr>
 <td>AnimeRotta</td>
@@ -3705,17 +3977,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>5</td>
 <td>4</td>
 <td>80</td>
+<td>69</td>
 <td>1.68</td>
 <td>1.35</td>
+<td>8</td>
+<td>5</td>
+<td>4</td>
+<td>0.62</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-8', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-8', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-8', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-8', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-8', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-8');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-8', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Nuke (3×)</span>
 <span class="chip">Most picked: Overpass (2×)</span>
@@ -3866,32 +4150,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-8');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-8', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-8', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-8', 9, -15, 15, false);
-
-          applyDefaultSort('maps-8');
-          bindPlayedOnly('maps-8', 'maps-8-played-only');
-          buildColumnToggles('maps-8');
-        })();
+        postProcessTable('maps-8', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-8', 'maps-8-played-only');
         </script>
         
 </details>
@@ -3925,7 +4193,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-9',11,true)">3K</th>
           <th onclick="sortTable('players-basic-9',12,true)">4K</th>
           <th onclick="sortTable('players-basic-9',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-9',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-9',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>prnd</td>
@@ -3942,7 +4210,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>14</td>
               <td>1</td>
               <td>0</td>
-              <td>761</td>
+              <td>22</td>
             </tr>
 <tr>
               <td>Spamm1</td>
@@ -3959,7 +4227,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>6</td>
               <td>2</td>
               <td>0</td>
-              <td>847</td>
+              <td>19</td>
             </tr>
 <tr>
               <td>ValioPlayMK</td>
@@ -3976,7 +4244,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>1</td>
               <td>0</td>
-              <td>162</td>
+              <td>14</td>
             </tr>
 <tr>
               <td>Larbiz</td>
@@ -3993,7 +4261,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>4</td>
               <td>0</td>
               <td>0</td>
-              <td>738</td>
+              <td>6</td>
             </tr>
 <tr>
               <td>bRUTU55</td>
@@ -4010,7 +4278,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>5</td>
               <td>0</td>
               <td>0</td>
-              <td>198</td>
+              <td>7</td>
             </tr>
 <tr>
               <td>swagalee</td>
@@ -4027,7 +4295,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>805</td>
+              <td>2</td>
             </tr>
 <tr>
               <td>Aspartaam1</td>
@@ -4044,15 +4312,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>2</td>
               <td>0</td>
-              <td>527</td>
+              <td>5</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-9', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-9', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-9', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-9', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-9');</script>
@@ -4064,11 +4338,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-9',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-9',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-9',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-9',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-9',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-9',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-9',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-9',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-9',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-9',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-9',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-9',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-9',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-9',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-9',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-9',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-9',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>prnd</td>
@@ -4078,8 +4357,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>36</td>
 <td>27</td>
 <td>75</td>
+<td>761</td>
 <td>5.81</td>
 <td>1.94</td>
+<td>24</td>
+<td>21</td>
+<td>14</td>
+<td>0.88</td>
 </tr>
 <tr>
 <td>Spamm1</td>
@@ -4089,8 +4373,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>29</td>
 <td>16</td>
 <td>55</td>
+<td>847</td>
 <td>6.47</td>
 <td>1.34</td>
+<td>114</td>
+<td>81</td>
+<td>55</td>
+<td>0.71</td>
 </tr>
 <tr>
 <td>ValioPlayMK</td>
@@ -4100,8 +4389,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>18</td>
 <td>14</td>
 <td>78</td>
+<td>162</td>
 <td>1.84</td>
 <td>1.57</td>
+<td>23</td>
+<td>17</td>
+<td>10</td>
+<td>0.74</td>
 </tr>
 <tr>
 <td>Larbiz</td>
@@ -4111,8 +4405,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>16</td>
 <td>6</td>
 <td>38</td>
+<td>738</td>
 <td>5.63</td>
 <td>0.96</td>
+<td>30</td>
+<td>18</td>
+<td>12</td>
+<td>0.60</td>
 </tr>
 <tr>
 <td>bRUTU55</td>
@@ -4122,8 +4421,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>13</td>
 <td>6</td>
 <td>46</td>
+<td>198</td>
 <td>4.60</td>
 <td>1.73</td>
+<td>9</td>
+<td>9</td>
+<td>6</td>
+<td>1.00</td>
 </tr>
 <tr>
 <td>swagalee</td>
@@ -4133,8 +4437,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>11</td>
 <td>4</td>
 <td>36</td>
+<td>805</td>
 <td>9.15</td>
 <td>0.79</td>
+<td>36</td>
+<td>23</td>
+<td>17</td>
+<td>0.64</td>
 </tr>
 <tr>
 <td>Aspartaam1</td>
@@ -4144,17 +4453,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>6</td>
 <td>2</td>
 <td>33</td>
+<td>527</td>
 <td>12.26</td>
 <td>0.99</td>
+<td>12</td>
+<td>4</td>
+<td>4</td>
+<td>0.33</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-9', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-9', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-9', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-9', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-9', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-9');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-9', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Mirage (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -4304,32 +4625,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-9');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-9', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-9', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-9', 9, -15, 15, false);
-
-          applyDefaultSort('maps-9');
-          bindPlayedOnly('maps-9', 'maps-9-played-only');
-          buildColumnToggles('maps-9');
-        })();
+        postProcessTable('maps-9', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-9', 'maps-9-played-only');
         </script>
         
 </details>
@@ -4363,7 +4668,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-10',11,true)">3K</th>
           <th onclick="sortTable('players-basic-10',12,true)">4K</th>
           <th onclick="sortTable('players-basic-10',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-10',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-10',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>Mambus24</td>
@@ -4380,7 +4685,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>15</td>
               <td>1</td>
               <td>0</td>
-              <td>688</td>
+              <td>19</td>
             </tr>
 <tr>
               <td>annihiLeight</td>
@@ -4397,7 +4702,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>5</td>
               <td>1</td>
               <td>1</td>
-              <td>847</td>
+              <td>10</td>
             </tr>
 <tr>
               <td>d0nkaments</td>
@@ -4414,7 +4719,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>4</td>
               <td>2</td>
               <td>0</td>
-              <td>667</td>
+              <td>9</td>
             </tr>
 <tr>
               <td>SoijaB</td>
@@ -4431,7 +4736,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>0</td>
               <td>0</td>
-              <td>725</td>
+              <td>5</td>
             </tr>
 <tr>
               <td>-d0p-</td>
@@ -4448,7 +4753,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>173</td>
+              <td>3</td>
             </tr>
 <tr>
               <td>pardoner123</td>
@@ -4465,7 +4770,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>271</td>
+              <td>4</td>
             </tr>
 <tr>
               <td>simahayha</td>
@@ -4482,15 +4787,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>277</td>
+              <td>1</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-10', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-10', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-10', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-10', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-10');</script>
@@ -4502,11 +4813,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-10',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-10',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-10',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-10',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-10',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-10',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-10',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-10',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-10',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-10',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-10',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-10',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-10',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-10',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-10',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-10',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-10',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>Mambus24</td>
@@ -4516,8 +4832,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>18</td>
 <td>10</td>
 <td>56</td>
+<td>688</td>
 <td>5.42</td>
 <td>1.69</td>
+<td>47</td>
+<td>31</td>
+<td>25</td>
+<td>0.66</td>
 </tr>
 <tr>
 <td>annihiLeight</td>
@@ -4527,8 +4848,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>15</td>
 <td>8</td>
 <td>53</td>
+<td>847</td>
 <td>6.67</td>
 <td>1.28</td>
+<td>30</td>
+<td>30</td>
+<td>19</td>
+<td>1.00</td>
 </tr>
 <tr>
 <td>d0nkaments</td>
@@ -4538,8 +4864,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>28</td>
 <td>9</td>
 <td>32</td>
+<td>667</td>
 <td>7.67</td>
 <td>1.24</td>
+<td>26</td>
+<td>14</td>
+<td>12</td>
+<td>0.54</td>
 </tr>
 <tr>
 <td>SoijaB</td>
@@ -4549,8 +4880,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>24</td>
 <td>8</td>
 <td>33</td>
+<td>725</td>
 <td>8.33</td>
 <td>1.04</td>
+<td>31</td>
+<td>29</td>
+<td>20</td>
+<td>0.94</td>
 </tr>
 <tr>
 <td>-d0p-</td>
@@ -4560,8 +4896,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>29</td>
 <td>12</td>
 <td>41</td>
+<td>173</td>
 <td>2.01</td>
 <td>0.65</td>
+<td>78</td>
+<td>61</td>
+<td>42</td>
+<td>0.78</td>
 </tr>
 <tr>
 <td>pardoner123</td>
@@ -4571,8 +4912,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>9</td>
 <td>3</td>
 <td>33</td>
+<td>271</td>
 <td>3.35</td>
 <td>0.49</td>
+<td>10</td>
+<td>8</td>
+<td>4</td>
+<td>0.80</td>
 </tr>
 <tr>
 <td>simahayha</td>
@@ -4582,17 +4928,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>3</td>
 <td>0</td>
 <td>0</td>
+<td>277</td>
 <td>6.92</td>
 <td>0.49</td>
+<td>7</td>
+<td>7</td>
+<td>5</td>
+<td>1.00</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-10', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-10', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-10', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-10', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-10', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-10');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-10', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Ancient (2×)</span>
 <span class="chip">Most picked: Dust II (2×)</span>
@@ -4743,32 +5101,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-10');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-10', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-10', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-10', 9, -15, 15, false);
-
-          applyDefaultSort('maps-10');
-          bindPlayedOnly('maps-10', 'maps-10-played-only');
-          buildColumnToggles('maps-10');
-        })();
+        postProcessTable('maps-10', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-10', 'maps-10-played-only');
         </script>
         
 </details>
@@ -4802,7 +5144,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-11',11,true)">3K</th>
           <th onclick="sortTable('players-basic-11',12,true)">4K</th>
           <th onclick="sortTable('players-basic-11',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-11',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-11',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>Tiffmeister</td>
@@ -4819,7 +5161,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>10</td>
               <td>3</td>
               <td>0</td>
-              <td>369</td>
+              <td>18</td>
             </tr>
 <tr>
               <td>Kunbo</td>
@@ -4836,7 +5178,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>6</td>
               <td>0</td>
               <td>0</td>
-              <td>246</td>
+              <td>9</td>
             </tr>
 <tr>
               <td>janzuhhh</td>
@@ -4853,7 +5195,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>1</td>
               <td>0</td>
-              <td>262</td>
+              <td>9</td>
             </tr>
 <tr>
               <td>DaGibber</td>
@@ -4870,7 +5212,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>2</td>
               <td>0</td>
               <td>0</td>
-              <td>561</td>
+              <td>6</td>
             </tr>
 <tr>
               <td>Heiskanen</td>
@@ -4887,7 +5229,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>0</td>
               <td>0</td>
-              <td>511</td>
+              <td>5</td>
             </tr>
 <tr>
               <td>ALuHaRD808</td>
@@ -4904,7 +5246,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>296</td>
+              <td>5</td>
             </tr>
 <tr>
               <td>Lainaamua</td>
@@ -4921,7 +5263,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>0</td>
               <td>0</td>
               <td>0</td>
-              <td>648</td>
+              <td>3</td>
             </tr>
 <tr>
               <td>Uhinho</td>
@@ -4938,15 +5280,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>230</td>
+              <td>2</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-11', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-11', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-11', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-11', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-11');</script>
@@ -4958,11 +5306,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-11',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-11',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-11',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-11',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-11',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-11',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-11',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-11',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-11',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-11',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-11',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-11',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-11',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-11',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-11',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-11',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-11',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>Tiffmeister</td>
@@ -4972,8 +5325,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>29</td>
 <td>16</td>
 <td>55</td>
+<td>369</td>
 <td>4.24</td>
 <td>2.06</td>
+<td>40</td>
+<td>23</td>
+<td>16</td>
+<td>0.57</td>
 </tr>
 <tr>
 <td>Kunbo</td>
@@ -4983,8 +5341,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>16</td>
 <td>5</td>
 <td>31</td>
+<td>246</td>
 <td>2.83</td>
 <td>1.43</td>
+<td>24</td>
+<td>9</td>
+<td>8</td>
+<td>0.38</td>
 </tr>
 <tr>
 <td>janzuhhh</td>
@@ -4994,8 +5357,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>9</td>
 <td>5</td>
 <td>56</td>
+<td>262</td>
 <td>3.01</td>
 <td>1.21</td>
+<td>40</td>
+<td>20</td>
+<td>16</td>
+<td>0.50</td>
 </tr>
 <tr>
 <td>DaGibber</td>
@@ -5005,8 +5373,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>18</td>
 <td>11</td>
 <td>61</td>
+<td>561</td>
 <td>6.93</td>
 <td>1.02</td>
+<td>18</td>
+<td>12</td>
+<td>9</td>
+<td>0.67</td>
 </tr>
 <tr>
 <td>Heiskanen</td>
@@ -5016,8 +5389,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>15</td>
 <td>6</td>
 <td>40</td>
+<td>511</td>
 <td>6.91</td>
 <td>1.09</td>
+<td>28</td>
+<td>11</td>
+<td>9</td>
+<td>0.39</td>
 </tr>
 <tr>
 <td>ALuHaRD808</td>
@@ -5027,8 +5405,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>15</td>
 <td>7</td>
 <td>47</td>
+<td>296</td>
 <td>4.00</td>
 <td>0.99</td>
+<td>27</td>
+<td>20</td>
+<td>13</td>
+<td>0.74</td>
 </tr>
 <tr>
 <td>Lainaamua</td>
@@ -5038,8 +5421,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>11</td>
 <td>8</td>
 <td>73</td>
+<td>648</td>
 <td>8.00</td>
 <td>0.73</td>
+<td>10</td>
+<td>8</td>
+<td>6</td>
+<td>0.80</td>
 </tr>
 <tr>
 <td>Uhinho</td>
@@ -5049,17 +5437,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>8</td>
 <td>1</td>
 <td>12</td>
+<td>230</td>
 <td>6.76</td>
 <td>0.55</td>
+<td>10</td>
+<td>9</td>
+<td>5</td>
+<td>0.90</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-11', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-11', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-11', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-11', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-11', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-11');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-11', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Ancient (2×)</span>
 <span class="chip">Most picked: Nuke (2×)</span>
@@ -5210,32 +5610,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-11');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-11', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-11', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-11', 9, -15, 15, false);
-
-          applyDefaultSort('maps-11');
-          bindPlayedOnly('maps-11', 'maps-11-played-only');
-          buildColumnToggles('maps-11');
-        })();
+        postProcessTable('maps-11', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-11', 'maps-11-played-only');
         </script>
         
 </details>
@@ -5269,7 +5653,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-12',11,true)">3K</th>
           <th onclick="sortTable('players-basic-12',12,true)">4K</th>
           <th onclick="sortTable('players-basic-12',13,true)">5K</th>
-          <th onclick="sortTable('players-basic-12',14,true)">Util dmg</th>
+          <th onclick="sortTable('players-basic-12',14,true)">MVPs</th>
         </tr></thead><tbody>
 <tr>
               <td>Arthuur</td>
@@ -5286,7 +5670,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>8</td>
               <td>3</td>
               <td>1</td>
-              <td>1348</td>
+              <td>30</td>
             </tr>
 <tr>
               <td>JAPE</td>
@@ -5303,7 +5687,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>6</td>
               <td>0</td>
               <td>0</td>
-              <td>1019</td>
+              <td>21</td>
             </tr>
 <tr>
               <td>Qrioz</td>
@@ -5320,7 +5704,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>7</td>
               <td>2</td>
               <td>0</td>
-              <td>1054</td>
+              <td>17</td>
             </tr>
 <tr>
               <td>NMT-GSM</td>
@@ -5337,7 +5721,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>5</td>
               <td>1</td>
               <td>0</td>
-              <td>704</td>
+              <td>14</td>
             </tr>
 <tr>
               <td>inra1n</td>
@@ -5354,7 +5738,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>3</td>
               <td>1</td>
               <td>0</td>
-              <td>427</td>
+              <td>10</td>
             </tr>
 <tr>
               <td>Mynttoni</td>
@@ -5371,15 +5755,21 @@ document.addEventListener('DOMContentLoaded', () => {
               <td>1</td>
               <td>0</td>
               <td>0</td>
-              <td>495</td>
+              <td>6</td>
             </tr>
 </tbody></table>
 
         <script>
-          // KD (kolumni 3), ADR (4), KR (5) – dynaamiset (divisioona) kynnykset
-          colorizeContinuous('players-basic-12', 3, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('players-basic-12', 4, 62.5500, 75.0833, 92.8700, false);
-          colorizeContinuous('players-basic-12', 5, 0.5320,  0.6675,  0.8578,  false);
+        postProcessTable('players-basic-12', {
+          // ei barreja basicissa
+          color: [
+            {col:3, p:[0.6951, 0.9643, 1.3680]},
+            {col:4, p:[62.5500, 75.0833, 92.8700]},
+            {col:5, p:[0.5320, 0.6675, 0.8578]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
         </script>
         
 <script>applyDefaultSort('players-basic-12');</script>
@@ -5391,11 +5781,16 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-12',1,true)" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>
 <th onclick="sortTable('players-adv-12',2,true)" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>
 <th onclick="sortTable('players-adv-12',3,true)" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>
-<th onclick="sortTable('players-adv-12',4,true)" title='Entry attempts (ensimmäiset kontaktit)'>Entry Att</th>
-<th onclick="sortTable('players-adv-12',5,true)" title='Entry wins (voitetut ensimmäiset kontaktit)'>Entry Win</th>
+<th onclick="sortTable('players-adv-12',4,true)" title='Entry attempts'>Entry Att</th>
+<th onclick="sortTable('players-adv-12',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-12',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-12',7,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-12',8,true)" title='Impact-proxy: 2*KR + 0.42*AR - 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-12',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-12',8,true)" title='Utility damage per round'>UDPR</th>
+<th onclick="sortTable('players-adv-12',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
+<th onclick="sortTable('players-adv-12',10,true)"title='Total flashes thorown'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-12',11,true)"title='Enemies flashed'>Flashed</th>
+<th onclick="sortTable('players-adv-12',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
+<th onclick="sortTable('players-adv-12',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
 </tr></thead><tbody>
 <tr>
 <td>Arthuur</td>
@@ -5405,8 +5800,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>23</td>
 <td>14</td>
 <td>61</td>
+<td>1348</td>
 <td>8.53</td>
 <td>1.77</td>
+<td>67</td>
+<td>44</td>
+<td>31</td>
+<td>0.66</td>
 </tr>
 <tr>
 <td>JAPE</td>
@@ -5416,8 +5816,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>42</td>
 <td>29</td>
 <td>69</td>
+<td>1019</td>
 <td>6.45</td>
 <td>1.66</td>
+<td>50</td>
+<td>38</td>
+<td>27</td>
+<td>0.76</td>
 </tr>
 <tr>
 <td>Qrioz</td>
@@ -5427,8 +5832,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>37</td>
 <td>19</td>
 <td>51</td>
+<td>1054</td>
 <td>6.67</td>
 <td>1.49</td>
+<td>45</td>
+<td>47</td>
+<td>28</td>
+<td>1.04</td>
 </tr>
 <tr>
 <td>NMT-GSM</td>
@@ -5438,8 +5848,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>24</td>
 <td>15</td>
 <td>62</td>
+<td>704</td>
 <td>5.87</td>
 <td>1.34</td>
+<td>52</td>
+<td>19</td>
+<td>16</td>
+<td>0.37</td>
 </tr>
 <tr>
 <td>inra1n</td>
@@ -5449,8 +5864,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>24</td>
 <td>11</td>
 <td>46</td>
+<td>427</td>
 <td>3.81</td>
 <td>1.32</td>
+<td>25</td>
+<td>13</td>
+<td>8</td>
+<td>0.52</td>
 </tr>
 <tr>
 <td>Mynttoni</td>
@@ -5460,17 +5880,29 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>7</td>
 <td>3</td>
 <td>43</td>
+<td>495</td>
 <td>5.89</td>
 <td>1.03</td>
+<td>21</td>
+<td>10</td>
+<td>7</td>
+<td>0.48</td>
 </tr>
 </tbody></table>
-<script>colorizeRange('players-adv-12', 2, 0, 100, false);</script>
-<script>colorizeRange('players-adv-12', 3, 0, 100, false);</script>
-<script>colorizeRange('players-adv-12', 6, 0, 100, false);</script>
-<script>colorizeContinuous('players-adv-12', 7, 3.1325, 6.1138, 8.2751, false);</script>
-<script>colorizeContinuous('players-adv-12', 8, 1.0640, 1.3350, 1.7157, false);</script>
 <script>applyDefaultSort('players-adv-12');</script>
 </div>
+
+        <script>
+        postProcessTable('players-adv-12', {
+          color: [
+            {col:8, p:[3.1325, 6.1138, 8.2751]},
+            {col:9, p:[1.0640, 1.3350, 1.7157]}
+          ],
+          defaultSort: {col:0, dir:'asc'},
+          toggles: true
+        });
+        </script>
+        
 <div class="chips">
 <span class="chip">Most banned: Dust II (2×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -5621,32 +6053,16 @@ document.addEventListener('DOMContentLoaded', () => {
 </tbody></table>
 
         <script>
-        (function(){
-          const t = document.getElementById('maps-12');
-          if (!t || !t.tBodies.length) return;
-          const rows = t.tBodies[0].rows;
-          for (const tr of rows) {
-            const played = parseInt(tr.cells[1].textContent || '0', 10);
-            [4,5,6].forEach(function(i){
-              const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-              renderBar(tr.cells[i], isFinite(num) ? num : 0);
-              const span = tr.cells[i].querySelector('.bar > span');
-              span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
-              tr.cells[i].title = 'Played: ' + played;
-            });
-          }
-
-          // KD (col 7), ADR (8) – divisioonan mukainen jatkuva väritys
-          colorizeContinuous('maps-12', 7, 0.6951,  0.9643,  1.3680,  false);
-          colorizeContinuous('maps-12', 8, 62.5500, 75.0833, 92.8700, false);
-
-          // RD: jätetään symmetriseksi haarukaksi
-          colorizeRange('maps-12', 9, -15, 15, false);
-
-          applyDefaultSort('maps-12');
-          bindPlayedOnly('maps-12', 'maps-12-played-only');
-          buildColumnToggles('maps-12');
-        })();
+        postProcessTable('maps-12', {
+          bars: [4,5,6], // WR%, WR own, WR opp
+          color: [
+            {col:7, p:[0.6951, 0.9643, 1.3680]},   // KD
+            {col:8, p:[62.5500, 75.0833, 92.8700]} // ADR
+          ],
+          defaultSort: {col:1, dir:'desc'}, // Played
+          toggles: true
+        });
+        bindPlayedOnly('maps-12', 'maps-12-played-only');
         </script>
         
 </details>

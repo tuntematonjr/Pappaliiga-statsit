@@ -96,22 +96,22 @@ def insert_vote(con, v):
 def upsert_team_stat(con, ts):
     con.execute(
         """INSERT INTO team_stats(match_id, round_index, team_id, team_name, kills, deaths, assists, kd, kr, adr, hs_pct,
-                                     mvps, sniper_kills, utility_damage, flash_assists, entry_count, entry_wins,
+                                     mvps, sniper_kills, utility_damage, entry_count, entry_wins,
                                      mk_2k, mk_3k, mk_4k, mk_5k)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(match_id, round_index, team_id) DO UPDATE SET
             team_name=excluded.team_name,
             kills=excluded.kills, deaths=excluded.deaths, assists=excluded.assists,
             kd=excluded.kd, kr=excluded.kr, adr=excluded.adr, hs_pct=excluded.hs_pct,
             mvps=excluded.mvps, sniper_kills=excluded.sniper_kills, utility_damage=excluded.utility_damage,
-            flash_assists=excluded.flash_assists, entry_count=excluded.entry_count, entry_wins=excluded.entry_wins,
+            entry_count=excluded.entry_count, entry_wins=excluded.entry_wins,
             mk_2k=excluded.mk_2k, mk_3k=excluded.mk_3k, mk_4k=excluded.mk_4k, mk_5k=excluded.mk_5k
         """, (
             ts["match_id"], ts["round_index"], ts["team_id"], ts.get("team_name"),
             ts.get("kills"), ts.get("deaths"), ts.get("assists"),
             ts.get("kd"), ts.get("kr"), ts.get("adr"), ts.get("hs_pct"),
             ts.get("mvps"), ts.get("sniper_kills"), ts.get("utility_damage"),
-            ts.get("flash_assists"), ts.get("entry_count"), ts.get("entry_wins"),
+            ts.get("entry_count"), ts.get("entry_wins"),
             ts.get("mk_2k"), ts.get("mk_3k"), ts.get("mk_4k"), ts.get("mk_5k"),
         )
     )
@@ -126,8 +126,10 @@ def upsert_player_stat(con, ps):
             -- clutch-kentät:
             clutch_kills, cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
             -- entry-kentät:
-            entry_count, entry_wins
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            entry_count, entry_wins,
+            -- flash-kentät:
+            enemies_flashed, flash_count, flash_successes
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(match_id, round_index, player_id, nickname) DO UPDATE SET
             kills=excluded.kills,
             deaths=excluded.deaths,
@@ -146,19 +148,25 @@ def upsert_player_stat(con, ps):
             cl_1v2_attempts=excluded.cl_1v2_attempts,
             cl_1v2_wins=excluded.cl_1v2_wins,
             entry_count=excluded.entry_count,
-            entry_wins=excluded.entry_wins
+            entry_wins=excluded.entry_wins,
+            enemies_flashed=excluded.enemies_flashed,
+            flash_count=excluded.flash_count,
+            flash_successes=excluded.flash_successes
         """,
         (
             ps["match_id"], ps["round_index"], ps["player_id"], ps["nickname"],
             ps["team_id"], ps["team_name"],
             ps["kills"], ps["deaths"], ps["assists"], ps["kd"], ps["kr"], ps["adr"], ps["hs_pct"],
-            ps["mvps"], ps["sniper_kills"], ps["utility_damage"],
-            ps["mk_3k"], ps["mk_4k"], ps["mk_5k"],
-            ps["clutch_kills"], ps["cl_1v1_attempts"], ps["cl_1v1_wins"],
-            ps["cl_1v2_attempts"], ps["cl_1v2_wins"],
-            ps.get("entry_count"), ps.get("entry_wins"),
+            ps.get("mvps", 0), ps.get("sniper_kills", 0),
+            ps.get("utility_damage", 0), ps.get("mk_3k", 0), ps.get("mk_4k", 0), ps.get("mk_5k", 0),
+            ps.get("clutch_kills", 0),
+            ps.get("cl_1v1_attempts", 0), ps.get("cl_1v1_wins", 0),
+            ps.get("cl_1v2_attempts", 0), ps.get("cl_1v2_wins", 0),
+            ps.get("entry_count", 0), ps.get("entry_wins", 0),
+            ps.get("enemies_flashed", 0), ps.get("flash_count", 0), ps.get("flash_successes", 0),
         )
     )
+
 
 def upsert_player_identity(con, player_id: str, nickname: str):
     # Lisää, tai päivitä vain jos nickname oikeasti muuttuu
