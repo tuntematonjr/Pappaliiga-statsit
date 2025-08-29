@@ -128,8 +128,8 @@ def upsert_player_stat(con, ps):
             -- entry-kentät:
             entry_count, entry_wins,
             -- flash-kentät:
-            enemies_flashed, flash_count, flash_successes
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            enemies_flashed, flash_count, flash_successes,pistol_kills
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(match_id, round_index, player_id, nickname) DO UPDATE SET
             kills=excluded.kills,
             deaths=excluded.deaths,
@@ -151,7 +151,8 @@ def upsert_player_stat(con, ps):
             entry_wins=excluded.entry_wins,
             enemies_flashed=excluded.enemies_flashed,
             flash_count=excluded.flash_count,
-            flash_successes=excluded.flash_successes
+            flash_successes=excluded.flash_successes,
+            pistol_kills=excluded.pistol_kills
         """,
         (
             ps["match_id"], ps["round_index"], ps["player_id"], ps["nickname"],
@@ -164,6 +165,7 @@ def upsert_player_stat(con, ps):
             ps.get("cl_1v2_attempts", 0), ps.get("cl_1v2_wins", 0),
             ps.get("entry_count", 0), ps.get("entry_wins", 0),
             ps.get("enemies_flashed", 0), ps.get("flash_count", 0), ps.get("flash_successes", 0),
+            ps.get("pistol_kills", 0),
         )
     )
 

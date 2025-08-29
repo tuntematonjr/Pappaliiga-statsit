@@ -239,6 +239,8 @@ def extract_player_row(con, match_id: str, round_index: int, pl: Dict[str, Any],
     enemies_flashed = safe_int(ps.get("Enemies Flashed", 0))
     flash_count     = safe_int(ps.get("Flash Count", 0))
     flash_successes = safe_int(ps.get("Flash Successes", 0))
+    pistol_kills = safe_int(ps.get("Pistol Kills", 0))
+    
 
     upsert_player_identity(con, player_id, nickname)
 
@@ -262,6 +264,7 @@ def extract_player_row(con, match_id: str, round_index: int, pl: Dict[str, Any],
         "enemies_flashed": enemies_flashed,
         "flash_count": flash_count,
         "flash_successes": flash_successes,
+        "pistol_kills": pistol_kills,
     }
 
 def sync_division(con, div):

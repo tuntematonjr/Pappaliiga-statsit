@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>20 Divisioona S11 - generoitu 2025-08-30 01:31</title>
+<title>20 Divisioona S11 - generoitu 2025-08-30 02:34</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -17,341 +17,172 @@
   --nav-bg:#2a2a2a;
   --accent:#4ade80;
 }
-
-
-
 html,body{height:100%;}
-body{
-  margin:0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  font-size: 18px;
-  line-height: 1.45;
-  color: var(--fg);
-  background: var(--bg);
-}
-
-.page{
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 1.25rem 1.25rem 3rem;
-}
-
-/* Otsikot */
-h1{ font-size: 2rem; margin:.5rem 0 1rem; }
-h2{ font-size: 1.5rem; margin:1.25rem 0 .5rem; }
-h3{ font-size: 1.15rem; margin:1rem 0 .5rem; }
-
-/* Joukkue-navigaatio */
+body{ margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; font-size:18px; line-height:1.45; color:var(--fg); background:var(--bg); }
+.page{ max-width:1400px; margin:0 auto; padding:1.25rem 1.25rem 3rem; }
+h1{ font-size:2rem; margin:.5rem 0 1rem; }
+h2{ font-size:1.5rem; margin:1.25rem 0 .5rem; }
+h3{ font-size:1.15rem; margin:1rem 0 .5rem; }
 .nav{ display:flex; flex-wrap:wrap; gap:.75rem; margin:.25rem 0 1rem; }
-.nav a{
-  color:#cfe1ff;
-  text-decoration:none;
-  border:1px solid var(--border);
-  padding:.25rem .5rem;
-  border-radius:999px;
-  background: var(--nav-bg);
-}
+.nav a{ color:#cfe1ff; text-decoration:none; border:1px solid var(--border); padding:.25rem .5rem; border-radius:999px; background:var(--nav-bg); }
 .nav a:hover{ background:#3a3a3a; }
+.chips{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.25rem 0 .75rem 0; }
+.chip{ font-size:.95rem; padding:.35rem .65rem; border-radius:999px; background:var(--chip-bg); border:1px solid var(--border); color:var(--fg); }
 
-/* Chipit */
-.chips { display:flex; gap:.5rem; flex-wrap:wrap; margin:.25rem 0 .75rem 0; }
-.chip  { font-size:.95rem; padding:.35rem .65rem; border-radius:999px; background: var(--chip-bg); border:1px solid var(--border); color:var(--fg); }
-
-/* Taulukot */
-table{ width:100%; border-collapse: collapse; margin:.5rem 0 1rem; background: var(--table-bg); }
-thead th{
-  position: sticky; top:0;
-  background: var(--head);
-  border-bottom:1px solid var(--border);
-  font-weight:600;
-  color: var(--fg);
-}
-th, td{ padding:.55rem .7rem; border-bottom:1px solid var(--border); }
-tbody tr:nth-child(even){ background: var(--table-alt); }
-th, td{ text-align:center; }
-th:first-child, td:first-child{ text-align:left; }
-
-/* Sticky 1. sarake ja hover-korostus */
-td:first-child, th:first-child{ position:sticky; left:0; z-index:1; background:var(--table-bg); }
+table{ width:100%; border-collapse:collapse; margin:.5rem 0 1rem; background:var(--table-bg); }
+thead th{ position:sticky; top:0; background:var(--head); border-bottom:1px solid var(--border); font-weight:600; color:var(--fg); }
+th,td{ padding:.55rem .7rem; border-bottom:1px solid var(--border); }
+tbody tr:nth-child(even){ background:var(--table-alt); }
+th,td{ text-align:center; }
+th:first-child,td:first-child{ text-align:left; }
+td:first-child,th:first-child{ position:sticky; left:0; z-index:1; background:var(--table-bg); }
 tbody tr:hover{ outline:1px solid #555; background:#292929; }
 
-/* progress bar WR-prosenteille */
-.bar { position:relative; background:#333; height:20px; border-radius:8px; overflow:hidden; }
-.bar > span { position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--accent); }
-.bar .val { position:relative; z-index:1; font-size:.9rem; padding-left:.5rem; color:#fff; }
+.bar{ position:relative; background:#333; height:20px; border-radius:8px; overflow:hidden; }
+.bar>span{ position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--accent); }
+.bar .val{ position:relative; z-index:1; font-size:.9rem; padding-left:.5rem; color:#fff; }
 
-/* asteittainen väriskaala soluille */
-.cell-grad.good   { background:linear-gradient(90deg, rgba(34,197,94,.25), transparent); }
-.cell-grad.bad    { background:linear-gradient(90deg, rgba(239,68,68,.25), transparent); }
-.cell-muted { color:var(--muted); }
+.cell-grad.good{ background:linear-gradient(90deg, rgba(34,197,94,.25), transparent); }
+.cell-grad.bad{  background:linear-gradient(90deg, rgba(239,68,68,.25), transparent); }
+.cell-muted{ color:var(--muted); }
+th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cursor:help; }
 
-/* tooltip otsikoissa */
-th[title] { text-decoration: underline dotted #777; text-underline-offset: 3px; cursor: help; }
-
-/* Joukkueosio + ohjeteksti */
 .team-section{ padding:.25rem 0 1.25rem; border-top:1px solid var(--border); margin-top:1rem; }
 .muted{ color:var(--muted); font-size:.95rem; margin:.25rem 0 1rem; }
 
-/* Toolbar (filter + CSV + columns) */
 .toolbar{ display:flex; gap:.75rem; align-items:center; margin:.4rem 0 .5rem; flex-wrap:wrap; }
 details.cols summary{ cursor:pointer; }
 details.cols div{ display:flex; gap:.75rem; flex-wrap:wrap; padding:.5rem 0; }
 
-/* Tulostus */
+.tabs{ margin:.75rem 0 1rem; }
+.tab-nav{ display:flex; gap:.5rem; }
+.tab-btn{ background:var(--chip-bg); color:var(--fg); border:1px solid var(--border); padding:.35rem .7rem; border-radius:999px; cursor:pointer; }
+.tab-btn.active{ background:#3a3a3a; }
+.tab-panel{ display:none; }
+.tab-panel.active{ display:block; }
+
+.logo{ height:130px; width:130px; object-fit:cover; vertical-align:middle; border-radius:4px; margin-right:.5rem; background:#111; border:1px solid var(--border); }
+.nav .logo{ height:35px; width:35px; margin-right:.4rem; }
+
+.div-summary{ display:grid; grid-template-columns:1.2fr 1fr; gap:1rem; margin:.75rem 0 1rem; }
+.div-summary .card{ background:var(--table-bg); border:1px solid var(--border); border-radius:8px; padding:.75rem .9rem; }
+.summary-grid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.6rem; }
+.summary-item{ background:var(--table-alt); border:1px solid var(--border); border-radius:6px; padding:.5rem .6rem; text-align:center; }
+.summary-item .label{ color:var(--muted); font-size:.9rem; }
+.summary-item .val{ font-size:1.15rem; font-weight:600; }
+.leaders table{ width:100%; border-collapse:collapse; }
+.leaders th,.leaders td{ padding:.35rem .5rem; border-bottom:1px solid var(--border); text-align:left; }
+.leaders th{ color:var(--muted); font-weight:600; }
+
 @media print{
   body{ background:#fff; color:#000; }
   .page{ max-width:100%; padding:0; }
-  .nav, .toolbar{ display:none; }
+  .nav,.toolbar{ display:none; }
   .bar{ height:12px; }
 }
-
-/* Tabs (Basic / Advanced) */
-.tabs { margin:.75rem 0 1rem; }
-.tab-nav { display:flex; gap:.5rem; }
-.tab-btn {
-  background: var(--chip-bg);
-  color: var(--fg);
-  border:1px solid var(--border);
-  padding:.35rem .7rem; border-radius:999px; cursor:pointer;
-}
-.tab-btn.active { background:#3a3a3a; }
-.tab-panel { display:none; }
-.tab-panel.active { display:block; }
-
-/* Joukkueen logot */
-.logo{
-  height:130px; width:130px; object-fit:cover;
-  vertical-align:middle; border-radius:4px; margin-right:.5rem;
-  background:#111; border:1px solid var(--border);
-}
-.nav .logo{
-  height:35px; width:35px; margin-right:.4rem;
-}
-
-/* Division summary */
-.div-summary{
-  display:grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 1rem;
-  margin: .75rem 0 1rem;
-}
-.div-summary .card{
-  background: var(--table-bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: .75rem .9rem;
-}
-.summary-grid{
-  display:grid;
-  grid-template-columns: repeat(4, minmax(0,1fr));
-  gap:.6rem;
-}
-.summary-item{
-  background: var(--table-alt);
-  border:1px solid var(--border);
-  border-radius:6px;
-  padding:.5rem .6rem;
-  text-align:center;
-}
-.summary-item .label{ color: var(--muted); font-size:.9rem; }
-.summary-item .val{ font-size:1.15rem; font-weight:600; }
-.leaders table{ width:100%; border-collapse:collapse; }
-.leaders th, .leaders td{ padding:.35rem .5rem; border-bottom:1px solid var(--border); text-align:left; }
-.leaders th{ color:var(--muted); font-weight:600; }
-
 </style>
 
 <script>
-// --- lajittelu ---
-function sortTable(tableId, n, numeric){
-  const table = document.getElementById(tableId);
-  const dirAttr = table.getAttribute('data-sort-dir') || 'asc';
-  const dir = dirAttr === 'asc' ? 1 : -1;
-  let rows = Array.from(table.tBodies[0].rows);
+function sortTable(tableId,n,numeric){
+  const table=document.getElementById(tableId);
+  const dirAttr=table.getAttribute('data-sort-dir')||'asc';
+  const dir=dirAttr==='asc'?1:-1;
+  let rows=Array.from(table.tBodies[0].rows);
   rows.sort((a,b)=>{
-    const x = a.cells[n].textContent.trim();
-    const y = b.cells[n].textContent.trim();
+    const x=a.cells[n].textContent.trim(); const y=b.cells[n].textContent.trim();
     if(numeric){
-      const nx = parseFloat(x.replace(',', '.')) || 0;
-      const ny = parseFloat(y.replace(',', '.')) || 0;
-      return (nx - ny) * dir;
+      const nx=parseFloat(x.replace(',','.'))||0; const ny=parseFloat(y.replace(',','.'))||0;
+      return (nx-ny)*dir;
     }
-    return x.localeCompare(y) * dir;
+    return x.localeCompare(y)*dir;
   });
   table.tBodies[0].append(...rows);
-  table.setAttribute('data-sort-dir', dirAttr === 'asc' ? 'desc' : 'asc');
+  table.setAttribute('data-sort-dir', dirAttr==='asc'?'desc':'asc');
 }
-
 function applyDefaultSort(tableId){
-  const t = document.getElementById(tableId);
-  if(!t) return;
-  const col = parseInt(t.getAttribute('data-sort-col') || '0',10);
-  const dir = (t.getAttribute('data-sort-dir') || 'asc') === 'asc';
-  sortTable(tableId, col, !dir);
-  sortTable(tableId, col, dir);
+  const t=document.getElementById(tableId); if(!t) return;
+  const col=parseInt(t.getAttribute('data-sort-col')||'0',10);
+  const dir=(t.getAttribute('data-sort-dir')||'asc')==='asc';
+  sortTable(tableId,col,!dir); sortTable(tableId,col,dir);
 }
-
-// --- Progress bar ---
-function renderBar(cell, value){
-  cell.innerHTML = '<div class="bar"><span></span><div class="val"></div></div>';
-  const span = cell.querySelector('.bar > span');
-  const val  = cell.querySelector('.bar .val');
-  val.textContent = (isFinite(value) ? value.toFixed(1) : 0) + '%';
-  const width = Math.max(0, Math.min(100, value));
-  span.style.width = width + '%';
-  const g = Math.round(120 * (width/100));
-  const r = Math.round(180 * (1 - width/100)) + 60;
-  span.style.background = `rgb(${r}, ${g+80}, 100)`;
+function renderBar(cell,value){
+  cell.innerHTML='<div class="bar"><span></span><div class="val"></div></div>';
+  const span=cell.querySelector('.bar > span'); const val=cell.querySelector('.bar .val');
+  val.textContent=(isFinite(value)?value.toFixed(1):0)+'%';
+  const width=Math.max(0,Math.min(100,value)); span.style.width=width+'%';
+  const g=Math.round(120*(width/100)); const r=Math.round(180*(1-width/100))+60;
+  span.style.background=`rgb(${r},${g+80},100)`;
 }
-
-// --- Played only ---
-function bindPlayedOnly(tableId, chkId){
-  const chk = document.getElementById(chkId);
-  const t = document.getElementById(tableId);
-  if(!chk || !t) return;
-  const colPlayed = 1;
-  chk.addEventListener('change', ()=> {
-    for(const tr of t.tBodies[0].rows){
-      const played = parseInt(tr.cells[colPlayed].textContent||'0',10);
-      tr.style.display = (chk.checked && !played) ? 'none' : '';
-    }
-  });
+function bindPlayedOnly(tableId,chkId){
+  const chk=document.getElementById(chkId); const t=document.getElementById(tableId);
+  if(!chk||!t) return; const colPlayed=1;
+  chk.addEventListener('change',()=>{ for(const tr of t.tBodies[0].rows){ const played=parseInt(tr.cells[colPlayed].textContent||'0',10); tr.style.display=(chk.checked&&!played)?'none':''; }});
 }
-
-/**
- * Jatkuva liukuva väritys p25-p50-p75 -kriteereillä.
- * - lo = p25, mid = p50, hi = p75
- * - inverse=false: hi parempi (vihreä), lo huonompi (punainen)
- * - inverse=true: toisin päin
- * Väri: HSL-hue 0..120 (punainen→vihreä), alpha kasvaa kun etäännytään medianista.
- */
-function colorizeContinuous(tableId, colIdx, p25, p50, p75, inverse=false){
-  const t = document.getElementById(tableId);
-  if(!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-
+/* p25–p50–p75 liuku: punainen→vihreä */
+function colorizeContinuous(tableId,colIdx,p25,p50,p75,inverse=false){
+  const t=document.getElementById(tableId); if(!t||!t.tBodies.length) return;
+  const rows=t.tBodies[0].rows;
   for(const tr of rows){
-    const td = tr.cells[colIdx];
-    let v = parseFloat((td.textContent||'').replace(',', '.'));
-    if(!isFinite(v)) { td.classList.add('cell-muted'); continue; }
-
-    // Skaalaus p25..p75: alle p25 punertava, yli p75 vihertävä
-    let ratio;
-    if (v <= p25) ratio = 0;
-    else if (v >= p75) ratio = 1;
-    else ratio = (v - p25) / (p75 - p25 || 1);
-
-    if (inverse) ratio = 1 - ratio;
-
-    // Punaisesta vihreään
-    const r = Math.round(220 * (1 - ratio));
-    const g = Math.round(220 * ratio);
-    const b = 0;
-    td.style.background = `rgba(${r},${g},${b},0.25)`;
+    const td=tr.cells[colIdx]; let v=parseFloat((td.textContent||'').replace(',','.'));
+    if(!isFinite(v)){ td.classList.add('cell-muted'); continue; }
+    let ratio; if(v<=p25) ratio=0; else if(v>=p75) ratio=1; else ratio=(v-p25)/(p75-p25||1);
+    if(inverse) ratio=1-ratio;
+    const r=Math.round(240*(1-ratio)); const g=Math.round(220*ratio); td.style.background=`rgba(${r},${g},0,0.28)`;
   }
 }
-
-function postProcessTable(tableId, opts){
-  const t = document.getElementById(tableId);
-  if(!t || !t.tBodies.length) return;
-  const rows = t.tBodies[0].rows;
-
-  // Progress bar -sarakkeet (esim. WR%)
+function postProcessTable(tableId,opts){
+  const t=document.getElementById(tableId); if(!t||!t.tBodies.length) return;
+  const rows=t.tBodies[0].rows;
   if(opts.bars){
     for(const tr of rows){
-      const played = parseInt(tr.cells[1].textContent||'0',10); // kolumni 1 = Played
-      opts.bars.forEach(i => {
-        const num = parseFloat((tr.cells[i].textContent || '').replace(',', '.'));
-        renderBar(tr.cells[i], isFinite(num) ? num : 0);
-        const span = tr.cells[i].querySelector('.bar > span');
-        if(span) span.style.opacity = Math.max(.35, Math.min(1, Math.sqrt(played)/2));
+      const played=parseInt(tr.cells[1].textContent||'0',10);
+      opts.bars.forEach(i=>{
+        const num=parseFloat((tr.cells[i].textContent||'').replace(',','.'));
+        renderBar(tr.cells[i], isFinite(num)?num:0);
+        const span=tr.cells[i].querySelector('.bar > span'); if(span) span.style.opacity=Math.max(.35,Math.min(1,Math.sqrt(played)/2));
       });
     }
   }
-
-  // Väritykset p25-p50-p75
-  if(opts.color){
-    opts.color.forEach(c => {
-      colorizeContinuous(tableId, c.col, c.p[0], c.p[1], c.p[2], c.inverse||false);
-    });
-  }
-
-  // Oletuslajittelu
-  if(opts.defaultSort){
-    sortTable(tableId, opts.defaultSort.col, opts.defaultSort.dir === 'asc');
-  }
-
-  // Sarake-toggle
+  if(opts.color){ opts.color.forEach(c=>colorizeContinuous(tableId,c.col,c.p[0],c.p[1],c.p[2],c.inverse||false)); }
+  if(opts.defaultSort){ sortTable(tableId,opts.defaultSort.col,opts.defaultSort.dir==='asc'); }
   if(opts.toggles) buildColumnToggles(tableId);
 }
-
-
-// --- Saraketooglet ---
 function buildColumnToggles(tableId){
-  const t = document.getElementById(tableId);
-  const host = document.querySelector(`details.cols div[data-for="${tableId}"]`);
-  if(!t || !host) return;
-  const ths = [...t.tHead.rows[0].cells];
-  ths.forEach((th, idx)=>{
-    const id = `${tableId}-col-${idx}`;
-    const wrap = document.createElement('label');
-    wrap.innerHTML = `<input type="checkbox" id="${id}" checked> ${th.textContent}`;
+  const t=document.getElementById(tableId);
+  const host=document.querySelector(`details.cols div[data-for="${tableId}"]`);
+  if(!t||!host) return; const ths=[...t.tHead.rows[0].cells];
+  ths.forEach((th,idx)=>{
+    const id=`${tableId}-col-${idx}`; const wrap=document.createElement('label');
+    wrap.innerHTML=`<input type="checkbox" id="${id}" checked> ${th.textContent}`;
     host.appendChild(wrap);
-    wrap.querySelector('input').addEventListener('change', (e)=>{
-      const on = e.target.checked;
-      th.style.display = on ? '' : 'none';
-      for(const tr of t.tBodies[0].rows){
-        tr.cells[idx].style.display = on ? '' : 'none';
-      }
+    wrap.querySelector('input').addEventListener('change',(e)=>{
+      const on=e.target.checked; th.style.display=on?'':'none';
+      for(const tr of t.tBodies[0].rows){ tr.cells[idx].style.display=on?'':'none'; }
     });
   });
 }
-
-// Tabien vaihto
-function switchTab(containerId, tabName){
-  const root = document.getElementById(containerId);
-  if(!root) return;
-  const panels = root.querySelectorAll('.tab-panel');
-  const buttons = root.querySelectorAll('.tab-btn');
-  panels.forEach(p => p.classList.remove('active'));
-  buttons.forEach(b => b.classList.remove('active'));
+function switchTab(containerId,tabName){
+  const root=document.getElementById(containerId); if(!root) return;
+  const panels=root.querySelectorAll('.tab-panel'); const buttons=root.querySelectorAll('.tab-btn');
+  panels.forEach(p=>p.classList.remove('active')); buttons.forEach(b=>b.classList.remove('active'));
   root.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
   root.querySelector(`[data-target="${tabName}"]`)?.classList.add('active');
   initTabsAutoSort(containerId);
 }
-
-
 function initTabsAutoSort(rootId){
-  const root = document.getElementById(rootId);
-  if(!root) return;
-  const activePanel = root.querySelector('.tab-panel.active');
-  if(!activePanel) return;
-  const table = activePanel.querySelector('table');
-  if(!table) return;
-
-  // Pakota nimen mukaan (kolumni 0), tekstilajittelu, nouseva
-  table.setAttribute('data-sort-col', '0');
-  table.setAttribute('data-sort-dir', 'desc'); // tehdään kaksi kutsua, jotta lopputulos on asc
-
-  // 1) sorttaa nimen mukaan (desc), 2) sorttaa uudelleen (asc)
-  sortTable(table.id, 0, /*numeric*/ false);
-  sortTable(table.id, 0, /*numeric*/ false);
+  const root=document.getElementById(rootId); if(!root) return;
+  const activePanel=root.querySelector('.tab-panel.active'); if(!activePanel) return;
+  const table=activePanel.querySelector('table'); if(!table) return;
+  table.setAttribute('data-sort-col','0'); table.setAttribute('data-sort-dir','desc');
+  sortTable(table.id,0,false); sortTable(table.id,0,false);
 }
-
-// Aja nimen (kolumni 0) mukainen lajittelu kaikille pelaajataabeille heti sivun latauksen jälkeen
-document.addEventListener('DOMContentLoaded', () => {
-  // Valitse kaikki tab-kontainerit, joilla on id (esim. "tabs-xxxx")
-  document.querySelectorAll('.tabs[id]').forEach(root => {
-    initTabsAutoSort(root.id);
-  });
-});
-
+document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.tabs[id]').forEach(root=>initTabsAutoSort(root.id)); });
 </script>
 </head>
 <body>
 
 <div class="page">
-<h1>20 Divisioona S11 <span class='muted'>(generoitu 2025-08-30 01:31)</span></h1>
+<h1>20 Divisioona S11 <span class='muted'>(generoitu 2025-08-30 02:34)</span></h1>
 <div class="nav">
 <a href="#team-0fa9f8cd-3d3a-4812-ae59-81f257eeb7a7"><img class="logo" src="https://distribution.faceit-cdn.net/images/0584678d-5731-44fe-92dd-aaab2aca815a.jpg" alt="">Armafinland</a>
 <a href="#team-2f754ef4-f411-4a26-9024-92aa65746d72"><img class="logo" src="https://distribution.faceit-cdn.net/images/7d25926a-531c-40b2-946b-a5c61d1b6576.jpeg" alt="">CS-apustajat</a>
@@ -420,118 +251,117 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-1',12,true)">4K</th>
           <th onclick="sortTable('players-basic-1',13,true)">5K</th>
           <th onclick="sortTable('players-basic-1',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>Lolkai</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.3">116</td>
-              <td>1.32</td>
-              <td>91.5</td>
-              <td>0.84</td>
-              <td>96</td>
-              <td>73</td>
-              <td>40</td>
-              <td>47.2</td>
-              <td>0</td>
-              <td>5</td>
-              <td>0</td>
-              <td>0</td>
-              <td>15</td>
-            </tr>
+            <td>Lolkai</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.3">116</td>
+            <td>1.32</td>
+            <td>91.5</td>
+            <td>0.84</td>
+            <td>96</td>
+            <td>73</td>
+            <td>40</td>
+            <td>47.2</td>
+            <td>0</td>
+            <td>5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>15</td>
+          </tr>
 <tr>
-              <td>anzar</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.3">116</td>
-              <td>1.23</td>
-              <td>76.6</td>
-              <td>0.71</td>
-              <td>81</td>
-              <td>66</td>
-              <td>34</td>
-              <td>26.2</td>
-              <td>3</td>
-              <td>3</td>
-              <td>1</td>
-              <td>0</td>
-              <td>14</td>
-            </tr>
+            <td>anzar</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.3">116</td>
+            <td>1.23</td>
+            <td>76.6</td>
+            <td>0.71</td>
+            <td>81</td>
+            <td>66</td>
+            <td>34</td>
+            <td>26.2</td>
+            <td>3</td>
+            <td>3</td>
+            <td>1</td>
+            <td>0</td>
+            <td>14</td>
+          </tr>
 <tr>
-              <td>Vajaa</td>
-              <td>4</td>
-              <td title="Rounds/Map: 18.2">73</td>
-              <td>1.75</td>
-              <td>124.7</td>
-              <td>1.13</td>
-              <td>77</td>
-              <td>44</td>
-              <td>33</td>
-              <td>50.2</td>
-              <td>2</td>
-              <td>5</td>
-              <td>0</td>
-              <td>0</td>
-              <td>13</td>
-            </tr>
+            <td>Vajaa</td>
+            <td>4</td>
+            <td title="Rounds/Map: 18.2">73</td>
+            <td>1.75</td>
+            <td>124.7</td>
+            <td>1.13</td>
+            <td>77</td>
+            <td>44</td>
+            <td>33</td>
+            <td>50.2</td>
+            <td>2</td>
+            <td>5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>13</td>
+          </tr>
 <tr>
-              <td>Shuv1t</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.8">83</td>
-              <td>1.38</td>
-              <td>86.9</td>
-              <td>0.83</td>
-              <td>69</td>
-              <td>50</td>
-              <td>20</td>
-              <td>39.0</td>
-              <td>1</td>
-              <td>4</td>
-              <td>0</td>
-              <td>0</td>
-              <td>10</td>
-            </tr>
+            <td>Shuv1t</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.8">83</td>
+            <td>1.38</td>
+            <td>86.9</td>
+            <td>0.83</td>
+            <td>69</td>
+            <td>50</td>
+            <td>20</td>
+            <td>39.0</td>
+            <td>1</td>
+            <td>4</td>
+            <td>0</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
 <tr>
-              <td>Cultti</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.3">116</td>
-              <td>0.92</td>
-              <td>61.9</td>
-              <td>0.58</td>
-              <td>66</td>
-              <td>72</td>
-              <td>28</td>
-              <td>37.0</td>
-              <td>1</td>
-              <td>2</td>
-              <td>1</td>
-              <td>0</td>
-              <td>9</td>
-            </tr>
+            <td>Cultti</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.3">116</td>
+            <td>0.92</td>
+            <td>61.9</td>
+            <td>0.58</td>
+            <td>66</td>
+            <td>72</td>
+            <td>28</td>
+            <td>37.0</td>
+            <td>1</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>9</td>
+          </tr>
 <tr>
-              <td>Tuntematonjr</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.0">76</td>
-              <td>1.26</td>
-              <td>72.6</td>
-              <td>0.69</td>
-              <td>53</td>
-              <td>42</td>
-              <td>17</td>
-              <td>38.5</td>
-              <td>1</td>
-              <td>4</td>
-              <td>1</td>
-              <td>0</td>
-              <td>8</td>
-            </tr>
+            <td>Tuntematonjr</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.0">76</td>
+            <td>1.26</td>
+            <td>72.6</td>
+            <td>0.69</td>
+            <td>53</td>
+            <td>42</td>
+            <td>17</td>
+            <td>38.5</td>
+            <td>1</td>
+            <td>4</td>
+            <td>1</td>
+            <td>0</td>
+            <td>8</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-1', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -550,13 +380,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-1',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-1',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-1',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-1',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-1',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-1',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-1',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-1',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-1',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-1',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-1',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-1',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-1',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-1',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-1',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-1',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-1',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>Lolkai</td>
@@ -573,6 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>36</td>
 <td>24</td>
 <td>0.69</td>
+<td>18</td>
 </tr>
 <tr>
 <td>anzar</td>
@@ -589,6 +421,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>18</td>
 <td>12</td>
 <td>0.78</td>
+<td>18</td>
 </tr>
 <tr>
 <td>Vajaa</td>
@@ -605,6 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>33</td>
 <td>20</td>
 <td>0.87</td>
+<td>7</td>
 </tr>
 <tr>
 <td>Shuv1t</td>
@@ -621,6 +455,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>46</td>
 <td>30</td>
 <td>0.90</td>
+<td>10</td>
 </tr>
 <tr>
 <td>Cultti</td>
@@ -637,6 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>26</td>
 <td>17</td>
 <td>0.81</td>
+<td>8</td>
 </tr>
 <tr>
 <td>Tuntematonjr</td>
@@ -653,22 +489,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>25</td>
 <td>15</td>
 <td>1.25</td>
+<td>10</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-1');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-1', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Nuke (3×)</span>
 <span class="chip">Most picked: Overpass (2×)</span>
@@ -817,20 +642,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>1</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-1', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-1', 'maps-1-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-2f754ef4-f411-4a26-9024-92aa65746d72" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/7d25926a-531c-40b2-946b-a5c61d1b6576.jpeg" alt="">CS-apustajat</h2></summary>
@@ -863,152 +674,151 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-2',12,true)">4K</th>
           <th onclick="sortTable('players-basic-2',13,true)">5K</th>
           <th onclick="sortTable('players-basic-2',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>tirsa</td>
-              <td>6</td>
-              <td title="Rounds/Map: 20.0">120</td>
-              <td>1.77</td>
-              <td>102.9</td>
-              <td>1.05</td>
-              <td>122</td>
-              <td>69</td>
-              <td>34</td>
-              <td>23.7</td>
-              <td>2</td>
-              <td>7</td>
-              <td>1</td>
-              <td>0</td>
-              <td>21</td>
-            </tr>
+            <td>tirsa</td>
+            <td>6</td>
+            <td title="Rounds/Map: 20.0">120</td>
+            <td>1.77</td>
+            <td>102.9</td>
+            <td>1.05</td>
+            <td>122</td>
+            <td>69</td>
+            <td>34</td>
+            <td>23.7</td>
+            <td>2</td>
+            <td>7</td>
+            <td>1</td>
+            <td>0</td>
+            <td>21</td>
+          </tr>
 <tr>
-              <td>Taikis</td>
-              <td>6</td>
-              <td title="Rounds/Map: 20.0">120</td>
-              <td>1.37</td>
-              <td>99.8</td>
-              <td>0.87</td>
-              <td>107</td>
-              <td>78</td>
-              <td>42</td>
-              <td>47.0</td>
-              <td>14</td>
-              <td>6</td>
-              <td>2</td>
-              <td>0</td>
-              <td>16</td>
-            </tr>
+            <td>Taikis</td>
+            <td>6</td>
+            <td title="Rounds/Map: 20.0">120</td>
+            <td>1.37</td>
+            <td>99.8</td>
+            <td>0.87</td>
+            <td>107</td>
+            <td>78</td>
+            <td>42</td>
+            <td>47.0</td>
+            <td>14</td>
+            <td>6</td>
+            <td>2</td>
+            <td>0</td>
+            <td>16</td>
+          </tr>
 <tr>
-              <td>tZuu</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.2">81</td>
-              <td>1.53</td>
-              <td>77.5</td>
-              <td>0.85</td>
-              <td>69</td>
-              <td>45</td>
-              <td>22</td>
-              <td>33.0</td>
-              <td>0</td>
-              <td>4</td>
-              <td>1</td>
-              <td>0</td>
-              <td>10</td>
-            </tr>
+            <td>tZuu</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.2">81</td>
+            <td>1.53</td>
+            <td>77.5</td>
+            <td>0.85</td>
+            <td>69</td>
+            <td>45</td>
+            <td>22</td>
+            <td>33.0</td>
+            <td>0</td>
+            <td>4</td>
+            <td>1</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
 <tr>
-              <td>Heykeyy</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.2">77</td>
-              <td>0.85</td>
-              <td>69.5</td>
-              <td>0.67</td>
-              <td>51</td>
-              <td>60</td>
-              <td>25</td>
-              <td>25.2</td>
-              <td>5</td>
-              <td>1</td>
-              <td>1</td>
-              <td>0</td>
-              <td>10</td>
-            </tr>
+            <td>Heykeyy</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.2">77</td>
+            <td>0.85</td>
+            <td>69.5</td>
+            <td>0.67</td>
+            <td>51</td>
+            <td>60</td>
+            <td>25</td>
+            <td>25.2</td>
+            <td>5</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
 <tr>
-              <td>Abandemon</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.5">82</td>
-              <td>0.64</td>
-              <td>58.3</td>
-              <td>0.48</td>
-              <td>36</td>
-              <td>56</td>
-              <td>18</td>
-              <td>47.0</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>5</td>
-            </tr>
+            <td>Abandemon</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.5">82</td>
+            <td>0.64</td>
+            <td>58.3</td>
+            <td>0.48</td>
+            <td>36</td>
+            <td>56</td>
+            <td>18</td>
+            <td>47.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>5</td>
+          </tr>
 <tr>
-              <td>Suolamartti</td>
-              <td>2</td>
-              <td title="Rounds/Map: 19.0">38</td>
-              <td>1.12</td>
-              <td>73.6</td>
-              <td>0.69</td>
-              <td>27</td>
-              <td>24</td>
-              <td>13</td>
-              <td>43.5</td>
-              <td>0</td>
-              <td>2</td>
-              <td>1</td>
-              <td>0</td>
-              <td>4</td>
-            </tr>
+            <td>Suolamartti</td>
+            <td>2</td>
+            <td title="Rounds/Map: 19.0">38</td>
+            <td>1.12</td>
+            <td>73.6</td>
+            <td>0.69</td>
+            <td>27</td>
+            <td>24</td>
+            <td>13</td>
+            <td>43.5</td>
+            <td>0</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>4</td>
+          </tr>
 <tr>
-              <td>Benamaister</td>
-              <td>2</td>
-              <td title="Rounds/Map: 19.5">39</td>
-              <td>0.66</td>
-              <td>70.5</td>
-              <td>0.52</td>
-              <td>21</td>
-              <td>32</td>
-              <td>8</td>
-              <td>55.0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>3</td>
-            </tr>
+            <td>Benamaister</td>
+            <td>2</td>
+            <td title="Rounds/Map: 19.5">39</td>
+            <td>0.66</td>
+            <td>70.5</td>
+            <td>0.52</td>
+            <td>21</td>
+            <td>32</td>
+            <td>8</td>
+            <td>55.0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>3</td>
+          </tr>
 <tr>
-              <td>straikah</td>
-              <td>2</td>
-              <td title="Rounds/Map: 21.5">43</td>
-              <td>0.62</td>
-              <td>47.5</td>
-              <td>0.45</td>
-              <td>16</td>
-              <td>26</td>
-              <td>7</td>
-              <td>56.0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
+            <td>straikah</td>
+            <td>2</td>
+            <td title="Rounds/Map: 21.5">43</td>
+            <td>0.62</td>
+            <td>47.5</td>
+            <td>0.45</td>
+            <td>16</td>
+            <td>26</td>
+            <td>7</td>
+            <td>56.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-2', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -1027,13 +837,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-2',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-2',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-2',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-2',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-2',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-2',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-2',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-2',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-2',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-2',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-2',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-2',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-2',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-2',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-2',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-2',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-2',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>tirsa</td>
@@ -1050,6 +861,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>57</td>
 <td>37</td>
 <td>0.88</td>
+<td>21</td>
 </tr>
 <tr>
 <td>Taikis</td>
@@ -1066,6 +878,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>44</td>
 <td>34</td>
 <td>0.61</td>
+<td>12</td>
 </tr>
 <tr>
 <td>tZuu</td>
@@ -1082,6 +895,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>45</td>
 <td>30</td>
 <td>0.76</td>
+<td>11</td>
 </tr>
 <tr>
 <td>Heykeyy</td>
@@ -1098,6 +912,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>13</td>
 <td>10</td>
 <td>0.52</td>
+<td>15</td>
 </tr>
 <tr>
 <td>Abandemon</td>
@@ -1114,6 +929,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>36</td>
 <td>20</td>
 <td>1.12</td>
+<td>8</td>
 </tr>
 <tr>
 <td>Suolamartti</td>
@@ -1130,6 +946,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>1</td>
 <td>1</td>
 <td>0.20</td>
+<td>5</td>
 </tr>
 <tr>
 <td>Benamaister</td>
@@ -1146,6 +963,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>13</td>
 <td>7</td>
 <td>0.68</td>
+<td>6</td>
 </tr>
 <tr>
 <td>straikah</td>
@@ -1162,22 +980,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>3</td>
 <td>3</td>
 <td>0.60</td>
+<td>5</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-2');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-2', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Overpass (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -1326,20 +1133,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>2</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-2', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-2', 'maps-2-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-e694421d-b859-4374-8724-646c4777e250" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/19a37e76-4071-4fd2-b84c-ad3c71322b7b.jpeg" alt="">Dorve</h2></summary>
@@ -1372,118 +1165,117 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-3',12,true)">4K</th>
           <th onclick="sortTable('players-basic-3',13,true)">5K</th>
           <th onclick="sortTable('players-basic-3',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>Pinles</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.7">118</td>
-              <td>1.70</td>
-              <td>100.8</td>
-              <td>1.06</td>
-              <td>126</td>
-              <td>74</td>
-              <td>22</td>
-              <td>37.5</td>
-              <td>0</td>
-              <td>12</td>
-              <td>2</td>
-              <td>1</td>
-              <td>22</td>
-            </tr>
+            <td>Pinles</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.7">118</td>
+            <td>1.70</td>
+            <td>100.8</td>
+            <td>1.06</td>
+            <td>126</td>
+            <td>74</td>
+            <td>22</td>
+            <td>37.5</td>
+            <td>0</td>
+            <td>12</td>
+            <td>2</td>
+            <td>1</td>
+            <td>22</td>
+          </tr>
 <tr>
-              <td>Nemira</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.7">118</td>
-              <td>1.22</td>
-              <td>87.9</td>
-              <td>0.79</td>
-              <td>93</td>
-              <td>76</td>
-              <td>41</td>
-              <td>43.7</td>
-              <td>0</td>
-              <td>6</td>
-              <td>2</td>
-              <td>0</td>
-              <td>15</td>
-            </tr>
+            <td>Nemira</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.7">118</td>
+            <td>1.22</td>
+            <td>87.9</td>
+            <td>0.79</td>
+            <td>93</td>
+            <td>76</td>
+            <td>41</td>
+            <td>43.7</td>
+            <td>0</td>
+            <td>6</td>
+            <td>2</td>
+            <td>0</td>
+            <td>15</td>
+          </tr>
 <tr>
-              <td>Pimgu</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.7">118</td>
-              <td>1.15</td>
-              <td>78.2</td>
-              <td>0.71</td>
-              <td>86</td>
-              <td>75</td>
-              <td>30</td>
-              <td>37.3</td>
-              <td>0</td>
-              <td>7</td>
-              <td>0</td>
-              <td>0</td>
-              <td>17</td>
-            </tr>
+            <td>Pimgu</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.7">118</td>
+            <td>1.15</td>
+            <td>78.2</td>
+            <td>0.71</td>
+            <td>86</td>
+            <td>75</td>
+            <td>30</td>
+            <td>37.3</td>
+            <td>0</td>
+            <td>7</td>
+            <td>0</td>
+            <td>0</td>
+            <td>17</td>
+          </tr>
 <tr>
-              <td>Hyrypaa</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.5">78</td>
-              <td>1.10</td>
-              <td>70.8</td>
-              <td>0.70</td>
-              <td>53</td>
-              <td>48</td>
-              <td>19</td>
-              <td>33.0</td>
-              <td>0</td>
-              <td>6</td>
-              <td>0</td>
-              <td>0</td>
-              <td>7</td>
-            </tr>
+            <td>Hyrypaa</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.5">78</td>
+            <td>1.10</td>
+            <td>70.8</td>
+            <td>0.70</td>
+            <td>53</td>
+            <td>48</td>
+            <td>19</td>
+            <td>33.0</td>
+            <td>0</td>
+            <td>6</td>
+            <td>0</td>
+            <td>0</td>
+            <td>7</td>
+          </tr>
 <tr>
-              <td>MikkoBoy</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.7">118</td>
-              <td>0.55</td>
-              <td>62.8</td>
-              <td>0.41</td>
-              <td>49</td>
-              <td>89</td>
-              <td>37</td>
-              <td>42.0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>3</td>
-            </tr>
+            <td>MikkoBoy</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.7">118</td>
+            <td>0.55</td>
+            <td>62.8</td>
+            <td>0.41</td>
+            <td>49</td>
+            <td>89</td>
+            <td>37</td>
+            <td>42.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+          </tr>
 <tr>
-              <td>xCoorative</td>
-              <td>2</td>
-              <td title="Rounds/Map: 20.0">40</td>
-              <td>0.54</td>
-              <td>49.5</td>
-              <td>0.36</td>
-              <td>15</td>
-              <td>28</td>
-              <td>10</td>
-              <td>35.0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-            </tr>
+            <td>xCoorative</td>
+            <td>2</td>
+            <td title="Rounds/Map: 20.0">40</td>
+            <td>0.54</td>
+            <td>49.5</td>
+            <td>0.36</td>
+            <td>15</td>
+            <td>28</td>
+            <td>10</td>
+            <td>35.0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-3', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -1502,13 +1294,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-3',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-3',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-3',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-3',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-3',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-3',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-3',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-3',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-3',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-3',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-3',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-3',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-3',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-3',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-3',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-3',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-3',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>Pinles</td>
@@ -1525,6 +1318,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>45</td>
 <td>30</td>
 <td>0.80</td>
+<td>21</td>
 </tr>
 <tr>
 <td>Nemira</td>
@@ -1541,6 +1335,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>27</td>
 <td>21</td>
 <td>0.79</td>
+<td>18</td>
 </tr>
 <tr>
 <td>Pimgu</td>
@@ -1557,6 +1352,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>25</td>
 <td>17</td>
 <td>0.89</td>
+<td>16</td>
 </tr>
 <tr>
 <td>Hyrypaa</td>
@@ -1573,6 +1369,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>24</td>
 <td>22</td>
 <td>0.62</td>
+<td>7</td>
 </tr>
 <tr>
 <td>MikkoBoy</td>
@@ -1589,6 +1386,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>20</td>
 <td>18</td>
 <td>0.61</td>
+<td>13</td>
 </tr>
 <tr>
 <td>xCoorative</td>
@@ -1605,22 +1403,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>17</td>
 <td>8</td>
 <td>0.85</td>
+<td>3</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-3');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-3', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Train (3×)</span>
 <span class="chip">Most picked: Dust II (1×)</span>
@@ -1769,20 +1556,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>3</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-3', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-3', 'maps-3-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-ee607038-b238-4c60-81dc-acc04b9d661c" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/c7c83ae6-54a8-4ac8-a859-0564adbd1502.jpeg" alt="">drkSLAYez</h2></summary>
@@ -1815,135 +1588,134 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-4',12,true)">4K</th>
           <th onclick="sortTable('players-basic-4',13,true)">5K</th>
           <th onclick="sortTable('players-basic-4',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>Rimpularapu</td>
-              <td>8</td>
-              <td title="Rounds/Map: 19.5">156</td>
-              <td>0.91</td>
-              <td>80.8</td>
-              <td>0.71</td>
-              <td>116</td>
-              <td>128</td>
-              <td>35</td>
-              <td>37.9</td>
-              <td>21</td>
-              <td>8</td>
-              <td>2</td>
-              <td>1</td>
-              <td>13</td>
-            </tr>
+            <td>Rimpularapu</td>
+            <td>8</td>
+            <td title="Rounds/Map: 19.5">156</td>
+            <td>0.91</td>
+            <td>80.8</td>
+            <td>0.71</td>
+            <td>116</td>
+            <td>128</td>
+            <td>35</td>
+            <td>37.9</td>
+            <td>21</td>
+            <td>8</td>
+            <td>2</td>
+            <td>1</td>
+            <td>13</td>
+          </tr>
 <tr>
-              <td>Qhandi</td>
-              <td>8</td>
-              <td title="Rounds/Map: 19.5">156</td>
-              <td>0.83</td>
-              <td>76.7</td>
-              <td>0.69</td>
-              <td>106</td>
-              <td>127</td>
-              <td>31</td>
-              <td>39.8</td>
-              <td>3</td>
-              <td>7</td>
-              <td>0</td>
-              <td>0</td>
-              <td>13</td>
-            </tr>
+            <td>Qhandi</td>
+            <td>8</td>
+            <td title="Rounds/Map: 19.5">156</td>
+            <td>0.83</td>
+            <td>76.7</td>
+            <td>0.69</td>
+            <td>106</td>
+            <td>127</td>
+            <td>31</td>
+            <td>39.8</td>
+            <td>3</td>
+            <td>7</td>
+            <td>0</td>
+            <td>0</td>
+            <td>13</td>
+          </tr>
 <tr>
-              <td>paskajaskati</td>
-              <td>6</td>
-              <td title="Rounds/Map: 20.3">122</td>
-              <td>0.91</td>
-              <td>77.9</td>
-              <td>0.65</td>
-              <td>84</td>
-              <td>92</td>
-              <td>25</td>
-              <td>28.2</td>
-              <td>17</td>
-              <td>6</td>
-              <td>0</td>
-              <td>0</td>
-              <td>13</td>
-            </tr>
+            <td>paskajaskati</td>
+            <td>6</td>
+            <td title="Rounds/Map: 20.3">122</td>
+            <td>0.91</td>
+            <td>77.9</td>
+            <td>0.65</td>
+            <td>84</td>
+            <td>92</td>
+            <td>25</td>
+            <td>28.2</td>
+            <td>17</td>
+            <td>6</td>
+            <td>0</td>
+            <td>0</td>
+            <td>13</td>
+          </tr>
 <tr>
-              <td>jaylandslide</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.8">119</td>
-              <td>0.56</td>
-              <td>59.5</td>
-              <td>0.48</td>
-              <td>57</td>
-              <td>101</td>
-              <td>25</td>
-              <td>44.5</td>
-              <td>0</td>
-              <td>2</td>
-              <td>0</td>
-              <td>0</td>
-              <td>4</td>
-            </tr>
+            <td>jaylandslide</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.8">119</td>
+            <td>0.56</td>
+            <td>59.5</td>
+            <td>0.48</td>
+            <td>57</td>
+            <td>101</td>
+            <td>25</td>
+            <td>44.5</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>4</td>
+          </tr>
 <tr>
-              <td>miikkam55</td>
-              <td>6</td>
-              <td title="Rounds/Map: 18.8">113</td>
-              <td>0.52</td>
-              <td>62.5</td>
-              <td>0.43</td>
-              <td>48</td>
-              <td>92</td>
-              <td>32</td>
-              <td>44.0</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>4</td>
-            </tr>
+            <td>miikkam55</td>
+            <td>6</td>
+            <td title="Rounds/Map: 18.8">113</td>
+            <td>0.52</td>
+            <td>62.5</td>
+            <td>0.43</td>
+            <td>48</td>
+            <td>92</td>
+            <td>32</td>
+            <td>44.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>4</td>
+          </tr>
 <tr>
-              <td>Polomna</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.2">77</td>
-              <td>0.52</td>
-              <td>53.2</td>
-              <td>0.42</td>
-              <td>34</td>
-              <td>66</td>
-              <td>16</td>
-              <td>38.2</td>
-              <td>4</td>
-              <td>1</td>
-              <td>1</td>
-              <td>0</td>
-              <td>6</td>
-            </tr>
+            <td>Polomna</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.2">77</td>
+            <td>0.52</td>
+            <td>53.2</td>
+            <td>0.42</td>
+            <td>34</td>
+            <td>66</td>
+            <td>16</td>
+            <td>38.2</td>
+            <td>4</td>
+            <td>1</td>
+            <td>1</td>
+            <td>0</td>
+            <td>6</td>
+          </tr>
 <tr>
-              <td>Fabahaba</td>
-              <td>2</td>
-              <td title="Rounds/Map: 18.5">37</td>
-              <td>0.85</td>
-              <td>64.0</td>
-              <td>0.61</td>
-              <td>23</td>
-              <td>27</td>
-              <td>7</td>
-              <td>39.0</td>
-              <td>0</td>
-              <td>3</td>
-              <td>0</td>
-              <td>0</td>
-              <td>3</td>
-            </tr>
+            <td>Fabahaba</td>
+            <td>2</td>
+            <td title="Rounds/Map: 18.5">37</td>
+            <td>0.85</td>
+            <td>64.0</td>
+            <td>0.61</td>
+            <td>23</td>
+            <td>27</td>
+            <td>7</td>
+            <td>39.0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-4', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -1962,13 +1734,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-4',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-4',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-4',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-4',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-4',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-4',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-4',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-4',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-4',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-4',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-4',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-4',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-4',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-4',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-4',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-4',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-4',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>Rimpularapu</td>
@@ -1985,6 +1758,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>45</td>
 <td>31</td>
 <td>0.67</td>
+<td>22</td>
 </tr>
 <tr>
 <td>Qhandi</td>
@@ -2001,6 +1775,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>49</td>
 <td>34</td>
 <td>0.75</td>
+<td>24</td>
 </tr>
 <tr>
 <td>paskajaskati</td>
@@ -2017,6 +1792,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>35</td>
 <td>25</td>
 <td>0.83</td>
+<td>17</td>
 </tr>
 <tr>
 <td>jaylandslide</td>
@@ -2033,6 +1809,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>71</td>
 <td>44</td>
 <td>0.80</td>
+<td>7</td>
 </tr>
 <tr>
 <td>miikkam55</td>
@@ -2049,6 +1826,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>54</td>
 <td>35</td>
 <td>0.77</td>
+<td>9</td>
 </tr>
 <tr>
 <td>Polomna</td>
@@ -2065,6 +1843,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>5</td>
 <td>4</td>
 <td>0.28</td>
+<td>9</td>
 </tr>
 <tr>
 <td>Fabahaba</td>
@@ -2081,22 +1860,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>7</td>
 <td>6</td>
 <td>0.88</td>
+<td>2</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-4');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-4', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Inferno (3×)</span>
 <span class="chip">Most picked: Nuke (2×)</span>
@@ -2245,20 +2013,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>0</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-4', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-4', 'maps-4-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-753b32ea-1d6e-46ab-8a8b-151de3229325" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/7aabf40f-1120-4006-a374-71993b222073.jpeg" alt="">Hold My Beer</h2></summary>
@@ -2291,135 +2045,134 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-5',12,true)">4K</th>
           <th onclick="sortTable('players-basic-5',13,true)">5K</th>
           <th onclick="sortTable('players-basic-5',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>Intozzz</td>
-              <td>8</td>
-              <td title="Rounds/Map: 22.9">183</td>
-              <td>1.54</td>
-              <td>94.3</td>
-              <td>0.98</td>
-              <td>179</td>
-              <td>116</td>
-              <td>40</td>
-              <td>34.0</td>
-              <td>25</td>
-              <td>9</td>
-              <td>3</td>
-              <td>1</td>
-              <td>26</td>
-            </tr>
+            <td>Intozzz</td>
+            <td>8</td>
+            <td title="Rounds/Map: 22.9">183</td>
+            <td>1.54</td>
+            <td>94.3</td>
+            <td>0.98</td>
+            <td>179</td>
+            <td>116</td>
+            <td>40</td>
+            <td>34.0</td>
+            <td>25</td>
+            <td>9</td>
+            <td>3</td>
+            <td>1</td>
+            <td>26</td>
+          </tr>
 <tr>
-              <td>Harteezyy</td>
-              <td>8</td>
-              <td title="Rounds/Map: 22.9">183</td>
-              <td>1.37</td>
-              <td>89.0</td>
-              <td>0.87</td>
-              <td>155</td>
-              <td>113</td>
-              <td>35</td>
-              <td>37.9</td>
-              <td>3</td>
-              <td>10</td>
-              <td>0</td>
-              <td>2</td>
-              <td>22</td>
-            </tr>
+            <td>Harteezyy</td>
+            <td>8</td>
+            <td title="Rounds/Map: 22.9">183</td>
+            <td>1.37</td>
+            <td>89.0</td>
+            <td>0.87</td>
+            <td>155</td>
+            <td>113</td>
+            <td>35</td>
+            <td>37.9</td>
+            <td>3</td>
+            <td>10</td>
+            <td>0</td>
+            <td>2</td>
+            <td>22</td>
+          </tr>
 <tr>
-              <td>Hiirulainen</td>
-              <td>8</td>
-              <td title="Rounds/Map: 22.9">183</td>
-              <td>1.06</td>
-              <td>84.5</td>
-              <td>0.69</td>
-              <td>126</td>
-              <td>119</td>
-              <td>62</td>
-              <td>39.6</td>
-              <td>1</td>
-              <td>7</td>
-              <td>1</td>
-              <td>0</td>
-              <td>25</td>
-            </tr>
+            <td>Hiirulainen</td>
+            <td>8</td>
+            <td title="Rounds/Map: 22.9">183</td>
+            <td>1.06</td>
+            <td>84.5</td>
+            <td>0.69</td>
+            <td>126</td>
+            <td>119</td>
+            <td>62</td>
+            <td>39.6</td>
+            <td>1</td>
+            <td>7</td>
+            <td>1</td>
+            <td>0</td>
+            <td>25</td>
+          </tr>
 <tr>
-              <td>Tuippa</td>
-              <td>6</td>
-              <td title="Rounds/Map: 23.5">141</td>
-              <td>0.89</td>
-              <td>83.9</td>
-              <td>0.69</td>
-              <td>99</td>
-              <td>111</td>
-              <td>41</td>
-              <td>32.7</td>
-              <td>1</td>
-              <td>5</td>
-              <td>3</td>
-              <td>0</td>
-              <td>13</td>
-            </tr>
+            <td>Tuippa</td>
+            <td>6</td>
+            <td title="Rounds/Map: 23.5">141</td>
+            <td>0.89</td>
+            <td>83.9</td>
+            <td>0.69</td>
+            <td>99</td>
+            <td>111</td>
+            <td>41</td>
+            <td>32.7</td>
+            <td>1</td>
+            <td>5</td>
+            <td>3</td>
+            <td>0</td>
+            <td>13</td>
+          </tr>
 <tr>
-              <td>Coira</td>
-              <td>4</td>
-              <td title="Rounds/Map: 24.0">96</td>
-              <td>0.81</td>
-              <td>73.7</td>
-              <td>0.58</td>
-              <td>52</td>
-              <td>64</td>
-              <td>36</td>
-              <td>39.5</td>
-              <td>18</td>
-              <td>5</td>
-              <td>0</td>
-              <td>0</td>
-              <td>5</td>
-            </tr>
+            <td>Coira</td>
+            <td>4</td>
+            <td title="Rounds/Map: 24.0">96</td>
+            <td>0.81</td>
+            <td>73.7</td>
+            <td>0.58</td>
+            <td>52</td>
+            <td>64</td>
+            <td>36</td>
+            <td>39.5</td>
+            <td>18</td>
+            <td>5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>5</td>
+          </tr>
 <tr>
-              <td>Sh4dowvv</td>
-              <td>4</td>
-              <td title="Rounds/Map: 21.8">87</td>
-              <td>0.84</td>
-              <td>59.5</td>
-              <td>0.54</td>
-              <td>46</td>
-              <td>55</td>
-              <td>14</td>
-              <td>32.0</td>
-              <td>2</td>
-              <td>1</td>
-              <td>0</td>
-              <td>1</td>
-              <td>6</td>
-            </tr>
+            <td>Sh4dowvv</td>
+            <td>4</td>
+            <td title="Rounds/Map: 21.8">87</td>
+            <td>0.84</td>
+            <td>59.5</td>
+            <td>0.54</td>
+            <td>46</td>
+            <td>55</td>
+            <td>14</td>
+            <td>32.0</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>1</td>
+            <td>6</td>
+          </tr>
 <tr>
-              <td>eziroo</td>
-              <td>2</td>
-              <td title="Rounds/Map: 21.0">42</td>
-              <td>1.04</td>
-              <td>67.2</td>
-              <td>0.64</td>
-              <td>27</td>
-              <td>26</td>
-              <td>8</td>
-              <td>26.0</td>
-              <td>17</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
+            <td>eziroo</td>
+            <td>2</td>
+            <td title="Rounds/Map: 21.0">42</td>
+            <td>1.04</td>
+            <td>67.2</td>
+            <td>0.64</td>
+            <td>27</td>
+            <td>26</td>
+            <td>8</td>
+            <td>26.0</td>
+            <td>17</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>2</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-5', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -2438,13 +2191,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-5',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-5',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-5',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-5',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-5',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-5',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-5',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-5',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-5',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-5',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-5',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-5',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-5',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-5',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-5',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-5',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-5',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>Intozzz</td>
@@ -2461,6 +2215,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>69</td>
 <td>42</td>
 <td>1.06</td>
+<td>24</td>
 </tr>
 <tr>
 <td>Harteezyy</td>
@@ -2477,6 +2232,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>38</td>
 <td>23</td>
 <td>0.75</td>
+<td>16</td>
 </tr>
 <tr>
 <td>Hiirulainen</td>
@@ -2493,6 +2249,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>59</td>
 <td>39</td>
 <td>0.79</td>
+<td>19</td>
 </tr>
 <tr>
 <td>Tuippa</td>
@@ -2509,6 +2266,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>21</td>
 <td>16</td>
 <td>0.43</td>
+<td>12</td>
 </tr>
 <tr>
 <td>Coira</td>
@@ -2525,6 +2283,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>16</td>
 <td>10</td>
 <td>0.89</td>
+<td>7</td>
 </tr>
 <tr>
 <td>Sh4dowvv</td>
@@ -2541,6 +2300,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>37</td>
 <td>25</td>
 <td>0.80</td>
+<td>9</td>
 </tr>
 <tr>
 <td>eziroo</td>
@@ -2557,22 +2317,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>2</td>
 <td>1</td>
 <td>0.50</td>
+<td>3</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-5');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-5', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Dust II (4×)</span>
 <span class="chip">Most picked: Nuke (3×)</span>
@@ -2721,20 +2470,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>0</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-5', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-5', 'maps-5-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-a508e6bd-4241-477d-81eb-0252800cab06" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/ccea1c6a-950f-4f58-9115-7a70c401b175.jpeg" alt="">HuKi</h2></summary>
@@ -2767,152 +2502,151 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-6',12,true)">4K</th>
           <th onclick="sortTable('players-basic-6',13,true)">5K</th>
           <th onclick="sortTable('players-basic-6',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>Sarutuubaa</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.2">115</td>
-              <td>1.28</td>
-              <td>84.9</td>
-              <td>0.80</td>
-              <td>92</td>
-              <td>72</td>
-              <td>32</td>
-              <td>60.7</td>
-              <td>0</td>
-              <td>4</td>
-              <td>1</td>
-              <td>0</td>
-              <td>10</td>
-            </tr>
+            <td>Sarutuubaa</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.2">115</td>
+            <td>1.28</td>
+            <td>84.9</td>
+            <td>0.80</td>
+            <td>92</td>
+            <td>72</td>
+            <td>32</td>
+            <td>60.7</td>
+            <td>0</td>
+            <td>4</td>
+            <td>1</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
 <tr>
-              <td>Jeke87</td>
-              <td>6</td>
-              <td title="Rounds/Map: 19.2">115</td>
-              <td>1.12</td>
-              <td>75.9</td>
-              <td>0.80</td>
-              <td>90</td>
-              <td>80</td>
-              <td>29</td>
-              <td>34.8</td>
-              <td>21</td>
-              <td>6</td>
-              <td>0</td>
-              <td>0</td>
-              <td>10</td>
-            </tr>
+            <td>Jeke87</td>
+            <td>6</td>
+            <td title="Rounds/Map: 19.2">115</td>
+            <td>1.12</td>
+            <td>75.9</td>
+            <td>0.80</td>
+            <td>90</td>
+            <td>80</td>
+            <td>29</td>
+            <td>34.8</td>
+            <td>21</td>
+            <td>6</td>
+            <td>0</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
 <tr>
-              <td>keksiee</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.8">79</td>
-              <td>1.05</td>
-              <td>92.1</td>
-              <td>0.75</td>
-              <td>59</td>
-              <td>56</td>
-              <td>32</td>
-              <td>59.8</td>
-              <td>0</td>
-              <td>2</td>
-              <td>1</td>
-              <td>1</td>
-              <td>12</td>
-            </tr>
+            <td>keksiee</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.8">79</td>
+            <td>1.05</td>
+            <td>92.1</td>
+            <td>0.75</td>
+            <td>59</td>
+            <td>56</td>
+            <td>32</td>
+            <td>59.8</td>
+            <td>0</td>
+            <td>2</td>
+            <td>1</td>
+            <td>1</td>
+            <td>12</td>
+          </tr>
 <tr>
-              <td>Olber24</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.2">81</td>
-              <td>0.84</td>
-              <td>80.1</td>
-              <td>0.64</td>
-              <td>53</td>
-              <td>63</td>
-              <td>32</td>
-              <td>39.5</td>
-              <td>0</td>
-              <td>3</td>
-              <td>1</td>
-              <td>0</td>
-              <td>6</td>
-            </tr>
+            <td>Olber24</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.2">81</td>
+            <td>0.84</td>
+            <td>80.1</td>
+            <td>0.64</td>
+            <td>53</td>
+            <td>63</td>
+            <td>32</td>
+            <td>39.5</td>
+            <td>0</td>
+            <td>3</td>
+            <td>1</td>
+            <td>0</td>
+            <td>6</td>
+          </tr>
 <tr>
-              <td>RaineVeltti</td>
-              <td>4</td>
-              <td title="Rounds/Map: 17.5">70</td>
-              <td>0.94</td>
-              <td>81.8</td>
-              <td>0.72</td>
-              <td>50</td>
-              <td>53</td>
-              <td>19</td>
-              <td>21.5</td>
-              <td>0</td>
-              <td>3</td>
-              <td>1</td>
-              <td>0</td>
-              <td>5</td>
-            </tr>
+            <td>RaineVeltti</td>
+            <td>4</td>
+            <td title="Rounds/Map: 17.5">70</td>
+            <td>0.94</td>
+            <td>81.8</td>
+            <td>0.72</td>
+            <td>50</td>
+            <td>53</td>
+            <td>19</td>
+            <td>21.5</td>
+            <td>0</td>
+            <td>3</td>
+            <td>1</td>
+            <td>0</td>
+            <td>5</td>
+          </tr>
 <tr>
-              <td>L0gger_</td>
-              <td>2</td>
-              <td title="Rounds/Map: 22.5">45</td>
-              <td>1.15</td>
-              <td>57.2</td>
-              <td>0.67</td>
-              <td>30</td>
-              <td>26</td>
-              <td>4</td>
-              <td>34.0</td>
-              <td>0</td>
-              <td>3</td>
-              <td>0</td>
-              <td>0</td>
-              <td>7</td>
-            </tr>
+            <td>L0gger_</td>
+            <td>2</td>
+            <td title="Rounds/Map: 22.5">45</td>
+            <td>1.15</td>
+            <td>57.2</td>
+            <td>0.67</td>
+            <td>30</td>
+            <td>26</td>
+            <td>4</td>
+            <td>34.0</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>7</td>
+          </tr>
 <tr>
-              <td>mikza</td>
-              <td>2</td>
-              <td title="Rounds/Map: 17.0">34</td>
-              <td>1.58</td>
-              <td>85.5</td>
-              <td>0.88</td>
-              <td>30</td>
-              <td>19</td>
-              <td>11</td>
-              <td>37.5</td>
-              <td>0</td>
-              <td>4</td>
-              <td>0</td>
-              <td>0</td>
-              <td>8</td>
-            </tr>
+            <td>mikza</td>
+            <td>2</td>
+            <td title="Rounds/Map: 17.0">34</td>
+            <td>1.58</td>
+            <td>85.5</td>
+            <td>0.88</td>
+            <td>30</td>
+            <td>19</td>
+            <td>11</td>
+            <td>37.5</td>
+            <td>0</td>
+            <td>4</td>
+            <td>0</td>
+            <td>0</td>
+            <td>8</td>
+          </tr>
 <tr>
-              <td>Ospemo</td>
-              <td>2</td>
-              <td title="Rounds/Map: 18.0">36</td>
-              <td>0.54</td>
-              <td>63.7</td>
-              <td>0.54</td>
-              <td>19</td>
-              <td>35</td>
-              <td>3</td>
-              <td>73.0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>1</td>
-            </tr>
+            <td>Ospemo</td>
+            <td>2</td>
+            <td title="Rounds/Map: 18.0">36</td>
+            <td>0.54</td>
+            <td>63.7</td>
+            <td>0.54</td>
+            <td>19</td>
+            <td>35</td>
+            <td>3</td>
+            <td>73.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-6', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -2931,13 +2665,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-6',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-6',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-6',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-6',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-6',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-6',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-6',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-6',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-6',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-6',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-6',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-6',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-6',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-6',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-6',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-6',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-6',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>Sarutuubaa</td>
@@ -2954,6 +2689,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>5</td>
 <td>3</td>
 <td>0.31</td>
+<td>14</td>
 </tr>
 <tr>
 <td>Jeke87</td>
@@ -2970,6 +2706,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>15</td>
 <td>9</td>
 <td>1.00</td>
+<td>17</td>
 </tr>
 <tr>
 <td>keksiee</td>
@@ -2986,6 +2723,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>64</td>
 <td>37</td>
 <td>1.14</td>
+<td>8</td>
 </tr>
 <tr>
 <td>Olber24</td>
@@ -3002,6 +2740,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>39</td>
 <td>22</td>
 <td>0.95</td>
+<td>11</td>
 </tr>
 <tr>
 <td>RaineVeltti</td>
@@ -3018,6 +2757,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>6</td>
 <td>5</td>
 <td>0.86</td>
+<td>9</td>
 </tr>
 <tr>
 <td>L0gger_</td>
@@ -3034,6 +2774,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>0</td>
 <td>0</td>
 <td>0.00</td>
+<td>12</td>
 </tr>
 <tr>
 <td>mikza</td>
@@ -3050,6 +2791,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>9</td>
 <td>8</td>
 <td>0.56</td>
+<td>2</td>
 </tr>
 <tr>
 <td>Ospemo</td>
@@ -3066,22 +2808,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>17</td>
 <td>8</td>
 <td>0.71</td>
+<td>8</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-6');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-6', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Inferno (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -3230,20 +2961,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>1</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-6', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-6', 'maps-6-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-1b14a5cb-ebf7-4caf-8c02-1fca17b7aa18" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/870f2708-cfb6-408d-9bdd-c3381c5343e6.jpg" alt="">Kerhonpapat</h2></summary>
@@ -3276,135 +2993,134 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-7',12,true)">4K</th>
           <th onclick="sortTable('players-basic-7',13,true)">5K</th>
           <th onclick="sortTable('players-basic-7',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>Naamiokala</td>
-              <td>6</td>
-              <td title="Rounds/Map: 20.0">120</td>
-              <td>1.04</td>
-              <td>85.3</td>
-              <td>0.71</td>
-              <td>87</td>
-              <td>84</td>
-              <td>32</td>
-              <td>43.3</td>
-              <td>8</td>
-              <td>4</td>
-              <td>3</td>
-              <td>0</td>
-              <td>13</td>
-            </tr>
+            <td>Naamiokala</td>
+            <td>6</td>
+            <td title="Rounds/Map: 20.0">120</td>
+            <td>1.04</td>
+            <td>85.3</td>
+            <td>0.71</td>
+            <td>87</td>
+            <td>84</td>
+            <td>32</td>
+            <td>43.3</td>
+            <td>8</td>
+            <td>4</td>
+            <td>3</td>
+            <td>0</td>
+            <td>13</td>
+          </tr>
 <tr>
-              <td>Isojano-</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.5">82</td>
-              <td>1.34</td>
-              <td>91.2</td>
-              <td>0.85</td>
-              <td>71</td>
-              <td>53</td>
-              <td>20</td>
-              <td>42.8</td>
-              <td>3</td>
-              <td>3</td>
-              <td>6</td>
-              <td>0</td>
-              <td>8</td>
-            </tr>
+            <td>Isojano-</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.5">82</td>
+            <td>1.34</td>
+            <td>91.2</td>
+            <td>0.85</td>
+            <td>71</td>
+            <td>53</td>
+            <td>20</td>
+            <td>42.8</td>
+            <td>3</td>
+            <td>3</td>
+            <td>6</td>
+            <td>0</td>
+            <td>8</td>
+          </tr>
 <tr>
-              <td>To_omi</td>
-              <td>6</td>
-              <td title="Rounds/Map: 20.0">120</td>
-              <td>0.71</td>
-              <td>62.0</td>
-              <td>0.53</td>
-              <td>65</td>
-              <td>91</td>
-              <td>24</td>
-              <td>49.0</td>
-              <td>9</td>
-              <td>6</td>
-              <td>1</td>
-              <td>0</td>
-              <td>9</td>
-            </tr>
+            <td>To_omi</td>
+            <td>6</td>
+            <td title="Rounds/Map: 20.0">120</td>
+            <td>0.71</td>
+            <td>62.0</td>
+            <td>0.53</td>
+            <td>65</td>
+            <td>91</td>
+            <td>24</td>
+            <td>49.0</td>
+            <td>9</td>
+            <td>6</td>
+            <td>1</td>
+            <td>0</td>
+            <td>9</td>
+          </tr>
 <tr>
-              <td>Foxmania</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.0">80</td>
-              <td>0.98</td>
-              <td>82.9</td>
-              <td>0.71</td>
-              <td>58</td>
-              <td>59</td>
-              <td>19</td>
-              <td>51.0</td>
-              <td>1</td>
-              <td>3</td>
-              <td>1</td>
-              <td>0</td>
-              <td>7</td>
-            </tr>
+            <td>Foxmania</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.0">80</td>
+            <td>0.98</td>
+            <td>82.9</td>
+            <td>0.71</td>
+            <td>58</td>
+            <td>59</td>
+            <td>19</td>
+            <td>51.0</td>
+            <td>1</td>
+            <td>3</td>
+            <td>1</td>
+            <td>0</td>
+            <td>7</td>
+          </tr>
 <tr>
-              <td>WaLugia</td>
-              <td>6</td>
-              <td title="Rounds/Map: 20.0">120</td>
-              <td>0.54</td>
-              <td>50.5</td>
-              <td>0.43</td>
-              <td>51</td>
-              <td>94</td>
-              <td>21</td>
-              <td>52.0</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>4</td>
-            </tr>
+            <td>WaLugia</td>
+            <td>6</td>
+            <td title="Rounds/Map: 20.0">120</td>
+            <td>0.54</td>
+            <td>50.5</td>
+            <td>0.43</td>
+            <td>51</td>
+            <td>94</td>
+            <td>21</td>
+            <td>52.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>4</td>
+          </tr>
 <tr>
-              <td>Japrno</td>
-              <td>2</td>
-              <td title="Rounds/Map: 20.0">40</td>
-              <td>0.62</td>
-              <td>60.2</td>
-              <td>0.50</td>
-              <td>20</td>
-              <td>32</td>
-              <td>7</td>
-              <td>44.0</td>
-              <td>3</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>8</td>
-            </tr>
+            <td>Japrno</td>
+            <td>2</td>
+            <td title="Rounds/Map: 20.0">40</td>
+            <td>0.62</td>
+            <td>60.2</td>
+            <td>0.50</td>
+            <td>20</td>
+            <td>32</td>
+            <td>7</td>
+            <td>44.0</td>
+            <td>3</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>8</td>
+          </tr>
 <tr>
-              <td>kleemis123</td>
-              <td>2</td>
-              <td title="Rounds/Map: 19.0">38</td>
-              <td>0.67</td>
-              <td>59.0</td>
-              <td>0.52</td>
-              <td>20</td>
-              <td>30</td>
-              <td>4</td>
-              <td>33.0</td>
-              <td>7</td>
-              <td>2</td>
-              <td>0</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
+            <td>kleemis123</td>
+            <td>2</td>
+            <td title="Rounds/Map: 19.0">38</td>
+            <td>0.67</td>
+            <td>59.0</td>
+            <td>0.52</td>
+            <td>20</td>
+            <td>30</td>
+            <td>4</td>
+            <td>33.0</td>
+            <td>7</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-7', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -3423,13 +3139,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-7',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-7',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-7',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-7',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-7',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-7',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-7',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-7',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-7',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-7',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-7',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-7',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-7',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-7',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-7',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-7',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-7',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>Naamiokala</td>
@@ -3446,6 +3163,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>50</td>
 <td>29</td>
 <td>0.86</td>
+<td>20</td>
 </tr>
 <tr>
 <td>Isojano-</td>
@@ -3462,6 +3180,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>56</td>
 <td>34</td>
 <td>0.88</td>
+<td>9</td>
 </tr>
 <tr>
 <td>To_omi</td>
@@ -3478,6 +3197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>37</td>
 <td>19</td>
 <td>1.09</td>
+<td>10</td>
 </tr>
 <tr>
 <td>Foxmania</td>
@@ -3494,6 +3214,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>43</td>
 <td>26</td>
 <td>0.86</td>
+<td>12</td>
 </tr>
 <tr>
 <td>WaLugia</td>
@@ -3510,6 +3231,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>39</td>
 <td>22</td>
 <td>1.34</td>
+<td>12</td>
 </tr>
 <tr>
 <td>Japrno</td>
@@ -3526,6 +3248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>0</td>
 <td>0</td>
 <td>0.00</td>
+<td>1</td>
 </tr>
 <tr>
 <td>kleemis123</td>
@@ -3542,22 +3265,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>2</td>
 <td>2</td>
 <td>0.50</td>
+<td>3</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-7');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-7', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Nuke (2×)</span>
 <span class="chip">Most picked: Dust II (1×)</span>
@@ -3706,20 +3418,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>2</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-7', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-7', 'maps-7-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-526fab8b-d95e-485b-89a9-5b22f40c8fa7" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt="">KuskiOnTulossa</h2></summary>
@@ -3752,135 +3450,134 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-8',12,true)">4K</th>
           <th onclick="sortTable('players-basic-8',13,true)">5K</th>
           <th onclick="sortTable('players-basic-8',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>keravanjari</td>
-              <td>6</td>
-              <td title="Rounds/Map: 17.5">105</td>
-              <td>1.05</td>
-              <td>89.2</td>
-              <td>0.78</td>
-              <td>83</td>
-              <td>79</td>
-              <td>28</td>
-              <td>32.7</td>
-              <td>0</td>
-              <td>5</td>
-              <td>0</td>
-              <td>0</td>
-              <td>12</td>
-            </tr>
+            <td>keravanjari</td>
+            <td>6</td>
+            <td title="Rounds/Map: 17.5">105</td>
+            <td>1.05</td>
+            <td>89.2</td>
+            <td>0.78</td>
+            <td>83</td>
+            <td>79</td>
+            <td>28</td>
+            <td>32.7</td>
+            <td>0</td>
+            <td>5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>12</td>
+          </tr>
 <tr>
-              <td>hj3lmut</td>
-              <td>6</td>
-              <td title="Rounds/Map: 17.5">105</td>
-              <td>0.72</td>
-              <td>59.0</td>
-              <td>0.55</td>
-              <td>60</td>
-              <td>83</td>
-              <td>18</td>
-              <td>36.3</td>
-              <td>0</td>
-              <td>4</td>
-              <td>1</td>
-              <td>0</td>
-              <td>9</td>
-            </tr>
+            <td>hj3lmut</td>
+            <td>6</td>
+            <td title="Rounds/Map: 17.5">105</td>
+            <td>0.72</td>
+            <td>59.0</td>
+            <td>0.55</td>
+            <td>60</td>
+            <td>83</td>
+            <td>18</td>
+            <td>36.3</td>
+            <td>0</td>
+            <td>4</td>
+            <td>1</td>
+            <td>0</td>
+            <td>9</td>
+          </tr>
 <tr>
-              <td>permiss</td>
-              <td>2</td>
-              <td title="Rounds/Map: 20.0">40</td>
-              <td>2.26</td>
-              <td>135.3</td>
-              <td>1.32</td>
-              <td>52</td>
-              <td>23</td>
-              <td>9</td>
-              <td>51.5</td>
-              <td>0</td>
-              <td>5</td>
-              <td>1</td>
-              <td>0</td>
-              <td>9</td>
-            </tr>
+            <td>permiss</td>
+            <td>2</td>
+            <td title="Rounds/Map: 20.0">40</td>
+            <td>2.26</td>
+            <td>135.3</td>
+            <td>1.32</td>
+            <td>52</td>
+            <td>23</td>
+            <td>9</td>
+            <td>51.5</td>
+            <td>0</td>
+            <td>5</td>
+            <td>1</td>
+            <td>0</td>
+            <td>9</td>
+          </tr>
 <tr>
-              <td>mikamattaa</td>
-              <td>6</td>
-              <td title="Rounds/Map: 17.5">105</td>
-              <td>0.49</td>
-              <td>48.3</td>
-              <td>0.40</td>
-              <td>44</td>
-              <td>90</td>
-              <td>18</td>
-              <td>29.0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
+            <td>mikamattaa</td>
+            <td>6</td>
+            <td title="Rounds/Map: 17.5">105</td>
+            <td>0.49</td>
+            <td>48.3</td>
+            <td>0.40</td>
+            <td>44</td>
+            <td>90</td>
+            <td>18</td>
+            <td>29.0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+          </tr>
 <tr>
-              <td>kivi247</td>
-              <td>6</td>
-              <td title="Rounds/Map: 17.5">105</td>
-              <td>0.45</td>
-              <td>50.7</td>
-              <td>0.32</td>
-              <td>36</td>
-              <td>80</td>
-              <td>20</td>
-              <td>52.5</td>
-              <td>5</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>3</td>
-            </tr>
+            <td>kivi247</td>
+            <td>6</td>
+            <td title="Rounds/Map: 17.5">105</td>
+            <td>0.45</td>
+            <td>50.7</td>
+            <td>0.32</td>
+            <td>36</td>
+            <td>80</td>
+            <td>20</td>
+            <td>52.5</td>
+            <td>5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>3</td>
+          </tr>
 <tr>
-              <td>TOPIJAAKOLA</td>
-              <td>2</td>
-              <td title="Rounds/Map: 16.0">32</td>
-              <td>0.82</td>
-              <td>81.3</td>
-              <td>0.72</td>
-              <td>23</td>
-              <td>28</td>
-              <td>7</td>
-              <td>30.5</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
+            <td>TOPIJAAKOLA</td>
+            <td>2</td>
+            <td title="Rounds/Map: 16.0">32</td>
+            <td>0.82</td>
+            <td>81.3</td>
+            <td>0.72</td>
+            <td>23</td>
+            <td>28</td>
+            <td>7</td>
+            <td>30.5</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+          </tr>
 <tr>
-              <td>WkndWarrior</td>
-              <td>2</td>
-              <td title="Rounds/Map: 16.5">33</td>
-              <td>0.48</td>
-              <td>57.4</td>
-              <td>0.39</td>
-              <td>14</td>
-              <td>29</td>
-              <td>6</td>
-              <td>30.0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-            </tr>
+            <td>WkndWarrior</td>
+            <td>2</td>
+            <td title="Rounds/Map: 16.5">33</td>
+            <td>0.48</td>
+            <td>57.4</td>
+            <td>0.39</td>
+            <td>14</td>
+            <td>29</td>
+            <td>6</td>
+            <td>30.0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-8', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -3899,13 +3596,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-8',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-8',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-8',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-8',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-8',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-8',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-8',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-8',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-8',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-8',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-8',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-8',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-8',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-8',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-8',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-8',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-8',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>keravanjari</td>
@@ -3922,6 +3620,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>56</td>
 <td>37</td>
 <td>0.93</td>
+<td>11</td>
 </tr>
 <tr>
 <td>hj3lmut</td>
@@ -3938,6 +3637,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>25</td>
 <td>19</td>
 <td>0.69</td>
+<td>7</td>
 </tr>
 <tr>
 <td>permiss</td>
@@ -3954,6 +3654,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>15</td>
 <td>13</td>
 <td>0.42</td>
+<td>9</td>
 </tr>
 <tr>
 <td>mikamattaa</td>
@@ -3970,6 +3671,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>14</td>
 <td>10</td>
 <td>1.00</td>
+<td>7</td>
 </tr>
 <tr>
 <td>kivi247</td>
@@ -3986,6 +3688,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>30</td>
 <td>20</td>
 <td>0.57</td>
+<td>11</td>
 </tr>
 <tr>
 <td>TOPIJAAKOLA</td>
@@ -4002,6 +3705,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>18</td>
 <td>9</td>
 <td>1.38</td>
+<td>8</td>
 </tr>
 <tr>
 <td>WkndWarrior</td>
@@ -4018,22 +3722,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>11</td>
 <td>8</td>
 <td>0.85</td>
+<td>1</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-8');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-8', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Inferno (3×)</span>
 <span class="chip">Most picked: Nuke (2×)</span>
@@ -4182,20 +3875,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>0</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-8', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-8', 'maps-8-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-a932dfba-911b-4d2e-884e-562c99465554" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt="">MyyraMafia</h2></summary>
@@ -4228,152 +3907,151 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-9',12,true)">4K</th>
           <th onclick="sortTable('players-basic-9',13,true)">5K</th>
           <th onclick="sortTable('players-basic-9',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>buubibi</td>
-              <td>6</td>
-              <td title="Rounds/Map: 18.5">111</td>
-              <td>1.33</td>
-              <td>91.2</td>
-              <td>0.81</td>
-              <td>89</td>
-              <td>67</td>
-              <td>29</td>
-              <td>39.2</td>
-              <td>27</td>
-              <td>6</td>
-              <td>0</td>
-              <td>0</td>
-              <td>15</td>
-            </tr>
+            <td>buubibi</td>
+            <td>6</td>
+            <td title="Rounds/Map: 18.5">111</td>
+            <td>1.33</td>
+            <td>91.2</td>
+            <td>0.81</td>
+            <td>89</td>
+            <td>67</td>
+            <td>29</td>
+            <td>39.2</td>
+            <td>27</td>
+            <td>6</td>
+            <td>0</td>
+            <td>0</td>
+            <td>15</td>
+          </tr>
 <tr>
-              <td>papparainen</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.8">79</td>
-              <td>1.62</td>
-              <td>99.0</td>
-              <td>1.06</td>
-              <td>81</td>
-              <td>50</td>
-              <td>16</td>
-              <td>50.0</td>
-              <td>0</td>
-              <td>7</td>
-              <td>1</td>
-              <td>0</td>
-              <td>12</td>
-            </tr>
+            <td>papparainen</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.8">79</td>
+            <td>1.62</td>
+            <td>99.0</td>
+            <td>1.06</td>
+            <td>81</td>
+            <td>50</td>
+            <td>16</td>
+            <td>50.0</td>
+            <td>0</td>
+            <td>7</td>
+            <td>1</td>
+            <td>0</td>
+            <td>12</td>
+          </tr>
 <tr>
-              <td>Perkhele</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.8">79</td>
-              <td>1.30</td>
-              <td>92.4</td>
-              <td>0.89</td>
-              <td>69</td>
-              <td>53</td>
-              <td>24</td>
-              <td>51.5</td>
-              <td>10</td>
-              <td>7</td>
-              <td>0</td>
-              <td>1</td>
-              <td>11</td>
-            </tr>
+            <td>Perkhele</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.8">79</td>
+            <td>1.30</td>
+            <td>92.4</td>
+            <td>0.89</td>
+            <td>69</td>
+            <td>53</td>
+            <td>24</td>
+            <td>51.5</td>
+            <td>10</td>
+            <td>7</td>
+            <td>0</td>
+            <td>1</td>
+            <td>11</td>
+          </tr>
 <tr>
-              <td>Zuxin</td>
-              <td>4</td>
-              <td title="Rounds/Map: 17.8">71</td>
-              <td>1.34</td>
-              <td>76.8</td>
-              <td>0.79</td>
-              <td>55</td>
-              <td>41</td>
-              <td>21</td>
-              <td>29.0</td>
-              <td>0</td>
-              <td>1</td>
-              <td>3</td>
-              <td>0</td>
-              <td>6</td>
-            </tr>
+            <td>Zuxin</td>
+            <td>4</td>
+            <td title="Rounds/Map: 17.8">71</td>
+            <td>1.34</td>
+            <td>76.8</td>
+            <td>0.79</td>
+            <td>55</td>
+            <td>41</td>
+            <td>21</td>
+            <td>29.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>3</td>
+            <td>0</td>
+            <td>6</td>
+          </tr>
 <tr>
-              <td>Piippo8</td>
-              <td>4</td>
-              <td title="Rounds/Map: 17.8">71</td>
-              <td>1.23</td>
-              <td>72.2</td>
-              <td>0.69</td>
-              <td>49</td>
-              <td>40</td>
-              <td>23</td>
-              <td>36.0</td>
-              <td>0</td>
-              <td>1</td>
-              <td>2</td>
-              <td>0</td>
-              <td>7</td>
-            </tr>
+            <td>Piippo8</td>
+            <td>4</td>
+            <td title="Rounds/Map: 17.8">71</td>
+            <td>1.23</td>
+            <td>72.2</td>
+            <td>0.69</td>
+            <td>49</td>
+            <td>40</td>
+            <td>23</td>
+            <td>36.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>2</td>
+            <td>0</td>
+            <td>7</td>
+          </tr>
 <tr>
-              <td>Antzaaaaa</td>
-              <td>4</td>
-              <td title="Rounds/Map: 18.0">72</td>
-              <td>0.85</td>
-              <td>80.5</td>
-              <td>0.69</td>
-              <td>47</td>
-              <td>55</td>
-              <td>23</td>
-              <td>14.2</td>
-              <td>3</td>
-              <td>3</td>
-              <td>1</td>
-              <td>0</td>
-              <td>10</td>
-            </tr>
+            <td>Antzaaaaa</td>
+            <td>4</td>
+            <td title="Rounds/Map: 18.0">72</td>
+            <td>0.85</td>
+            <td>80.5</td>
+            <td>0.69</td>
+            <td>47</td>
+            <td>55</td>
+            <td>23</td>
+            <td>14.2</td>
+            <td>3</td>
+            <td>3</td>
+            <td>1</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
 <tr>
-              <td>McGaryMac</td>
-              <td>2</td>
-              <td title="Rounds/Map: 16.0">32</td>
-              <td>1.29</td>
-              <td>84.1</td>
-              <td>0.69</td>
-              <td>22</td>
-              <td>17</td>
-              <td>17</td>
-              <td>22.5</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>6</td>
-            </tr>
+            <td>McGaryMac</td>
+            <td>2</td>
+            <td title="Rounds/Map: 16.0">32</td>
+            <td>1.29</td>
+            <td>84.1</td>
+            <td>0.69</td>
+            <td>22</td>
+            <td>17</td>
+            <td>17</td>
+            <td>22.5</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>6</td>
+          </tr>
 <tr>
-              <td>JU1KK1</td>
-              <td>2</td>
-              <td title="Rounds/Map: 20.0">40</td>
-              <td>0.43</td>
-              <td>43.2</td>
-              <td>0.33</td>
-              <td>13</td>
-              <td>30</td>
-              <td>10</td>
-              <td>28.5</td>
-              <td>2</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>1</td>
-            </tr>
+            <td>JU1KK1</td>
+            <td>2</td>
+            <td title="Rounds/Map: 20.0">40</td>
+            <td>0.43</td>
+            <td>43.2</td>
+            <td>0.33</td>
+            <td>13</td>
+            <td>30</td>
+            <td>10</td>
+            <td>28.5</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-9', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -4392,13 +4070,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-9',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-9',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-9',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-9',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-9',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-9',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-9',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-9',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-9',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-9',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-9',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-9',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-9',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-9',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-9',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-9',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-9',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>buubibi</td>
@@ -4415,6 +4094,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>61</td>
 <td>41</td>
 <td>0.81</td>
+<td>14</td>
 </tr>
 <tr>
 <td>papparainen</td>
@@ -4431,6 +4111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>37</td>
 <td>21</td>
 <td>0.86</td>
+<td>15</td>
 </tr>
 <tr>
 <td>Perkhele</td>
@@ -4447,6 +4128,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>17</td>
 <td>13</td>
 <td>0.61</td>
+<td>11</td>
 </tr>
 <tr>
 <td>Zuxin</td>
@@ -4463,6 +4145,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>30</td>
 <td>21</td>
 <td>0.81</td>
+<td>7</td>
 </tr>
 <tr>
 <td>Piippo8</td>
@@ -4479,6 +4162,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>31</td>
 <td>23</td>
 <td>0.66</td>
+<td>11</td>
 </tr>
 <tr>
 <td>Antzaaaaa</td>
@@ -4495,6 +4179,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>31</td>
 <td>20</td>
 <td>1.11</td>
+<td>4</td>
 </tr>
 <tr>
 <td>McGaryMac</td>
@@ -4511,6 +4196,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>14</td>
 <td>9</td>
 <td>0.93</td>
+<td>5</td>
 </tr>
 <tr>
 <td>JU1KK1</td>
@@ -4527,22 +4213,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>13</td>
 <td>8</td>
 <td>1.44</td>
+<td>5</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-9');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-9', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Dust II (3×)</span>
 <span class="chip">Most picked: Ancient (1×)</span>
@@ -4691,20 +4366,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>1</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-9', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-9', 'maps-9-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-b284ce27-4745-4b76-9785-f86048e3a649" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/99802701-48b2-4fdd-a8db-40c309f7b29c.jpeg" alt="">Old-Farts</h2></summary>
@@ -4737,169 +4398,168 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-10',12,true)">4K</th>
           <th onclick="sortTable('players-basic-10',13,true)">5K</th>
           <th onclick="sortTable('players-basic-10',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>DJFITME</td>
-              <td>4</td>
-              <td title="Rounds/Map: 18.8">75</td>
-              <td>1.26</td>
-              <td>106.4</td>
-              <td>1.02</td>
-              <td>77</td>
-              <td>61</td>
-              <td>20</td>
-              <td>60.8</td>
-              <td>2</td>
-              <td>6</td>
-              <td>2</td>
-              <td>0</td>
-              <td>10</td>
-            </tr>
+            <td>DJFITME</td>
+            <td>4</td>
+            <td title="Rounds/Map: 18.8">75</td>
+            <td>1.26</td>
+            <td>106.4</td>
+            <td>1.02</td>
+            <td>77</td>
+            <td>61</td>
+            <td>20</td>
+            <td>60.8</td>
+            <td>2</td>
+            <td>6</td>
+            <td>2</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
 <tr>
-              <td>--Jone--</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.2">77</td>
-              <td>0.98</td>
-              <td>75.0</td>
-              <td>0.73</td>
-              <td>57</td>
-              <td>58</td>
-              <td>20</td>
-              <td>37.5</td>
-              <td>5</td>
-              <td>2</td>
-              <td>1</td>
-              <td>0</td>
-              <td>13</td>
-            </tr>
+            <td>--Jone--</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.2">77</td>
+            <td>0.98</td>
+            <td>75.0</td>
+            <td>0.73</td>
+            <td>57</td>
+            <td>58</td>
+            <td>20</td>
+            <td>37.5</td>
+            <td>5</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>13</td>
+          </tr>
 <tr>
-              <td>NakedDreamer</td>
-              <td>4</td>
-              <td title="Rounds/Map: 19.5">78</td>
-              <td>0.67</td>
-              <td>77.8</td>
-              <td>0.60</td>
-              <td>46</td>
-              <td>69</td>
-              <td>25</td>
-              <td>51.0</td>
-              <td>0</td>
-              <td>2</td>
-              <td>0</td>
-              <td>0</td>
-              <td>6</td>
-            </tr>
+            <td>NakedDreamer</td>
+            <td>4</td>
+            <td title="Rounds/Map: 19.5">78</td>
+            <td>0.67</td>
+            <td>77.8</td>
+            <td>0.60</td>
+            <td>46</td>
+            <td>69</td>
+            <td>25</td>
+            <td>51.0</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>6</td>
+          </tr>
 <tr>
-              <td>AukustiCat</td>
-              <td>5</td>
-              <td title="Rounds/Map: 18.8">94</td>
-              <td>0.65</td>
-              <td>54.1</td>
-              <td>0.48</td>
-              <td>45</td>
-              <td>69</td>
-              <td>16</td>
-              <td>21.8</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>1</td>
-            </tr>
+            <td>AukustiCat</td>
+            <td>5</td>
+            <td title="Rounds/Map: 18.8">94</td>
+            <td>0.65</td>
+            <td>54.1</td>
+            <td>0.48</td>
+            <td>45</td>
+            <td>69</td>
+            <td>16</td>
+            <td>21.8</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+          </tr>
 <tr>
-              <td>-Flovi-</td>
-              <td>3</td>
-              <td title="Rounds/Map: 19.3">58</td>
-              <td>1.26</td>
-              <td>81.0</td>
-              <td>0.77</td>
-              <td>44</td>
-              <td>35</td>
-              <td>11</td>
-              <td>41.7</td>
-              <td>0</td>
-              <td>3</td>
-              <td>0</td>
-              <td>0</td>
-              <td>5</td>
-            </tr>
+            <td>-Flovi-</td>
+            <td>3</td>
+            <td title="Rounds/Map: 19.3">58</td>
+            <td>1.26</td>
+            <td>81.0</td>
+            <td>0.77</td>
+            <td>44</td>
+            <td>35</td>
+            <td>11</td>
+            <td>41.7</td>
+            <td>0</td>
+            <td>3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>5</td>
+          </tr>
 <tr>
-              <td>DrunkenElf</td>
-              <td>3</td>
-              <td title="Rounds/Map: 20.3">61</td>
-              <td>1.10</td>
-              <td>75.8</td>
-              <td>0.70</td>
-              <td>43</td>
-              <td>39</td>
-              <td>14</td>
-              <td>33.7</td>
-              <td>0</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>8</td>
-            </tr>
+            <td>DrunkenElf</td>
+            <td>3</td>
+            <td title="Rounds/Map: 20.3">61</td>
+            <td>1.10</td>
+            <td>75.8</td>
+            <td>0.70</td>
+            <td>43</td>
+            <td>39</td>
+            <td>14</td>
+            <td>33.7</td>
+            <td>0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>8</td>
+          </tr>
 <tr>
-              <td>MAYH3Mi</td>
-              <td>2</td>
-              <td title="Rounds/Map: 19.0">38</td>
-              <td>0.85</td>
-              <td>57.5</td>
-              <td>0.60</td>
-              <td>23</td>
-              <td>27</td>
-              <td>4</td>
-              <td>44.0</td>
-              <td>3</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
+            <td>MAYH3Mi</td>
+            <td>2</td>
+            <td title="Rounds/Map: 19.0">38</td>
+            <td>0.85</td>
+            <td>57.5</td>
+            <td>0.60</td>
+            <td>23</td>
+            <td>27</td>
+            <td>4</td>
+            <td>44.0</td>
+            <td>3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+          </tr>
 <tr>
-              <td>OogieB</td>
-              <td>2</td>
-              <td title="Rounds/Map: 20.0">40</td>
-              <td>0.64</td>
-              <td>67.4</td>
-              <td>0.55</td>
-              <td>21</td>
-              <td>33</td>
-              <td>9</td>
-              <td>14.0</td>
-              <td>3</td>
-              <td>2</td>
-              <td>0</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
+            <td>OogieB</td>
+            <td>2</td>
+            <td title="Rounds/Map: 20.0">40</td>
+            <td>0.64</td>
+            <td>67.4</td>
+            <td>0.55</td>
+            <td>21</td>
+            <td>33</td>
+            <td>9</td>
+            <td>14.0</td>
+            <td>3</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+          </tr>
 <tr>
-              <td>Angrycrock</td>
-              <td>2</td>
-              <td title="Rounds/Map: 19.0">38</td>
-              <td>0.48</td>
-              <td>56.6</td>
-              <td>0.44</td>
-              <td>16</td>
-              <td>33</td>
-              <td>12</td>
-              <td>53.5</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-            </tr>
+            <td>Angrycrock</td>
+            <td>2</td>
+            <td title="Rounds/Map: 19.0">38</td>
+            <td>0.48</td>
+            <td>56.6</td>
+            <td>0.44</td>
+            <td>16</td>
+            <td>33</td>
+            <td>12</td>
+            <td>53.5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-10', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -4918,13 +4578,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-10',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-10',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-10',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-10',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-10',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-10',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-10',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-10',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-10',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-10',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-10',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-10',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-10',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-10',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-10',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-10',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-10',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>DJFITME</td>
@@ -4941,6 +4602,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>22</td>
 <td>11</td>
 <td>0.88</td>
+<td>16</td>
 </tr>
 <tr>
 <td>--Jone--</td>
@@ -4957,6 +4619,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>46</td>
 <td>29</td>
 <td>1.12</td>
+<td>12</td>
 </tr>
 <tr>
 <td>NakedDreamer</td>
@@ -4973,6 +4636,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>28</td>
 <td>17</td>
 <td>0.70</td>
+<td>10</td>
 </tr>
 <tr>
 <td>AukustiCat</td>
@@ -4989,6 +4653,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>23</td>
 <td>15</td>
 <td>0.53</td>
+<td>7</td>
 </tr>
 <tr>
 <td>-Flovi-</td>
@@ -5005,6 +4670,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>24</td>
 <td>14</td>
 <td>0.77</td>
+<td>8</td>
 </tr>
 <tr>
 <td>DrunkenElf</td>
@@ -5021,6 +4687,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>9</td>
 <td>6</td>
 <td>0.82</td>
+<td>4</td>
 </tr>
 <tr>
 <td>MAYH3Mi</td>
@@ -5037,6 +4704,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>16</td>
 <td>9</td>
 <td>0.94</td>
+<td>8</td>
 </tr>
 <tr>
 <td>OogieB</td>
@@ -5053,6 +4721,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>10</td>
 <td>6</td>
 <td>0.83</td>
+<td>4</td>
 </tr>
 <tr>
 <td>Angrycrock</td>
@@ -5069,22 +4738,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>24</td>
 <td>15</td>
 <td>0.96</td>
+<td>3</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-10');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-10', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Ancient (3×)</span>
 <span class="chip">Most picked: Dust II (2×)</span>
@@ -5233,20 +4891,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>1</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-10', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-10', 'maps-10-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-3e7070ad-66f0-4305-877e-c9eda836467a" open>
 <summary><h2><img class="logo" src="https://distribution.faceit-cdn.net/images/8b9779e4-96f8-47d3-bf9d-ed45a70bd681.jpeg" alt="">Rush Ravellys</h2></summary>
@@ -5279,135 +4923,134 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-11',12,true)">4K</th>
           <th onclick="sortTable('players-basic-11',13,true)">5K</th>
           <th onclick="sortTable('players-basic-11',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>-tomie</td>
-              <td>6</td>
-              <td title="Rounds/Map: 21.5">129</td>
-              <td>1.48</td>
-              <td>100.3</td>
-              <td>1.04</td>
-              <td>132</td>
-              <td>89</td>
-              <td>28</td>
-              <td>52.7</td>
-              <td>1</td>
-              <td>9</td>
-              <td>5</td>
-              <td>0</td>
-              <td>23</td>
-            </tr>
+            <td>-tomie</td>
+            <td>6</td>
+            <td title="Rounds/Map: 21.5">129</td>
+            <td>1.48</td>
+            <td>100.3</td>
+            <td>1.04</td>
+            <td>132</td>
+            <td>89</td>
+            <td>28</td>
+            <td>52.7</td>
+            <td>1</td>
+            <td>9</td>
+            <td>5</td>
+            <td>0</td>
+            <td>23</td>
+          </tr>
 <tr>
-              <td>eskoilmari</td>
-              <td>6</td>
-              <td title="Rounds/Map: 21.5">129</td>
-              <td>0.90</td>
-              <td>75.5</td>
-              <td>0.65</td>
-              <td>84</td>
-              <td>93</td>
-              <td>31</td>
-              <td>30.0</td>
-              <td>0</td>
-              <td>4</td>
-              <td>1</td>
-              <td>0</td>
-              <td>8</td>
-            </tr>
+            <td>eskoilmari</td>
+            <td>6</td>
+            <td title="Rounds/Map: 21.5">129</td>
+            <td>0.90</td>
+            <td>75.5</td>
+            <td>0.65</td>
+            <td>84</td>
+            <td>93</td>
+            <td>31</td>
+            <td>30.0</td>
+            <td>0</td>
+            <td>4</td>
+            <td>1</td>
+            <td>0</td>
+            <td>8</td>
+          </tr>
 <tr>
-              <td>Leutsi</td>
-              <td>6</td>
-              <td title="Rounds/Map: 21.5">129</td>
-              <td>0.73</td>
-              <td>58.8</td>
-              <td>0.52</td>
-              <td>68</td>
-              <td>93</td>
-              <td>35</td>
-              <td>48.5</td>
-              <td>6</td>
-              <td>2</td>
-              <td>2</td>
-              <td>0</td>
-              <td>9</td>
-            </tr>
+            <td>Leutsi</td>
+            <td>6</td>
+            <td title="Rounds/Map: 21.5">129</td>
+            <td>0.73</td>
+            <td>58.8</td>
+            <td>0.52</td>
+            <td>68</td>
+            <td>93</td>
+            <td>35</td>
+            <td>48.5</td>
+            <td>6</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>9</td>
+          </tr>
 <tr>
-              <td>delkki</td>
-              <td>4</td>
-              <td title="Rounds/Map: 22.2">89</td>
-              <td>1.06</td>
-              <td>92.4</td>
-              <td>0.76</td>
-              <td>67</td>
-              <td>63</td>
-              <td>33</td>
-              <td>28.5</td>
-              <td>0</td>
-              <td>5</td>
-              <td>0</td>
-              <td>0</td>
-              <td>8</td>
-            </tr>
+            <td>delkki</td>
+            <td>4</td>
+            <td title="Rounds/Map: 22.2">89</td>
+            <td>1.06</td>
+            <td>92.4</td>
+            <td>0.76</td>
+            <td>67</td>
+            <td>63</td>
+            <td>33</td>
+            <td>28.5</td>
+            <td>0</td>
+            <td>5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>8</td>
+          </tr>
 <tr>
-              <td>BrxA</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.8">83</td>
-              <td>0.88</td>
-              <td>72.8</td>
-              <td>0.62</td>
-              <td>51</td>
-              <td>58</td>
-              <td>23</td>
-              <td>50.5</td>
-              <td>3</td>
-              <td>2</td>
-              <td>1</td>
-              <td>0</td>
-              <td>7</td>
-            </tr>
+            <td>BrxA</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.8">83</td>
+            <td>0.88</td>
+            <td>72.8</td>
+            <td>0.62</td>
+            <td>51</td>
+            <td>58</td>
+            <td>23</td>
+            <td>50.5</td>
+            <td>3</td>
+            <td>2</td>
+            <td>1</td>
+            <td>0</td>
+            <td>7</td>
+          </tr>
 <tr>
-              <td>SaMs</td>
-              <td>2</td>
-              <td title="Rounds/Map: 23.0">46</td>
-              <td>0.79</td>
-              <td>61.9</td>
-              <td>0.57</td>
-              <td>26</td>
-              <td>33</td>
-              <td>11</td>
-              <td>57.5</td>
-              <td>0</td>
-              <td>2</td>
-              <td>0</td>
-              <td>0</td>
-              <td>6</td>
-            </tr>
+            <td>SaMs</td>
+            <td>2</td>
+            <td title="Rounds/Map: 23.0">46</td>
+            <td>0.79</td>
+            <td>61.9</td>
+            <td>0.57</td>
+            <td>26</td>
+            <td>33</td>
+            <td>11</td>
+            <td>57.5</td>
+            <td>0</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>6</td>
+          </tr>
 <tr>
-              <td>Slikdd</td>
-              <td>2</td>
-              <td title="Rounds/Map: 20.0">40</td>
-              <td>0.65</td>
-              <td>57.2</td>
-              <td>0.43</td>
-              <td>17</td>
-              <td>26</td>
-              <td>9</td>
-              <td>34.5</td>
-              <td>4</td>
-              <td>2</td>
-              <td>0</td>
-              <td>0</td>
-              <td>2</td>
-            </tr>
+            <td>Slikdd</td>
+            <td>2</td>
+            <td title="Rounds/Map: 20.0">40</td>
+            <td>0.65</td>
+            <td>57.2</td>
+            <td>0.43</td>
+            <td>17</td>
+            <td>26</td>
+            <td>9</td>
+            <td>34.5</td>
+            <td>4</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>2</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-11', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -5426,13 +5069,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-11',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-11',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-11',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-11',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-11',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-11',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-11',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-11',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-11',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-11',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-11',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-11',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-11',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-11',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-11',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-11',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-11',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>-tomie</td>
@@ -5449,6 +5093,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>82</td>
 <td>51</td>
 <td>1.09</td>
+<td>19</td>
 </tr>
 <tr>
 <td>eskoilmari</td>
@@ -5465,6 +5110,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>49</td>
 <td>35</td>
 <td>0.69</td>
+<td>14</td>
 </tr>
 <tr>
 <td>Leutsi</td>
@@ -5481,6 +5127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>60</td>
 <td>39</td>
 <td>0.97</td>
+<td>17</td>
 </tr>
 <tr>
 <td>delkki</td>
@@ -5497,6 +5144,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>46</td>
 <td>28</td>
 <td>1.10</td>
+<td>11</td>
 </tr>
 <tr>
 <td>BrxA</td>
@@ -5513,6 +5161,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>8</td>
 <td>6</td>
 <td>0.40</td>
+<td>10</td>
 </tr>
 <tr>
 <td>SaMs</td>
@@ -5529,6 +5178,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>16</td>
 <td>13</td>
 <td>0.73</td>
+<td>0</td>
 </tr>
 <tr>
 <td>Slikdd</td>
@@ -5545,22 +5195,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>8</td>
 <td>6</td>
 <td>0.57</td>
+<td>2</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-11');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-11', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Mirage (3×)</span>
 <span class="chip">Most picked: Ancient (3×)</span>
@@ -5709,20 +5348,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>1</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-11', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-11', 'maps-11-played-only');
-        </script>
-        
 </details>
 <details class="team-section" id="team-64a2a6b7-dd85-4efa-bac8-56f89bed2b06" open>
 <summary><h2><img class="logo" src="https://assets.faceit-cdn.net/avatars/69833d66-6610-4966-b2b3-2e12ca297606_1550549652757.jpg" alt="">Servujatkot</h2></summary>
@@ -5755,135 +5380,134 @@ document.addEventListener('DOMContentLoaded', () => {
           <th onclick="sortTable('players-basic-12',12,true)">4K</th>
           <th onclick="sortTable('players-basic-12',13,true)">5K</th>
           <th onclick="sortTable('players-basic-12',14,true)">MVPs</th>
-        </tr></thead><tbody>
+          </tr></thead>
 <tr>
-              <td>Shapeir</td>
-              <td>6</td>
-              <td title="Rounds/Map: 22.7">136</td>
-              <td>1.50</td>
-              <td>111.1</td>
-              <td>1.03</td>
-              <td>138</td>
-              <td>92</td>
-              <td>43</td>
-              <td>48.7</td>
-              <td>0</td>
-              <td>8</td>
-              <td>1</td>
-              <td>1</td>
-              <td>23</td>
-            </tr>
+            <td>Shapeir</td>
+            <td>6</td>
+            <td title="Rounds/Map: 22.7">136</td>
+            <td>1.50</td>
+            <td>111.1</td>
+            <td>1.03</td>
+            <td>138</td>
+            <td>92</td>
+            <td>43</td>
+            <td>48.7</td>
+            <td>0</td>
+            <td>8</td>
+            <td>1</td>
+            <td>1</td>
+            <td>23</td>
+          </tr>
 <tr>
-              <td>Zyrk</td>
-              <td>6</td>
-              <td title="Rounds/Map: 22.7">136</td>
-              <td>1.48</td>
-              <td>87.1</td>
-              <td>0.93</td>
-              <td>127</td>
-              <td>86</td>
-              <td>44</td>
-              <td>43.5</td>
-              <td>1</td>
-              <td>13</td>
-              <td>2</td>
-              <td>1</td>
-              <td>23</td>
-            </tr>
+            <td>Zyrk</td>
+            <td>6</td>
+            <td title="Rounds/Map: 22.7">136</td>
+            <td>1.48</td>
+            <td>87.1</td>
+            <td>0.93</td>
+            <td>127</td>
+            <td>86</td>
+            <td>44</td>
+            <td>43.5</td>
+            <td>1</td>
+            <td>13</td>
+            <td>2</td>
+            <td>1</td>
+            <td>23</td>
+          </tr>
 <tr>
-              <td>Damienn</td>
-              <td>4</td>
-              <td title="Rounds/Map: 22.5">90</td>
-              <td>1.25</td>
-              <td>96.4</td>
-              <td>0.89</td>
-              <td>80</td>
-              <td>64</td>
-              <td>31</td>
-              <td>26.5</td>
-              <td>13</td>
-              <td>3</td>
-              <td>0</td>
-              <td>0</td>
-              <td>12</td>
-            </tr>
+            <td>Damienn</td>
+            <td>4</td>
+            <td title="Rounds/Map: 22.5">90</td>
+            <td>1.25</td>
+            <td>96.4</td>
+            <td>0.89</td>
+            <td>80</td>
+            <td>64</td>
+            <td>31</td>
+            <td>26.5</td>
+            <td>13</td>
+            <td>3</td>
+            <td>0</td>
+            <td>0</td>
+            <td>12</td>
+          </tr>
 <tr>
-              <td>attes1</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.5">82</td>
-              <td>0.83</td>
-              <td>72.8</td>
-              <td>0.61</td>
-              <td>50</td>
-              <td>60</td>
-              <td>33</td>
-              <td>45.5</td>
-              <td>0</td>
-              <td>5</td>
-              <td>0</td>
-              <td>0</td>
-              <td>10</td>
-            </tr>
+            <td>attes1</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.5">82</td>
+            <td>0.83</td>
+            <td>72.8</td>
+            <td>0.61</td>
+            <td>50</td>
+            <td>60</td>
+            <td>33</td>
+            <td>45.5</td>
+            <td>0</td>
+            <td>5</td>
+            <td>0</td>
+            <td>0</td>
+            <td>10</td>
+          </tr>
 <tr>
-              <td>BigTimeSam</td>
-              <td>4</td>
-              <td title="Rounds/Map: 20.5">82</td>
-              <td>0.77</td>
-              <td>64.5</td>
-              <td>0.59</td>
-              <td>49</td>
-              <td>64</td>
-              <td>20</td>
-              <td>44.8</td>
-              <td>1</td>
-              <td>2</td>
-              <td>0</td>
-              <td>0</td>
-              <td>6</td>
-            </tr>
+            <td>BigTimeSam</td>
+            <td>4</td>
+            <td title="Rounds/Map: 20.5">82</td>
+            <td>0.77</td>
+            <td>64.5</td>
+            <td>0.59</td>
+            <td>49</td>
+            <td>64</td>
+            <td>20</td>
+            <td>44.8</td>
+            <td>1</td>
+            <td>2</td>
+            <td>0</td>
+            <td>0</td>
+            <td>6</td>
+          </tr>
 <tr>
-              <td>toivo-</td>
-              <td>4</td>
-              <td title="Rounds/Map: 25.0">100</td>
-              <td>0.61</td>
-              <td>51.3</td>
-              <td>0.49</td>
-              <td>45</td>
-              <td>74</td>
-              <td>17</td>
-              <td>49.0</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>4</td>
-            </tr>
+            <td>toivo-</td>
+            <td>4</td>
+            <td title="Rounds/Map: 25.0">100</td>
+            <td>0.61</td>
+            <td>51.3</td>
+            <td>0.49</td>
+            <td>45</td>
+            <td>74</td>
+            <td>17</td>
+            <td>49.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>4</td>
+          </tr>
 <tr>
-              <td>Johkis</td>
-              <td>2</td>
-              <td title="Rounds/Map: 27.0">54</td>
-              <td>0.41</td>
-              <td>45.8</td>
-              <td>0.29</td>
-              <td>18</td>
-              <td>44</td>
-              <td>14</td>
-              <td>50.0</td>
-              <td>0</td>
-              <td>1</td>
-              <td>0</td>
-              <td>0</td>
-              <td>0</td>
-            </tr>
+            <td>Johkis</td>
+            <td>2</td>
+            <td title="Rounds/Map: 27.0">54</td>
+            <td>0.41</td>
+            <td>45.8</td>
+            <td>0.29</td>
+            <td>18</td>
+            <td>44</td>
+            <td>14</td>
+            <td>50.0</td>
+            <td>0</td>
+            <td>1</td>
+            <td>0</td>
+            <td>0</td>
+            <td>0</td>
+          </tr>
 </tbody></table>
 
         <script>
         postProcessTable('players-basic-12', {
-          // ei barreja basicissa
           color: [
-            {col:3, p:[0.6447, 0.9167, 1.3124]},
-            {col:4, p:[59.0067, 75.8333, 89.1967]},
-            {col:5, p:[0.5030, 0.6850, 0.8380]}
+            {col:3, p:[0.6447, 0.9167, 1.3124] },
+            {col:4, p:[59.0067, 75.8333, 89.1967] },
+            {col:5, p:[0.5030, 0.6850, 0.8380]  }
           ],
           defaultSort: {col:0, dir:'asc'},
           toggles: true
@@ -5902,13 +5526,14 @@ document.addEventListener('DOMContentLoaded', () => {
 <th onclick="sortTable('players-adv-12',4,true)" title='Entry attempts'>Entry Att</th>
 <th onclick="sortTable('players-adv-12',5,true)" title='Entry wins'>Entry Win</th>
 <th onclick="sortTable('players-adv-12',6,true)" title='Entry win rate'>Entry WR%</th>
-<th onclick="sortTable('players-adv-12',7,true)" title='Utility damage (total)'>Util dmg</th>
+<th onclick="sortTable('players-adv-12',7,true)" title='Total utility damage'>Util dmg</th>
 <th onclick="sortTable('players-adv-12',8,true)" title='Utility damage per round'>UDPR</th>
-<th onclick="sortTable('players-adv-12',9,true)" title='Impact-proxy: 2*KR + 0.42*AR − 0.41*DR'>Impact</th>
-<th onclick="sortTable('players-adv-12',10,true)"title='Total flashes thorown'>Flash Cnt</th>
-<th onclick="sortTable('players-adv-12',11,true)"title='Enemies flashed'>Flashed</th>
-<th onclick="sortTable('players-adv-12',12,true)"title='How many flashes at least hit one enemy'>Flash Succ</th>
-<th onclick="sortTable('players-adv-12',13,true)" title='Enemies Flashed / Flash Count'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-12',9,true)" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>
+<th onclick="sortTable('players-adv-12',10,true)" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>
+<th onclick="sortTable('players-adv-12',11,true)" title='Number of enemies blinded by flashes'>Flashed</th>
+<th onclick="sortTable('players-adv-12',12,true)" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>
+<th onclick="sortTable('players-adv-12',13,true)" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>
+<th onclick="sortTable('players-adv-12',14,true)" title='Number of pistol kills'>Pistol K</th>
 </tr></thead><tbody>
 <tr>
 <td>Shapeir</td>
@@ -5925,6 +5550,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>27</td>
 <td>18</td>
 <td>0.59</td>
+<td>25</td>
 </tr>
 <tr>
 <td>Zyrk</td>
@@ -5941,6 +5567,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>77</td>
 <td>49</td>
 <td>0.88</td>
+<td>14</td>
 </tr>
 <tr>
 <td>Damienn</td>
@@ -5957,6 +5584,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>8</td>
 <td>6</td>
 <td>0.89</td>
+<td>10</td>
 </tr>
 <tr>
 <td>attes1</td>
@@ -5973,6 +5601,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>22</td>
 <td>16</td>
 <td>0.85</td>
+<td>9</td>
 </tr>
 <tr>
 <td>BigTimeSam</td>
@@ -5989,6 +5618,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>12</td>
 <td>6</td>
 <td>0.92</td>
+<td>11</td>
 </tr>
 <tr>
 <td>toivo-</td>
@@ -6005,6 +5635,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>1</td>
 <td>1</td>
 <td>0.33</td>
+<td>4</td>
 </tr>
 <tr>
 <td>Johkis</td>
@@ -6021,22 +5652,11 @@ document.addEventListener('DOMContentLoaded', () => {
 <td>9</td>
 <td>6</td>
 <td>0.69</td>
+<td>2</td>
 </tr>
 </tbody></table>
 <script>applyDefaultSort('players-adv-12');</script>
 </div>
-
-        <script>
-        postProcessTable('players-adv-12', {
-          color: [
-            {col:8, p:[2.5902, 4.6506, 7.4132]},
-            {col:9, p:[1.0060, 1.3700, 1.6760]}
-          ],
-          defaultSort: {col:0, dir:'asc'},
-          toggles: true
-        });
-        </script>
-        
 <div class="chips">
 <span class="chip">Most banned: Train (3×)</span>
 <span class="chip">Most picked: Nuke (2×)</span>
@@ -6185,20 +5805,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <td>3</td>
             </tr>
 </tbody></table>
-
-        <script>
-        postProcessTable('maps-12', {
-          bars: [4,5,6], // WR%, WR own, WR opp
-          color: [
-            {col:7, p:[0.6447, 0.9167, 1.3124]},   // KD
-            {col:8, p:[59.0067, 75.8333, 89.1967]} // ADR
-          ],
-          defaultSort: {col:1, dir:'desc'}, // Played
-          toggles: true
-        });
-        bindPlayedOnly('maps-12', 'maps-12-played-only');
-        </script>
-        
 </details>
 </div>
 

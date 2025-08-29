@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
   cl_1v2_wins             INTEGER DEFAULT 0,
   entry_count INTEGER,
   entry_wins  INTEGER,
+  pistol_kills  INTEGER,
   UNIQUE(match_id, round_index, player_id, nickname),
   FOREIGN KEY (match_id) REFERENCES matches(match_id) ON DELETE CASCADE
 );
