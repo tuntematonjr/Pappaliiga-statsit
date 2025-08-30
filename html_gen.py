@@ -63,7 +63,6 @@ tbody tr:hover{ outline:1px solid #555; background:#292929; }
 .bar-split .loss{position:absolute;top:0;bottom:0;background:#ef4444}
 .bar-split .val{position:relative;z-index:1;text-align:center;line-height:20px;font-size:.85rem;color:#fff}
 
-
 .cell-grad.good{ background:linear-gradient(90deg, rgba(34,197,94,.25), transparent); }
 .cell-grad.bad{  background:linear-gradient(90deg, rgba(239,68,68,.25), transparent); }
 .cell-muted{ color:var(--muted); }
@@ -290,6 +289,17 @@ HTML_FOOT = """
 </html>
 """
 
+# Tooltip text for Rating1 column
+TOOLTIP_RATING1 = (
+    "Rating1 ≈ HLTV 1.0:\n"
+    "  ( KR/0.679 + SURV/0.317 + ADR/79.9 ) / 3\n"
+    "Missä:\n"
+    "  KR   = Kills per Round (kills / rounds)\n"
+    "  SURV = Survived per Round = 1 - (deaths / rounds)\n"
+    "  ADR  = Average Damage per Round\n"
+    "Baselinet on kalibroitu niin, että ~1.00 ≈ sarjan keskitason suoritus."
+)
+
 # ------------------------------
 # DB helpers
 # ------------------------------
@@ -319,6 +329,9 @@ def weighted_percentile(values, weights, p):
 def weighted_median(values, weights):
     return weighted_percentile(values, weights, 50)
 
+def esc_title(s: str) -> str:
+    # Poistaa yksittäiset heittomerkit ja korvaa rivinvaihdot HTML:lle sopiviksi
+    return (s or "").replace("'", "").replace("\n", "&#10;")
 
 MAP_NAME_DISPLAY = {
     "de_nuke": "Nuke",
@@ -345,46 +358,51 @@ def q(con, sql, params=()):
 def _safe_div(a, b):
     return (a / b) if b else 0.0
 
-def compute_division_player_summary(con, division_id: int, min_rounds: int = 20):
+def compute_division_player_summary(con, division_id: int, min_rounds: int = 40, min_flashes: int = 10):
     """
-    Laskee pelaajatasolla (divisioonassa) perusmittarit ja johtajat.
-    - Painottaa keskiarvot kierrosmäärällä, jotta 1 mapin outlierit eivät dominoi.
-    - Poistaa leader-taulusta pelaajat, joilla alle min_rounds kierrosta.
-    Palauttaa:
-      {
-        'players': int, 'teams': int, 'maps': int, 'rounds': int,
-        'avg_kd': float, 'avg_adr': float, 'avg_kr': float,
-        'leaders': {'kd': (nickname, value), 'adr': (...), 'kr': (...)}
-      }
+    Division summary + Leaders (korjattu):
+      - ADR/KR lasketaan kierros-painotettuna: sum(adr_i * rounds_i) / sum(rounds_i), KR = sum(kills)/sum(rounds)
+      - Per-round -leaderit vaativat min_rounds (oletus 40)
+      - "Most Enemies Flashed / round" vaatii lisäksi min_flashes (oletus 10 heittoa)
+      - Clutcher = 1v1 + 1v2 WR, vaatii min 10 yritystä
+      - Entry WR vaatii min 10 duelia
+      - Top Fragger / Most Deaths ovat absoluuttisia summia (ei min_rounds)
     """
-    # Pelaajakohtaiset aggregaatit + kierrokset
     rows = q(con, """
       SELECT
         ps.player_id,
         COALESCE(pl.nickname, MAX(ps.nickname)) AS nick,
         MAX(t.name) AS team_name,
-        SUM(ps.kills)                      AS k,
-        SUM(ps.deaths)                     AS d,
-        AVG(ps.adr)                        AS adr_avg,
-        AVG(ps.kr)                         AS kr_avg,
-        SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds
+
+        -- summat
+        SUM(ps.kills)                       AS kills,
+        SUM(ps.deaths)                      AS deaths,
+        SUM(ps.assists)                     AS assists,
+        SUM(COALESCE(ps.utility_damage,0))  AS util_total,
+        SUM(COALESCE(ps.enemies_flashed,0)) AS flashed_total,
+        SUM(COALESCE(ps.flash_count,0))     AS flash_cnt_total,
+        SUM(COALESCE(ps.entry_wins,0))      AS entry_wins,
+        SUM(COALESCE(ps.entry_count,0))     AS entry_count,
+        SUM(COALESCE(ps.cl_1v1_wins,0))     AS c11_wins,
+        SUM(COALESCE(ps.cl_1v1_attempts,0)) AS c11_atts,
+        SUM(COALESCE(ps.cl_1v2_wins,0))     AS c12_wins,
+        SUM(COALESCE(ps.cl_1v2_attempts,0)) AS c12_atts,
+
+        -- kierrokset per kartta rivillä -> käytä painotukseen
+        SUM(mp.score_team1 + mp.score_team2)                             AS rounds,
+        SUM( (mp.score_team1 + mp.score_team2) * COALESCE(ps.adr,0) )    AS adr_weighted,
+        SUM( (mp.score_team1 + mp.score_team2) * COALESCE(ps.kr,0) )     AS kr_weighted
+
       FROM player_stats ps
-      JOIN matches m  ON m.match_id = ps.match_id
-      JOIN maps mp    ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+      JOIN matches m ON m.match_id = ps.match_id
+      JOIN maps    mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
       LEFT JOIN players pl ON pl.player_id = ps.player_id
-      LEFT JOIN teams t ON t.team_id = ps.team_id   -- otetaan mukaan joukkue
+      LEFT JOIN teams   t  ON t.team_id   = ps.team_id
       WHERE m.division_id = ?
       GROUP BY ps.player_id
     """, (division_id,))
 
-
-    # Joukkue- ja mappimäärät + kokonaiskierrokset
-    trow = q(con, """
-      SELECT
-        COUNT(DISTINCT COALESCE(team1_id,'')) + COUNT(DISTINCT COALESCE(team2_id,'')) AS teams_dummy
-      FROM matches WHERE division_id=?
-    """, (division_id,))
-    # tiimit tarkemmin
+    # Joukkue-, kartta- ja kierrosmäärät summaryyn
     teams = q(con, """
       SELECT COUNT(*) AS c FROM (
         SELECT DISTINCT team1_id AS tid FROM matches WHERE division_id=? AND team1_id IS NOT NULL
@@ -393,91 +411,143 @@ def compute_division_player_summary(con, division_id: int, min_rounds: int = 20)
       )
     """, (division_id, division_id,))[0]["c"] or 0
 
-    maps_cnt = q(con, "SELECT COUNT(*) AS c FROM maps mp JOIN matches m ON m.match_id=mp.match_id WHERE m.division_id=?", (division_id,))[0]["c"] or 0
+    maps_cnt = q(con, """
+      SELECT COUNT(*) AS c
+      FROM maps mp JOIN matches m ON m.match_id=mp.match_id
+      WHERE m.division_id=?
+    """, (division_id,))[0]["c"] or 0
+
     total_rounds = q(con, """
-      SELECT SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS r
+      SELECT SUM(mp.score_team1 + mp.score_team2) AS r
       FROM maps mp JOIN matches m ON m.match_id=mp.match_id
       WHERE m.division_id=?
     """, (division_id,))[0]["r"] or 0
 
-    # Painotetut keskiarvot
+    # Jakaumat (painotettu p25/p50/p75)
     kd_vals, kd_w = [], []
     adr_vals, adr_w = [], []
     kr_vals,  kr_w  = [], []
+    surv_vals, surv_w = [], []
+    r1_vals, r1_w   = [], []
 
-    w_kd_sum = w_adr_sum = w_kr_sum = w_sum = 0.0
-    leaders_pool = []
+    # Leaders-poolit
+    leaders_pool = []         # vain rounds >= min_rounds
+    totals_kills = []
+    totals_deaths = []
+
     for r in rows:
-        k = r["k"] or 0
-        d = r["d"] or 0
-        kd = (k / d) if d else float(k)
-        adr = r["adr_avg"] or 0.0
-        kr  = r["kr_avg"]  or 0.0
+        nick = r["nick"] or r["player_id"]
+        team = r.get("team_name") or "-"
         rounds = r["rounds"] or 0
 
-        w_kd_sum  += kd  * rounds
-        w_adr_sum += adr * rounds
-        w_kr_sum  += kr  * rounds
-        w_sum     += rounds
+        kills   = r["kills"] or 0
+        deaths  = r["deaths"] or 0
+        assists = r["assists"] or 0
 
-        # mediaania varten
+        # Kierros-painotetut mittarit
+        adr = (r["adr_weighted"] / rounds) if rounds else 0.0
+        kr  = (kills / rounds) if rounds else 0.0
+        kd  = (kills / deaths) if deaths else float(kills)   # jos 0 kuolemaa, aseta KD = kills
+
+        # Survival% ja Rating1 (HLTV1.0-approks.)
+        deaths_pr = (deaths / rounds) if rounds else 0.0
+        survival_pct = max(0.0, 1.0 - deaths_pr) * 100.0
+        surv_ratio = survival_pct / 100.0
+        rating1 = ((kr / 0.679) + (surv_ratio / 0.317) + (adr / 79.9)) / 3.0 if rounds else 0.0
+
+        # jakaumiin painotus = pelatut kierrokset
         if rounds > 0:
-            kd_vals.append(kd);  kd_w.append(rounds)
-            adr_vals.append(adr); adr_w.append(rounds)
-            kr_vals.append(kr);   kr_w.append(rounds)
+            kd_vals.append(kd);          kd_w.append(rounds)
+            adr_vals.append(adr);        adr_w.append(rounds)
+            kr_vals.append(kr);          kr_w.append(rounds)
+            surv_vals.append(survival_pct); surv_w.append(rounds)
+            r1_vals.append(rating1);     r1_w.append(rounds)
 
+        # absoluuttiset leaderit
+        totals_kills.append( (nick, team, kills) )
+        totals_deaths.append((nick, team, deaths))
+
+        # per-round leaderien rajaus
         if rounds >= min_rounds:
+            udpr = (r["util_total"] or 0) / rounds
+            flashed_pr = (r["flashed_total"] or 0) / rounds
+            assist_pr  = assists / rounds
+
+            # entry/clutch – rajat
+            ewin = r["entry_wins"] or 0
+            eatt = r["entry_count"] or 0
+            entry_wr = (100.0 * ewin / eatt) if eatt >= 10 else -1.0
+
+            c11w = r["c11_wins"] or 0; c11a = r["c11_atts"] or 0
+            c12w = r["c12_wins"] or 0; c12a = r["c12_atts"] or 0
+            c_wins = c11w + c12w
+            c_atts = c11a + c12a
+            clutch_wr = (100.0 * c_wins / c_atts) if c_atts >= 10 else -1.0
+
+            # Laske enemies-per-flash (EB/F) ja käytä sitä leaderiin
+            flashed_total = r["flashed_total"] or 0
+            flash_cnt_total = r["flash_cnt_total"] or 0
+
+            if flash_cnt_total >= min_flashes and rounds >= min_rounds:
+                enemies_per_flash = flashed_total / flash_cnt_total
+            else:
+                enemies_per_flash = -1.0  # suodata pois leader-vertailusta
+
             leaders_pool.append({
-                "nick": r["nick"] or r["player_id"],
-                "team": r.get("team_name") or "-",
-                "kd": kd, "adr": adr, "kr": kr, "rounds": rounds
+                "nick": nick, "team": team, "rounds": rounds,
+                "kd": kd, "adr": adr, "kr": kr,
+                "udpr": udpr,
+                "enemies_per_flash": enemies_per_flash,   # <-- käytä tätä
+                "assist_pr":  assist_pr,
+                "entry_wr":   entry_wr,
+                "clutch_wr":  clutch_wr,
             })
 
-    # Painotetut “keskiarvot”
-    avg_kd  = _safe_div(w_kd_sum,  w_sum)
-    avg_adr = _safe_div(w_adr_sum, w_sum)
-    avg_kr  = _safe_div(w_kr_sum,  w_sum)
+    def _wperc(vals, w, p):
+        return weighted_percentile(vals, w, p) if vals else 0.0
 
-    # KD: painotettu mediaani + IQR (p25-p75)
-    # KD (painotettu)
-    kd_p50 = weighted_percentile(kd_vals, kd_w, 50) if kd_vals else 0.0
-    kd_p25 = weighted_percentile(kd_vals, kd_w, 25) if kd_vals else 0.0
-    kd_p75 = weighted_percentile(kd_vals, kd_w, 75) if kd_vals else 0.0
+    kd_p50, kd_p25, kd_p75 = _wperc(kd_vals, kd_w, 50), _wperc(kd_vals, kd_w, 25), _wperc(kd_vals, kd_w, 75)
+    adr_p50, adr_p25, adr_p75 = _wperc(adr_vals, adr_w, 50), _wperc(adr_vals, adr_w, 25), _wperc(adr_vals, adr_w, 75)
+    kr_p50,  kr_p25,  kr_p75  = _wperc(kr_vals,  kr_w, 50),  _wperc(kr_vals,  kr_w, 25),  _wperc(kr_vals,  kr_w, 75)
+    surv_p50, surv_p25, surv_p75 = _wperc(surv_vals, surv_w, 50), _wperc(surv_vals, surv_w, 25), _wperc(surv_vals, surv_w, 75)
+    r1_p50,   r1_p25,   r1_p75   = _wperc(r1_vals,   r1_w,   50), _wperc(r1_vals,   r1_w,   25), _wperc(r1_vals,   r1_w,   75)
 
-    # ADR (painotettu)
-    adr_p50 = weighted_percentile(adr_vals, adr_w, 50) if adr_vals else 0.0
-    adr_p25 = weighted_percentile(adr_vals, adr_w, 25) if adr_vals else 0.0
-    adr_p75 = weighted_percentile(adr_vals, adr_w, 75) if adr_vals else 0.0
-
-    # KR (painotettu)
-    kr_p50 = weighted_percentile(kr_vals, kr_w, 50) if kr_vals else 0.0
-    kr_p25 = weighted_percentile(kr_vals, kr_w, 25) if kr_vals else 0.0
-    kr_p75 = weighted_percentile(kr_vals, kr_w, 75) if kr_vals else 0.0
-
-
-    # Johtajat
-    def top(metric):
+    def _best(metric):
         if not leaders_pool:
             return ("-", "-", 0.0)
-        best = max(leaders_pool, key=lambda x: x[metric])
-        return (best["nick"], best["team"], best[metric])
+        # suodata ulos negatiiviset "ei kelpaa" -arvot
+        valid = [x for x in leaders_pool if x[metric] is not None and x[metric] >= 0]
+        if not valid:
+            return ("-", "-", 0.0)
+        b = max(valid, key=lambda x: x[metric])
+        return (b["nick"], b["team"], b[metric])
+
+    top_frg_total     = max(totals_kills,  key=lambda x: x[2]) if totals_kills  else ("-", "-", 0)
+    most_deaths_total = max(totals_deaths, key=lambda x: x[2]) if totals_deaths else ("-", "-", 0)
 
     leaders = {
-        "kd":  top("kd"),
-        "adr": top("adr"),
-        "kr":  top("kr"),
+        "top_frg_total":     top_frg_total,        # (nick, team, kills)
+        "most_deaths_total": most_deaths_total,    # (nick, team, deaths)
+        "adr":        _best("adr"),
+        "kd":         _best("kd"),
+        "kr":         _best("kr"),
+        "udpr":       _best("udpr"),
+        "enemies_per_flash": _best("enemies_per_flash"),
+        "assist_pr":  _best("assist_pr"),
+        "entry_wr":   _best("entry_wr"),
+        "clutch_wr":  _best("clutch_wr"),
     }
-
 
     return {
         "players": len(rows),
         "teams": teams,
         "maps": maps_cnt,
         "rounds": total_rounds,
-        "avg_kd": avg_kd, "avg_adr": avg_adr, "avg_kr": avg_kr,
         "kd_p50": kd_p50, "kd_p25": kd_p25, "kd_p75": kd_p75,
         "adr_p50": adr_p50, "adr_p25": adr_p25, "adr_p75": adr_p75,
         "kr_p50": kr_p50,  "kr_p25": kr_p25,  "kr_p75": kr_p75,
+        "surv_p50": surv_p50, "surv_p25": surv_p25, "surv_p75": surv_p75,
+        "r1_p50": r1_p50,   "r1_p25": r1_p25,   "r1_p75": r1_p75,
         "leaders": leaders,
     }
 
@@ -501,8 +571,8 @@ def compute_division_thresholds(con, division_id: int):
     rows = q(con, """
       SELECT
         ps.player_id,
-        SUM(ps.kills)                     AS k,
-        SUM(ps.deaths)                    AS d,
+        SUM(ps.kills)                     AS kills,
+        SUM(ps.deaths)                    AS deaths,
         AVG(ps.adr)                       AS adr,
         AVG(ps.kr)                        AS kr,
         AVG(ps.hs_pct)                    AS hs_pct,
@@ -526,12 +596,12 @@ def compute_division_thresholds(con, division_id: int):
 
     kd_vals, adr_vals, kr_vals, hs_pct_vals, udpr_vals, impact_vals = [], [], [], [], [], []
     entrywr_vals, cl_1v1_vals, cl_1v2_vals, enem_per_flash_vals  = [], [], [], []
-
+    survival_vals, rating1_vals = [], []
 
     for r in rows:
-        k  = r["k"] or 0
-        d  = r["d"] or 0
-        kd = (k / d) if d else float(k)
+        kills  = r["kills"] or 0
+        deaths  = r["deaths"] or 0
+        kd = (kills / deaths) if deaths else float(kills)
 
         adr = r["adr"] or 0.0
         kr  = r["kr"] or 0.0
@@ -545,6 +615,15 @@ def compute_division_thresholds(con, division_id: int):
         ar = 0.0
         dr = 0.0
         impact = 2.0*kr + 0.42*ar - 0.41*dr
+
+        # --- UUSI: Survival% ja Rating1 ---
+        deaths_per_round = (deaths / rounds) if rounds else 0.0
+        survival = max(0.0, 1.0 - deaths_per_round) * 100.0  # prosentteina 0..100
+
+        # HLTV Rating 1.0 -kaava (yleisesti käytetty approksimaatio)
+        # KPR = kr, Survival osuutena 0..1, ADR sellaisenaan
+        survival_ratio = survival / 100.0
+        rating1 = ((kr / 0.679) + (survival_ratio / 0.317) + (adr / 79.9)) / 3.0
 
         # Entry WR (%)
         ewin = r["entry_wins"]  or 0
@@ -576,6 +655,8 @@ def compute_division_thresholds(con, division_id: int):
         entrywr_vals.append(entry_wr)
         cl_1v1_vals.append(c11_wr)
         cl_1v2_vals.append(c12_wr)
+        survival_vals.append(survival)
+        rating1_vals.append(rating1)
 
     def _percentile(lst, q):
         lst = sorted(lst)
@@ -611,7 +692,42 @@ def compute_division_thresholds(con, division_id: int):
         "c11_wr": pack(cl_1v1_vals, fallback=(30.0, 50.0, 70.0)),
         "c12_wr": pack(cl_1v2_vals, fallback=(30.0, 50.0, 70.0)),
         "enem_flash": pack(enem_per_flash_vals, fallback=(0.3, 0.6, 0.9)),
+        "survival": pack(survival_vals, fallback=(30.0, 50.0, 70.0)),   # prosenttiasteikko
+        "rating1":  pack(rating1_vals,  fallback=(0.85, 1.00, 1.15)),  # tyypilliset haarukat
     }
+
+def compute_division_map_summary(con, division_id: int):
+    """
+    Division-tason karttayhteenveto:
+      - top_played:  top-3 pelatuimmat kartat (maps-taulusta)
+      - top_banned:  top-3 bannatuimmat kartat (map_votes.status='drop')
+    Palauttaa: { 'top_played': [(map, cnt),...], 'top_banned': [(map, cnt),...] }
+    """
+    played_rows = q(con, """
+        SELECT mp.map_name AS map_name, COUNT(*) AS c
+        FROM maps mp
+        JOIN matches m ON m.match_id = mp.match_id
+        WHERE m.division_id = ? AND mp.map_name IS NOT NULL
+        GROUP BY mp.map_name
+        ORDER BY c DESC, mp.map_name ASC
+        LIMIT 3
+    """, (division_id,))
+    top_played = [(r["map_name"], r["c"]) for r in played_rows]
+
+    ban_rows = q(con, """
+        SELECT v.map_name AS map_name, COUNT(*) AS c
+        FROM map_votes v
+        JOIN matches m ON m.match_id = v.match_id
+        WHERE m.division_id = ?
+          AND v.status = 'drop'
+          AND v.map_name IS NOT NULL
+        GROUP BY v.map_name
+        ORDER BY c DESC, v.map_name ASC
+        LIMIT 3
+    """, (division_id,))
+    top_banned = [(r["map_name"], r["c"]) for r in ban_rows]
+
+    return {"top_played": top_played, "top_banned": top_banned}
 
 def get_teams_in_division(con, division_id: int):
     sql = """
@@ -671,9 +787,9 @@ def compute_player_table(con, division_id: int, team_id: str):
         "ps.player_id AS player_id",
         "COALESCE(pl.nickname, MAX(ps.nickname)) AS nickname_display",
         "COUNT(*) AS maps_played",
-        "SUM(COALESCE(ps.kills,0)) AS k",
-        "SUM(COALESCE(ps.deaths,0)) AS d",
-        "SUM(COALESCE(ps.assists,0)) AS a",
+        "SUM(COALESCE(ps.kills,0)) AS kills",
+        "SUM(COALESCE(ps.deaths,0)) AS deaths",
+        "SUM(COALESCE(ps.assists,0)) AS assists",
         "AVG(COALESCE(ps.adr,0)) AS adr",
         "AVG(COALESCE(ps.kr,0)) AS kr",
         "AVG(COALESCE(ps.hs_pct,0)) AS hs_pct",
@@ -719,17 +835,17 @@ def compute_player_table(con, division_id: int, team_id: str):
         ON pl.player_id = ps.player_id
       WHERE m.division_id = ? AND ps.team_id = ?
       GROUP BY ps.player_id
-      ORDER BY k DESC
+      ORDER BY kills DESC
     """
     rows = q(con, sql, (division_id, team_id))
 
 
     table = []
     for r in rows:
-        k = r["k"] or 0
-        d = r["d"] or 0
-        a = r["a"] or 0
-        kd = (k / d) if d else float(k)
+        kills = r["kills"] or 0
+        deaths = r["deaths"] or 0
+        assists = r["assists"] or 0
+        kd = (kills / deaths) if deaths else float(kills)
         rounds = r["rounds"] or 0
         maps_played = r["maps_played"] or 0
         rpm = (rounds / maps_played) if maps_played else 0.0
@@ -745,10 +861,9 @@ def compute_player_table(con, division_id: int, team_id: str):
             "kr": r["kr"] or 0.0,
 
             # kokonaismäärät erikseen, jotta HTML voi näyttää ne yksittäisinä sarakkeina
-            "kill": k,
-            "death": d,
-            "assist": a,
-            "kda": f"{k}/{d}/{a}",
+            "kill": kills,
+            "death": deaths,
+            "assist": assists,
             "mvps": r.get("mvps", 0) or 0,
 
             "hs_pct": r["hs_pct"] or 0.0,
@@ -767,6 +882,14 @@ def compute_player_table(con, division_id: int, team_id: str):
             "entry_att": r["entry_att"] or 0,
             "entry_win": r["entry_win"] or 0,
         }
+
+        deaths_per_round = (deaths / rounds) if rounds else 0.0
+        survival_pct = max(0.0, 1.0 - deaths_per_round) * 100.0  # 0..100 %
+
+        survival_ratio = survival_pct / 100.0
+        rating1 = ((row["kr"] / 0.679) + (survival_ratio / 0.317) + (row["adr"] / 79.9)) / 3.0
+        row["survival_pct"] = survival_pct
+        row["rating1"]      = rating1
 
         # Valinnaiset sarakkeet jos kannassa on
         if "pistol_kills" in r.keys():
@@ -957,6 +1080,7 @@ def render_division(con, div):
 
     # --- Divisioonan lyhyt yhteenveto pelaajista ---
     divsum = compute_division_player_summary(con, div["division_id"], min_rounds=20)
+    mp_sum = compute_division_map_summary(con, div["division_id"])
 
     html.append('<div class="div-summary">')
 
@@ -1004,19 +1128,96 @@ def render_division(con, div):
         f'</div></div>'
     )
 
+    # Survival%: mediaani + IQR
+    html.append(
+        f'<div class="summary-item" title="{TOOLTIP_WMED}">'
+        f'<div class="label">Median Survival% (p50)</div>'
+        f'<div class="val">{divsum["surv_p50"]:.0f}% '
+        f'<div class="label">p25-p75</div>'
+        f'<span class="cell-muted" style="font-weight:400;">{divsum["surv_p25"]:.0f}%–{divsum["surv_p75"]:.0f}%</span>'
+        f'</div></div>'
+    )
+
+    # Rating1: mediaani + IQR
+    html.append(
+        f'<div class="summary-item" title="{esc_title(TOOLTIP_RATING1)}">'
+        f'<div class="label">Median Rating1 (p50)</div>'
+        f'<div class="val">{divsum["r1_p50"]:.2f} '
+        f'<div class="label">p25-p75</div>'
+        f'<span class="cell-muted" style="font-weight:400;">{divsum["r1_p25"]:.2f}-{divsum["r1_p75"]:.2f}</span>'
+        f'</div></div>'
+    )
+    # Top 3 pelatuimmat kartat (ruutuna)
+    lines = "<br>".join([f"{pretty_map_name(n)} <span class='cell-muted'>({c}×)</span>" for n, c in mp_sum["top_played"]])
+    html.append(
+        f"<div class='summary-item'>"
+        f"  <div class='label'>Most played (top3)</div>"
+        f"  <div class='val' style='line-height:1.25'>{lines}</div>"
+        f"</div>"
+    )
+
+    # Top 3 bannatuimmat kartat (ruutuna)
+    lines = "<br>".join([f"{pretty_map_name(n)} <span class='cell-muted'>({c}×)</span>" for n, c in mp_sum["top_banned"]])
+    html.append(
+        f"<div class='summary-item'>"
+        f"  <div class='label'>Most banned (top3)</div>"
+        f"  <div class='val' style='line-height:1.25'>{lines}</div>"
+        f"</div>"
+    )
+
+
     html.append('</div>')  # /summary-grid
 
     html.append('</div>')  # /card
 
     # Oikean puolen "Leaders" kortti
     html.append('<div class="card leaders">')
-    html.append('<h3>Leaders (min 20 rounds)</h3>')
+    html.append('<h3>Leaders (min 40 rounds, except totals)</h3>')
     html.append('<table><thead><tr><th>Metric</th><th>Player</th><th>Value</th></tr></thead><tbody>')
-    html.append(f'<tr><td>KD</td><td>{escape(divsum["leaders"]["kd"][0])} <span class="cell-muted">({escape(divsum["leaders"]["kd"][1])})</span></td><td>{divsum["leaders"]["kd"][2]:.2f}</td></tr>')
-    html.append(f'<tr><td>ADR</td><td>{escape(divsum["leaders"]["adr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["adr"][1])})</span></td><td>{divsum["leaders"]["adr"][2]:.1f}</td></tr>')
-    html.append(f'<tr><td>KR</td><td>{escape(divsum["leaders"]["kr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["kr"][1])})</span></td><td>{divsum["leaders"]["kr"][2]:.2f}</td></tr>')
+
+    # Absoluuttiset
+    html.append(f'<tr><td>Top Fragger (total kills)</td>'
+                f'<td>{escape(divsum["leaders"]["top_frg_total"][0])} <span class="cell-muted">({escape(divsum["leaders"]["top_frg_total"][1])})</span></td>'
+                f'<td>{int(divsum["leaders"]["top_frg_total"][2])}</td></tr>')
+
+    html.append(f'<tr><td>Most Deaths (total)</td>'
+                f'<td>{escape(divsum["leaders"]["most_deaths_total"][0])} <span class="cell-muted">({escape(divsum["leaders"]["most_deaths_total"][1])})</span></td>'
+                f'<td>{int(divsum["leaders"]["most_deaths_total"][2])}</td></tr>')
+
+    # Per round -mittarit (min 40 rounds)
+    html.append(f'<tr><td>Top ADR</td>'
+                f'<td>{escape(divsum["leaders"]["adr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["adr"][1])})</span></td>'
+                f'<td>{divsum["leaders"]["adr"][2]:.1f}</td></tr>')
+
+    html.append(f'<tr><td>Top KD</td>'
+                f'<td>{escape(divsum["leaders"]["kd"][0])} <span class="cell-muted">({escape(divsum["leaders"]["kd"][1])})</span></td>'
+                f'<td>{divsum["leaders"]["kd"][2]:.2f}</td></tr>')
+
+    html.append(f'<tr><td>Top Utility (UDPR)</td>'
+                f'<td>{escape(divsum["leaders"]["udpr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["udpr"][1])})</span></td>'
+                f'<td>{divsum["leaders"]["udpr"][2]:.2f}</td></tr>')
+
+    html.append(
+      f'<tr><td>Most Enemies Blinded / flash</td>'
+      f'<td>{escape(divsum["leaders"]["enemies_per_flash"][0])} '
+      f'<span class="cell-muted">({escape(divsum["leaders"]["enemies_per_flash"][1])})</span></td>'
+      f'<td>{divsum["leaders"]["enemies_per_flash"][2]:.2f}</td></tr>')
+
+    html.append(f'<tr><td>Top Support (assists / round)</td>'
+                f'<td>{escape(divsum["leaders"]["assist_pr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["assist_pr"][1])})</span></td>'
+                f'<td>{divsum["leaders"]["assist_pr"][2]:.2f}</td></tr>')
+
+    html.append(f'<tr><td>Top Entry (winrate)</td>'
+                f'<td>{escape(divsum["leaders"]["entry_wr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["entry_wr"][1])})</span></td>'
+                f'<td>{divsum["leaders"]["entry_wr"][2]:.1f}%</td></tr>')
+
+    html.append(f'<tr><td>Top Clutcher (winrate)</td>'
+                f'<td>{escape(divsum["leaders"]["clutch_wr"][0])} <span class="cell-muted">({escape(divsum["leaders"]["clutch_wr"][1])})</span></td>'
+                f'<td>{divsum["leaders"]["clutch_wr"][2]:.1f}%</td></tr>')
+
     html.append('</tbody></table>')
-    html.append('</div>')  # /card leaders
+    html.append('</div>')
+
 
     html.append('</div>')  # /div-summary
 
@@ -1109,13 +1310,13 @@ def render_division(con, div):
           <th onclick="sortTable('{tid_basic}',3,true)" title="Kills/Deaths">KD</th>
           <th onclick="sortTable('{tid_basic}',4,true)">ADR</th>
           <th onclick="sortTable('{tid_basic}',5,true)">KR</th>
-          <th onclick="sortTable('{tid_basic}',6,true)">K</th>
-          <th onclick="sortTable('{tid_basic}',7,true)">D</th>
-          <th onclick="sortTable('{tid_basic}',8,true)">A</th>
+          <th onclick="sortTable('{tid_basic}',6,true)">Kills</th>
+          <th onclick="sortTable('{tid_basic}',7,true)">Deaths</th>
+          <th onclick="sortTable('{tid_basic}',8,true)">Assists</th>
           <th onclick="sortTable('{tid_basic}',9,true)">HS%</th>
           <th onclick="sortTable('{tid_basic}',11,true)">3K</th>
           <th onclick="sortTable('{tid_basic}',12,true)">4K</th>
-          <th onclick="sortTable('{tid_basic}',13,true)">5K</th>
+          <th onclick="sortTable('{tid_basic}',13,true)">ACE</th>
           <th onclick="sortTable('{tid_basic}',14,true)">MVPs</th>
           </tr></thead>""")
         for p in players:
@@ -1164,7 +1365,7 @@ def render_division(con, div):
         html.append("<thead><tr>")
         col_idx = 0
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},false)\">Nickname</th>"); col_idx += 1
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>"); col_idx += 1
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Clutch-fragit 1vX-tilanteissa'>Clutch Kills</th>"); col_idx += 1
         # WR-palkit: 1v1, 1v2 ja yhdistetty Entry
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='1v1 clutch winrate (W–L, %)'>1v1 WR</th>"); col_idx += 1
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='1v2 clutch winrate (W–L, %)'>1v2 WR</th>"); col_idx += 1
@@ -1174,7 +1375,13 @@ def render_division(con, div):
         # Util, UDPR, Impact
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Total utility damage'>Util dmg</th>"); col_idx += 1
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Utility damage per round'>UDPR</th>"); col_idx += 1
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Impact (2×KR + 0.42×AR - 0.41×DR)'>Impact</th>"); col_idx += 1
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Percentage of rounds survived'>Survival %</th>"); col_idx += 1
+        html.append(
+            f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" "
+            f"title='{esc_title(TOOLTIP_RATING1)}'>Rating1</th>"
+        ); col_idx += 1
+
+
 
         # Flash-sarakkeet vain jos dataa
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Number of flashbang grenades thrown by the player'>Flash Cnt</th>"); col_idx += 1
@@ -1216,7 +1423,8 @@ def render_division(con, div):
           # Utility: total + per round + impact
           html.append(f"<td>{int(p['util'])}</td>")
           html.append(f"<td>{p['udpr']:.2f}</td>")
-          html.append(f"<td>{p['impact']:.2f}</td>")
+          html.append(f"<td>{p['survival_pct']:.0f}</td>")
+          html.append( f"<td title='{esc_title(TOOLTIP_RATING1)}'>{p['rating1']:.2f}</td>")
 
           # Flash-sarakkeet (jos dataa)
           
@@ -1237,13 +1445,10 @@ def render_division(con, div):
         postProcessTable('{tid_adv}', {{
           wrbars: [2, 3, 4],
           color: [
-            {{col:6, p:[{thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, {thresholds['udpr'][2]:.4f}] }},
-            {{col:7, p:[{thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, {thresholds['impact'][2]:.4f}] }},
-            {{col:11, p:[{thresholds['enem_flash'][0]:.4f},{thresholds['enem_flash'][1]:.4f},{thresholds['enem_flash'][2]:.4f}]}}
-          ],
-          // Entry WR% on prosentti → halutessasi voit värjätä sen kiinteällä asteikolla (0..100) näin:
-          fixedColor: [
-            {{col:6, min:0, max:100}}
+            {{col:6,  p:[{thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, {thresholds['udpr'][2]:.4f}]}},
+            {{col:7,  p:[{thresholds['survival'][0]:.4f}, {thresholds['survival'][1]:.4f}, {thresholds['survival'][2]:.4f}]}},
+            {{col:8,  p:[{thresholds['rating1'][0]:.4f},  {thresholds['rating1'][1]:.4f},  {thresholds['rating1'][2]:.4f}]}},
+            {{col:10, p:[{thresholds['enem_flash'][0]:.4f}, {thresholds['enem_flash'][1]:.4f}, {thresholds['enem_flash'][2]:.4f}]}}
           ],
           defaultSort: {{col:0, dir:'asc'}},
           toggles: true
