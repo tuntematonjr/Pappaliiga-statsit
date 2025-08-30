@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CS2 Faceit Reports - generoitu 2025-08-30 15:20</title>
+<title>CS2 Faceit Reports - generoitu 2025-08-30 18:07</title>
 <style>
 :root{
   --fg:#f5f5f5;
@@ -41,6 +41,13 @@ tbody tr:hover{ outline:1px solid #555; background:#292929; }
 .bar{ position:relative; background:#333; height:20px; border-radius:8px; overflow:hidden; }
 .bar>span{ position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--accent); }
 .bar .val{ position:relative; z-index:1; font-size:.9rem; padding-left:.5rem; color:#fff; }
+
+/* Split WR bar (win + loss) */
+.bar-split{position:relative;height:20px;border-radius:6px;overflow:hidden;background:#333}
+.bar-split .win{position:absolute;left:0;top:0;bottom:0;background:#22c55e}
+.bar-split .loss{position:absolute;top:0;bottom:0;background:#ef4444}
+.bar-split .val{position:relative;z-index:1;text-align:center;line-height:20px;font-size:.85rem;color:#fff}
+
 
 .cell-grad.good{ background:linear-gradient(90deg, rgba(34,197,94,.25), transparent); }
 .cell-grad.bad{  background:linear-gradient(90deg, rgba(239,68,68,.25), transparent); }
@@ -143,6 +150,44 @@ function postProcessTable(tableId,opts){
       });
     }
   }
+  if (opts.wrbars){
+    for (const tr of rows){
+      opts.wrbars.forEach(i => {
+        const td = tr.cells[i];
+        if (!td || !td.classList.contains('wr')) return;
+
+        const g   = parseInt(td.dataset.g || '0', 10);        // games played
+        const w   = parseInt(td.dataset.w || '0', 10);        // wins
+        const pctAttr = parseFloat((td.dataset.pct || '').replace(',','.'));
+        const pct = isFinite(pctAttr) ? pctAttr : (g ? (100*w/g) : 0);
+
+        if (!g) {
+          // Pelaajataulukot: näytä 0–0 (0%) harmaana, jos data-zero="show"
+          if (td.dataset.zero === 'show') {
+            td.innerHTML = '<div class="bar-split"><span class="win"></span><span class="loss"></span><div class="val"></div></div>';
+            const val = td.querySelector('.val');
+            val.textContent = '0–0 (0%)';
+            td.querySelector('.win').style.width  = '0%';
+            td.querySelector('.loss').style.left  = '0%';
+            td.querySelector('.loss').style.width = '100%';
+            td.querySelector('.win').style.background  = '#555';  // neutraali harmaa
+            td.querySelector('.loss').style.background = '#555';  // neutraali harmaa
+            td.classList.add('cell-muted');
+            td.title = 'No attempts';
+          } else {
+            // Karttataulukot: pidä "not played"
+            td.textContent = 'not played';
+            td.classList.add('cell-muted');
+            td.title = 'No games';
+          }
+          return;
+        }
+
+        renderSplitWR(td, g, pct);  // piirtää vihreä/punainen -splitin
+      });
+    }
+  }
+
   if(opts.color){ opts.color.forEach(c=>colorizeContinuous(tableId,c.col,c.p[0],c.p[1],c.p[2],c.inverse||false)); }
   if(opts.defaultSort){ sortTable(tableId,opts.defaultSort.col,opts.defaultSort.dir==='asc'); }
   if(opts.toggles) buildColumnToggles(tableId);
@@ -176,13 +221,56 @@ function initTabsAutoSort(rootId){
   table.setAttribute('data-sort-col','0'); table.setAttribute('data-sort-dir','desc');
   sortTable(table.id,0,false); sortTable(table.id,0,false);
 }
+function renderWRCell(td){
+  const w = parseInt(td.dataset.w || '0', 10);    // wins
+  const g = parseInt(td.dataset.g || '0', 10);    // games
+  const l = Math.max(0, g - w);                   // losses
+  const pctAttr = parseFloat((td.dataset.pct || '').replace(',','.'));
+  const pct = isFinite(pctAttr) ? pctAttr : (g ? (100*w/g) : 0);
+
+  td.innerHTML = '<div class="bar"><span></span><div class="val"></div></div>';
+  const span = td.querySelector('.bar > span');
+  const val  = td.querySelector('.bar .val');
+
+  // palkin leveys
+  const wPct = Math.max(0, Math.min(100, pct));
+  span.style.width = wPct + '%';
+
+  // teksti "W–L (P%)"
+  val.textContent = `${w}–${l} (${Math.round(pct)}%)`;
+
+  // sävy: vihreä kasvaa, punainen vähenee
+  const gcol = Math.round(180 * (wPct/100));
+  const rcol = Math.round(200 * (1 - wPct/100));
+  span.style.background = `rgb(${rcol},${gcol},100)`;
+
+  td.title = g ? `Wins: ${w}, Losses: ${l}, WR: ${pct.toFixed(1)}%` : 'No games';
+}
+function renderSplitWR(td, played, wrPct){
+  const g = Math.max(0, parseInt(played || 0, 10));
+  const pct = Math.max(0, Math.min(100, parseFloat((wrPct||0))));
+  const wins = Math.round(g * pct / 100);
+  const losses = Math.max(0, g - wins);
+
+  td.innerHTML = '<div class="bar-split"><span class="win"></span><span class="loss"></span><div class="val"></div></div>';
+  const win  = td.querySelector('.win');
+  const loss = td.querySelector('.loss');
+  const val  = td.querySelector('.val');
+
+  win.style.width  = pct + '%';
+  loss.style.left  = pct + '%';
+  loss.style.width = (100 - pct) + '%';
+  val.textContent  = (g ? `${wins}–${losses} (${Math.round(pct)}%)` : '0–0 (0%)');
+
+  td.title = g ? `Wins: ${wins}, Losses: ${losses}, WR: ${pct.toFixed(1)}%` : 'No games';
+}
 document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.tabs[id]').forEach(root=>initTabsAutoSort(root.id)); });
 </script>
 </head>
 <body>
 
 <div class="page">
-<h1>CS2 Faceit Reports <span class='muted'>(generoitu 2025-08-30 15:20)</span></h1>
+<h1>CS2 Faceit Reports <span class='muted'>(generoitu 2025-08-30 18:07)</span></h1>
 <p class='muted'>Valitse divisioona alta. Sivu linkittää valmiiksi generoituun raporttiin.</p>
 <div class="nav">
 <a href="output/div5.html">5 Divisioona S11</a>

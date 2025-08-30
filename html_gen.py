@@ -57,6 +57,13 @@ tbody tr:hover{ outline:1px solid #555; background:#292929; }
 .bar>span{ position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--accent); }
 .bar .val{ position:relative; z-index:1; font-size:.9rem; padding-left:.5rem; color:#fff; }
 
+/* Split WR bar (win + loss) */
+.bar-split{position:relative;height:20px;border-radius:6px;overflow:hidden;background:#333}
+.bar-split .win{position:absolute;left:0;top:0;bottom:0;background:#22c55e}
+.bar-split .loss{position:absolute;top:0;bottom:0;background:#ef4444}
+.bar-split .val{position:relative;z-index:1;text-align:center;line-height:20px;font-size:.85rem;color:#fff}
+
+
 .cell-grad.good{ background:linear-gradient(90deg, rgba(34,197,94,.25), transparent); }
 .cell-grad.bad{  background:linear-gradient(90deg, rgba(239,68,68,.25), transparent); }
 .cell-muted{ color:var(--muted); }
@@ -158,6 +165,44 @@ function postProcessTable(tableId,opts){
       });
     }
   }
+  if (opts.wrbars){
+    for (const tr of rows){
+      opts.wrbars.forEach(i => {
+        const td = tr.cells[i];
+        if (!td || !td.classList.contains('wr')) return;
+
+        const g   = parseInt(td.dataset.g || '0', 10);        // games played
+        const w   = parseInt(td.dataset.w || '0', 10);        // wins
+        const pctAttr = parseFloat((td.dataset.pct || '').replace(',','.'));
+        const pct = isFinite(pctAttr) ? pctAttr : (g ? (100*w/g) : 0);
+
+        if (!g) {
+          // Pelaajataulukot: näytä 0–0 (0%) harmaana, jos data-zero="show"
+          if (td.dataset.zero === 'show') {
+            td.innerHTML = '<div class="bar-split"><span class="win"></span><span class="loss"></span><div class="val"></div></div>';
+            const val = td.querySelector('.val');
+            val.textContent = '0–0 (0%)';
+            td.querySelector('.win').style.width  = '0%';
+            td.querySelector('.loss').style.left  = '0%';
+            td.querySelector('.loss').style.width = '100%';
+            td.querySelector('.win').style.background  = '#555';  // neutraali harmaa
+            td.querySelector('.loss').style.background = '#555';  // neutraali harmaa
+            td.classList.add('cell-muted');
+            td.title = 'No attempts';
+          } else {
+            // Karttataulukot: pidä "not played"
+            td.textContent = 'not played';
+            td.classList.add('cell-muted');
+            td.title = 'No games';
+          }
+          return;
+        }
+
+        renderSplitWR(td, g, pct);  // piirtää vihreä/punainen -splitin
+      });
+    }
+  }
+
   if(opts.color){ opts.color.forEach(c=>colorizeContinuous(tableId,c.col,c.p[0],c.p[1],c.p[2],c.inverse||false)); }
   if(opts.defaultSort){ sortTable(tableId,opts.defaultSort.col,opts.defaultSort.dir==='asc'); }
   if(opts.toggles) buildColumnToggles(tableId);
@@ -190,6 +235,49 @@ function initTabsAutoSort(rootId){
   const table=activePanel.querySelector('table'); if(!table) return;
   table.setAttribute('data-sort-col','0'); table.setAttribute('data-sort-dir','desc');
   sortTable(table.id,0,false); sortTable(table.id,0,false);
+}
+function renderWRCell(td){
+  const w = parseInt(td.dataset.w || '0', 10);    // wins
+  const g = parseInt(td.dataset.g || '0', 10);    // games
+  const l = Math.max(0, g - w);                   // losses
+  const pctAttr = parseFloat((td.dataset.pct || '').replace(',','.'));
+  const pct = isFinite(pctAttr) ? pctAttr : (g ? (100*w/g) : 0);
+
+  td.innerHTML = '<div class="bar"><span></span><div class="val"></div></div>';
+  const span = td.querySelector('.bar > span');
+  const val  = td.querySelector('.bar .val');
+
+  // palkin leveys
+  const wPct = Math.max(0, Math.min(100, pct));
+  span.style.width = wPct + '%';
+
+  // teksti "W–L (P%)"
+  val.textContent = `${w}–${l} (${Math.round(pct)}%)`;
+
+  // sävy: vihreä kasvaa, punainen vähenee
+  const gcol = Math.round(180 * (wPct/100));
+  const rcol = Math.round(200 * (1 - wPct/100));
+  span.style.background = `rgb(${rcol},${gcol},100)`;
+
+  td.title = g ? `Wins: ${w}, Losses: ${l}, WR: ${pct.toFixed(1)}%` : 'No games';
+}
+function renderSplitWR(td, played, wrPct){
+  const g = Math.max(0, parseInt(played || 0, 10));
+  const pct = Math.max(0, Math.min(100, parseFloat((wrPct||0))));
+  const wins = Math.round(g * pct / 100);
+  const losses = Math.max(0, g - wins);
+
+  td.innerHTML = '<div class="bar-split"><span class="win"></span><span class="loss"></span><div class="val"></div></div>';
+  const win  = td.querySelector('.win');
+  const loss = td.querySelector('.loss');
+  const val  = td.querySelector('.val');
+
+  win.style.width  = pct + '%';
+  loss.style.left  = pct + '%';
+  loss.style.width = (100 - pct) + '%';
+  val.textContent  = (g ? `${wins}–${losses} (${Math.round(pct)}%)` : '0–0 (0%)');
+
+  td.title = g ? `Wins: ${wins}, Losses: ${losses}, WR: ${pct.toFixed(1)}%` : 'No games';
 }
 document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.tabs[id]').forEach(root=>initTabsAutoSort(root.id)); });
 </script>
@@ -820,9 +908,19 @@ def compute_map_stats_table(con, division_id: int, team_id: str):
             "played": played,
             "picks": picks,
             "opp_picks": opp_picks,
+
+            # WR:t prosentteina kuten ennen
             "wr": wr,
             "wr_own": wr_own,
             "wr_opp": wr_opp,
+
+            "wins": w,
+            "games": played,
+            "wins_own": own_pick_wins,
+            "games_own": own_pick_games,
+            "wins_opp": opp_pick_wins,
+            "games_opp": opp_pick_games,
+
             "kd": kd,
             "adr": adr,
             "rd": rd,
@@ -831,6 +929,7 @@ def compute_map_stats_table(con, division_id: int, team_id: str):
             "opp_ban": opp_ban,
             "total_own_ban": total_own_ban,
         })
+
     return rows
 
 # ------------------------------
@@ -1014,7 +1113,6 @@ def render_division(con, div):
           <th onclick="sortTable('{tid_basic}',7,true)">D</th>
           <th onclick="sortTable('{tid_basic}',8,true)">A</th>
           <th onclick="sortTable('{tid_basic}',9,true)">HS%</th>
-          <th onclick="sortTable('{tid_basic}',10,true)">AWP</th>
           <th onclick="sortTable('{tid_basic}',11,true)">3K</th>
           <th onclick="sortTable('{tid_basic}',12,true)">4K</th>
           <th onclick="sortTable('{tid_basic}',13,true)">5K</th>
@@ -1032,7 +1130,6 @@ def render_division(con, div):
             <td>{p["death"]}</td>
             <td>{p["assist"]}</td>
             <td>{p["hs_pct"]:.1f}</td>
-            <td>{p["awp_kills"]}</td>
             <td>{p["k3"]}</td>
             <td>{p["k4"]}</td>
             <td>{p["k5"]}</td>
@@ -1068,11 +1165,11 @@ def render_division(con, div):
         col_idx = 0
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},false)\">Nickname</th>"); col_idx += 1
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Clutch-fragit 1vX-tilanteissa'>Clutch K</th>"); col_idx += 1
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='1v1 WR%, suluissa yritykset'>1v1 WR%</th>"); col_idx += 1
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='1v2 WR%, suluissa yritykset'>1v2 WR%</th>"); col_idx += 1
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Entry attempts'>Entry Att</th>"); col_idx += 1
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Entry wins'>Entry Win</th>"); col_idx += 1
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Entry win rate'>Entry WR%</th>"); col_idx += 1
+        # WR-palkit: 1v1, 1v2 ja yhdistetty Entry
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='1v1 clutch winrate (W–L, %)'>1v1 WR</th>"); col_idx += 1
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='1v2 clutch winrate (W–L, %)'>1v2 WR</th>"); col_idx += 1
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Entry duels winrate (W–L, %)'>Entry WR</th>"); col_idx += 1
+
 
         # Util, UDPR, Impact
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Total utility damage'>Util dmg</th>"); col_idx += 1
@@ -1085,7 +1182,8 @@ def render_division(con, div):
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Count of successful flashes that actually blinded enemies'>Flash Succ</th>"); col_idx += 1
         html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Ratio: enemies blinded per flash thrown'>Enem/Flash</th>"); col_idx += 1
 
-        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Number of pistol kills'>Pistol K</th>"); col_idx += 1
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Number of pistol kills'>Pistol Kills</th>"); col_idx += 1
+        html.append(f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" title='Number of sniper kills'>Sniper Kills</th>"); col_idx += 1
 
         html.append("</tr></thead><tbody>")
 
@@ -1093,11 +1191,27 @@ def render_division(con, div):
           html.append("<tr>")
           html.append(f"<td>{p['nickname']}</td>")
           html.append(f"<td>{p['clutch_kills']}</td>")
-          html.append(f"<td data-sort=\"{p['c11_wr']:.1f}\" title=\"Attempts: {p['c11_att']}, Wins: {p['c11_win']}\">{p['c11_wr']:.0f}% ({p['c11_att']})</td>")
-          html.append(f"<td data-sort=\"{p['c12_wr']:.1f}\" title=\"Attempts: {p['c12_att']}, Wins: {p['c12_win']}\">{p['c12_wr']:.0f}% ({p['c12_att']})</td>")
-          html.append(f"<td>{p['entry_att']}</td>")
-          html.append(f"<td>{p['entry_win']}</td>")
-          html.append(f"<td>{p['entry_wr']:.0f}</td>")
+          # 1v1 WR palkki
+          html.append(
+            f"<td class='wr' data-zero='show' data-g='{p['c11_att']}' data-w='{p['c11_win']}' "
+            f"data-pct='{p['c11_wr']:.1f}' title='Attempts: {p['c11_att']}, Wins: {p['c11_win']}'>"
+            f"</td>"
+          )
+
+          # 1v2 WR palkki
+          html.append(
+            f"<td class='wr' data-zero='show' data-g='{p['c12_att']}' data-w='{p['c12_win']}' "
+            f"data-pct='{p['c12_wr']:.1f}' title='Attempts: {p['c12_att']}, Wins: {p['c12_win']}'>"
+            f"</td>"
+          )
+
+          # Entry WR yhdistettynä (W–L näkyy palkissa)
+          html.append(
+            f"<td class='wr' data-zero='show' data-g='{p['entry_att']}' data-w='{p['entry_win']}' "
+            f"data-pct='{p['entry_wr']:.1f}' title='Attempts: {p['entry_att']}, Wins: {p['entry_win']}'>"
+            f"</td>"
+          )
+
 
           # Utility: total + per round + impact
           html.append(f"<td>{int(p['util'])}</td>")
@@ -1113,6 +1227,7 @@ def render_division(con, div):
           html.append(f"<td>{val:.2f}</td>")
 
           html.append(f"<td>{p.get('pistol_kills',0)}</td>")
+          html.append(f"<td>{p.get('awp_kills',0)}</td>")
           html.append("</tr>")
 
         html.append("</tbody></table>")
@@ -1120,14 +1235,11 @@ def render_division(con, div):
         html.append(f"""
         <script>
         postProcessTable('{tid_adv}', {{
+          wrbars: [2, 3, 4],
           color: [
-            // UDPR (col=8), Impact (col=9) -- division tason mediaani+IQR
-            {{col:2, p:[{thresholds['c11_wr'][0]:.4f}, {thresholds['c11_wr'][1]:.4f}, {thresholds['c11_wr'][2]:.4f}] }},
-            {{col:3, p:[{thresholds['c12_wr'][0]:.4f}, {thresholds['c12_wr'][1]:.4f}, {thresholds['c12_wr'][2]:.4f}] }},
-            {{col:6, p:[{thresholds['entry_wr'][0]:.4f}, {thresholds['entry_wr'][1]:.4f}, {thresholds['entry_wr'][2]:.4f}] }},
-            {{col:8, p:[{thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, {thresholds['udpr'][2]:.4f}] }},
-            {{col:9, p:[{thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, {thresholds['impact'][2]:.4f}] }},
-            {{col:13, p:[{thresholds['enem_flash'][0]:.4f},{thresholds['enem_flash'][1]:.4f},{thresholds['enem_flash'][2]:.4f}]}}
+            {{col:6, p:[{thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, {thresholds['udpr'][2]:.4f}] }},
+            {{col:7, p:[{thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, {thresholds['impact'][2]:.4f}] }},
+            {{col:11, p:[{thresholds['enem_flash'][0]:.4f},{thresholds['enem_flash'][1]:.4f},{thresholds['enem_flash'][2]:.4f}]}}
           ],
           // Entry WR% on prosentti → halutessasi voit värjätä sen kiinteällä asteikolla (0..100) näin:
           fixedColor: [
@@ -1207,9 +1319,16 @@ def render_division(con, div):
             <td>{r["played"]}</td>
             <td>{r["picks"]}</td>
             <td>{r["opp_picks"]}</td>
-            <td>{r["wr"]:.1f}</td>
-            <td>{r["wr_own"]:.1f}</td>
-            <td>{r["wr_opp"]:.1f}</td>
+            <!-- WR %: kokonaisuus -->
+            <td class="wr" data-w="{r['wins']}" data-g="{r['games']}" data-pct="{r['wr']:.1f}"></td>
+
+            <!-- WR own pick % -->
+            <td class="wr" data-w="{r['wins_own']}" data-g="{r['games_own']}" data-pct="{r['wr_own']:.1f}"></td>
+
+            <!-- WR opp pick % -->
+            <td class="wr" data-w="{r['wins_opp']}" data-g="{r['games_opp']}" data-pct="{r['wr_opp']:.1f}"></td>
+
+
             <td title="Δ vs div avg: {dkd:+.2f}">{r["kd"]:.2f}</td>
             <td title="Δ vs div avg: {dadr:+.1f}">{r["adr"]:.1f}</td>
             <td>{r["rd"]}</td>
@@ -1222,22 +1341,23 @@ def render_division(con, div):
         html.append(f"""
         <script>
         postProcessTable('{tid2}', {{
-          // KD (col=7), ADR (col=8) – käytetään divisionin pelaajamediaaneja pohjakynnyksinä.
-          // (Jos haluat karttakohtaiset mediaanit myöhemmin, voit laskea ne Pythonissa erikseen.)
+          // WR-sarakkeiden split-palkit datasta
+          wrbars: [4,5,6],
+
+          // (valinnaisesti) dynaaminen väritys KD/ADR/RD tms. – pidä oma nykyinen listasi:
           color: [
-            {{col:7, p:[{thresholds['kd'][0]:.4f},  {thresholds['kd'][1]:.4f},  {thresholds['kd'][2]:.4f}] }},
-            {{col:8, p:[{thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, {thresholds['adr'][2]:.4f}] }}
+            {{col:7, p:[{thresholds['kd'][0]:.4f}, {thresholds['kd'][1]:.4f}, {thresholds['kd'][2]:.4f}] }},
+            {{col:8, p:[{thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, {thresholds['adr'][2]:.4f}] }},
+            // RD esimerkkinä kiinteällä alueella:
+            // colorizeRangea jos käytät, tai pidä oma toteutuksesi
           ],
-          // ±RD on luonnostaan symmetrinen → kiinteä asteikko esim. −15..+15
-          fixedColor: [
-            {{col:9, min:-15, max:15}}
-          ],
-          // Winrate-palkit renderöidään jo muualla (jos käytät palkkeja erikseen, laita bars:[4,5,6])
-          defaultSort: {{col:1, dir:'desc'}},
+          defaultSort: {{col:0, dir:'asc'}},
           toggles: true
         }});
+        bindPlayedOnly('{tid2}', '{tid2}-played-only');
         </script>
         """)
+
         html.append("</details>")  # team section
 
     html.append('</div>')  # .page
