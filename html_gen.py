@@ -413,10 +413,9 @@ def compute_division_thresholds(con, division_id: int):
     rows = q(con, """
       SELECT
         ps.player_id,
-        AVG(ps.adr)    AS adr,
-        AVG(ps.kr)     AS kr,
-        SUM(ps.utility_damage) AS util,
-        SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds
+        SUM(ps.kills)                     AS k,
+        SUM(ps.deaths)                    AS d,
+        AVG(ps.adr)                       AS adr,
         AVG(ps.kr)                        AS kr,
         AVG(ps.hs_pct)                    AS hs_pct,
         SUM(ps.utility_damage)            AS util,
@@ -424,6 +423,11 @@ def compute_division_thresholds(con, division_id: int):
         SUM(COALESCE(ps.entry_wins,0))    AS entry_wins,
         SUM(COALESCE(ps.entry_count,0))   AS entry_count,
         SUM(COALESCE(ps.cl_1v1_Wins,0))    AS cl_1v1_Wins,
+        SUM(COALESCE(ps.cl_1v1_Attempts,0))   AS cl_1v1_Attempts,
+        SUM(COALESCE(ps.cl_1v2_Wins,0))    AS cl_1v2_Wins,
+        SUM(COALESCE(ps.cl_1v2_Attempts,0))   AS cl_1v2_Attempts,
+        SUM(COALESCE(ps.enemies_flashed,0)) AS enemies_flashed,
+        SUM(COALESCE(ps.flash_count,0))     AS flash_count
       FROM player_stats ps
       JOIN matches m ON m.match_id = ps.match_id
       JOIN maps mp   ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
@@ -431,46 +435,94 @@ def compute_division_thresholds(con, division_id: int):
       GROUP BY ps.player_id
     """, (division_id,))
 
-    kd_vals, adr_vals, kr_vals, udpr_vals, impact_vals = [], [], [], [], []
+
+    kd_vals, adr_vals, kr_vals, hs_pct_vals, udpr_vals, impact_vals = [], [], [], [], [], []
+    entrywr_vals, cl_1v1_vals, cl_1v2_vals, enem_per_flash_vals  = [], [], [], []
+
+
     for r in rows:
         k  = r["k"] or 0
         d  = r["d"] or 0
         kd = (k / d) if d else float(k)
+
         adr = r["adr"] or 0.0
         kr  = r["kr"] or 0.0
+        hs_pct  = r["hs_pct"] or 0.0
+
         rounds = r["rounds"] or 0
         util   = r["util"] or 0
         udpr   = (util / rounds) if rounds else 0.0
+
+        # Impact (yksinkertainen placeholder: ar/dr ei ole erikseen)
         ar = 0.0
         dr = 0.0
         impact = 2.0*kr + 0.42*ar - 0.41*dr
 
         # Entry WR (%)
         ewin = r["entry_wins"]  or 0
+        eatt = r["entry_count"] or 0
+        entry_wr = (100.0 * ewin / eatt) if eatt else None
+
+        # Winratet (%)
+        c11_att = r.get("c11_att", 0) or 0
+        c11_win = r.get("c11_win", 0) or 0
+        c11_wr = (c11_win / c11_att * 100.0) if c11_att else 0.0
+
+        c12_att = r.get("c12_att", 0) or 0
+        c12_win = r.get("c12_win", 0) or 0
+        c12_wr = (c12_win / c12_att * 100.0) if c12_att else 0.0
+
+        efl = r["enemies_flashed"] or 0
+        fct = r["flash_count"]     or 0
+        enem_per_flash = (efl / fct) if fct else None  # None jos ei heittoja
+        if enem_per_flash is not None:
+            enem_per_flash_vals.append(enem_per_flash)
+
+
         kd_vals.append(kd)
         adr_vals.append(adr)
         kr_vals.append(kr)
+        hs_pct_vals.append(hs_pct)
         udpr_vals.append(udpr)
         impact_vals.append(impact)
+        entrywr_vals.append(entry_wr)
+        cl_1v1_vals.append(c11_wr)
+        cl_1v2_vals.append(c12_wr)
+
+    def _percentile(lst, q):
+        lst = sorted(lst)
+        if not lst: return 0.0
+        pos = (len(lst)-1) * q
+        i = int(pos)
+        frac = pos - i
+        if i+1 < len(lst):
+            return lst[i] + frac * (lst[i+1] - lst[i])
+        return lst[i]
 
     def pack(lst, fallback=(0.0, 0.5, 1.0)):
         lst = [v for v in lst if v is not None]
         if not lst:
             return fallback
-        lo = _percentile(lst, 20)
-        mid = _percentile(lst, 50)
-        hi = _percentile(lst, 80)
-        if lo == hi:
-            lo = min(lo, lo*0.9)
-            hi = max(hi, hi*1.1 if hi != 0 else 0.1)
-        return (lo, mid, hi)
+        p25 = _percentile(lst, 0.25)
+        p50 = _percentile(lst, 0.50)
+        p75 = _percentile(lst, 0.75)
+        # varmistetaan että ala- ja ylärajat eivät ole identtiset
+        if p25 == p75:
+            p25 = min(p25, p25*0.9)
+            p75 = max(p75, p75*1.1 if p75 != 0 else 0.1)
+        return (p25, p50, p75)
 
     return {
-      "kd":     pack(kd_vals),
-      "adr":    pack(adr_vals),
-      "kr":     pack(kr_vals),
-      "udpr":   pack(udpr_vals),
-      "impact": pack(impact_vals),
+        "kd":       pack(kd_vals),
+        "adr":      pack(adr_vals),
+        "kr":       pack(kr_vals),
+        "hs_pct":       pack(hs_pct_vals),
+        "udpr":     pack(udpr_vals),
+        "impact":   pack(impact_vals),
+        "entry_wr": pack(entrywr_vals, fallback=(30.0, 50.0, 70.0)),
+        "c11_wr": pack(cl_1v1_vals, fallback=(30.0, 50.0, 70.0)),
+        "c12_wr": pack(cl_1v2_vals, fallback=(30.0, 50.0, 70.0)),
+        "enem_flash": pack(enem_per_flash_vals, fallback=(0.3, 0.6, 0.9)),
     }
 
 def get_teams_in_division(con, division_id: int):
@@ -994,7 +1046,8 @@ def render_division(con, div):
           color: [
             {{col:3, p:[{thresholds['kd'][0]:.4f}, {thresholds['kd'][1]:.4f}, {thresholds['kd'][2]:.4f}] }},
             {{col:4, p:[{thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, {thresholds['adr'][2]:.4f}] }},
-            {{col:5, p:[{thresholds['kr'][0]:.4f}, {thresholds['kr'][1]:.4f}, {thresholds['kr'][2]:.4f}]  }}
+            {{col:5, p:[{thresholds['kr'][0]:.4f}, {thresholds['kr'][1]:.4f}, {thresholds['kr'][2]:.4f}]  }},
+            {{col:9, p:[{thresholds['hs_pct'][0]:.4f}, {thresholds['hs_pct'][1]:.4f}, {thresholds['hs_pct'][2]:.4f}]  }}
           ],
           defaultSort: {{col:0, dir:'asc'}},
           toggles: true
@@ -1002,7 +1055,7 @@ def render_division(con, div):
         </script>
         """)
 
-        html.append(f"<script>applyDefaultSort('{tid_basic}');</script>")
+        #html.append(f"<script>applyDefaultSort('{tid_basic}');</script>")
         html.append("</div>")  # /tab-panel basic
 
         # ---------- ADVANCED ----------
@@ -1052,21 +1105,40 @@ def render_division(con, div):
           html.append(f"<td>{p['impact']:.2f}</td>")
 
           # Flash-sarakkeet (jos dataa)
-          if has_flash:
-              html.append(f"<td>{p.get('flash_count',0)}</td>")
-              html.append(f"<td>{p.get('flashed',0)}</td>")
-              if any('flash_successes' in pp for pp in players):
-                  html.append(f"<td>{p.get('flash_successes',0)}</td>")
-              val = p['enemies_per_flash'] if p['enemies_per_flash'] is not None else 0.0
-              html.append(f"<td>{val:.2f}</td>")
+          
+          html.append(f"<td>{p.get('flash_count',0)}</td>")
+          html.append(f"<td>{p.get('flashed',0)}</td>")
+          html.append(f"<td>{p.get('flash_successes',0)}</td>")
+          val = p['enemies_per_flash'] if p['enemies_per_flash'] is not None else 0.0
+          html.append(f"<td>{val:.2f}</td>")
 
-          if has_pistol:
-              html.append(f"<td>{p.get('pistol_kills',0)}</td>")
+          html.append(f"<td>{p.get('pistol_kills',0)}</td>")
           html.append("</tr>")
 
         html.append("</tbody></table>")
 
-        html.append(f"<script>applyDefaultSort('{tid_adv}');</script>")
+        html.append(f"""
+        <script>
+        postProcessTable('{tid_adv}', {{
+          color: [
+            // UDPR (col=8), Impact (col=9) -- division tason mediaani+IQR
+            {{col:2, p:[{thresholds['c11_wr'][0]:.4f}, {thresholds['c11_wr'][1]:.4f}, {thresholds['c11_wr'][2]:.4f}] }},
+            {{col:3, p:[{thresholds['c12_wr'][0]:.4f}, {thresholds['c12_wr'][1]:.4f}, {thresholds['c12_wr'][2]:.4f}] }},
+            {{col:6, p:[{thresholds['entry_wr'][0]:.4f}, {thresholds['entry_wr'][1]:.4f}, {thresholds['entry_wr'][2]:.4f}] }},
+            {{col:8, p:[{thresholds['udpr'][0]:.4f}, {thresholds['udpr'][1]:.4f}, {thresholds['udpr'][2]:.4f}] }},
+            {{col:9, p:[{thresholds['impact'][0]:.4f}, {thresholds['impact'][1]:.4f}, {thresholds['impact'][2]:.4f}] }},
+            {{col:13, p:[{thresholds['enem_flash'][0]:.4f},{thresholds['enem_flash'][1]:.4f},{thresholds['enem_flash'][2]:.4f}]}}
+          ],
+          // Entry WR% on prosentti → halutessasi voit värjätä sen kiinteällä asteikolla (0..100) näin:
+          fixedColor: [
+            {{col:6, min:0, max:100}}
+          ],
+          defaultSort: {{col:0, dir:'asc'}},
+          toggles: true
+        }});
+        </script>
+        """)
+        #html.append(f"<script>applyDefaultSort('{tid_adv}');</script>")
         html.append("</div>")  # /tab-panel advanced
 
         # Map stats
@@ -1147,7 +1219,25 @@ def render_division(con, div):
             <td>{r["total_own_ban"]}</td>
             </tr>""")
         html.append("</tbody></table>")
-
+        html.append(f"""
+        <script>
+        postProcessTable('{tid2}', {{
+          // KD (col=7), ADR (col=8) – käytetään divisionin pelaajamediaaneja pohjakynnyksinä.
+          // (Jos haluat karttakohtaiset mediaanit myöhemmin, voit laskea ne Pythonissa erikseen.)
+          color: [
+            {{col:7, p:[{thresholds['kd'][0]:.4f},  {thresholds['kd'][1]:.4f},  {thresholds['kd'][2]:.4f}] }},
+            {{col:8, p:[{thresholds['adr'][0]:.4f}, {thresholds['adr'][1]:.4f}, {thresholds['adr'][2]:.4f}] }}
+          ],
+          // ±RD on luonnostaan symmetrinen → kiinteä asteikko esim. −15..+15
+          fixedColor: [
+            {{col:9, min:-15, max:15}}
+          ],
+          // Winrate-palkit renderöidään jo muualla (jos käytät palkkeja erikseen, laita bars:[4,5,6])
+          defaultSort: {{col:1, dir:'desc'}},
+          toggles: true
+        }});
+        </script>
+        """)
         html.append("</details>")  # team section
 
     html.append('</div>')  # .page
