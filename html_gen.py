@@ -413,12 +413,17 @@ def compute_division_thresholds(con, division_id: int):
     rows = q(con, """
       SELECT
         ps.player_id,
-        SUM(ps.kills)  AS k,
-        SUM(ps.deaths) AS d,
         AVG(ps.adr)    AS adr,
         AVG(ps.kr)     AS kr,
         SUM(ps.utility_damage) AS util,
         SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds
+        AVG(ps.kr)                        AS kr,
+        AVG(ps.hs_pct)                    AS hs_pct,
+        SUM(ps.utility_damage)            AS util,
+        SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds,
+        SUM(COALESCE(ps.entry_wins,0))    AS entry_wins,
+        SUM(COALESCE(ps.entry_count,0))   AS entry_count,
+        SUM(COALESCE(ps.cl_1v1_Wins,0))    AS cl_1v1_Wins,
       FROM player_stats ps
       JOIN matches m ON m.match_id = ps.match_id
       JOIN maps mp   ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
@@ -435,11 +440,13 @@ def compute_division_thresholds(con, division_id: int):
         kr  = r["kr"] or 0.0
         rounds = r["rounds"] or 0
         util   = r["util"] or 0
-        udpr = (util / rounds) if rounds else 0.0
+        udpr   = (util / rounds) if rounds else 0.0
         ar = 0.0
         dr = 0.0
         impact = 2.0*kr + 0.42*ar - 0.41*dr
 
+        # Entry WR (%)
+        ewin = r["entry_wins"]  or 0
         kd_vals.append(kd)
         adr_vals.append(adr)
         kr_vals.append(kr)
