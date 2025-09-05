@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Pappaliiga — Index</title>
+<style>
+/* ---- Colors & base ---- */
+:root{
+  --bg: #0b1020;
+  --card: #121932;
+  --muted: #9db1d1;
+  --fg:#e7eefc;
+  --border:#27324d;
+  --table-bg:#0e1730;
+  --table-alt:#0f1a38;
+  --head:#0f213f;
+  --chip-bg:#121b36;
+  --nav-bg:#121b36;
+  --accent:#3aa3ff;
+  --accent-2:#7dd3fc;
+  --ok:#39d98a;
+  --warn:#f4bf4f;
+  --err:#f97066;
+  --radius:14px;
+  --shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+
+/* Team logos: different size for index vs division */
+img.logo.nav-logo {
+  max-height: 40px;
+  max-width: 40px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border-radius: 3px;
+}
+
+/* Bigger logos in team section headings */
+img.logo.team-logo {
+  max-height: 100px;
+  max-width: 100px;
+  vertical-align: middle;
+  margin-right: 10px;
+  border-radius: 6px;
+}
+img.logo.promo-logo {
+  max-height: 200px;
+  max-width: 200px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border-radius: 3px;
+}
+
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background: radial-gradient(1800px 600px at 20% -10%, #152046 0%, #0b1020 55%) fixed;
+  color:var(--fg);
+  font:18px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+}
+a{ color:var(--accent); text-decoration:none; }
+.muted{ color:var(--muted); }
+
+/* ---- Containers ---- */
+.container{ max-width:1800px; margin:0 auto; padding:24px; }
+.page{ max-width:1800px; margin:0 auto; padding:1.25rem 1.25rem 3rem; }
+
+/* ---- Navigation / brand ---- */
+.nav{ display:flex; flex-wrap:wrap; gap:.75rem; margin:0.25rem 0 1rem; }
+.topbar{ display:flex; align-items:center; justify-content:space-between; gap:16px; margin: 0 0 20px 0; }
+.brand{ display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:.3px; color:var(--fg); }
+.brand .dot{ width:10px; height:10px; border-radius:50%; background:linear-gradient(135deg, var(--accent), var(--accent-2)); }
+
+/* ---- Buttons ---- */
+.btn{
+  display:inline-flex; align-items:center; gap:8px;
+  border:1px solid rgba(255,255,255,0.12);
+  background:linear-gradient(180deg, rgba(58,163,255,0.12), rgba(125,211,252,0.08));
+  color:var(--fg); padding:10px 14px; border-radius:10px;
+  transition:.15s transform, .15s background, .15s border-color;
+}
+.btn:hover{ transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
+.btn-primary{ background:linear-gradient(180deg, #3aa3ff, #2a7cd6); border:none; color:#fff; }
+.btn-ghost{ background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); }
+.btn-floating{
+  position:fixed; right:18px; bottom:18px; z-index:50;
+  box-shadow: var(--shadow);
+}
+
+/* ---- Hero ---- */
+.hero{
+  display:grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap:24px;
+  align-items:stretch;
+  margin-bottom:28px;
+}
+.hero-card{
+  background: linear-gradient(180deg, rgba(18,25,50,0.9), rgba(12,18,36,0.9));
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding:24px;
+  text-align:center; /* keskitetään otsikko, tekstit ja napit */
+}
+.hero h1{ margin:0 0 8px 0; font-size:36px; line-height:1.1; letter-spacing:.2px; }
+.hero p{ margin: 0 0 16px 0; color: var(--muted); }
+/* nappirivi aina keskelle */
+.hero-cta{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:10px;
+}
+
+.badge{
+  display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px;
+  background: rgba(58,163,255,0.12); color:var(--accent-2); border: 1px solid rgba(125,211,252,0.25);
+  font-size:13px;
+}
+
+/* ---- Grid & cards ---- */
+.grid{ display:grid; gap:16px; grid-template-columns: repeat(12,1fr); }
+.card {
+  grid-column: span 2; /* 6 cards per row on 12-col grid */
+  min-height: 100px;
+  background: linear-gradient(180deg, rgba(18,25,50,0.85), rgba(12,18,36,0.85));
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  padding:14px;
+  box-shadow: var(--shadow);
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  transition: transform .15s;
+  text-align:center; 
+}
+.card h3{ margin:0 0 4px 0; font-size:16px; }
+.card small{ color: var(--muted); font-size:13px; }
+
+.card:hover{ transform: translateY(-2px); }
+.footer{ margin-top:24px; padding:16px; color:var(--muted); font-size:13px; text-align:center; opacity:.8; }
+
+/* ---- Tables & utilities ---- */
+table{ width:100%; border-collapse:collapse; margin:.5rem 0 1rem; background:var(--table-bg); }
+thead th{ position:sticky; top:0; background:var(--head); border-bottom:1px solid var(--border); font-weight:600; color:var(--fg); }
+th,td{ padding:.55rem .7rem; border-bottom:1px solid var(--border); text-align:center; }
+tbody tr:nth-child(even){ background:var(--table-alt); }
+th:first-child,td:first-child{ text-align:left; position:sticky; left:0; z-index:1; background:var(--table-bg); }
+tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
+.chips{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.4rem 0 .8rem; }
+/* Global chip (generic) */
+.chip{ font-size:.95rem; padding:.35rem .65rem; border-radius:999px; background:var(--chip-bg); border:1px solid var(--border); color:var(--fg); }
+
+.bar{ position:relative; background:#1b2a4a; height:20px; border-radius:8px; overflow:hidden; }
+.bar>span{ position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--accent); }
+.bar .val{ position:relative; z-index:1; font-size:.9rem; padding-left:.5rem; color:#fff; }
+.bar-split{position:relative;height:20px;border-radius:6px;overflow:hidden;background:#1b2a4a}
+.bar-split .win{position:absolute;left:0;top:0;bottom:0;background:#22c55e}
+.bar-split .loss{position:absolute;top:0;bottom:0;background:#ef4444}
+.bar-split .val{position:relative;z-index:1;text-align:center;line-height:20px;font-size:.85rem;color:#fff}
+
+.cell-grad.good{ background:linear-gradient(90deg, rgba(34,197,94,0.25), transparent); }
+.cell-grad.bad{  background:linear-gradient(90deg, rgba(239,68,68,0.25), transparent); }
+.cell-muted{ color:var(--muted); }
+th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cursor:help; }
+
+/* ---- Division summary ---- */
+.div-summary{
+  display:grid;
+  grid-template-columns: 1fr 1fr; /* left/right columns */
+  gap:1rem;
+  margin:.75rem 0 1rem;
+  align-items: start;
+}
+.div-summary .card{ grid-column: auto !important; }
+.summary-grid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.6rem; }
+.summary-item{ background:var(--table-alt); border:1px solid var(--border); border-radius:6px; padding:.5rem .6rem; text-align:center; }
+.summary-item .label{ color:var(--muted); font-size:.9rem; }
+.summary-item .val{ font-size:1.15rem; font-weight:600; }
+
+/* ---- Responsiveness ---- */
+@media (max-width: 960px){
+  .hero{ grid-template-columns: 1fr; }
+  .card{ grid-column: span 12; }
+  .div-summary{ grid-template-columns: 1fr; }
+  .div-summary .card{ grid-column: auto !important; }
+}
+
+/* ---- Tabs ---- */
+.tabs { margin-top: 1rem; }
+.tab-nav { display: flex; gap: .5rem; margin-bottom: .5rem; }
+.tab-btn {
+  padding: 6px 12px; border-radius: 8px;
+  background: var(--chip-bg); border:1px solid var(--border);
+  color: var(--fg); cursor:pointer;
+}
+.tab-btn.active {
+  background: var(--accent); color:#fff; border-color: var(--accent);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ---- Matches mirror layout (scoped, cleaned) ---- */
+.matches-mirror .matches-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.5rem;}
+.matches-mirror .title{font-weight:700;}
+.matches-mirror .matches-list{display:flex;flex-direction:column;gap:.6rem;}
+
+/* Card + row */
+.match-row{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--card);}
+.match-row[open] .match-summary{border-bottom:1px solid var(--border);}
+.card.matches-mirror:hover{transform:none;}
+.match-row:hover{border-color:rgba(255,255,255,.12);box-shadow:none;}
+
+.match-summary{
+  list-style:none;
+  display:grid;
+  grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); /* vasen | keskiblokki | oikea */
+  align-items:center;
+  gap:.65rem;
+  padding:.6rem 1rem;
+  cursor:pointer;
+}
+
+/* Vasen ja oikea asettuvat reunoihin, keskiblokki on aina keskellä */
+.match-summary .side-left{
+  text-align:left;
+  justify-self:start;
+}
+/* oikea tiimipalsta: logo ihan kortin reunaan */
+.match-summary .side-right{
+  margin-left:auto;
+  text-align:right;
+  justify-content:flex-end;
+}
+/* järjestys: nimi ennen logoa, jotta logo päätyy ihan oikeaan reunaan */
+.match-summary .side-right .logo{
+  order: 2;
+  margin-left:.55rem;
+}
+
+.match-summary .center{
+  justify-self:center;
+  text-align:center;
+  display:flex; flex-direction:column; align-items:center; gap:.25rem;
+  min-width:160px;
+}
+
+.match-summary::-webkit-details-marker{display:none;}
+.match-summary .team{display:flex;align-items:center;gap:.55rem;min-width:0;}
+.match-summary .team .logo{width:100px;height:100px;border-radius:8px;object-fit:contain;box-shadow:0 0 0 1px rgba(255,255,255,.06) inset;}
+.match-summary .team .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+.match-summary .meta{font-size:.9rem;color:var(--muted);display:flex;align-items:center;gap:.35rem;}
+.match-summary .scoreline{display:flex;align-items:center;gap:.5rem;font-size:1.1rem;}
+.match-summary .maps-score{font-weight:800;letter-spacing:.5px;min-width:2.6ch;text-align:center;}
+.result-row{display:flex;gap:.5rem;justify-content:center;margin:2px 0;}
+
+/* Summary-row chips ONLY (kept small) */
+.match-summary .chip{
+  padding:.12rem .5rem;
+  border:1px solid transparent;
+  border-radius:999px;
+  font-size:.82rem;
+  line-height:1.2;
+  letter-spacing:.2px;
+  white-space:nowrap;
+}
+
+.result-win{background:rgba(40,160,90,.16);border-color:rgba(40,160,90,.42);color:#64e09f;}
+.result-loss{background:rgba(210,60,60,.14);border-color:rgba(210,60,60,.38);color:#ff8b8b;}
+.result-draw{background:rgba(160,160,160,.14);border-color:rgba(160,160,160,.35);color:#dadada;}
+.result-upcoming{background:rgba(130,130,130,.12);border-color:rgba(130,130,130,.32);color:#cfcfcf;}
+.stage-chip{padding:.05rem .45rem;border:1px solid rgba(255,255,255,.12);border-radius:999px;font-size:.78rem;color:var(--muted);}
+
+/* Details area */
+.match-details{padding:.65rem .85rem;display:flex;flex-direction:column;gap:.35rem;}
+
+/* Map-side chip stacks (yksi yhtenäinen määrittely) */
+.matches-mirror .map-side{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  gap:.35rem;
+  min-width:0;
+}
+/* Kaikki karttarivin chipit samalla koolla */
+.matches-mirror .map-side .chip{
+  padding:.44rem 1.0rem !important;
+  font-size:1.06rem !important;
+  line-height:1.16 !important;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:var(--chip-bg);
+  color:var(--fg);
+}
+/* Kierroschippi suuremmaksi + värit */
+.matches-mirror .map-side .chip.round{
+  padding:.56rem 1.05rem !important;
+  font-size:1.18rem !important;
+  font-weight:800;
+  line-height:1.05;
+  border:1px solid transparent;
+  border-radius:999px;
+}
+.matches-mirror .map-side .chip.round.win  { background:rgba(34,197,94,.18);  border-color:rgba(34,197,94,.45);  color:#66e0a3; }
+.matches-mirror .map-side .chip.round.loss { background:rgba(239,68,68,.18);  border-color:rgba(239,68,68,.45);  color:#ff8a8a; }
+.matches-mirror .map-side .chip.round.draw { background:rgba(160,160,160,.14); border-color:rgba(160,160,160,.35); color:#dadada; }
+/* Pick aina pinon alas */
+.matches-mirror .map-side .chip.pick{
+  margin-top:auto;
+  color:var(--accent-2);
+  border-color:rgba(125,211,252,.45);
+  background:rgba(58,163,255,.12);
+}
+
+/* Map row: left stack | image | right stack */
+.matches-mirror .map-row{
+  display:grid;
+  grid-template-columns:minmax(10rem,1fr) auto minmax(10rem,1fr);
+  align-items:stretch; text-align:center; gap:.8rem; padding:.5rem 0;
+}
+/* Viiva karttarivien väliin (ei ensimmäisen yläpuolelle) */
+.matches-mirror .match-details .map-row + .map-row{
+  border-top:1px dashed var(--border);
+  margin-top:.5rem;
+  padding-top:.75rem;
+}
+
+.matches-mirror .map-name{text-align:center;font-weight:700;}
+.matches-mirror .map-img{
+  display:block;margin:.35rem auto 0;width:100%;max-width:420px;height:auto;
+  border-radius:8px;border:1px solid var(--border);opacity:.95;
+}
+
+/* Totals centered */
+.aggregate{border-top:1px dashed var(--border);padding-top:.45rem;margin-top:.25rem;}
+.aggregate .totals{display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;justify-content:center;}
+.aggregate .label{color:var(--muted);}
+
+/* Fixed inner width: summary + details same width */
+.matches-mirror{--mirror-max:1080px;}
+.matches-mirror .match-summary,
+.matches-mirror .match-details{max-width:var(--mirror-max);margin:0 auto;width:100%;}
+
+/* Mobile */
+@media (max-width:720px){
+  .matches-mirror .map-row{grid-template-columns:1fr;row-gap:.45rem;}
+}
+</style>
+
+
+<script>
+function sortTable(tableId,n,numeric){
+  const table=document.getElementById(tableId);
+  const dirAttr=table.getAttribute('data-sort-dir')||'asc';
+  const dir=dirAttr==='asc'?1:-1;
+  let rows=Array.from(table.tBodies[0].rows);
+  rows.sort((a,b)=>{
+    const x=a.cells[n].textContent.trim(); const y=b.cells[n].textContent.trim();
+    if(numeric){
+      const nx=parseFloat(x.replace(',','.'))||0; const ny=parseFloat(y.replace(',','.'))||0;
+      return (nx-ny)*dir;
+    }
+    return x.localeCompare(y)*dir;
+  });
+  table.tBodies[0].append(...rows);
+  table.setAttribute('data-sort-dir', dirAttr==='asc'?'desc':'asc');
+}
+function applyDefaultSort(tableId){
+  const t=document.getElementById(tableId); if(!t) return;
+  const col=parseInt(t.getAttribute('data-sort-col')||'0',10);
+  const dir=(t.getAttribute('data-sort-dir')||'asc')==='asc';
+  sortTable(tableId,col,!dir); sortTable(tableId,col,dir);
+}
+function renderBar(cell,value){
+  cell.innerHTML='<div class="bar"><span></span><div class="val"></div></div>';
+  const span=cell.querySelector('.bar > span'); const val=cell.querySelector('.bar .val');
+  val.textContent=(isFinite(value)?value.toFixed(1):0)+'%';
+  const width=Math.max(0,Math.min(100,value)); span.style.width=width+'%';
+  const g=Math.round(120*(width/100)); const r=Math.round(180*(1-width/100))+60;
+  span.style.background=`rgb(${r},${g+80},100)`;
+}
+function bindPlayedOnly(tableId,chkId){
+  const chk=document.getElementById(chkId); const t=document.getElementById(tableId);
+  if(!chk||!t) return; const colPlayed=1;
+  chk.addEventListener('change',()=>{ for(const tr of t.tBodies[0].rows){ const played=parseInt(tr.cells[colPlayed].textContent||'0',10); tr.style.display=(chk.checked&&!played)?'none':''; }});
+}
+function colorizeContinuous(tableId,colIdx,p25,p50,p75,inverse=false){
+  const t=document.getElementById(tableId); if(!t||!t.tBodies.length) return;
+  const rows=t.tBodies[0].rows;
+  for(const tr of rows){
+    const td=tr.cells[colIdx]; let v=parseFloat((td.textContent||'').replace(',','.'));
+    if(!isFinite(v)){ td.classList.add('cell-muted'); continue; }
+    let ratio; if(v<=p25) ratio=0; else if(v>=p75) ratio=1; else ratio=(v-p25)/(p75-p25||1);
+    if(inverse) ratio=1-ratio;
+    const r=Math.round(240*(1-ratio)); const g=Math.round(220*ratio); td.style.background=`rgba(${r},${g},0,0.28)`;
+  }
+}
+function postProcessTable(tableId,opts){
+  const t=document.getElementById(tableId); if(!t||!t.tBodies.length) return;
+  const rows=t.tBodies[0].rows;
+  if(opts.bars){
+    for(const tr of rows){
+      const played=parseInt(tr.cells[1].textContent||'0',10);
+      opts.bars.forEach(i=>{
+        const num=parseFloat((tr.cells[i].textContent||'').replace(',','.'));
+        renderBar(tr.cells[i], isFinite(num)?num:0);
+        const span=tr.cells[i].querySelector('.bar > span'); if(span) span.style.opacity=Math.max(.35,Math.min(1,Math.sqrt(played)/2));
+      });
+    }
+  }
+  if (opts.wrbars){
+    for (const tr of rows){
+      opts.wrbars.forEach(i => {
+        const td = tr.cells[i];
+        if (!td || !td.classList.contains('wr')) return;
+        const g   = parseInt(td.dataset.g || '0', 10);
+        const w   = parseInt(td.dataset.w || '0', 10);
+        const pctAttr = parseFloat((td.dataset.pct || '').replace(',','.'));
+        const pct = isFinite(pctAttr) ? pctAttr : (g ? (100*w/g) : 0);
+        if (!g) {
+          if (td.dataset.zero === 'show') {
+            td.innerHTML = '<div class="bar-split"><span class="win"></span><span class="loss"></span><div class="val"></div></div>';
+            const val = td.querySelector('.val');
+            val.textContent = '0–0 (0%)';
+            td.querySelector('.win').style.width  = '0%';
+            td.querySelector('.loss').style.left  = '0%';
+            td.querySelector('.loss').style.width = '100%';
+            td.querySelector('.win').style.background  = '#555';
+            td.querySelector('.loss').style.background = '#555';
+            td.classList.add('cell-muted');
+            td.title = 'No attempts';
+          } else {
+            td.textContent = 'not played';
+            td.classList.add('cell-muted');
+            td.title = 'No games';
+          }
+          return;
+        }
+        renderSplitWR(td, g, pct);
+      });
+    }
+  }
+  if(opts.color){ opts.color.forEach(c=>colorizeContinuous(tableId,c.col,c.p[0],c.p[1],c.p[2],c.inverse||false)); }
+  if(opts.defaultSort){ sortTable(tableId,opts.defaultSort.col,opts.defaultSort.dir==='asc'); }
+}
+function switchTab(containerId,tabName){
+  const root=document.getElementById(containerId); if(!root) return;
+  const panels=root.querySelectorAll('.tab-panel'); const buttons=root.querySelectorAll('.tab-btn');
+  panels.forEach(p=>p.classList.remove('active')); buttons.forEach(b=>b.classList.remove('active'));
+  root.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
+  root.querySelector(`[data-target="${tabName}"]`)?.classList.add('active');
+  initTabsAutoSort(containerId);
+}
+function initTabsAutoSort(rootId){
+  const root=document.getElementById(rootId); if(!root) return;
+  const activePanel=root.querySelector('.tab-panel.active'); if(!activePanel) return;
+  const table=activePanel.querySelector('table'); if(!table) return;
+  table.setAttribute('data-sort-col','0'); table.setAttribute('data-sort-dir','desc');
+  sortTable(table.id,0,false); sortTable(table.id,0,false);
+}
+function renderWRCell(td){
+  const w = parseInt(td.dataset.w || '0', 10);
+  const g = parseInt(td.dataset.g || '0', 10);
+  const l = Math.max(0, g - w);
+  const pctAttr = parseFloat((td.dataset.pct || '').replace(',','.'));
+  const pct = isFinite(pctAttr) ? pctAttr : (g ? (100*w/g) : 0);
+  td.innerHTML = '<div class="bar"><span></span><div class="val"></div></div>';
+  const span = td.querySelector('.bar > span');
+  const val  = td.querySelector('.bar .val');
+  const wPct = Math.max(0, Math.min(100, pct));
+  span.style.width = wPct + '%';
+  val.textContent = `${w}–${l} (${Math.round(pct)}%)`;
+  const gcol = Math.round(180 * (wPct/100));
+  const rcol = Math.round(200 * (1 - wPct/100));
+  span.style.background = `rgb(${rcol},${gcol},100)`;
+  td.title = g ? `Wins: ${w}, Losses: ${l}, WR: ${pct.toFixed(1)}%` : 'No games';
+}
+function renderSplitWR(td, played, wrPct){
+  const g   = Math.max(0, parseInt(played || 0, 10));
+  const pct = Math.max(0, Math.min(100, parseFloat((wrPct || 0))));
+  const wins   = Math.round(g * pct / 100);
+  const losses = Math.max(0, g - wins);
+
+  td.innerHTML = '<div class="bar-split"><span class="win"></span><span class="loss"></span><div class="val"></div></div>';
+  const win  = td.querySelector('.win');
+  const loss = td.querySelector('.loss');
+  const val  = td.querySelector('.val');
+
+  win.style.width  = pct + '%';
+  loss.style.left  = pct + '%';
+  loss.style.width = (100 - pct) + '%';
+
+  if (td.dataset.mode === 'ratio') {
+    // Example: Flash Succ = successes / throws (pct)
+    val.textContent = g ? `${wins}/${g} (${Math.round(pct)}%)` : '0/0 (0%)';
+    td.title = g ? `Successes: ${wins}, Throws: ${g}, Rate: ${pct.toFixed(1)}%` : 'No attempts';
+  } else {
+    // Default: WR (wins–losses)
+    val.textContent = g ? `${wins}–${losses} (${Math.round(pct)}%)` : '0–0 (0%)';
+    td.title = g ? `Wins: ${wins}, Losses: ${losses}, WR: ${pct.toFixed(1)}%` : 'No games';
+  }
+}
+document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.tabs[id]').forEach(root=>initTabsAutoSort(root.id)); });
+</script>
+</head>
+<body class="is-index">
+
+
+    <div class="container">
+      <div class="topbar">
+        <div class="brand">
+          <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
+          <span>AFI - Pappaliiga Stats v1</span>
+        </div>
+        <div class="nav">
+          
+        </div>  
+      </div>
+    </div>
+    
+
+      <div class="container">
+        <section class="hero">
+          <div class="hero-card">
+            <h1>Armafinland</h1>
+            <p>
+              Arma Finland on suomenkielisille pelaajille ja peliporukoille tarkoitettu avoin peliyhteisö. Yhteisö tarjoaa Arman pelaamista taktisessa ympäristössä mahdollisimman monen suomalaisen pelaajan kanssa. Pelitapahtumissa keskitytään realismiin, toimintaan joukkueissa ja yhteistyöhön. Tapahtumissa on usein erilaisia ajoneuvoja ja aseita. Teemat vaihtelevat toisen maailmansodan, kylmän sodan ja nykyajan konfliktien välillä.
+            </p>
+            <div class="hero-cta">
+              <a class="btn btn-primary" href="https://armafinland.fi/discord" title="Liity Armafinland Discordiin">Liity AFI Discord</a>
+              <a class="btn" href="https://armafinland.fi/" title="Lue lisää yhteisöstä">Lue lisää</a>
+            </div>
+          </div>
+
+          <div class="hero-card">
+            <h1>Pappaliiga</h1>
+            <p>
+              Pappaliigan tarkoituksena on tarjota varttuneemmalle väelle mahdollisuus kilpapelaamiseen; tosissaan ja `ei niin tosissaan`.
+            </p>
+            <div class="hero-cta">
+              <a class="btn btn-primary" href="https://discord.gg/qbySKpAYch" title="Liity Pappaliigan Discordiin">Liity Pappaliiga Discord</a>
+              <a class="btn" href="https://pappaliiga.fi/" title="Lue lisää">Lue lisää</a>
+            </div>
+          </div>
+        </section>
+    
+<h2 style="margin:0 0 10px 0;">Season 11</h2>
+<div class="grid">
+
+              <a class="card" href="div1-s11.html" title="1 Divisioona S11">
+                <div>
+                  <h3>1 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>6/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div2-s11.html" title="2 Divisioona S11">
+                <div>
+                  <h3>2 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>8/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div3-s11.html" title="3 Divisioona S11">
+                <div>
+                  <h3>3 Divisioona S11</h3>
+                  <small>11 joukkuetta<br>7/55 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div4-s11.html" title="4 Divisioona S11">
+                <div>
+                  <h3>4 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>7/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div5-s11.html" title="5 Divisioona S11">
+                <div>
+                  <h3>5 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>7/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div6-s11.html" title="6 Divisioona S11">
+                <div>
+                  <h3>6 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>12/65 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div7-s11.html" title="7 Divisioona S11">
+                <div>
+                  <h3>7 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>15/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div8-s11.html" title="8 Divisioona S11">
+                <div>
+                  <h3>8 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>14/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div9-s11.html" title="9 Divisioona S11">
+                <div>
+                  <h3>9 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>12/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div10-s11.html" title="10 Divisioona S11">
+                <div>
+                  <h3>10 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>15/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div11-s11.html" title="11 Divisioona S11">
+                <div>
+                  <h3>11 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>12/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div12-s11.html" title="12 Divisioona S11">
+                <div>
+                  <h3>12 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>19/65 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div13-s11.html" title="13 Divisioona S11">
+                <div>
+                  <h3>13 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>18/65 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div14-s11.html" title="14 Divisioona S11">
+                <div>
+                  <h3>14 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>21/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div15-s11.html" title="15 Divisioona S11">
+                <div>
+                  <h3>15 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>19/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div16-s11.html" title="16 Divisioona S11">
+                <div>
+                  <h3>16 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>21/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div17-s11.html" title="17 Divisioona S11">
+                <div>
+                  <h3>17 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>18/65 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div18-s11.html" title="18 Divisioona S11">
+                <div>
+                  <h3>18 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>20/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div19-s11.html" title="19 Divisioona S11">
+                <div>
+                  <h3>19 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>27/65 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div20-s11.html" title="20 Divisioona S11">
+                <div>
+                  <h3>20 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>25/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div21-s11.html" title="21 Divisioona S11">
+                <div>
+                  <h3>21 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>25/65 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div22-s11.html" title="22 Divisioona S11">
+                <div>
+                  <h3>22 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>25/66 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div23-s11.html" title="23 Divisioona S11">
+                <div>
+                  <h3>23 Divisioona S11</h3>
+                  <small>12 joukkuetta<br>21/63 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div24-s11.html" title="24 Divisioona S11">
+                <div>
+                  <h3>24 Divisioona S11</h3>
+                  <small>13 joukkuetta<br>28/78 ottelua pelattu</small>
+                </div>
+              </a>
+            
+
+              <a class="card" href="div25-s11.html" title="25 Divisioona S11">
+                <div>
+                  <h3>25 Divisioona S11</h3>
+                  <small>14 joukkuetta<br>30/91 ottelua pelattu</small>
+                </div>
+              </a>
+            
+</div>
+<h2 style="margin:0 0 10px 0;">Season 10</h2>
+<div class="grid">
+
+              <a class="card" href="div22-s10.html" title="22 Divisioona S10">
+                <div>
+                  <h3>22 Divisioona S10</h3>
+                  <small>12 joukkuetta<br>65/65 ottelua pelattu</small>
+                </div>
+              </a>
+            
+</div>
+
+      <div class="footer">
+        By Tuntematon from Armafinland
+      </div>
+    </div>
+    
+<a class="btn btn-primary btn-floating back-index" href="index.html" title="Palaa indexiin">← Index</a>
+</body></html>

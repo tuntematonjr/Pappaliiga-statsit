@@ -1,405 +1,656 @@
-# Sync script: fetch matches, details, stats, and democracy votes; store into SQLite.
-import time
-from typing import Dict, Any, List, Tuple
-from pathlib import Path
-from collections import defaultdict
-from html import escape
+# sync.py
+# Championship-centric sync for Pappaliiga (CS2).
+# - Reads divisions from faceit_config.DIVISIONS (JSON-backed)
+# - Upserts championships
+# - Fetches matches (+ details), map veto history, and (best-effort) per-map/team/player stats
+# All comments in English by design.
 
-from faceit_config import DIVISIONS, RATE_LIMIT_SLEEP
-from faceit_client import list_championship_matches, get_match_details, get_match_stats, get_democracy_history
+from __future__ import annotations
+import argparse
+import re
+import sys
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+import sqlite3
+import logging
+from db import upsert_player
+from logging.handlers import RotatingFileHandler
+
+from faceit_config import DIVISIONS  # loaded from divisions.json by faceit_config.py
+from faceit_client import (
+    list_championship_matches, get_match_details, get_match_stats, get_democracy_history
+)
 from db import (
-    get_conn, init_db, upsert_division, upsert_match, upsert_map,
-    upsert_team_stat, upsert_player_stat, insert_vote, commit,
-    match_exists, match_fully_synced, upsert_player_identity, upsert_team_identity
+    get_conn, init_db,
+    upsert_championship, upsert_match,
+    upsert_team,
+    upsert_maps, upsert_map_votes,
+    upsert_player_stats,
+    upsert_map_catalog, add_map_to_season_pool
 )
 
-DB_PATH = str(Path(__file__).with_name("faceit_reports.sqlite"))
+# Configure logging
+# Configure logging with rotation (max 5 MB per file, keep 3 backups)
+logFile = "sync.log"
+handler = RotatingFileHandler(logFile, maxBytes=5*1024*1024, backupCount=3, encoding="utf-8")
+logging.basicConfig(
+    level=logging.INFO,  # was DEBUG
+    handlers=[handler],
+    format="%(asctime)s %(levelname)s:%(name)s:%(message)s"
+)
 
-def safe_int(x, default=0):
+# ---- helpers ---------------------------------------------------------------
+
+def safe_int(v: Any, default: Optional[int] = None) -> Optional[int]:
     try:
-        return int(x)
-    except:
-        try:
-            return int(float(x))
-        except:
-            return default
+        return int(v)
+    except Exception:
+        return default
 
-def safe_float(x, default=0.0):
+def safe_float(v: Any, default: Optional[float] = None) -> Optional[float]:
     try:
-        return float(x)
-    except:
-        try:
-            return float(str(x).replace(",", "."))
-        except:
-            return default
+        # Faceit saattaa välillä antaa "1,23" → normalisoidaan pisteeseen
+        s = str(v).replace(",", ".")
+        return float(s)
+    except Exception:
+        return default
 
-def _upsert_teams_from_details(con, details: dict) -> None:
-    teams = (details or {}).get("teams", {}) or {}
-    for k in ("faction1", "faction2"):
-        info = teams.get(k) or {}
-        team_id = info.get("faction_id") or info.get("team_id")
-        name    = info.get("name")
-        avatar  = info.get("avatar") or ""
-        if team_id and name:
-            upsert_team_identity(con, team_id, name, avatar)
+# --- progress bar with ETA --------------------------------------------------
 
-def ratio(num, den):
-    if den == 0:
-        return 0.0
-    return float(num) / float(den)
+def _fmt_hms(seconds: float) -> str:
+    seconds = max(0, int(seconds))
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    if h > 0:
+        return f"{h:d}:{m:02d}:{s:02d}"
+    return f"{m:d}:{s:02d}"
 
-def derive_kd(kills, deaths):
-    return kills / deaths if deaths else float(kills)
+def _progress_bar(prefix: str, i: int, total: int, start_ts: float, width: int = 32) -> None:
+    """
+    In-place progress bar with ETA:
+      Example: Past [########------------] 12/100 (12%) | elapsed 0:25 | ETA 2:56
+    """
+    i = max(0, min(i, total))
+    pct = 0 if total <= 0 else int(100 * i / total)
+    fill = 0 if total <= 0 else int(width * i / total)
+    bar = "#" * fill + "-" * (width - fill)
 
-def map_faction_to_team_id(match_details: Dict[str, Any]) -> Dict[str, str]:
-    # match_details['teams'] commonly includes 'faction1' and 'faction2' objects with 'team_id' and 'name'.
-    m = {}
-    try:
-        t = match_details.get("teams", {})
-        for faction in ("faction1", "faction2"):
-            if faction in t and isinstance(t[faction], dict):
-                team_id = t[faction].get("team_id") or t[faction].get("faction_id")
-                m[faction] = team_id or ""
-    except:
-        pass
-    return m
+    elapsed = max(0.0, time.time() - start_ts)
+    rate = (i / elapsed) if elapsed > 0 else 0.0
+    remaining = ((total - i) / rate) if rate > 0 else 0.0
+    msg = (
+        f"{prefix} [{bar}] {i}/{total} ({pct}%)"
+        f" | elapsed {_fmt_hms(elapsed)}"
+        f" | ETA {_fmt_hms(remaining)}"
+    )
+    print("\r" + msg, end="", file=sys.stdout, flush=True)
+    if i >= total:
+        print("", file=sys.stdout, flush=True)  # newline at end
 
-def extract_team_names(match_details: Dict[str, Any]) -> Dict[str, str]:
-    names = {}
-    try:
-        t = match_details.get("teams", {})
-        for faction in ("faction1", "faction2"):
-            if faction in t and isinstance(t[faction], dict):
-                names[faction] = t[faction].get("name") or t[faction].get("team_name") or ""
-    except:
-        pass
-    return names
+# ---- transformers for stats payload ---------------------------------------
 
-def parse_match_basic(div, match_item: Dict[str, Any], details: Dict[str, Any]) -> Dict[str, Any]:
-    # Build matches row
-    factions_to_team = map_faction_to_team_id(details)
-    names = extract_team_names(details)
-    winner_team_id = details.get("results", {}).get("winner")
-    best_of = details.get("match_type") or details.get("best_of") or match_item.get("best_of") or 1
-    try:
-        best_of = int(best_of)
-    except:
-        best_of = 1
+def _persist_map_catalog_from_details(con: sqlite3.Connection, details: dict, season: int, game: str = "cs2") -> None:
+    """
+    Read voting.map.entities from match details and persist maps_catalog + map_pool_seasons.
+    """
+    voting = (details or {}).get("voting") or {}
+    msec = voting.get("map") or {}
+    entities = msec.get("entities") or []
 
-    # team1/2 based on faction1/2 to keep consistent
-    m = {
-        "match_id": match_item.get("match_id") or details.get("match_id"),
-        "division_id": div["division_id"],
-        "competition_id": match_item.get("competition_id"),
-        "competition_name": match_item.get("competition_name") or details.get("competition_name"),
-        "best_of": best_of,
-        "game": match_item.get("game") or details.get("game"),
-        "faceit_url": match_item.get("faceit_url") or details.get("faceit_url"),
-        "configured_at": match_item.get("configured_at") or details.get("configured_at"),
-        "started_at": match_item.get("started_at") or details.get("started_at"),
-        "finished_at": match_item.get("finished_at") or details.get("finished_at"),
-        "team1_id": factions_to_team.get("faction1"),
-        "team1_name": names.get("faction1"),
-        "team2_id": factions_to_team.get("faction2"),
-        "team2_name": names.get("faction2"),
-        "winner_team_id": winner_team_id,
-    }
-    return m
+    def _pretty_for(ent: dict, map_id: str) -> str:
+        # 1) Faceitin nimi
+        raw = (ent.get("name") or "").strip()
+        # 2) Erikoiskaunistukset
+        mid = (map_id or "").lower()
+        if raw.lower() == "dust2" or "dust2" in mid:
+            return "Dust II"
+        # 3) Fallback: slug -> Title
+        if raw:
+            return raw
+        slug = (map_id or "").replace("de_", "").replace("_", " ").strip()
+        return slug.title() if slug else map_id
 
-def parse_round_map_row(match_id: str, round_index: int, round_stats: Dict[str, Any], team1_id: str, team2_id: str) -> Dict[str, Any]:
-    # round_stats typically has keys like 'Map', 'Score', 'Winner' etc. Scores often '16-12' string.
-    map_name = round_stats.get("Map") or round_stats.get("Map Name") or round_stats.get("map")
-    score_str = round_stats.get("Score") or ""
-    s1 = s2 = None
-    if isinstance(score_str, str) and "-" in score_str:
-        left, right = score_str.split("-", 1)
-        try:
-            s1 = int(left.strip())
-            s2 = int(right.strip())
-        except:
-            s1 = s2 = None
-    winner_faction = round_stats.get("Winner")  # sometimes a team name
-    winner_team_id = None
-    # winner may be a name; we will set id later by comparing to team names if needed
-    return {
-        "match_id": match_id,
-        "round_index": round_index,
-        "map_name": map_name,
-        "score_team1": s1,
-        "score_team2": s2,
-        "winner_team_id": winner_team_id,
-    }
-
-def aggregate_team_stats_from_players(players: List[Dict[str, Any]], team_id: str, team_name: str) -> Dict[str, Any]:
-    agg = defaultdict(int)
-    adr_total = 0.0
-    kr_total = 0.0
-    hs_pct_accum = 0.0
-    hs_count = 0
-    for p in players:
-        ps = p.get("player_stats", {})
-        # Basic
-        kills = safe_int(ps.get("Kills", 0))
-        deaths = safe_int(ps.get("Deaths", 0))
-        assists = safe_int(ps.get("Assists", 0))
-        mvps = safe_int(ps.get("MVPs", 0))
-        sniper_kills = safe_int(ps.get("Sniper Kills", 0)) or safe_int(ps.get("AWP Kills", 0))
-
-        # Utility
-        util = safe_int(ps.get("Utility Damage", 0))
-        adr = safe_float(ps.get("ADR", 0.0))
-        kr = safe_float(ps.get("K/R Ratio", 0.0))
-
-        # Multi kills
-        mk3 = safe_int(ps.get("Triple Kills", 0))
-        mk4 = safe_int(ps.get("Quadro Kills", 0)) or safe_int(ps.get("Quadra Kills", 0))
-        mk5 = safe_int(ps.get("Penta Kills", 0)) or safe_int(ps.get("ACE", 0))
-        mk2 = safe_int(ps.get("Double Kills", 0))
-
-        # Entries (best-effort; some stats sets include First Kills)
-        entries = safe_int(ps.get("First Kills", 0))
-        entry_wins = entries  # best-effort
-
-        agg["kills"] += kills
-        agg["deaths"] += deaths
-        agg["assists"] += assists
-        agg["mvps"] += mvps
-        agg["sniper_kills"] += sniper_kills
-        agg["utility_damage"] += util
-        agg["mk_2k"] += mk2
-        agg["mk_3k"] += mk3
-        agg["mk_4k"] += mk4
-        agg["mk_5k"] += mk5
-        agg["entry_count"] += entries
-        agg["entry_wins"] += entry_wins
-
-        if adr > 0:
-            adr_total += adr
-        if kr > 0:
-            kr_total += kr
-        hs = ps.get("Headshots %") or ps.get("HS %")
-        if hs is not None:
-            hs_pct_accum += safe_float(hs)
-            hs_count += 1
-
-    deaths = agg["deaths"]
-    kd_val = derive_kd(agg["kills"], deaths)
-    # Team averages for ADR, KR, HS% are mean over players
-    players_n = len(players) if players else 1
-    adr_mean = adr_total / max(1, players_n)
-    kr_mean = kr_total / max(1, players_n)
-    hs_mean = hs_pct_accum / max(1, hs_count or players_n)
-
-    return {
-        "kills": agg["kills"],
-        "deaths": agg["deaths"],
-        "assists": agg["assists"],
-        "kd": kd_val,
-        "kr": kr_mean,
-        "adr": adr_mean,
-        "hs_pct": hs_mean,
-        "mvps": agg["mvps"],
-        "sniper_kills": agg["sniper_kills"],
-        "utility_damage": agg["utility_damage"],
-        "entry_count": agg["entry_count"],
-        "entry_wins": agg["entry_wins"],
-        "mk_2k": agg["mk_2k"],
-        "mk_3k": agg["mk_3k"],
-        "mk_4k": agg["mk_4k"],
-        "mk_5k": agg["mk_5k"],
-    }
-
-def extract_player_row(con, match_id: str, round_index: int, pl: Dict[str, Any], team_id: str, team_name: str) -> Dict[str, Any]:
-    ps = pl.get("player_stats", {}) or {}
-    nickname = pl.get("nickname") or ps.get("Player") or ""
-    player_id = pl.get("player_id") or ""
-    kills = safe_int(ps.get("Kills", 0))
-    deaths = safe_int(ps.get("Deaths", 0))
-    assists = safe_int(ps.get("Assists", 0))
-    adr = safe_float(ps.get("ADR", 0.0))
-    kr = safe_float(ps.get("K/R Ratio", 0.0))
-    kd_val = derive_kd(kills, deaths)
-    hs_pct = safe_float(ps.get("Headshots %", 0.0) or ps.get("HS %", 0.0))
-    mvps = safe_int(ps.get("MVPs", 0))
-    sniper_kills = safe_int(ps.get("Sniper Kills", 0)) or safe_int(ps.get("AWP Kills", 0))
-    util = safe_int(ps.get("Utility Damage", 0))
-    mk3 = safe_int(ps.get("Triple Kills", 0))
-    mk4 = safe_int(ps.get("Quadro Kills", 0)) or safe_int(ps.get("Quadra Kills", 0))
-    mk5 = safe_int(ps.get("Penta Kills", 0)) or safe_int(ps.get("ACE", 0))
-    # --- Clutches & clutch kills (suoraan Faceit-player_stats-kentistä) ---
-    clutch_kills = safe_int(ps.get("Clutch Kills", 0))
-    c11_attempts = safe_int(ps.get("1v1Count", 0))
-    c11_wins     = safe_int(ps.get("1v1Wins", 0))
-    c12_attempts = safe_int(ps.get("1v2Count", 0))
-    c12_wins     = safe_int(ps.get("1v2Wins", 0))
-    # --- Entryt ---
-    entry_count = safe_int(ps.get("Entry Count", 0))
-    entry_wins  = safe_int(ps.get("Entry Wins", 0))
-    # flash-metrikat
-    enemies_flashed = safe_int(ps.get("Enemies Flashed", 0))
-    flash_count     = safe_int(ps.get("Flash Count", 0))
-    flash_successes = safe_int(ps.get("Flash Successes", 0))
-    pistol_kills = safe_int(ps.get("Pistol Kills", 0))
-    
-
-    upsert_player_identity(con, player_id, nickname)
-
-    # Attempts unknown -> 0 by default
-    return {
-        "match_id": match_id,
-        "round_index": round_index,
-        "player_id": player_id,
-        "nickname": nickname,
-        "team_id": team_id,
-        "team_name": team_name,
-        "kills": kills, "deaths": deaths, "assists": assists,
-        "kd": kd_val, "kr": kr, "adr": adr, "hs_pct": hs_pct,
-        "mvps": mvps, "sniper_kills": sniper_kills, "utility_damage": util,
-        "mk_3k": mk3, "mk_4k": mk4, "mk_5k": mk5,
-        "clutch_kills": clutch_kills,
-        "cl_1v1_attempts": c11_attempts, "cl_1v1_wins": c11_wins,
-        "cl_1v2_attempts": c12_attempts, "cl_1v2_wins": c12_wins,
-        "entry_count": entry_count,
-        "entry_wins":  entry_wins,
-        "enemies_flashed": enemies_flashed,
-        "flash_count": flash_count,
-        "flash_successes": flash_successes,
-        "pistol_kills": pistol_kills,
-    }
-
-def sync_division(con, div):
-    print(f"[SYNC] Division {div['division_id']} - {div['name']} ...")
-    upsert_division(con, div)
-    matches = list_championship_matches(div["championship_id"], match_type="past")
-    print(f"[SYNC] Found {len(matches)} matches")
-    for m in matches:
-        match_id = m.get("match_id")
-        if not match_id:
+    for ent in entities:
+        # Prefer stable id in order: class_name, game_map_id, guid
+        map_id = ent.get("class_name") or ent.get("game_map_id") or ent.get("guid") or ""
+        if not map_id:
             continue
+        pretty = _pretty_for(ent, map_id)
+        img_sm = ent.get("image_sm") or ""
+        img_lg = ent.get("image_lg") or ""
 
-        # 1) Jos ottelu on jo “fully synced”, skippaa heti
-        if match_fully_synced(con, match_id):
-            print(f"[SKIP] {match_id} on jo synkattu (maps + player_stats) – ei päivitystä.")
-            continue
+        row = {
+            "map_id": map_id.lower(),
+            "pretty_name": pretty,
+            "image_sm": img_sm,
+            "image_lg": img_lg,
+            "game": game,
+        }
+        upsert_map_catalog(con, row)
+        add_map_to_season_pool(con, season, row["map_id"])
 
-        # 2) Jos ottelu on kannassa mutta ei fully-synced, jatketaan varovasti (täydennetään puuttuvat osat)
-        if match_exists(con, match_id):
-            print(f"[RESUME] {match_id} löytyi matches-taulusta – täydennetään puuttuvat taulut.")
+def _extract_player_rows(match_id: str, rounds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for idx, r in enumerate(rounds, start=1):
+        for t in (r.get("teams") or []):
+            tid = t.get("team_id") or t.get("id") or t.get("faction_id")
+            tname = (t.get("team_stats") or {}).get("Team") or t.get("name") or t.get("team")
+            for p in (t.get("players") or []):
+                ps = p.get("player_stats") or p.get("stats") or {}
 
-        # Vasta tässä vaiheessa haetaan API:sta
-        details = get_match_details(match_id)
-        _upsert_teams_from_details(con, details)
+                # Multikill mapping (Faceit keys -> our columns)
+                mk_2k = safe_int(ps.get("Double Kills"), 0)
+                mk_3k = safe_int(ps.get("Triple Kills"), 0)
+                mk_4k = safe_int(ps.get("Quadro Kills"), 0)
+                mk_5k = safe_int(ps.get("Penta Kills"), 0)
 
+                rows.append({
+                    "match_id": match_id,
+                    "round_index": idx,
+                    "player_id": p.get("player_id") or p.get("id"),
+                    "nickname": p.get("nickname") or p.get("name"),
+                    "team_id": tid,
+                    "team_name": tname,
+                    "kills": safe_int(ps.get("Kills"), 0),
+                    "deaths": safe_int(ps.get("Deaths"), 0),
+                    "assists": safe_int(ps.get("Assists"), 0),
+                    "kd": safe_float(ps.get("K/D Ratio"), 0.0),
+                    "kr": safe_float(ps.get("K/R Ratio"), 0.0),
+                    "adr": safe_float(ps.get("ADR"), 0.0),
+                    "hs_pct": safe_float(ps.get("Headshots %") or ps.get("HS %"), 0.0),
+                    "mvps": safe_int(ps.get("MVPs"), 0),
+                    "sniper_kills": safe_int(ps.get("Sniper Kills"), 0),
+                    "utility_damage": safe_int(ps.get("Utility Damage"), 0),
+                    "enemies_flashed": safe_int(ps.get("Enemies Flashed"), 0),
+                    "flash_count": safe_int(ps.get("Flash Count") or ps.get("Flashbangs Thrown"), 0),
+                    "flash_successes": safe_int(ps.get("Flash Successes") or ps.get("Successful Flashes"), 0),
+                    "mk_2k": mk_2k,
+                    "mk_3k": mk_3k,
+                    "mk_4k": mk_4k,
+                    "mk_5k": mk_5k,
+                    "clutch_kills": safe_int(ps.get("Clutch Kills"), 0),
+                    "cl_1v1_attempts": safe_int(ps.get("1v1Count") or ps.get("1v1 Attempts"), 0),
+                    "cl_1v1_wins": safe_int(ps.get("1v1Wins") or ps.get("1v1 Wins"), 0),
+                    "cl_1v2_attempts": safe_int(ps.get("1v2Count") or ps.get("1v2 Attempts"), 0),
+                    "cl_1v2_wins": safe_int(ps.get("1v2Wins") or ps.get("1v2 Wins"), 0),
+                    "entry_count": safe_int(ps.get("Entry Count") or ps.get("Entry Duels"), 0),
+                    "entry_wins": safe_int(ps.get("Entry Wins"), 0),
+                    "pistol_kills": safe_int(ps.get("Pistol Kills"), 0),
+                    "damage": safe_int(ps.get("Damage"), 0),
+                })
+    return rows
+
+
+def _extract_map_rows_from_stats(match_id: str, rounds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for idx, r in enumerate(rounds, start=1):
+        rs = r.get("round_stats") or {}
+        name = rs.get("Map") or r.get("map") or r.get("map_name") or None
+
+        s1 = s2 = None
+        score = (rs.get("Score") or rs.get("score") or "").strip()
+        if score:
+            m = re.match(r"^\s*(\d+)\s*[/\:]\s*(\d+)\s*$", score)
+            if m:
+                s1 = safe_int(m.group(1), None)
+                s2 = safe_int(m.group(2), None)
+
+        rows.append({
+            "match_id": match_id,
+            "round_index": idx,
+            "map_name": name,
+            "score_team1": s1,
+            "score_team2": s2,
+            "winner_team_id": rs.get("Winner") or rs.get("winner"),  # normalisoidaan myöhemmin
+        })
+    return rows
+
+
+def _extract_map_rows_from_details(match_id: str, details: Dict[str, Any], team1_id: Optional[str], team2_id: Optional[str]) -> List[Dict[str, Any]]:
+    """Extract map data from match_details for canceled matches or free wins."""
+    rows: List[Dict[str, Any]] = []
+    results = details.get("results", {})
+    score = results.get("score", {})
+    score1 = safe_int(score.get("faction1"))
+    score2 = safe_int(score.get("faction2"))
+    winner_team_id = details.get("winner_team_id")  # Already set in persist_match
+    map_name = None  # Faceit may not provide map_name for canceled matches
+
+    if score1 is not None and score2 is not None:
+        rows.append({
+            "match_id": match_id,
+            "round_index": 1,  # Assume single map for canceled/free win
+            "map_name": map_name or "unknown",
+            "score_team1": score1,
+            "score_team2": score2,
+            "winner_team_id": winner_team_id,
+        })
+    return rows
+
+def _extract_rounds_from_stats(stats_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Accept non-dict safely; return [] if shape not recognized."""
+    if not isinstance(stats_json, dict):
+        return []
+    rounds = stats_json.get("rounds") or stats_json.get("roundsStats") or []
+    return rounds if isinstance(rounds, list) else []
+def _derive_team_ids(details: Dict[str, Any], rounds: List[Dict[str, Any]]) -> tuple[Optional[str], Optional[str]]:
+    """
+    Palauta (team1_id, team2_id) käyttäen ensisijaisesti rounds[*].teams[*].team_id -arvoja.
+    Yritä matchata nimet: details.teams.faction1.name / faction2.name vs. team_stats.Team.
+    Jos nimi-matchia ei saada, ota kaksi ensimmäistä uniikkia team_id:tä rounds-datasta.
+    """
+    f1_name = ((details.get("teams") or {}).get("faction1") or {}).get("name")
+    f2_name = ((details.get("teams") or {}).get("faction2") or {}).get("name")
+
+    seen_ids: list[str] = []
+    t1_id = None
+    t2_id = None
+
+    for r in rounds or []:
+        for t in (r.get("teams") or []):
+            tid = t.get("team_id") or t.get("id") or t.get("faction_id")
+            if tid and tid not in seen_ids:
+                seen_ids.append(tid)
+            tname = t.get("name") or t.get("team")
+            if f1_name and tname and tname == f1_name and not t1_id:
+                t1_id = tid
+            if f2_name and tname and tname == f2_name and not t2_id:
+                t2_id = tid
+
+    # Fallback: jos nimi-matchi ei onnistunut mutta roundsissa on tasan 2 eri tiimiä
+    if (t1_id is None or t2_id is None) and len(seen_ids) >= 2:
+        if t1_id is None:
+            t1_id = seen_ids[0]
+        if t2_id is None:
+            # jos sama kuin t1_id, koita seuraavaa
+            t2_id = next((x for x in seen_ids if x != t1_id), seen_ids[1])
+
+    return t1_id, t2_id
+
+
+def _normalize_team_ref(ref: Any, team1_id: Optional[str], team2_id: Optional[str]) -> Optional[str]:
+    """
+    Muunna 'faction1'/'faction2'/'1'/'2'/'team1'/'team2' → oikea team_id.
+    Jos ref on jo ID, palautetaan sellaisenaan.
+    """
+    if ref is None:
+        return None
+    s = str(ref).lower()
+    if s in ("faction1", "1", "team1"):
+        return team1_id
+    if s in ("faction2", "2", "team2"):
+        return team2_id
+    return str(ref)
+
+# Skipataanko kannassa jo valmiiksi finished-matsit (säästää API:a)?
+SKIP_FINISHED_IN_DB = True
+
+def _is_finished_in_db(con: sqlite3.Connection, match_id: str) -> bool:
+    row = con.execute("SELECT status FROM matches WHERE match_id=?", (match_id,)).fetchone()
+    return bool(row and str(row[0] or "").lower() == "finished")
+
+def _target_kind_from_status(item: dict) -> str:
+    """
+    Map Faceit status → meidän käsittelyluokka.
+    - finished → 'past' (haetaan statsit)
+    - ongoing → 'upcoming' (käsitellään kuin scheduled)
+    - upcoming/whatever else → 'upcoming'
+    """
+    st = str(item.get("status") or "").lower()
+    if st == "finished":
+        return "past"
+    return "upcoming"  # ongoing/live + upcoming
+
+def _list_matches_all(championship_id: str) -> list[dict]:
+    """
+    Hae kaikki matsit kerralla (type=all), leimaa _target_kind ja nosta ydinkentät mukaan.
+    """
+    items = list_championship_matches(championship_id, match_type="all") or []
+    out: list[dict] = []
+    for it in items:
+        teams = it.get("teams") or {}
+        f1 = teams.get("faction1") or {}
+        f2 = teams.get("faction2") or {}
+        out.append({
+            "_raw": it,  # talteen jos tarvitsee myöhemmin
+            "_target_kind": _target_kind_from_status(it),
+            "match_id": it.get("match_id") or it.get("id"),
+            "status": (it.get("status") or "").lower(),
+            "scheduled_at": safe_int(it.get("scheduled_at")),
+            "started_at": safe_int(it.get("started_at")),
+            "finished_at": safe_int(it.get("finished_at")),
+            "team1_id": f1.get("faction_id"),
+            "team1_name": f1.get("name"),
+            "team2_id": f2.get("faction_id"),
+            "team2_name": f2.get("name"),
+            "team1_avatar": f1.get("avatar"),
+            "team2_avatar": f2.get("avatar"),
+            "team1_roster": f1.get("roster") or [],
+            "team2_roster": f2.get("roster") or [],
+        })
+    return out
+
+def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
+    """
+    Yksi progressi: käy läpi kaikki matsit (type=all). Ongoing käsitellään kuin scheduled.
+    Commit tehdään kerran per matsi, jotta pienennetään commit-kutsujen määrää.
+    """
+    matches = _list_matches_all(champ_row["championship_id"])
+    div_title = champ_row.get("name") or champ_row.get("slug") or f"Div{champ_row.get('division_num','?')}-S{champ_row.get('season','?')}"
+    title = f"{div_title} — All"
+    total = len(matches)
+    if total == 0:
+        _progress_bar(title, 0, 0, time.time())
+        return
+
+    seen: set[str] = set()
+    start_ts = time.time()
+    for i, m in enumerate(matches, start=1):
+        mid = m.get("match_id")
+        if not mid or mid in seen:
+            _progress_bar(title, i, total, start_ts); continue
+
+        if SKIP_FINISHED_IN_DB and _is_finished_in_db(con, mid):
+            seen.add(mid)
+            _progress_bar(title, i, total, start_ts); continue
+
+        seen.add(mid)
+        try:
+            kind = m.get("_target_kind") or "upcoming"
+            summary = m if kind != "past" else None
+            persist_match(con, champ_row, mid, kind=kind, summary=summary)
+            con.commit()  # yksi commit per matsi
+        except Exception as e:
+            logging.warning("sync (all) %s failed: %s", mid, e)
+            # virheen jälkeen rollback ettei jää puolikkaita transaktioita
+            try:
+                con.rollback()
+            except Exception:
+                pass
+
+        _progress_bar(title, i, total, start_ts)
+
+
+def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: str, kind: str, summary: Optional[Dict[str, Any]] = None) -> None:
+    """
+    Tallentaa match headerin aina.
+    - kind == 'past' → hakee myös statsit + mapit.
+    - kind != 'past' → ei hae statseja; jos 'summary' annettu (listavastauksesta),
+      käytetään siitä tiimit/ajat/status ilman get_match_details -kutsua.
+    """
+    details: Dict[str, Any] = {}
+    f1: Dict[str, Any] = {}
+    f2: Dict[str, Any] = {}
+    game_name: Optional[str] = None
+
+    if kind != "past" and isinstance(summary, dict):
+        # Käytä list endpointin tietoja suoraan
+        details = summary.get("_raw") or {}
+        f1 = {"name": summary.get("team1_name"), "avatar": summary.get("team1_avatar")}
+        f2 = {"name": summary.get("team2_name"), "avatar": summary.get("team2_avatar")}
+        game_name = (details.get("game") or None)
+    else:
+        # Past → tarvitaan aina tarkemmat detailit + statsit
+        details = get_match_details(match_id) or {}
+        teams_d = details.get("teams") or {}
+        f1 = teams_d.get("faction1") or {}
+        f2 = teams_d.get("faction2") or {}
+        game_field = details.get("game")
+        game_name = game_field.get("name") if isinstance(game_field, dict) else (game_field if isinstance(game_field, str) else None)
+
+        # Päivitä myös karttakatalogi/pooli tästä matsista
+        _persist_map_catalog_from_details(con, details, season=champ_row["season"], game=champ_row.get("game") or "cs2")
+
+    # STATS vain finished/past
+    stats = get_match_stats(match_id) if kind == "past" else {}
+    if not isinstance(stats, dict):
         stats = {}
-        try:
-            stats = get_match_stats(match_id)
-        except Exception as e:
-            print(f"[WARN] stats fetch failed for {match_id}: {e}")
 
+    rounds = _extract_rounds_from_stats(stats)
+    team1_id, team2_id = _derive_team_ids(details or {}, rounds)
 
-        # Insert match basic row
-        match_row = parse_match_basic(div, m, details)
-        upsert_match(con, match_row)
+    # Winner detailsista (fallback list)
+    winner_team_id = None
+    try:
+        res = (details.get("results") or {})
+        winner_team_id = res.get("winner") or res.get("winner_team_id")
+    except Exception:
+        pass
 
-        # Map faction -> team id and names (needed for votes + team/player stats)
-        factions_to_team = map_faction_to_team_id(details)
-        names = extract_team_names(details)
-        team1_id, team2_id = factions_to_team.get("faction1"), factions_to_team.get("faction2")
-        team1_name, team2_name = names.get("faction1"), names.get("faction2")
+    # --- build upsert payload for 'matches' ---
+    comp_id   = (details.get("competition_id") if isinstance(details, dict) else None) \
+                or (summary.get("_raw", {}).get("competition_id") if summary else None)
+    comp_name = (details.get("competition_name") if isinstance(details, dict) else None) \
+                or (summary.get("_raw", {}).get("competition_name") if summary else None)
+    faceit_url = (details.get("faceit_url") if isinstance(details, dict) else None) \
+                 or (summary.get("_raw", {}).get("faceit_url") if summary else None)
 
-        # --- Rounds (maps) + teams + players ---
-        rounds = (stats.get("rounds") or [])
-        for idx, rnd in enumerate(rounds, start=1):
-            round_stats = rnd.get("round_stats", {}) or {}
-            teams_arr = rnd.get("teams") or []  # oikea rakenne: list of teams each with team_stats + players
+    # Halutessasi voit pitää tämän normalisoinnin (nopeuteen ei vaikutusta)
+    # if faceit_url and "faceit.com" in faceit_url:
+    #     faceit_url = re.sub(r"https://www\.faceit\.com/[a-z]{2}/", "https://www.faceit.com/", faceit_url)
 
-            # Luo map-rivi: nimi + tulos
-            map_row = parse_round_map_row(match_id, idx, round_stats, team1_id, team2_id)
+    configured_at = safe_int(
+        (details.get("configured_at") if isinstance(details, dict) else None) \
+        or (summary.get("_raw", {}).get("configured_at") if summary else None)
+    , None)
 
-            # Jos Score puuttuu round_statsista, päättele pisteet teamien 'Final Score' -kentästä
-            if (map_row["score_team1"] is None or map_row["score_team2"] is None) and len(teams_arr) >= 2:
-                # yhdistä fac -> idx
-                t_by_faction = { (t.get("team_id") or t.get("faction")): t for t in teams_arr }
-                t1 = t_by_faction.get("faction1") or teams_arr[0]
-                t2 = t_by_faction.get("faction2") or teams_arr[1]
-                fs1 = t1.get("team_stats", {}).get("Final Score")
-                fs2 = t2.get("team_stats", {}).get("Final Score")
-                try:
-                    map_row["score_team1"] = int(fs1) if fs1 is not None else map_row["score_team1"]
-                    map_row["score_team2"] = int(fs2) if fs2 is not None else map_row["score_team2"]
-                except Exception:
-                    pass
+    m = {
+        "match_id": match_id,
+        "championship_id": champ_row["championship_id"],
 
-            # Päätä voittaja pisteistä
-            if map_row["winner_team_id"] is None and map_row["score_team1"] is not None and map_row["score_team2"] is not None:
-                map_row["winner_team_id"] = team1_id if map_row["score_team1"] > map_row["score_team2"] else (
-                    team2_id if map_row["score_team2"] > map_row["score_team1"] else None
-                )
+        "competition_id": comp_id,
+        "competition_name": comp_name,
+        "faceit_url": faceit_url,
+        "configured_at": configured_at,
 
-            upsert_map(con, map_row)
+        "game": game_name or champ_row.get("game") or "cs2",
+        "round": safe_int(details.get("round"), None),
+        "best_of": safe_int(details.get("best_of"), None),
 
-            # Käsittele jokainen team roundilla
-            for t in teams_arr:
-                tid_raw = t.get("team_id") or t.get("faction") or ""
-                if tid_raw == "faction1":
-                    tid, tname = team1_id, team1_name
-                elif tid_raw == "faction2":
-                    tid, tname = team2_id, team2_name
-                else:
-                    # jos API antaa oikean id:n, käytä sitä; fallback nimen perusteella
-                    tid = tid_raw or (team1_id if t.get("faction") == "faction1" else team2_id)
-                    tname = t.get("team_stats", {}).get("Team") or (team1_name if tid == team1_id else team2_name)
+        "started_at":  safe_int(summary.get("started_at")  if summary else details.get("started_at"),  None),
+        "finished_at": safe_int(summary.get("finished_at") if summary else details.get("finished_at"), None),
+        "scheduled_at":safe_int(summary.get("scheduled_at")if summary else details.get("scheduled_at"),None),
+        "status": (summary.get("status") if summary else details.get("status") or "").lower() or None,
+        "last_seen_at": int(time.time()),
 
-                players = t.get("players") or []
-                # Aggretoi tiimitaso suoraan pelaajista (varmin tapa)
-                if players:
-                    ts = aggregate_team_stats_from_players(players, tid, tname)
-                    ts.update({"match_id": match_id, "round_index": idx, "team_id": tid, "team_name": tname})
-                    upsert_team_stat(con, ts)
+        "team1_id":   team1_id or (summary.get("team1_id") if summary else None),
+        "team1_name": (summary.get("team1_name") if summary else f1.get("name")),
+        "team2_id":   team2_id or (summary.get("team2_id") if summary else None),
+        "team2_name": (summary.get("team2_name") if summary else f2.get("name")),
+        "winner_team_id": winner_team_id,
+    }
 
-                    # Tallenna pelaajat
-                    for p in players:
-                        pr = extract_player_row(con, match_id, idx, p, tid, tname)
-                        upsert_player_stat(con, pr)
+    # Upsert teams (avatar mukaan jos löytyy)
+    if m["team1_id"] or m["team1_name"]:
+        upsert_team(con, {"team_id": m["team1_id"], "name": m["team1_name"], "avatar": (summary.get("team1_avatar") if summary else f1.get("avatar")), "updated_at": None})
+    if m["team2_id"] or m["team2_name"]:
+        upsert_team(con, {"team_id": m["team2_id"], "name": m["team2_name"], "avatar": (summary.get("team2_avatar") if summary else f2.get("avatar")), "updated_at": None})
 
+    # Rosterit talteen
+    if kind != "past" and summary:
+        for pr in (summary.get("team1_roster") or []):
+            upsert_player(con, {"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
+        for pr in (summary.get("team2_roster") or []):
+            upsert_player(con, {"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
+    else:
+        for fac in (f1, f2):
+            for pr in (fac.get("roster") or []):
+                upsert_player(con, {"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
 
-        # Democracy votes (maps only; ignore server/location)
-        try:
-            demo = get_democracy_history(match_id)
-            tickets = demo.get("payload", {}).get("tickets", [])
-            for t in tickets:
-                if t.get("entity_type") != "map":
-                    # skip server/location vetoes explicitly
+    # Header aina talteen
+    upsert_match(con, m)
+
+    # upcoming/ongoing → stop here
+    if kind != "past":
+        return
+
+    # --- Vain yksi Democracy-kutsu; käytetään kahteen tarkoitukseen ---
+    demo_json = None
+    try:
+        demo_json = get_democracy_history(match_id)
+    except Exception:
+        demo_json = None
+
+    # --- MAPS round_statsista ---
+    map_rows = _extract_map_rows_from_stats(match_id, rounds)
+    for r in map_rows:
+        r["winner_team_id"] = _normalize_team_ref(r.get("winner_team_id"), team1_id, team2_id)
+
+    # Täydennä puuttuvat kartat democracy → details fallback
+    picks = []
+    try:
+        payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
+        tickets = payload.get("tickets", []) if isinstance(payload, dict) else []
+        cand = []
+        for tk in tickets:
+            if not isinstance(tk, dict):
+                continue
+            if str(tk.get("entity_type") or "").lower() != "map":
+                continue
+            for ent in (tk.get("entities") or []):
+                if not isinstance(ent, dict):
                     continue
-                entities = t.get("entities", [])
-                for ent in entities:
-                    v = {
-                        "match_id": match_id,
-                        "map_name": ent.get("guid"),
-                        "status": ent.get("status"),
-                        "selected_by_faction": ent.get("selected_by"),
-                        "round_num": ent.get("round"),
-                        "selected_by_team_id": None,
-                    }
-                    fac = v["selected_by_faction"]
-                    if fac in factions_to_team:
-                        v["selected_by_team_id"] = factions_to_team[fac]
-                    insert_vote(con, v)
-            time.sleep(RATE_LIMIT_SLEEP)
-        except Exception as e:
-            print(f"[WARN] democracy fetch failed for {match_id}: {e}")
+                status = str(ent.get("status") or "").lower()
+                if status not in ("pick", "decider", "selected"):
+                    continue
+                name = (ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"))
+                rnd = ent.get("round")
+                order_key = rnd if isinstance(rnd, int) else 10**9
+                if name:
+                    cand.append((order_key, name))
+        cand.sort(key=lambda x: x[0])
+        for _, n in cand:
+            if n not in picks:
+                picks.append(n)
+    except Exception:
+        picks = []
 
-        commit(con)
-        time.sleep(RATE_LIMIT_SLEEP)
+    if picks:
+        for idx, name in enumerate(picks, start=1):
+            if idx - 1 < len(map_rows):
+                if not map_rows[idx - 1].get("map_name"):
+                    map_rows[idx - 1]["map_name"] = name
+            else:
+                map_rows.append({
+                    "match_id": match_id,
+                    "round_index": idx,
+                    "map_name": name,
+                    "score_team1": None,
+                    "score_team2": None,
+                    "winner_team_id": None,
+                })
 
-def main():
-    con = get_conn(DB_PATH)
-    init_db(con)
-    for div in DIVISIONS:
-        sync_division(con, div)
-    commit(con)
-    con.close()
-    print("[DONE] Sync complete.")
+    if not any(r.get("map_name") for r in map_rows):
+        try:
+            picks2 = ((details.get("voting") or {}).get("map") or {}).get("pick") or []
+        except Exception:
+            picks2 = []
+        for idx, name in enumerate(picks2, start=1):
+            if idx - 1 < len(map_rows):
+                if not map_rows[idx - 1].get("map_name"):
+                    map_rows[idx - 1]["map_name"] = name
+            else:
+                map_rows.append({
+                    "match_id": match_id,
+                    "round_index": idx,
+                    "map_name": name,
+                    "score_team1": None,
+                    "score_team2": None,
+                    "winner_team_id": None,
+                })
+
+    if not map_rows:
+        map_rows = _extract_map_rows_from_details(match_id, details, team1_id, team2_id)
+
+    if map_rows:
+        upsert_maps(con, match_id, map_rows)
+
+    # --- Democracy / map_votes --- (käytä samaa demo_jsonia)
+    try:
+        votes = []
+        payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
+        tickets = payload.get("tickets", []) if isinstance(payload, dict) else []
+        for ticket in tickets:
+            if not isinstance(ticket, dict):
+                continue
+            if str(ticket.get("entity_type") or "").lower() != "map":
+                continue
+            for ent in (ticket.get("entities") or []):
+                if not isinstance(ent, dict):
+                    continue
+                sel = ent.get("selected_by")
+                votes.append({
+                    "round_num": ent.get("round"),
+                    "map_name": ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"),
+                    "status": ent.get("status"),
+                    "selected_by_faction": sel,
+                    "selected_by_team_id": _normalize_team_ref(sel, team1_id, team2_id),
+                })
+        if votes:
+            upsert_map_votes(con, match_id, votes)  # db.py tekee replace-tyylin
+    except Exception:
+        pass
+
+    # --- TEAM & PLAYER STATS ---  
+
+    player_rows = _extract_player_rows(match_id, rounds)
+    for r in player_rows:
+        r["team_id"] = _normalize_team_ref(r.get("team_id"), team1_id, team2_id)
+    player_rows = [r for r in player_rows if r.get("team_id")]
+
+    # varmista players-FK ennen player_statsia
+    uniq_players: dict[str, str] = {}
+    for r in player_rows:
+        pid = r.get("player_id")
+        if pid:
+            uniq_players[pid] = r.get("nickname") or ""
+    for pid, nick in uniq_players.items():
+        upsert_player(con, {"player_id": pid, "nickname": nick, "updated_at": None})
+
+    # if team_rows:
+    if player_rows:
+        upsert_player_stats(con, match_id, player_rows)
+
+
+# ---- main sync --------------------------------------------------------------
+
+def main(db_path: str) -> None:
+    con = get_conn(db_path)
+    try:
+        init_db(con)
+
+        # Upsert championships from faceit_config.DIVISIONS
+        champs = []
+        for d in DIVISIONS:
+            row = upsert_championship(con, {
+                "championship_id": d["championship_id"],
+                "season": d["season"],
+                "division_num": d["division_num"],
+                "name": d["name"],
+                "game": d.get("game", "cs2"),
+                "is_playoffs": d.get("is_playoffs", 0),
+                "slug": d["slug"],
+            })
+            champs.append(row)
+
+        # Käy kaikki divisioonat läpi yhdellä passilla / divisioona
+        for c in champs:
+            _sync_division_one_pass(con, c)
+
+        print(">> [OK] Sync valmis")
+    finally:
+        # Sulje yhteys aina lopuksi
+        try:
+            con.close()
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
-    main()
+    p = argparse.ArgumentParser(description="Sync Pappaliiga data into SQLite (championship-centric).")
+    p.add_argument("--db", default=str(Path(__file__).with_name("pappaliiga.db")),
+                   help="SQLite path (default: pappaliiga.db next to this file)")
+    args = p.parse_args()
+    main(args.db)
