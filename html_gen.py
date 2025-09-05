@@ -21,7 +21,7 @@ from db import (
 
 
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
-OUT_DIR = Path(__file__).with_name("output")
+OUT_DIR = Path(__file__).with_name("docs")
 
 # --- YHTEINEN POHJA KAIKILLE SIVUILLE (CSS + JS) ---
 UNIFIED_HEAD = """<!doctype html>
