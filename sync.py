@@ -67,10 +67,11 @@ def _fmt_hms(seconds: float) -> str:
         return f"{h:d}:{m:02d}:{s:02d}"
     return f"{m:d}:{s:02d}"
 
-def _progress_bar(prefix: str, i: int, total: int, start_ts: float, width: int = 32) -> None:
+def _progress_bar(prefix: str, i: int, total: int, start_ts: float, skipped: int = 0, width: int = 32) -> None:
     """
-    In-place progress bar with ETA:
-      Example: Past [########------------] 12/100 (12%) | elapsed 0:25 | ETA 2:56
+    In-place progress bar with ETA and skipped counter.
+      Example:
+        Div1 — All [########------------] 12/100 (12%) | skipped 5 | elapsed 0:25 | ETA 2:56
     """
     i = max(0, min(i, total))
     pct = 0 if total <= 0 else int(100 * i / total)
@@ -82,6 +83,7 @@ def _progress_bar(prefix: str, i: int, total: int, start_ts: float, width: int =
     remaining = ((total - i) / rate) if rate > 0 else 0.0
     msg = (
         f"{prefix} [{bar}] {i}/{total} ({pct}%)"
+        f" | skipped {skipped}"
         f" | elapsed {_fmt_hms(elapsed)}"
         f" | ETA {_fmt_hms(remaining)}"
     )
@@ -291,6 +293,55 @@ def _is_finished_in_db(con: sqlite3.Connection, match_id: str) -> bool:
     row = con.execute("SELECT status FROM matches WHERE match_id=?", (match_id,)).fetchone()
     return bool(row and str(row[0] or "").lower() == "finished")
 
+def _is_unchanged_in_db(con: sqlite3.Connection, match_id: str, new_status: str, new_finished_at: Optional[int]) -> bool:
+    """
+    Return True if match exists in DB with same status and finished_at → no real changes.
+    """
+    row = con.execute(
+        "SELECT status, finished_at FROM matches WHERE match_id=?",
+        (match_id,)
+    ).fetchone()
+    if not row:
+        return False
+    old_status = (row[0] or "").lower()
+    old_finished = row[1]
+    return (old_status == (new_status or "").lower()) and (old_finished == new_finished_at)
+
+def _has_full_stats(con: sqlite3.Connection, match_id: str) -> bool:
+    """Return True if both maps and player_stats exist for this match_id."""
+    r1 = con.execute("SELECT 1 FROM maps WHERE match_id=? LIMIT 1", (match_id,)).fetchone()
+    r2 = con.execute("SELECT 1 FROM player_stats WHERE match_id=? LIMIT 1", (match_id,)).fetchone()
+    return bool(r1 and r2)
+
+def _is_header_unchanged_by_summary(con: sqlite3.Connection, match_id: str, summary: dict) -> bool:
+    """
+    Compare only fields we get from the list endpoint ('summary').
+    If all equal in DB, we can skip without hitting details/stats.
+    """
+    row = con.execute(
+        """SELECT status, scheduled_at, started_at, finished_at, team1_id, team2_id
+           FROM matches WHERE match_id=?""",
+        (match_id,)
+    ).fetchone()
+    if not row:
+        return False
+
+    def s_int(x): 
+        try: return int(x)
+        except: return None
+
+    old_status = (row["status"] or "").lower()
+    new_status = (summary.get("status") or "").lower()
+
+    return (
+        old_status == new_status and
+        (row["scheduled_at"] or None) == s_int(summary.get("scheduled_at")) and
+        (row["started_at"]   or None) == s_int(summary.get("started_at"))   and
+        (row["finished_at"]  or None) == s_int(summary.get("finished_at"))  and
+        (row["team1_id"]     or None) == (summary.get("team1_id") or None)  and
+        (row["team2_id"]     or None) == (summary.get("team2_id") or None)
+    )
+
 def _target_kind_from_status(item: dict) -> str:
     """
     Map Faceit status → meidän käsittelyluokka.
@@ -334,44 +385,54 @@ def _list_matches_all(championship_id: str) -> list[dict]:
 
 def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
     """
-    Yksi progressi: käy läpi kaikki matsit (type=all). Ongoing käsitellään kuin scheduled.
-    Commit tehdään kerran per matsi, jotta pienennetään commit-kutsujen määrää.
+    One pass over all matches (type=all). Ongoing are handled like scheduled.
+    Commit once per match. Skip logic:
+      - If DB already has status='finished' AND full stats exist → skip (no API calls)
+      - If summary shows no header changes vs DB for non-past → skip
     """
     matches = _list_matches_all(champ_row["championship_id"])
     div_title = champ_row.get("name") or champ_row.get("slug") or f"Div{champ_row.get('division_num','?')}-S{champ_row.get('season','?')}"
     title = f"{div_title} — All"
     total = len(matches)
     if total == 0:
-        _progress_bar(title, 0, 0, time.time())
+        _progress_bar(title, 0, 0, time.time(), skipped=0)
         return
 
     seen: set[str] = set()
+    skipped = 0
     start_ts = time.time()
     for i, m in enumerate(matches, start=1):
         mid = m.get("match_id")
         if not mid or mid in seen:
-            _progress_bar(title, i, total, start_ts); continue
+            _progress_bar(title, i, total, start_ts, skipped); continue
 
-        if SKIP_FINISHED_IN_DB and _is_finished_in_db(con, mid):
-            seen.add(mid)
-            _progress_bar(title, i, total, start_ts); continue
+        # 1) Finished in DB + stats present -> skip entirely
+        if SKIP_FINISHED_IN_DB and _is_finished_in_db(con, mid) and _has_full_stats(con, mid):
+            seen.add(mid); skipped += 1
+            _progress_bar(title, i, total, start_ts, skipped)
+            continue
 
+        # 2) Non-past summary that hasn't changed (status/schedule/teams unchanged) -> skip
+        tgt = m.get("_target_kind") or "upcoming"
+        if tgt != "past" and _is_header_unchanged_by_summary(con, mid, m):
+            seen.add(mid); skipped += 1
+            _progress_bar(title, i, total, start_ts, skipped)
+            continue
+
+        # 3) Process (insert/update). For non-past, use summary to avoid details call.
         seen.add(mid)
         try:
-            kind = m.get("_target_kind") or "upcoming"
-            summary = m if kind != "past" else None
-            persist_match(con, champ_row, mid, kind=kind, summary=summary)
-            con.commit()  # yksi commit per matsi
+            summary = m if tgt != "past" else None
+            persist_match(con, champ_row, mid, kind=tgt, summary=summary)
+            con.commit()  # one commit per match
         except Exception as e:
             logging.warning("sync (all) %s failed: %s", mid, e)
-            # virheen jälkeen rollback ettei jää puolikkaita transaktioita
             try:
                 con.rollback()
             except Exception:
                 pass
 
-        _progress_bar(title, i, total, start_ts)
-
+        _progress_bar(title, i, total, start_ts, skipped)
 
 def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: str, kind: str, summary: Optional[Dict[str, Any]] = None) -> None:
     """

@@ -22,6 +22,25 @@ def get_conn(path: str) -> sqlite3.Connection:
     con = sqlite3.connect(path)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON;")
+
+    # Performance pragmas (safe defaults for this workload)
+    try:
+        con.execute("PRAGMA journal_mode=WAL;")      # persistent in DB file
+    except Exception:
+        pass
+    try:
+        con.execute("PRAGMA synchronous=NORMAL;")    # per-connection
+    except Exception:
+        pass
+    try:
+        con.execute("PRAGMA temp_store=MEMORY;")     # per-connection
+    except Exception:
+        pass
+    try:
+        con.execute("PRAGMA mmap_size=30000000000;") # per-connection, best-effort
+    except Exception:
+        pass
+
     return con
 
 
