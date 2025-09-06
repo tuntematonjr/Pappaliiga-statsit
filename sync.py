@@ -17,7 +17,7 @@ import logging
 from db import upsert_player
 from logging.handlers import RotatingFileHandler
 
-from faceit_config import DIVISIONS  # loaded from divisions.json by faceit_config.py
+from faceit_config import DIVISIONS, CURRENT_SEASON
 from faceit_client import (
     list_championship_matches, get_match_details, get_match_stats, get_democracy_history
 )
@@ -624,6 +624,8 @@ def main(db_path: str) -> None:
         # Upsert championships from faceit_config.DIVISIONS
         champs = []
         for d in DIVISIONS:
+            if int(d.get("season", 0)) < CURRENT_SEASON:
+                continue  # skip older seasons
             row = upsert_championship(con, {
                 "championship_id": d["championship_id"],
                 "season": d["season"],
