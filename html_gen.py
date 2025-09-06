@@ -1820,9 +1820,8 @@ def render_division(con, div):
     out_path = OUT_DIR / f"{div['slug']}.html"
     html_str = "\n".join(html)
     did_write = write_if_changed(out_path, html_str)
-    print(f"[{'write' if did_write else 'skip '}]", out_path)
-    if did_write:
-        print(f"[OK] Wrote {out_path}")
+    status = "OK] Wrote" if did_write else "skip ]"
+    print(f"[{status} {out_path}")
     return out_path
 
 def write_index(con: sqlite3.Connection):
@@ -1830,10 +1829,8 @@ def write_index(con: sqlite3.Connection):
     html = render_index(con, DIVISIONS)
     idx_path = OUT_DIR / "index.html"
     did_write = write_if_changed(idx_path, html)
-    print(f"[{'write' if did_write else 'skip '}]", idx_path)
-    if did_write:
-        print(f"[OK] Wrote {idx_path}")
-
+    status = "OK] Wrote" if did_write else "skip ]"
+    print(f"[{status} {idx_path}")
 
 # --- Content-aware write helpers -------------------------------------------
 
