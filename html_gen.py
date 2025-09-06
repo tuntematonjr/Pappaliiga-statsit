@@ -6,6 +6,9 @@ from collections import defaultdict
 from faceit_config import DIVISIONS
 from datetime import datetime
 from html import escape
+import hashlib, tempfile, re
+
+_TS_RX = re.compile(r"Generoitu\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}")
 
 from db import (
     get_conn,
@@ -1815,14 +1818,89 @@ def render_division(con, div):
     html.append(page_end())
 
     out_path = OUT_DIR / f"{div['slug']}.html"
-    out_path.write_text("\n".join(html), encoding="utf-8")
+    html_str = "\n".join(html)
+    did_write = write_if_changed(out_path, html_str)
+    print(f"[{'write' if did_write else 'skip '}]", out_path)
+    if did_write:
+        print(f"[OK] Wrote {out_path}")
     return out_path
-
 
 def write_index(con: sqlite3.Connection):
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     html = render_index(con, DIVISIONS)
-    (OUT_DIR / "index.html").write_text(html, encoding="utf-8")
+    idx_path = OUT_DIR / "index.html"
+    did_write = write_if_changed(idx_path, html)
+    print(f"[{'write' if did_write else 'skip '}]", idx_path)
+    if did_write:
+        print(f"[OK] Wrote {idx_path}")
+
+
+# --- Content-aware write helpers -------------------------------------------
+
+# Nappaa sekä suomen- että englanninkielisiä aikaleimatekstejä (varmuuden vuoksi).
+_TS_PATTERNS = [
+    r"Generoitu\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?",   # "Generoitu 2025-09-06 15:27" (tai sekunneilla)
+    r"\(Generoitu\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?\)", # "(Generoitu ...)"
+    r"Generated\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?",   # jos joskus käytössä
+]
+
+# Mahdollisia build/nonssi-merkintöjä, joita ei haluta vaikuttamaan vertailuun:
+# esim. <link href="app.css?b=abcdef1"> tai data-build="abcdef1"
+_BUILD_PATTERNS = [
+    r"\?b=[a-f0-9]{7,}",                   # query-param build hash
+    r"data-build=[\"'][a-f0-9]{7,}[\"']",  # data-build attribuutti
+]
+
+# Yleinen ISO-ajan poistaja varmistukseksi (jos viet jonkin ajan meta- tai kommenttikenttään)
+_ISO_TS_ANYWHERE = r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?"
+
+def _to_unix_newlines(s: str) -> str:
+    # Normalisoi rivinvaihdot: CRLF/LF -> LF (tämä oli syypää jatkuviin kirjoituksiin Windowsissa)
+    return s.replace("\r\n", "\n").replace("\r", "\n")
+
+def _normalize_for_compare_bytes(b: bytes) -> bytes:
+    # Dekoodaa, normalisoi rivinvaihdot ja poista dynaamiset osat vertailusta
+    s = b.decode("utf-8", errors="ignore")
+    s = _to_unix_newlines(s)
+
+    # Poista aikaleimatekstit
+    for pat in _TS_PATTERNS:
+        s = re.sub(pat, "GENERATED_TS", s, flags=re.IGNORECASE)
+
+    # Poista yksittäiset ISO-ajat varmuuden vuoksi (jos esiintyvät esim. kommenteissa)
+    s = re.sub(_ISO_TS_ANYWHERE, "GENERATED_TS", s)
+
+    # Poista build/nonssi-merkkaukset
+    for pat in _BUILD_PATTERNS:
+        s = re.sub(pat, "", s, flags=re.IGNORECASE)
+
+    # (Valinnainen) Siivoa trailing whitespace rivuilta, jotta editori-muutokset eivät vaikuta
+    s = "\n".join(line.rstrip() for line in s.split("\n"))
+
+    return s.encode("utf-8", errors="ignore")
+
+def write_if_changed(path: "Path", content: str) -> bool:
+    """
+    Kirjoita 'path' vain jos normalisoitu sisältö poikkeaa vanhasta.
+    Palauttaa True jos kirjoitettiin, False jos ohitettiin.
+    """
+    new_bytes = _normalize_for_compare_bytes(_to_unix_newlines(content).encode("utf-8"))
+
+    try:
+        old_raw = path.read_bytes()
+        old_bytes = _normalize_for_compare_bytes(old_raw)
+        if hashlib.sha256(old_bytes).digest() == hashlib.sha256(new_bytes).digest():
+            return False  # Ei muutosta
+    except FileNotFoundError:
+        pass
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Atomic write Windows-yhteensopivasti: kirjoita temp-tiedostoon ja vaihda paikalleen
+    with tempfile.NamedTemporaryFile("wb", delete=False, dir=str(path.parent)) as tf:
+        tf.write(content.encode("utf-8"))
+        tmp_name = tf.name
+    os.replace(tmp_name, path)
+    return True
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1831,10 +1909,8 @@ def main():
 
     for div in DIVISIONS:
         path = render_division(con, div)
-        print(f"[OK] Wrote {path}")
 
     write_index(con)
-    print(f"[OK] Wrote {(OUT_DIR / 'index.html')}")
 
 if __name__ == "__main__":
     main()
