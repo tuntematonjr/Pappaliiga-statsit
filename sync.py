@@ -489,8 +489,8 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                  or (summary.get("_raw", {}).get("faceit_url") if summary else None)
 
     # Halutessasi voit pitää tämän normalisoinnin (nopeuteen ei vaikutusta)
-    # if faceit_url and "faceit.com" in faceit_url:
-    #     faceit_url = re.sub(r"https://www\.faceit\.com/[a-z]{2}/", "https://www.faceit.com/", faceit_url)
+    if faceit_url and "faceit.com" in faceit_url:
+        faceit_url = re.sub(r"https://www\.faceit\.com/[a-z]{2}/", "https://www.faceit.com/", faceit_url)
 
     configured_at = safe_int(
         (details.get("configured_at") if isinstance(details, dict) else None) \
