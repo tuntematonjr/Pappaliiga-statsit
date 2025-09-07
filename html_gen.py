@@ -7,8 +7,7 @@ from faceit_config import DIVISIONS
 from datetime import datetime
 from html import escape
 import hashlib, tempfile, re
-
-_TS_RX = re.compile(r"Generoitu\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}")
+import time
 
 from db import (
     get_conn,
@@ -22,9 +21,12 @@ from db import (
     get_map_art, normalize_map_id,
     get_division_generated_ts,
     get_max_last_seen_for_champs,
+    compute_player_deltas,
+    compute_map_stats_with_delta,
 )
 
-SKIP_BY_MTIME = True
+# --- HTML/template versioning ---
+HTML_TEMPLATE_VERSION = 4
 
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
@@ -552,7 +554,10 @@ HTML_FOOT = """
 """
 
 def page_start(title: str, page_class: str = "") -> str:
-    return UNIFIED_HEAD.replace("{title}", title).replace("{page_class}", page_class)
+    gen_ts = int(time.time())
+    token = f"<!-- GENVER:{HTML_TEMPLATE_VERSION} GENERATED_AT:{gen_ts} -->"
+    # Put GENVER first, then the big HEAD block
+    return token + "\n" + UNIFIED_HEAD.replace("{title}", title).replace("{page_class}", page_class)
 
 def topbar(show_back_to_index: bool):
     back = '<a class="btn btn-ghost" href="index.html">← Takaisin indexiin</a>' if show_back_to_index else ""
@@ -599,15 +604,6 @@ def _fs_mtime(path: Path) -> int:
         return int(path.stat().st_mtime)
     except FileNotFoundError:
         return 0
-
-def _should_skip_division_render(con, div: dict, out_path: Path) -> tuple[bool, int, int]:
-    """
-    Returns (should_skip, fs_ts, db_ts).
-    should_skip=True if out_path mtime >= MAX(last_seen_at) for this championship.
-    """
-    db_ts = get_division_generated_ts(con, div["championship_id"]) or 0
-    fs_ts = _fs_mtime(out_path)
-    return (SKIP_BY_MTIME and fs_ts >= db_ts and db_ts > 0, fs_ts, db_ts)
 
 def weighted_percentile(values, weights, p):
     """
@@ -697,6 +693,55 @@ def _fmt_opt_stat(label: str, value: float | int, fmt: str) -> str:
     if abs(v) < 1e-9:
         return ""
     return f"{label} {fmt % v}"
+
+def _latest_mtime(paths: list[Path]) -> float:
+    mt = 0.0
+    for p in paths:
+        try:
+            mt = max(mt, p.stat().st_mtime)
+        except FileNotFoundError:
+            continue
+    return mt
+
+def _read_embedded_version(path: str) -> int:
+    """
+    Reads the file and looks for <!-- GENVER:x --> token anywhere.
+    Returns int x or 0 if not found.
+    """
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            data = f.read()  # read full file so GENVER can be after large CSS/JS
+        m = re.search(r"<!--\s*GENVER:(\d+)\s*(?:\S+)?\s*-->", data)
+        return int(m.group(1)) if m else 0
+    except FileNotFoundError:
+        return 0
+
+def should_render_division(con: sqlite3.Connection, champ_row: dict, out_path: str) -> tuple[bool, str]:
+    """
+    Päätös divisioonan HTML:n (uudelleen)generoinnista.
+    True jos:
+      - tiedosto puuttuu, tai
+      - DB:n MAX(last_seen_at) > tiedoston mtime, tai
+      - sisäänleivottu GENVER < HTML_TEMPLATE_VERSION
+    Palauttaa (decision, reason)
+    """
+    out_exists = os.path.exists(out_path)
+    out_mtime = os.path.getmtime(out_path) if out_exists else 0.0
+
+    # 1) DB-guard: käytä divisioonaa vastaavan mestaruuden maks. last_seen_at
+    db_ts = get_division_generated_ts(con, champ_row["championship_id"]) or 0
+
+    if not out_exists:
+        return True, "html missing"
+    if db_ts > out_mtime:
+        return True, f"db last_seen {int(db_ts)} > html mtime {int(out_mtime)}"
+
+    # 2) Template version guard
+    embedded = _read_embedded_version(out_path)
+    if embedded < HTML_TEMPLATE_VERSION:
+        return True, f"template version bump {HTML_TEMPLATE_VERSION} (was {embedded})"
+
+    return False, f"(html mtime {int(out_mtime)} >= last_seen {int(db_ts)} and ver={embedded})"
 
 def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_id: str, team_name: str, teams: list[dict]) -> str:
     """
@@ -1174,12 +1219,13 @@ def maybe_render_index(con, divisions: list[dict]) -> str:
     champ_ids = [d["championship_id"] for d in divisions]
     db_ts = get_max_last_seen_for_champs(con, champ_ids) or 0
     fs_ts = _fs_mtime(out_path)
+    embedded = _read_embedded_version(str(out_path)) if out_path.exists() else 0
 
-    if SKIP_BY_MTIME and fs_ts >= db_ts and db_ts > 0:
-        print(f"[skip] {out_path} (html mtime {fs_ts} >= last_seen {db_ts})")
+    if out_path.exists() and embedded >= HTML_TEMPLATE_VERSION and fs_ts >= db_ts and db_ts > 0:
+        print(f"[skip] {out_path} (html mtime {fs_ts} >= last_seen {db_ts}, ver={embedded})")
         return str(out_path)
 
-    html = render_index(divisions)  # rakentaa stringin
+    html = render_index(con, divisions)
     did_write = write_if_changed(out_path, html)
     print(f"[{'write' if did_write else 'skip'}] {out_path}")
     return str(out_path)
@@ -1269,11 +1315,14 @@ def render_division(con, div):
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = OUT_DIR / f"{div['slug']}.html"
 
-    # Fast skip by comparing file mtime vs DB's MAX(last_seen_at)
-    should_skip, fs_ts, db_ts = _should_skip_division_render(con, div, out_path)
-    if should_skip:
-        print(f"[skip] {out_path} (html mtime {fs_ts} >= last_seen {db_ts})")
+    # Smarter skip: DB last_seen / GENVER
+    do_render, reason = should_render_division(con, div, str(out_path))
+    if not do_render:
+        print(f"[skip] {out_path} ({reason})")
         return str(out_path)
+    else:
+        print(f"[render] {out_path} ({reason})")
+
 
     # --- Fetch data for page ---
     teams = get_teams_in_championship(con, div["championship_id"])
@@ -1296,7 +1345,6 @@ def render_division(con, div):
         f"Generoitu {ts_str}"
         f"</div>"
     )
-    html.append('<div class="page">')
     html.append('<div class="page">')
 
     html.append('<div class="nav">')
@@ -1463,6 +1511,34 @@ def render_division(con, div):
         # --- Lataa pelaajadata ensin, jotta voidaan laskea varaluotettavat tiimikompaktit ---
         players = compute_player_table_data(con, div["championship_id"], team_id)
 
+        # Weekly deltas per player (curr/prev)
+        player_deltas = compute_player_deltas(con, div["championship_id"], team_id)
+
+        def _pd(pid: str) -> dict | None:
+            return player_deltas.get(pid)
+
+        def _dval(d: dict | None, key: str):
+            if not d or not d.get("delta"):
+                return None, None
+            return d["delta"].get(key), (d["prev"][key] if d["prev"] is not None else None)
+
+        def _signed(x, prec=2):
+            if x is None: return ""
+            s = "+" if x >= 0 else ""
+            fmt = f"{{:{'.'+str(prec)+'f' if prec else ''}}}"
+            return s + fmt.format(x)
+
+        def _arrow(val: float | int | None) -> str:
+            """Pieni nuoli muutoksen suunnasta (tyhjä jos ei deltaa)."""
+            if val is None:
+                return ""
+            if val > 0:
+                return " ▲"
+            if val < 0:
+                return " ▼"
+            return ""
+
+
         # Johdetut mittarit + optiosarakkeiden tunnisteet (pidä entiset)
         has_flash  = any(("flashed" in p and "flash_count" in p) for p in players)
         has_pistol = any(("pistol_kills" in p) for p in players)
@@ -1592,24 +1668,40 @@ def render_division(con, div):
           <th onclick="sortTable('{tid_basic}',15,true)">MVPs</th>
           </tr></thead>""")
         for p in players:
+          deltas = _pd(p["player_id"])
+          d_kd,  prev_kd  = _dval(deltas, "kd")
+          d_adr, prev_adr = _dval(deltas, "adr")
+          d_kr,  prev_kr  = _dval(deltas, "kr")
+          d_dmg, prev_dmg = _dval(deltas, "damage")
+          d_k,   prev_k   = _dval(deltas, "kills")
+          d_d,   prev_d   = _dval(deltas, "deaths")
+          d_a,   prev_a   = _dval(deltas, "assists")
+          d_hs,  prev_hs  = _dval(deltas, "hs_pct")
+          d_k2,  prev_k2  = _dval(deltas, "k2")
+          d_k3,  prev_k3  = _dval(deltas, "k3")
+          d_k4,  prev_k4  = _dval(deltas, "k4")
+          d_k5,  prev_k5  = _dval(deltas, "k5")
+          d_mv,  prev_mv  = _dval(deltas, "mvps")
+
           html.append(f"""<tr>
             <td>{p["nickname"]}</td>
-            <td>{p["maps_played"]}</td>
-            <td title="Rounds/Map: {p['rpm']:.1f}">{p["rounds"]}</td>
-            <td>{p["kd"]:.2f}</td>
-            <td>{p["adr"]:.1f}</td>
-            <td>{p["kr"]:.2f}</td>
-            <td>{p["damage"]}</td>
-            <td>{p["kill"]}</td>
-            <td>{p["death"]}</td>
-            <td>{p["assist"]}</td>
-            <td>{p["hs_pct"]:.1f}</td>
-            <td>{p["k2"]}</td>
-            <td>{p["k3"]}</td>
-            <td>{p["k4"]}</td>
-            <td>{p["k5"]}</td>
-            <td>{p["mvps"]}</td>
+            <td title="Δ vs prev: {_signed(deltas['delta']['maps_played'] if deltas and deltas.get('delta') else 0, 0)} (prev {int(deltas['prev']['maps_played']) if deltas and deltas.get('prev') else 0})">{p["maps_played"]}</td>
+            <td title="Rounds/Map: {p['rpm']:.1f} — Δ rounds: {_signed(d_d if d_d is not None else 0, 0)} (prev {int(prev_d) if prev_d is not None else 0})">{p["rounds"]}</td>
+            <td title="Δ vs prev: {_signed(d_kd)} (prev {(prev_kd if prev_kd is not None else 0.0):.2f})">{p["kd"]:.2f}{_arrow(d_kd)}</td>
+            <td title="Δ vs prev: {_signed(d_adr,1)} (prev {(prev_adr if prev_adr is not None else 0.0):.1f})">{p["adr"]:.1f}{_arrow(d_adr)}</td>
+            <td title="Δ vs prev: {_signed(d_kr)} (prev {(prev_kr if prev_kr is not None else 0.0):.2f})">{p["kr"]:.2f}{_arrow(d_kr)}</td>
+            <td title="Δ vs prev: {_signed(d_dmg,0)} (prev {int(prev_dmg) if prev_dmg is not None else 0})">{p["damage"]}{_arrow(d_dmg)}</td>
+            <td title="Δ vs prev: {_signed(d_k,0)} (prev {int(prev_k) if prev_k is not None else 0})">{p["kill"]}{_arrow(d_k)}</td>
+            <td title="Δ vs prev: {_signed(d_d,0)} (prev {int(prev_d) if prev_d is not None else 0})">{p["death"]}{_arrow(d_d)}</td>
+            <td title="Δ vs prev: {_signed(d_a,0)} (prev {int(prev_a) if prev_a is not None else 0})">{p["assist"]}{_arrow(d_a)}</td>
+            <td title="Δ vs prev: {_signed(d_hs,1)} (prev {(prev_hs if prev_hs is not None else 0.0):.1f})">{p["hs_pct"]:.1f}{_arrow(d_hs)}</td>
+            <td title="Δ vs prev: {_signed(d_k2,0)} (prev {int(prev_k2) if prev_k2 is not None else 0})">{p["k2"]}{_arrow(d_k2)}</td>
+            <td title="Δ vs prev: {_signed(d_k3,0)} (prev {int(prev_k3) if prev_k3 is not None else 0})">{p["k3"]}{_arrow(d_k3)}</td>
+            <td title="Δ vs prev: {_signed(d_k4,0)} (prev {int(prev_k4) if prev_k4 is not None else 0})">{p["k4"]}{_arrow(d_k4)}</td>
+            <td title="Δ vs prev: {_signed(d_k5,0)} (prev {int(prev_k5) if prev_k5 is not None else 0})">{p["k5"]}{_arrow(d_k5)}</td>
+            <td title="Δ vs prev: {_signed(d_mv,0)} (prev {int(prev_mv) if prev_mv is not None else 0})">{p["mvps"]}{_arrow(d_mv)}</td>
           </tr>""")
+
         html.append("</tbody></table>")
 
         html.append(f"""
@@ -1679,57 +1771,76 @@ def render_division(con, div):
         html.append("</tr></thead><tbody>")
 
         for p in players:
+            deltas = _pd(p["player_id"])
+            d_ck,  prev_ck  = _dval(deltas, "clutch_kills")
+            d_c11a, prev_c11a = _dval(deltas, "c11_att")
+            d_c11w, prev_c11w = _dval(deltas, "c11_win")
+            d_c12a, prev_c12a = _dval(deltas, "c12_att")
+            d_c12w, prev_c12w = _dval(deltas, "c12_win")
+            d_ea,   prev_ea   = _dval(deltas, "entry_att")
+            d_ew,   prev_ew   = _dval(deltas, "entry_win")
+            d_util, prev_util = _dval(deltas, "util")
+            d_udpr, prev_udpr = _dval(deltas, "udpr")
+            # derived survival and rating1 are computed on the fly below; show deltas only for base util/flash/etc.
+            d_fsucc, prev_fsucc = _dval(deltas, "flash_successes")
+            d_fcnt,  prev_fcnt  = _dval(deltas, "flash_count")
+            d_flashed, prev_flashed = _dval(deltas, "flashed")
+            d_pistol, prev_pistol = _dval(deltas, "pistol_kills")
+            d_awp,    prev_awp    = _dval(deltas, "awp_kills")
+
             html.append("<tr>")
             html.append(f"<td>{p['nickname']}</td>")
-            html.append(f"<td>{p['clutch_kills']}</td>")
-            # 1v1 WR palkki
+            html.append(f"<td title='Δ vs prev: {_signed(d_ck,0)} (prev {int(prev_ck) if prev_ck is not None else 0})'>{p['clutch_kills']}{_arrow(d_ck)}</td>")
+
+            # 1v1 WR (append delta attempts/wins & delta WR)
+            c11_wr_prev = (100.0 * (prev_c11w or 0) / (prev_c11a or 0)) if (prev_c11a or 0) > 0 else 0.0
+            c11_wr_delta = p['c11_wr'] - c11_wr_prev
             html.append(
                 f"<td class='wr' data-zero='show' data-g='{p['c11_att']}' data-w='{p['c11_win']}' "
-                f"data-pct='{p['c11_wr']:.1f}' title='Attempts: {p['c11_att']}, Wins: {p['c11_win']}'>"
+                f"data-pct='{p['c11_wr']:.1f}' "
+                f"title='Attempts: {p['c11_att']} (Δ {_signed(d_c11a,0)}), Wins: {p['c11_win']} (Δ {_signed(d_c11w,0)}), Δ WR: {_signed(c11_wr_delta,1)} pp'>"
                 f"</td>"
             )
 
-            # 1v2 WR palkki
+            # 1v2 WR
+            c12_wr_prev = (100.0 * (prev_c12w or 0) / (prev_c12a or 0)) if (prev_c12a or 0) > 0 else 0.0
+            c12_wr_delta = p['c12_wr'] - c12_wr_prev
             html.append(
                 f"<td class='wr' data-zero='show' data-g='{p['c12_att']}' data-w='{p['c12_win']}' "
-                f"data-pct='{p['c12_wr']:.1f}' title='Attempts: {p['c12_att']}, Wins: {p['c12_win']}'>"
+                f"data-pct='{p['c12_wr']:.1f}' "
+                f"title='Attempts: {p['c12_att']} (Δ {_signed(d_c12a,0)}), Wins: {p['c12_win']} (Δ {_signed(d_c12w,0)}), Δ WR: {_signed(c12_wr_delta,1)} pp'>"
                 f"</td>"
             )
 
-            # Entry WR yhdistettynä (W–L näkyy palkissa)
+            # Entry WR
+            entry_wr_prev = (100.0 * (prev_ew or 0) / (prev_ea or 0)) if (prev_ea or 0) > 0 else 0.0
+            entry_wr_delta = p['entry_wr'] - entry_wr_prev
             html.append(
                 f"<td class='wr' data-zero='show' data-g='{p['entry_att']}' data-w='{p['entry_win']}' "
-                f"data-pct='{p['entry_wr']:.1f}' title='Attempts: {p['entry_att']}, Wins: {p['entry_win']}'>"
+                f"data-pct='{p['entry_wr']:.1f}' "
+                f"title='Attempts: {p['entry_att']} (Δ {_signed(d_ea,0)}), Wins: {p['entry_win']} (Δ {_signed(d_ew,0)}), Δ WR: {_signed(entry_wr_delta,1)} pp'>"
                 f"</td>"
             )
 
+            html.append(f"<td title='Δ vs prev: {_signed(d_util,0)} (prev {int(prev_util) if prev_util is not None else 0})'>{int(p['util'])}{_arrow(d_util)}</td>")
+            html.append(f"<td title='Δ vs prev: {_signed(d_udpr)} (prev {(prev_udpr if prev_udpr is not None else 0.0):.2f})'>{p['udpr']:.2f}{_arrow(d_udpr)}</td>")
+            html.append(f"<td>{p['survival_pct']:.0f}</td>")  # survival/rating1 remain as-is; could be derived deltas if desired
+            html.append(f"<td title='{esc_title(TOOLTIP_RATING1)}'>{p['rating1']:.2f}</td>")
 
-            # Utility: total + per round + impact
-            html.append(f"<td>{int(p['util'])}</td>")
-            html.append(f"<td>{p['udpr']:.2f}</td>")
-            html.append(f"<td>{p['survival_pct']:.0f}</td>")
-            html.append( f"<td title='{esc_title(TOOLTIP_RATING1)}'>{p['rating1']:.2f}</td>")
-
-            # Flash Succ ratio bar (succ/throws) – WR-tyylinen palkki
+            # Flash Succ ratio bar: append deltas in title
             _s = int(p.get("flash_successes", p.get("flash_succ", 0)) or 0)
             _c = int(p.get("flash_count", 0) or 0)
             _pct = (100.0 * _s / _c) if _c else 0.0
             html.append(
                 f"<td class='wr' data-mode='ratio' data-zero='show' "
                 f"data-g='{_c}' data-w='{_s}' data-pct='{_pct:.1f}' "
-                f"title='Successes: {_s}, Throws: {_c}'>"
+                f"title='Successes: {_s} (Δ {_signed(d_fsucc,0)}), Throws: {_c} (Δ {_signed(d_fcnt,0)})'>"
                 f"</td>"
             )
 
-            # Total enemies blinded
-            html.append(f"<td>{p.get('flashed', 0)}</td>")
-
-            # Efficiency: enemies blinded per flash
-            val = p['enemies_per_flash'] if p['enemies_per_flash'] is not None else 0.0
-            html.append(f"<td>{val:.2f}</td>")
-
-            html.append(f"<td>{p.get('pistol_kills',0)}</td>")
-            html.append(f"<td>{p.get('awp_kills',0)}</td>")
+            html.append(f"<td title='Δ vs prev: {_signed(d_flashed,0)} (prev {int(prev_flashed) if prev_flashed is not None else 0})'>{p.get('flashed', 0)}{_arrow(d_flashed)}</td>")
+            html.append(f"<td title='Δ vs prev: {_signed(d_pistol,0)} (prev {int(prev_pistol) if prev_pistol is not None else 0})'>{p.get('pistol_kills',0)}{_arrow(d_pistol)}</td>")
+            html.append(f"<td title='Δ vs prev: {_signed(d_awp,0)} (prev {int(prev_awp) if prev_awp is not None else 0})'>{p.get('awp_kills',0)}{_arrow(d_awp)}</td>")
             html.append("</tr>")
             
         html.append("</tbody></table>")
@@ -1754,7 +1865,8 @@ def render_division(con, div):
 
         # Map stats
         maps = compute_map_stats_table_data(con, div["championship_id"], team_id)
-
+        # Map weekly deltas
+        map_deltas = compute_map_stats_with_delta(con, div["championship_id"], team_id)
         # Chipit
         best_wr = max((r for r in maps if r["played"]>0), key=lambda r: r["wr"], default=None)
         most_pick = max(maps, key=lambda r: r["picks"], default=None)
@@ -1804,34 +1916,69 @@ def render_division(con, div):
 
         # rivit
         for r in maps:
-            # Δ vs division avg tooltippeihin
-            dkd = 0.0; dadr = 0.0
+            md = map_deltas.get(r["map"])
+            prev = md["prev"] if md else None
+            dlt  = md["delta"] if md else None
+
+            # Δ vs division avg
+            dkd_div = 0.0; dadr_div = 0.0
             if r["map"] in div_avgs:
-                dkd = (r["kd"] or 0.0) - div_avgs[r["map"]][0]
-                dadr= (r["adr"] or 0.0) - div_avgs[r["map"]][1]
+                dkd_div  = (r["kd"] or 0.0) - div_avgs[r["map"]][0]
+                dadr_div = (r["adr"] or 0.0) - div_avgs[r["map"]][1]
+
+            # Δ vs previous
+            def _pp(k, prec=0):
+                if not dlt: return f"(no prev)"
+                dv = dlt.get(k)
+                pv = prev.get(k) if prev else None
+                if isinstance(dv, float):  # number of decimals
+                    s = f"{dv:+.{prec}f}"
+                else:
+                    s = f"{int(dv) if dv is not None else 0:+d}"
+                ptxt = f"{prev[k]:.{prec}f}" if (prev and isinstance(prev.get(k), float)) else f"{int(prev.get(k) or 0)}" if prev else "0"
+                return f"Δ vs prev: {s} (prev {ptxt})"
+
+            # WR tooltips: include prev W/G and delta WR in pp
+            prev_wr = (100.0 * (prev["wins"] or 0) / (prev["games"] or 0)) if (prev and prev["games"]) else 0.0
+            wr_delta = r["wr"] - prev_wr
+
+            prev_wr_own = (100.0 * (prev["wins_own"] or 0) / (prev["games_own"] or 0)) if (prev and prev["games_own"]) else 0.0
+            wr_own_delta = r["wr_own"] - prev_wr_own
+
+            prev_wr_opp = (100.0 * (prev["wins_opp"] or 0) / (prev["games_opp"] or 0)) if (prev and prev["games_opp"]) else 0.0
+            wr_opp_delta = r["wr_opp"] - prev_wr_opp
+
             html.append(f"""<tr>
             <td>{map_pretty_name(con, r["map"])}</td>
-            <td>{r["played"]}</td>
-            <td>{r["picks"]}</td>
-            <td>{r["opp_picks"]}</td>
-            <!-- WR %: kokonaisuus -->
-            <td class="wr" data-w="{r['wins']}" data-g="{r['games']}" data-pct="{r['wr']:.1f}"></td>
+            <td title="{_pp('played',0)}">{r["played"]}{_arrow(dlt.get('played') if dlt else None)}</td>
+            <td title="{_pp('picks',0)}">{r["picks"]}{_arrow(dlt.get('picks') if dlt else None)}</td>
+            <td title="{_pp('opp_picks',0)}">{r["opp_picks"]}{_arrow(dlt.get('opp_picks') if dlt else None)}</td>
+
+
+            <!-- WR % (overall) with delta in title -->
+            <td class="wr" data-w="{r['wins']}" data-g="{r['games']}" data-pct="{r['wr']:.1f}"
+                title="Δ WR: {wr_delta:+.1f} pp; prev {prev['wins'] if prev else 0}-{(prev['games']-(prev['wins'] or 0)) if prev else 0}">
+            </td>
 
             <!-- WR own pick % -->
-            <td class="wr" data-w="{r['wins_own']}" data-g="{r['games_own']}" data-pct="{r['wr_own']:.1f}"></td>
+            <td class="wr" data-w="{r['wins_own']}" data-g="{r['games_own']}" data-pct="{r['wr_own']:.1f}"
+                title="Δ WR own: {wr_own_delta:+.1f} pp; prev {prev['wins_own'] if prev else 0}/{prev['games_own'] if prev else 0}">
+            </td>
 
             <!-- WR opp pick % -->
-            <td class="wr" data-w="{r['wins_opp']}" data-g="{r['games_opp']}" data-pct="{r['wr_opp']:.1f}"></td>
+            <td class="wr" data-w="{r['wins_opp']}" data-g="{r['games_opp']}" data-pct="{r['wr_opp']:.1f}"
+                title="Δ WR opp: {wr_opp_delta:+.1f} pp; prev {prev['wins_opp'] if prev else 0}/{prev['games_opp'] if prev else 0}">
+            </td>
 
-
-            <td title="Δ vs div avg: {dkd:+.2f}">{r["kd"]:.2f}</td>
-            <td title="Δ vs div avg: {dadr:+.1f}">{r["adr"]:.1f}</td>
-            <td>{r["rd"]}</td>
-            <td>{r["ban1"]}</td>
-            <td>{r["ban2"]}</td>
-            <td>{r["opp_ban"]}</td>
-            <td>{r["total_own_ban"]}</td>
+            <td title="{_pp('kd',2)}; Δ vs div avg: {dkd_div:+.2f}">{r["kd"]:.2f}{_arrow(dlt.get('kd') if dlt else None)}</td>
+            <td title="{_pp('adr',1)}; Δ vs div avg: {dadr_div:+.1f}">{r["adr"]:.1f}{_arrow(dlt.get('adr') if dlt else None)}</td>
+            <td title="{_pp('rd',0)}">{r["rd"]}{_arrow(dlt.get('rd') if dlt else None)}</td>
+            <td title="{_pp('ban1',0)}">{r["ban1"]}{_arrow(dlt.get('ban1') if dlt else None)}</td>
+            <td title="{_pp('ban2',0)}">{r["ban2"]}{_arrow(dlt.get('ban2') if dlt else None)}</td>
+            <td title="{_pp('opp_ban',0)}">{r["opp_ban"]}{_arrow(dlt.get('opp_ban') if dlt else None)}</td>
+            <td title="{_pp('total_own_ban',0)}">{r["total_own_ban"]}{_arrow(dlt.get('total_own_ban') if dlt else None)}</td>
             </tr>""")
+
         html.append("</tbody></table>")
         html.append(f"""
         <script>
@@ -1861,9 +2008,9 @@ def render_division(con, div):
 
     out_path = OUT_DIR / f"{div['slug']}.html"
     html_str = "\n".join(html)
-    did_write = write_if_changed(out_path, html_str)
-    status = "OK] Wrote" if did_write else "skip ]"
-    print(f"[{status} {out_path}")
+    # did_write = write_if_changed(out_path, html_str)
+    # status = "OK] Wrote" if did_write else "skip ]"
+    # print(f"[{status} {out_path}")
     return out_path
 
 def write_index(con: sqlite3.Connection):

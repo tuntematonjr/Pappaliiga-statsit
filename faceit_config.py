@@ -28,17 +28,11 @@ DEMOCRACY_BASE = "https://www.faceit.com/api/democracy/v1"
 # Organizer ID for Pappaliiga (fixed, no need to search every time)
 PAPPALIGA_ORG_ID = "1bfc69fa-5a21-4ed9-9ef3-37edbd7210d8"
 
-REQUEST_TIMEOUT = 20
 BASE_SLEEP = 0.10
 MAX_SLEEP = 1.50
 BACKOFF_FACTOR = 1.75
 RECOVER_FACTOR = 0.85
 RECOVER_STEPS = 3
-
-# Networking / retry settings
-MAX_RETRIES = 3
-TIMEOUT = 20  # seconds
-SLEEP_BETWEEN_RETRIES = 0.8
 
 DIVISIONS_JSON = Path(__file__).with_name("divisions.json")
 DIVISIONS = []

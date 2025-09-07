@@ -769,29 +769,53 @@ def compute_champ_thresholds_data(con: sqlite3.Connection, division_id: int) -> 
         "rating1":  pack(rating1_vals,  fallback=(0.85, 1.00, 1.15)),
     }
 
-
-def upsert_match(con, m: dict):
+def upsert_match(con: sqlite3.Connection, row: dict) -> None:
+    """
+    Upsert 'matches' header. Always refreshes last_seen_at.
+    Respects existing non-null values when new is NULL.
+    Expects at least: match_id, championship_id, (optional) competition_*, times, teams.
+    """
     sql = """
     INSERT INTO matches(
-      match_id, championship_id, competition_id, competition_name, best_of, game,
-      faceit_url, configured_at, started_at, finished_at, scheduled_at, status, last_seen_at,
+      match_id, championship_id,
+      competition_id, competition_name, best_of, game, faceit_url,
+      configured_at, started_at, finished_at, scheduled_at, status,
+      last_seen_at,
       team1_id, team1_name, team2_id, team2_name, winner_team_id
     ) VALUES (
-      :match_id, :championship_id, :competition_id, :competition_name, :best_of, :game,
-      :faceit_url, :configured_at, :started_at, :finished_at, :scheduled_at, :status, strftime('%s','now'),
+      :match_id, :championship_id,
+      :competition_id, :competition_name, :best_of, :game, :faceit_url,
+      :configured_at, :started_at, :finished_at, :scheduled_at, :status,
+      strftime('%s','now'),
       :team1_id, :team1_name, :team2_id, :team2_name, :winner_team_id
     )
     ON CONFLICT(match_id) DO UPDATE SET
-      status=excluded.status,
-      started_at=COALESCE(excluded.started_at, started_at),
-      finished_at=COALESCE(excluded.finished_at, finished_at),
-      scheduled_at=COALESCE(excluded.scheduled_at, scheduled_at),
-      last_seen_at=strftime('%s','now'),
-      winner_team_id=COALESCE(excluded.winner_team_id, winner_team_id),
-      team1_id=excluded.team1_id, team1_name=excluded.team1_name,
-      team2_id=excluded.team2_id, team2_name=excluded.team2_name
+      -- meta
+      competition_id   = COALESCE(excluded.competition_id,   matches.competition_id),
+      competition_name = COALESCE(excluded.competition_name, matches.competition_name),
+      best_of          = COALESCE(excluded.best_of,          matches.best_of),
+      game             = COALESCE(excluded.game,             matches.game),
+      faceit_url       = COALESCE(excluded.faceit_url,       matches.faceit_url),
+
+      -- times & status
+      configured_at = COALESCE(excluded.configured_at, matches.configured_at),
+      started_at    = COALESCE(excluded.started_at,    matches.started_at),
+      finished_at   = COALESCE(excluded.finished_at,   matches.finished_at),
+      scheduled_at  = COALESCE(excluded.scheduled_at,  matches.scheduled_at),
+      status        = COALESCE(excluded.status,        matches.status),
+
+      -- teams
+      team1_id      = COALESCE(excluded.team1_id,      matches.team1_id),
+      team1_name    = COALESCE(excluded.team1_name,    matches.team1_name),
+      team2_id      = COALESCE(excluded.team2_id,      matches.team2_id),
+      team2_name    = COALESCE(excluded.team2_name,    matches.team2_name),
+      winner_team_id= COALESCE(excluded.winner_team_id, matches.winner_team_id),
+
+      -- heartbeat
+      last_seen_at  = strftime('%s','now')
     """
-    con.execute(sql, m)
+    con.execute(sql, row)
+
 
 def upsert_maps(con, match_id: str, rounds: list[dict]):
     sql = """
@@ -1104,3 +1128,423 @@ def get_max_last_seen_for_champs(con: sqlite3.Connection, champ_ids: list[str]) 
     cur = con.execute(sql, champ_ids)
     row = cur.fetchone()
     return int(row[0]) if row and row[0] is not None else None
+
+_TS_EXPR = "COALESCE(m.finished_at, m.started_at, m.scheduled_at, m.configured_at, m.last_seen_at, 0)"
+
+
+def _get_team_last_prev_ts(con: sqlite3.Connection, division_id: int, team_id: str) -> tuple[int | None, int | None]:
+    """
+    Returns (curr_ts, prev_ts) for this team within the championship,
+    based on the timestamp expression used throughout the site.
+    curr_ts = timestamp of most recent match the team played (with at least one map row)
+    prev_ts = previous one, or None if not available
+    """
+    rows = _q(con, f"""
+        SELECT DISTINCT { _TS_EXPR } AS ts
+        FROM matches m
+        WHERE m.championship_id=? AND (m.team1_id=? OR m.team2_id=?)
+          AND EXISTS (SELECT 1 FROM maps mp WHERE mp.match_id = m.match_id)
+        ORDER BY ts ASC
+    """, (division_id, team_id, team_id))
+    if not rows:
+        return (None, None)
+    curr_ts = rows[-1]["ts"]
+    prev_ts = rows[-2]["ts"] if len(rows) >= 2 else None
+    return (curr_ts, prev_ts)
+
+
+def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, team_id: str) -> dict:
+    """
+    Provides {curr, prev|None, delta|None} similar to compute_team_summary_data
+    but split into 'prev' (before last match) and 'curr' (after last match).
+    """
+    curr_ts, prev_ts = _get_team_last_prev_ts(con, division_id, team_id)
+
+    def _summary_until(cutoff: int | None) -> dict:
+        if cutoff is None:
+            return {"matches_played":0,"maps_played":0,"w":0,"l":0,"rd":0,"kd":0.0,"kr":0.0,"adr":0.0,"util":0}
+        rows = _q(con, f"""
+            SELECT m.match_id, m.team1_id, m.team2_id,
+                   mp.score_team1, mp.score_team2, mp.winner_team_id
+            FROM matches m
+            JOIN maps mp ON mp.match_id = m.match_id
+            WHERE m.championship_id=? AND (m.team1_id=? OR m.team2_id=?)
+              AND { _TS_EXPR } <= ?
+        """, (division_id, team_id, team_id, cutoff))
+        mids = {r["match_id"] for r in rows}
+        maps_played = len(rows)
+        matches_played = len(mids)
+        maps_w = sum(1 for r in rows if r.get("winner_team_id") == team_id)
+        rd = 0
+        for r in rows:
+            s1 = r.get("score_team1") or 0
+            s2 = r.get("score_team2") or 0
+            if r["team1_id"] == team_id:
+                rd += (s1 - s2)
+            elif r["team2_id"] == team_id:
+                rd += (s2 - s1)
+        agg = _q(con, f"""
+            SELECT
+              SUM(COALESCE(ps.kills,0))           AS kills,
+              SUM(COALESCE(ps.deaths,0))          AS deaths,
+              AVG(COALESCE(ps.kr,0))              AS kr,
+              AVG(COALESCE(ps.adr,0))             AS adr,
+              SUM(COALESCE(ps.utility_damage,0))  AS util
+            FROM player_stats ps
+            JOIN matches m ON m.match_id = ps.match_id
+            WHERE ps.team_id=? AND m.championship_id=? AND { _TS_EXPR } <= ?
+        """, (team_id, division_id, cutoff))[0] if maps_played > 0 else {"kills":0,"deaths":0,"kr":0.0,"adr":0.0,"util":0}
+        kills = agg["kills"] or 0
+        deaths = agg["deaths"] or 0
+        kd = (kills / deaths) if deaths else (float(kills) if maps_played > 0 else 0.0)
+        return {"matches_played":matches_played,"maps_played":maps_played,"w":maps_w,"l":maps_played-maps_w,
+                "rd":rd,"kd":kd,"kr":agg["kr"] or 0.0,"adr":agg["adr"] or 0.0,"util":agg["util"] or 0}
+
+    if curr_ts is None:
+        zero = _summary_until(None)
+        return {"curr": zero, "prev": None, "delta": None}
+
+    prev = _summary_until(prev_ts)
+    curr = _summary_until(curr_ts)
+    delta = {k: (curr[k] - prev[k]) for k in ["matches_played","maps_played","w","l","rd","util"]}
+    for k in ["kd","kr","adr"]:
+        delta[k] = curr[k] - prev[k]
+    return {"curr": curr, "prev": prev if prev_ts is not None else None, "delta": delta}
+
+
+# -----------------------------
+# Player deltas (row aggregates)
+# -----------------------------
+
+def _player_agg_until(con: sqlite3.Connection, division_id: int, team_id: str, player_id: str, cutoff: int | None) -> dict:
+    """
+    Aggregates the same base columns used in compute_player_table_data but up to cutoff timestamp.
+    Returns 0/None defaults for missing data.
+    """
+    if cutoff is None:
+        return {
+            "maps_played": 0, "rounds": 0,
+            "kills": 0, "deaths": 0, "assists": 0, "damage": 0,
+            "adr": 0.0, "kr": 0.0, "kd": 0.0,
+            "hs_pct": 0.0, "k2": 0, "k3": 0, "k4": 0, "k5": 0,
+            "mvps": 0, "util": 0, "udpr": 0.0,
+            "flashed": 0, "flash_count": 0, "flash_successes": 0,
+            "entry_att": 0, "entry_win": 0,
+            "c11_att": 0, "c11_win": 0, "c12_att": 0, "c12_win": 0,
+            "awp_kills": 0, "pistol_kills": 0,
+            "clutch_kills": 0,
+        }
+
+    r = _q(con, f"""
+      SELECT
+        COUNT(*) AS maps_played,
+        SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0))          AS rounds,
+        SUM(COALESCE(ps.kills,0))                                             AS kills,
+        SUM(COALESCE(ps.deaths,0))                                            AS deaths,
+        SUM(COALESCE(ps.assists,0))                                           AS assists,
+        SUM(COALESCE(ps.damage,0))                                            AS damage,
+        AVG(COALESCE(ps.adr,0))                                               AS adr,
+        AVG(COALESCE(ps.kr,0))                                                AS kr,
+        AVG(COALESCE(ps.hs_pct,0))                                            AS hs_pct,
+        SUM(COALESCE(ps.mk_2k,0))                                             AS k2,
+        SUM(COALESCE(ps.mk_3k,0))                                             AS k3,
+        SUM(COALESCE(ps.mk_4k,0))                                             AS k4,
+        SUM(COALESCE(ps.mk_5k,0))                                             AS k5,
+        SUM(COALESCE(ps.mvps,0))                                              AS mvps,
+        SUM(COALESCE(ps.utility_damage,0))                                     AS util,
+        SUM(COALESCE(ps.enemies_flashed,0))                                    AS flashed,
+        SUM(COALESCE(ps.flash_count,0))                                        AS flash_count,
+        SUM(COALESCE(ps.flash_successes,0))                                    AS flash_successes,
+        SUM(COALESCE(ps.entry_count,0))                                        AS entry_att,
+        SUM(COALESCE(ps.entry_wins,0))                                         AS entry_win,
+        SUM(COALESCE(ps.cl_1v1_attempts,0))                                    AS c11_att,
+        SUM(COALESCE(ps.cl_1v1_wins,0))                                        AS c11_win,
+        SUM(COALESCE(ps.cl_1v2_attempts,0))                                    AS c12_att,
+        SUM(COALESCE(ps.cl_1v2_wins,0))                                        AS c12_win,
+        SUM(COALESCE(ps.sniper_kills,0))                                       AS awp_kills,
+        SUM(COALESCE(ps.pistol_kills,0))                                       AS pistol_kills,
+        SUM(COALESCE(ps.clutch_kills,0))                                       AS clutch_kills
+      FROM player_stats ps
+      JOIN matches m ON m.match_id = ps.match_id
+      LEFT JOIN maps mp
+        ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+      WHERE m.championship_id = ? AND ps.team_id = ? AND ps.player_id = ?
+        AND { _TS_EXPR } <= ?
+    """, (division_id, team_id, player_id, cutoff))[0]
+
+    kills = r["kills"] or 0
+    deaths = r["deaths"] or 0
+    kd = (kills / deaths) if deaths else (float(kills) if (r["maps_played"] or 0) > 0 else 0.0)
+
+    rounds = r["rounds"] or 0
+    udpr = (r["util"] or 0) / rounds if rounds else 0.0
+
+    return {
+        "maps_played": r["maps_played"] or 0,
+        "rounds": rounds,
+        "kills": kills,
+        "deaths": deaths,
+        "assists": r["assists"] or 0,
+        "damage": r["damage"] or 0,
+        "adr": r["adr"] or 0.0,
+        "kr": r["kr"] or 0.0,
+        "kd": kd,
+        "hs_pct": r["hs_pct"] or 0.0,
+        "k2": r["k2"] or 0, "k3": r["k3"] or 0, "k4": r["k4"] or 0, "k5": r["k5"] or 0,
+        "mvps": r["mvps"] or 0,
+        "util": r["util"] or 0,
+        "udpr": udpr,
+        "flashed": r["flashed"] or 0,
+        "flash_count": r["flash_count"] or 0,
+        "flash_successes": r["flash_successes"] or 0,
+        "entry_att": r["entry_att"] or 0,
+        "entry_win": r["entry_win"] or 0,
+        "c11_att": r["c11_att"] or 0, "c11_win": r["c11_win"] or 0,
+        "c12_att": r["c12_att"] or 0, "c12_win": r["c12_win"] or 0,
+        "awp_kills": r["awp_kills"] or 0,
+        "pistol_kills": r["pistol_kills"] or 0,
+        "clutch_kills": r["clutch_kills"] or 0,
+    }
+
+def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: str) -> dict[str, dict]:
+    """
+    Returns a dict keyed by player_id:
+      pid -> { curr: {...}, prev: {...}|None, delta: {...}|None }
+    The set of metrics matches _player_agg_until keys.
+    """
+    curr_ts, prev_ts = _get_team_last_prev_ts(con, division_id, team_id)
+    if curr_ts is None:
+        return {}
+
+    # Find players seen up to current cutoff (players on the team this season).
+    pids = [r["player_id"] for r in _q(con, """
+      SELECT DISTINCT ps.player_id
+      FROM player_stats ps
+      JOIN matches m ON m.match_id = ps.match_id
+      WHERE m.championship_id=? AND ps.team_id=?
+    """, (division_id, team_id))]
+
+    out: dict[str, dict] = {}
+    for pid in pids:
+        prev = _player_agg_until(con, division_id, team_id, pid, prev_ts) if prev_ts is not None else None
+        curr = _player_agg_until(con, division_id, team_id, pid, curr_ts)
+        if prev is None:
+            out[pid] = {"curr": curr, "prev": None, "delta": None}
+        else:
+            delta = {}
+            for k in curr.keys():
+                delta[k] = (curr[k] - prev[k]) if isinstance(curr[k], (int, float)) else None
+            out[pid] = {"curr": curr, "prev": prev, "delta": delta}
+    return out
+
+
+# -----------------------------
+# Map deltas (per map rows)
+# -----------------------------
+
+def compute_map_stats_table_data_until(con: sqlite3.Connection, championship_id: int, team_id: str, cutoff_ts: int) -> list[dict]:
+    """
+    Sama kuin compute_map_stats_table_data, mutta rajaa matsit _TS_EXPR <= cutoff_ts.
+    """
+    # 1) Kokoa map-lista: ensisijaisesti season pool, muuten maps_catalog
+    pool = get_season_map_pool(con, championship_id)  # [{map_id, pretty_name}]
+    if pool:
+        all_maps = [r["map_id"] for r in pool]
+    else:
+        rows = _q(con, "SELECT DISTINCT map_id FROM maps_catalog", ())
+        all_maps = [r["map_id"] for r in rows] if rows else [
+            "de_nuke","de_inferno","de_mirage","de_overpass","de_dust2","de_ancient","de_train","de_anubis"
+        ]
+
+    values_sql = ", ".join([f"('{m}')" for m in all_maps])
+
+    sql = f"""
+        WITH allmaps(map) AS ( VALUES {values_sql} ),
+
+        my_matches AS (
+            SELECT m.*
+            FROM matches m
+            WHERE m.championship_id = :champ
+              AND (:team = m.team1_id OR :team = m.team2_id)
+              AND { _TS_EXPR } <= :cutoff
+        ),
+
+        -- Joukkueen pickit (status='pick') ja vastustajan pickit map_votes-taulusta
+        team_picks AS (
+            SELECT v.match_id, v.map_name
+            FROM map_votes v
+            JOIN my_matches m ON m.match_id = v.match_id
+            WHERE v.status = 'pick' AND v.selected_by_team_id = :team
+        ),
+        opp_picks AS (
+            SELECT v.match_id, v.map_name
+            FROM map_votes v
+            JOIN my_matches m ON m.match_id = v.match_id
+            WHERE v.status = 'pick'
+              AND (
+                (m.team1_id = :team AND v.selected_by_team_id = m.team2_id) OR
+                (m.team2_id = :team AND v.selected_by_team_id = m.team1_id)
+              )
+        ),
+
+        team_maps AS (
+            -- :team näkökulmasta kierrokset, voitot ja pick-tyypit karttatasolla
+            SELECT
+                mp.map_name AS map,
+                CASE WHEN m.team1_id = :team THEN mp.score_team1 ELSE mp.score_team2 END AS rounds_for,
+                CASE WHEN m.team1_id = :team THEN mp.score_team2 ELSE mp.score_team1 END AS rounds_against,
+                CASE WHEN (m.team1_id = :team AND mp.score_team1 > mp.score_team2)
+                       OR (m.team2_id = :team AND mp.score_team2 > mp.score_team1) THEN 1 ELSE 0 END AS win,
+                1 AS game,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM team_picks tp
+                    WHERE tp.match_id = m.match_id AND tp.map_name = mp.map_name
+                ) THEN 1 ELSE 0 END AS own_pick,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM opp_picks op
+                    WHERE op.match_id = m.match_id AND op.map_name = mp.map_name
+                ) THEN 1 ELSE 0 END AS opp_pick
+            FROM maps mp
+            JOIN my_matches m ON m.match_id = mp.match_id
+        ),
+
+        -- Joukkueen KD + ADR karttatasolla player_statsista, ADR painotetaan kierrosmäärällä
+        perf AS (
+            SELECT
+                mp.map_name AS map,
+                SUM(COALESCE(ps.kills, 0))  AS kills,
+                SUM(COALESCE(ps.deaths, 0)) AS deaths,
+                SUM( (mp.score_team1 + mp.score_team2) * COALESCE(ps.adr, 0) ) AS adr_weighted,
+                SUM(  mp.score_team1 + mp.score_team2 )                          AS rounds_weight
+            FROM player_stats ps
+            JOIN my_matches m
+              ON m.match_id = ps.match_id
+            JOIN maps mp
+              ON mp.match_id    = ps.match_id
+             AND mp.round_index = ps.round_index
+            WHERE ps.team_id = :team
+              AND { _TS_EXPR } <= :cutoff
+            GROUP BY mp.map_name
+        ),
+
+        -- Omien bannien indeksointi per ottelu (1. ja 2. ban)
+        team_drops AS (
+            SELECT
+                v.match_id,
+                v.map_name,
+                ROW_NUMBER() OVER (
+                    PARTITION BY v.match_id, v.selected_by_team_id
+                    ORDER BY v.round_num
+                ) AS drop_idx
+            FROM map_votes v
+            JOIN my_matches m ON m.match_id = v.match_id
+            WHERE v.status = 'drop' AND v.selected_by_team_id = :team
+        ),
+
+        -- Vastustajan banit otteluissa, joissa :team pelasi
+        opp_drops AS (
+            SELECT v.match_id, v.map_name
+            FROM map_votes v
+            JOIN my_matches m ON m.match_id = v.match_id
+            WHERE v.status = 'drop' AND (
+                (m.team1_id = :team AND v.selected_by_team_id = m.team2_id) OR
+                (m.team2_id = :team AND v.selected_by_team_id = m.team1_id)
+            )
+        ),
+
+        ban_counts AS (
+            SELECT
+                am.map,
+                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx = 1), 0) AS ban1,
+                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx = 2), 0) AS ban2,
+                COALESCE((SELECT COUNT(*) FROM opp_drops  od WHERE od.map_name = am.map), 0) AS opp_ban,
+                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx IN (1,2)), 0) AS total_own_ban
+            FROM allmaps am
+        )
+
+        SELECT
+            am.map                                                        AS map,
+
+            COALESCE(COUNT(tm.map), 0)                                    AS played,
+            COALESCE(SUM(tm.own_pick), 0)                                 AS picks,
+            COALESCE(SUM(tm.opp_pick), 0)                                 AS opp_picks,
+
+            COALESCE(SUM(tm.win), 0)                                      AS wins,
+            COALESCE(SUM(tm.game), 0)                                     AS games,
+            CASE WHEN COALESCE(SUM(tm.game),0)=0 THEN 0.0
+                 ELSE 100.0 * SUM(tm.win) / SUM(tm.game)
+            END                                                           AS wr,
+
+            COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.win  ELSE 0 END),0) AS wins_own,
+            COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END),0) AS games_own,
+            CASE WHEN COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END),0)=0 THEN 0.0
+                 ELSE 100.0 * SUM(CASE WHEN tm.own_pick=1 THEN tm.win ELSE 0 END)
+                              / SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END)
+            END                                                           AS wr_own,
+
+            COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.win  ELSE 0 END),0) AS wins_opp,
+            COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END),0) AS games_opp,
+            CASE WHEN COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END),0)=0 THEN 0.0
+                 ELSE 100.0 * SUM(CASE WHEN tm.opp_pick=1 THEN tm.win ELSE 0 END)
+                              / SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END)
+            END                                                           AS wr_opp,
+
+            COALESCE(SUM(tm.rounds_for), 0) - COALESCE(SUM(tm.rounds_against), 0) AS rd,
+
+            COALESCE(bc.ban1, 0)                                          AS ban1,
+            COALESCE(bc.ban2, 0)                                          AS ban2,
+            COALESCE(bc.opp_ban, 0)                                       AS opp_ban,
+            COALESCE(bc.total_own_ban, 0)                                 AS total_own_ban,
+
+            COALESCE(1.0 * p.kills / NULLIF(p.deaths, 0), 0.0)            AS kd,
+            COALESCE(1.0 * p.adr_weighted / NULLIF(p.rounds_weight, 0), 0.0) AS adr
+
+        FROM allmaps am
+        LEFT JOIN team_maps tm ON tm.map = am.map
+        LEFT JOIN ban_counts bc ON bc.map = am.map
+        LEFT JOIN perf p        ON p.map  = am.map
+        GROUP BY am.map
+        ORDER BY am.map COLLATE NOCASE
+    """
+
+    res = con.execute(sql, {"champ": championship_id, "team": team_id, "cutoff": cutoff_ts}).fetchall()
+    return [dict(r) for r in res]
+
+def compute_map_stats_with_delta(con: sqlite3.Connection, championship_id: int, team_id: str) -> dict[str, dict]:
+    """
+    Returns map -> {prev, curr, delta} using last/prev team match cutoffs.
+    """
+    curr_ts, prev_ts = _get_team_last_prev_ts(con, championship_id, team_id)
+    if curr_ts is None:
+        return {}
+    curr = compute_map_stats_table_data_until(con, championship_id, team_id, curr_ts)
+    prev = compute_map_stats_table_data_until(con, championship_id, team_id, prev_ts) if prev_ts is not None else None
+
+    curr_by = {r["map"]: r for r in curr}
+    prev_by = {r["map"]: r for r in prev} if prev is not None else {}
+
+    out: dict[str, dict] = {}
+    for m, c in curr_by.items():
+        p = prev_by.get(m)
+        if not p:
+            out[m] = {"curr": c, "prev": None, "delta": None}
+        else:
+            d = {}
+            for k, v in c.items():
+                if isinstance(v, (int, float)):
+                    d[k] = v - (p.get(k) or 0)
+            out[m] = {"curr": c, "prev": p, "delta": d}
+    return out
+
+def get_champ_last_seen(con: sqlite3.Connection, championship_id: int | str) -> int | None:
+    """
+    Returns the latest 'last_seen_at' timestamp for a championship from matches table.
+    Fallback to max of configured/started/finished/scheduled if last_seen_at is NULLs.
+    """
+    row = con.execute("""
+        SELECT MAX(COALESCE(last_seen_at, configured_at, started_at, finished_at, scheduled_at, 0)) AS ts
+        FROM matches
+        WHERE championship_id = ?
+    """, (championship_id,)).fetchone()
+    ts = row["ts"] if row else None
+    return int(ts) if ts else None

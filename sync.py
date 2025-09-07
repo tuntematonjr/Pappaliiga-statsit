@@ -293,20 +293,6 @@ def _is_finished_in_db(con: sqlite3.Connection, match_id: str) -> bool:
     row = con.execute("SELECT status FROM matches WHERE match_id=?", (match_id,)).fetchone()
     return bool(row and str(row[0] or "").lower() == "finished")
 
-def _is_unchanged_in_db(con: sqlite3.Connection, match_id: str, new_status: str, new_finished_at: Optional[int]) -> bool:
-    """
-    Return True if match exists in DB with same status and finished_at → no real changes.
-    """
-    row = con.execute(
-        "SELECT status, finished_at FROM matches WHERE match_id=?",
-        (match_id,)
-    ).fetchone()
-    if not row:
-        return False
-    old_status = (row[0] or "").lower()
-    old_finished = row[1]
-    return (old_status == (new_status or "").lower()) and (old_finished == new_finished_at)
-
 def _has_full_stats(con: sqlite3.Connection, match_id: str) -> bool:
     """Return True if both maps and player_stats exist for this match_id."""
     r1 = con.execute("SELECT 1 FROM maps WHERE match_id=? LIMIT 1", (match_id,)).fetchone()
