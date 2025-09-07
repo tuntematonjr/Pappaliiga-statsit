@@ -17,7 +17,7 @@ jobs:
 
       # 2️⃣ Download previous SQLite DB if it exists
       - name: Download previous SQLite DB
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v5.0.0
         with:
           name: sqlite-db
           path: .
@@ -50,14 +50,13 @@ jobs:
 
       # 7️⃣ Upload updated SQLite DB
       - name: Upload SQLite DB
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: sqlite-db
           path: pappaliiga.db
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3.9.3
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4.0.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./docs
-          publish_branch: gh-pages
+          name: github-pages
+          path: docs/
