@@ -1,0 +1,63 @@
+name: Weekly Python Tasks (Linux)
+
+on:
+  schedule:
+    - cron: '0 18 * * 1'  # every Sunday at midnight UTC
+  workflow_dispatch:  # optional manual trigger
+
+jobs:
+  run-linux-scripts:
+    runs-on: ubuntu-latest
+    env:
+      FACEIT_API_KEY: ${{ secrets.FACEIT_API_KEY }}
+
+    steps:
+      # 1️⃣ Checkout repo
+      - uses: actions/checkout@v3
+
+      # 2️⃣ Download previous SQLite DB if it exists
+      - name: Download previous SQLite DB
+        uses: actions/download-artifact@v3
+        with:
+          name: sqlite-db
+          path: .
+      
+      # 3️⃣ Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      # 4️⃣ Install dependencies
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # 5️⃣ Run sync.py
+      - name: Run sync.py
+        run: |
+          echo "[1/2] Running sync.py..."
+          python sync.py
+        shell: bash
+        continue-on-error: false
+
+      # 6️⃣ Run html_gen.py
+      - name: Run html_gen.py
+        run: |
+          echo "[2/2] Generating HTML..."
+          python html_gen.py
+        shell: bash
+        continue-on-error: false
+
+      # 7️⃣ Upload updated SQLite DB
+      - name: Upload SQLite DB
+        uses: actions/upload-artifact@v3
+        with:
+          name: sqlite-db
+          path: pappaliiga.db
+
+      - name: Deploy docs to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v6
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          publish_branch: gh-pages
