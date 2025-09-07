@@ -501,6 +501,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
                 COALESCE((
                     SELECT COUNT(*) FROM team_drops td
                     WHERE td.map_name = am.map
+                    AND td.drop_idx IN (1,2)
                 ), 0) AS total_own_ban
             FROM allmaps am
         ),
