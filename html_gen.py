@@ -20,8 +20,11 @@ from db import (
     compute_champ_map_summary_data,
     compute_champ_thresholds_data,
     get_map_art, normalize_map_id,
+    get_division_generated_ts,
+    get_max_last_seen_for_champs,
 )
 
+SKIP_BY_MTIME = True
 
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
@@ -588,8 +591,23 @@ TOOLTIP_RATING1 = (
 )
 
 # ------------------------------
-# DB helpers
+# helpers
 # ------------------------------
+
+def _fs_mtime(path: Path) -> int:
+    try:
+        return int(path.stat().st_mtime)
+    except FileNotFoundError:
+        return 0
+
+def _should_skip_division_render(con, div: dict, out_path: Path) -> tuple[bool, int, int]:
+    """
+    Returns (should_skip, fs_ts, db_ts).
+    should_skip=True if out_path mtime >= MAX(last_seen_at) for this championship.
+    """
+    db_ts = get_division_generated_ts(con, div["championship_id"]) or 0
+    fs_ts = _fs_mtime(out_path)
+    return (SKIP_BY_MTIME and fs_ts >= db_ts and db_ts > 0, fs_ts, db_ts)
 
 def weighted_percentile(values, weights, p):
     """
@@ -1151,6 +1169,21 @@ def _index_card_stats(con: sqlite3.Connection, championship_id: str) -> tuple[in
 
     return (team_cnt, played, total)
 
+def maybe_render_index(con, divisions: list[dict]) -> str:
+    out_path = OUT_DIR / "index.html"
+    champ_ids = [d["championship_id"] for d in divisions]
+    db_ts = get_max_last_seen_for_champs(con, champ_ids) or 0
+    fs_ts = _fs_mtime(out_path)
+
+    if SKIP_BY_MTIME and fs_ts >= db_ts and db_ts > 0:
+        print(f"[skip] {out_path} (html mtime {fs_ts} >= last_seen {db_ts})")
+        return str(out_path)
+
+    html = render_index(divisions)  # rakentaa stringin
+    did_write = write_if_changed(out_path, html)
+    print(f"[{'write' if did_write else 'skip'}] {out_path}")
+    return str(out_path)
+
 def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
     # Group divisions by season
     by_season: dict[int, list[dict]] = {}
@@ -1234,28 +1267,37 @@ def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
 # ------------------------------
 def render_division(con, div):
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = OUT_DIR / f"{div['slug']}.html"
+
+    # Fast skip by comparing file mtime vs DB's MAX(last_seen_at)
+    should_skip, fs_ts, db_ts = _should_skip_division_render(con, div, out_path)
+    if should_skip:
+        print(f"[skip] {out_path} (html mtime {fs_ts} >= last_seen {db_ts})")
+        return str(out_path)
+
+    # --- Fetch data for page ---
     teams = get_teams_in_championship(con, div["championship_id"])
     div_avgs = compute_champ_map_avgs_data(con, div["championship_id"])
     thresholds = compute_champ_thresholds_data(con, div["championship_id"])
 
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+    # Timestamp shown on page: use DB timestamp; fallback to dash if none
+    ts_epoch = get_division_generated_ts(con, div["championship_id"])
+    ts_str = datetime.fromtimestamp(int(ts_epoch)).strftime("%Y-%m-%d %H:%M") if ts_epoch else "—"
 
     html = []
     title = f"{esc_title(div['name'])} (Season {div['season']}) — Pappaliiga Stats"
     html.append(page_start(title, "is-division"))
     html.append(topbar(show_back_to_index=True))
 
-    # --- sivun sisältö alkaa ---
     html.append('<div class="container">')
     html.append(f"<h1 style='text-align:center'>{div['name']} (Season {div['season']})</h1>")
     html.append(
         f"<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>"
-        f"Generoitu {ts}"
+        f"Generoitu {ts_str}"
         f"</div>"
     )
     html.append('<div class="page">')
     html.append('<div class="page">')
-
 
     html.append('<div class="nav">')
     for t in teams:
@@ -1277,7 +1319,6 @@ def render_division(con, div):
     TOOLTIP_WMED = ("Painotettu mediaani: pelaajakohtaiset arvot lajitellaan, "
                     "paino = pelatut kierrokset divisioonassa. p50 on pienin arvo, "
                     "jossa kumulatiiviset painot ylittävät 50% (p25/p75 vastaavasti 25%/75%).")
-
 
     html.append('<div class="summary-grid">')
     html.append(f'<div class="summary-item"><div class="label">Teams</div><div class="val">{divsum["teams"]}</div></div>')

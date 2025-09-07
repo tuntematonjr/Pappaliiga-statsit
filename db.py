@@ -1079,3 +1079,28 @@ def get_maps_catalog_lookup(con: sqlite3.Connection) -> dict[str, dict]:
     """
     rows = _q(con, "SELECT map_id, pretty_name, image_sm, image_lg FROM maps_catalog", ())
     return {r["map_id"]: r for r in rows}
+
+def get_division_generated_ts(con: sqlite3.Connection, championship_id: str) -> int | None:
+    """
+    Returns latest sync timestamp (epoch seconds) for given championship,
+    based on matches.last_seen_at MAX.
+    """
+    cur = con.execute(
+        "SELECT MAX(last_seen_at) AS ts FROM matches WHERE championship_id = ?",
+        (championship_id,)
+    )
+    row = cur.fetchone()
+    return int(row[0]) if row and row[0] is not None else None
+
+def get_max_last_seen_for_champs(con: sqlite3.Connection, champ_ids: list[str]) -> int | None:
+    """
+    Returns MAX(last_seen_at) across the given championships.
+    If list is empty or no data, returns None.
+    """
+    if not champ_ids:
+        return None
+    placeholders = ",".join(["?"] * len(champ_ids))
+    sql = f"SELECT MAX(last_seen_at) FROM matches WHERE championship_id IN ({placeholders})"
+    cur = con.execute(sql, champ_ids)
+    row = cur.fetchone()
+    return int(row[0]) if row and row[0] is not None else None
