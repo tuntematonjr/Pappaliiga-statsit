@@ -206,6 +206,7 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   align-items: start;
 }
 .div-summary .card{ grid-column: auto !important; }
+.div-summary .card:hover{ transform: none; }
 .summary-grid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.6rem; }
 .summary-item{ background:var(--table-alt); border:1px solid var(--border); border-radius:6px; padding:.5rem .6rem; text-align:center; }
 .summary-item .label{ color:var(--muted); font-size:.9rem; }
