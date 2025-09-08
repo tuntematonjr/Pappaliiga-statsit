@@ -30,7 +30,7 @@ from db import (
 HTML_TEMPLATE_VERSION = 2
 
 HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
-
+_GENVER_RE = re.compile(r"<!--\s*GENVER:(\d+)\s*(?:\S+)?\s*-->", re.IGNORECASE)
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
 
@@ -677,11 +677,11 @@ def map_image_from_db(con: sqlite3.Connection, map_raw: str) -> tuple[str, str]:
     if art:
         url = art.get("image_lg") or art.get("image_sm") or ""
         pretty = art.get("pretty_name") or map_raw
-        if url:
-            return url, pretty
-        return "", pretty
-    slug = normalize_map_id(map_raw).replace("de_", "")
-    return f"https://static.faceit.com/images/games/cs2/maps/{slug}.webp", map_raw
+        return (url, pretty) if url else ("", pretty)
+
+    norm = normalize_map_id(map_raw)
+    slug = norm.replace("de_", "")
+    return (f"https://static.faceit.com/images/games/cs2/maps/{slug}.webp", map_raw)
 
 def map_pretty_name(con: sqlite3.Connection, raw: str) -> str:
     """
@@ -712,8 +712,8 @@ def _read_embedded_version(path: str) -> int:
     """
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            data = f.read()  # read full file so GENVER can be after large CSS/JS
-        m = re.search(r"<!--\s*GENVER:(\d+)\s*(?:\S+)?\s*-->", data)
+            data = f.read()
+        m = _GENVER_RE.search(data)
         return int(m.group(1)) if m else 0
     except FileNotFoundError:
         return 0
@@ -747,25 +747,25 @@ def should_render_division(con: sqlite3.Connection, champ_row: dict, out_path: s
 
 def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_id: str, team_name: str, teams: list[dict]) -> str:
     """
-    Mirror-näkymä joukkueelle. KORJAUKSET:
-      1) rf/ra haetaan jokaiselle karttariville erikseen (aiemmin käytettiin
-         edellisen silmukan viimeisiä arvoja, mikä sekoitti "R xx" -chipit).
-      2) Statit haetaan aina mapin sisäisistä left/right-dikteistä (back-compat
-         opp_*-avaimiin säilytetty).
-      3) Totals-rivin K/D lasketaan summasta (left.kills/deaths), ei vanhoista top-level-avaimista.
+    Mirror-näkymä joukkueelle. Optimoinnit:
+      - team_index: O(1) haut nimille/avatareille (ei next(...) jokaisessa rivissä)
+      - map_art_cache: kevyt välimuisti map_image_from_db()-kutsuille
+      - siistit helperit (_m_side_val, _fmt_kd) ennallaan
     """
     from db import get_team_matches_mirror
     from html import escape
 
     rows = get_team_matches_mirror(con, division_id, team_id)
 
-    # avatar-helper
+    # ---- O(1) hakemisto joukkueille ----
+    team_index: dict[str, dict] = {str(t.get("team_id")): t for t in teams if t.get("team_id") is not None}
     def _avatar_of(tid: str | None) -> str | None:
-        if not tid: return None
-        x = next((t for t in teams if str(t.get("team_id")) == str(tid)), None)
-        return x.get("avatar") if x else None
+        return (team_index.get(str(tid)) or {}).get("avatar")
 
-    left_avatar = _avatar_of(team_id)
+    def _team_name(tid: str | None, fallback: str = "—") -> str:
+        if tid and str(tid) == str(team_id):
+            return team_name or fallback
+        return (team_index.get(str(tid)) or {}).get("team_name") or fallback
 
     def _ts(row) -> int:
         return int(row.get("ts") or row.get("started_at") or 0)
@@ -779,13 +779,6 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
         fid = row.get("faceit_match_id")
         return f"https://www.faceit.com/cs2/room/{fid}" if fid else "#"
 
-    def _team_name(tid: str | None, fallback: str = "—") -> str:
-        if tid and str(tid) == str(team_id):
-            return team_name or fallback
-        x = next((t for t in teams if str(t.get("team_id")) == str(tid)), None)
-        # huom! team_name eikä name
-        return (x.get("team_name") if x else None) or fallback
-
     def _map_key(m: dict, *candidates: str, default=None):
         for k in candidates:
             if k in m and m[k] is not None:
@@ -796,6 +789,15 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
         if deaths > 0:
             return kills / deaths
         return float(kills) if kills > 0 else 0.0
+
+    # ---- Kevyt välimuisti karttakuville/nimille (DB-haukoille) ----
+    _map_art_cache: dict[str, tuple[str, str]] = {}
+    def _map_img_and_pretty(map_raw: str) -> tuple[str, str]:
+        if map_raw not in _map_art_cache:
+            _map_art_cache[map_raw] = map_image_from_db(con, map_raw)
+        return _map_art_cache[map_raw]
+
+    left_avatar = _avatar_of(team_id)
 
     html: list[str] = []
     html.append(f'<div class="card matches-mirror" data-team-id="{team_id}">')
@@ -871,7 +873,7 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
         # --- DETAILS: kartat ---
         html.append('      <div class="match-details">')
         for m in maps:
-            # rf/ra tälle kartalle (tämä on varsinainen fix)
+            # rf/ra tälle kartalle
             rf = int(_map_key(m, "rf", default=0))
             ra = int(_map_key(m, "ra", default=0))
 
@@ -906,11 +908,11 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
             picked_left  = (pick_tid == str(left_tid))
             picked_right = (pick_tid == str(right_tid))
 
-            # karttanimi + kuva
+            # karttanimi + kuva (välimuistista)
             map_raw = str(_map_key(m, "map", "map_name", default="—"))
-            img_url, pretty = map_image_from_db(con, map_raw)
+            img_url, pretty = _map_img_and_pretty(map_raw)
 
-            # chipit: R, ADR, K/D, DMG, Pick
+            # chipit
             left_chips = [
                 f'<span class="chip round {"win" if rf > ra else ("loss" if rf < ra else "draw")}">R {rf}</span>',
                 f'<span class="chip stat"><span class="stat-label">ADR</span> {adr:.1f}</span>',
@@ -929,7 +931,6 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
             if picked_right:
                 right_chips.append('<span class="chip stat pick">Pick</span>')
 
-            # rivi
             html.append('        <div class="map-row">')
             html.append('          <div class="map-side side-left">'  + " ".join(left_chips)  + '</div>')
             html.append(f'          <div class="map-name">{escape(pretty)}'
@@ -938,7 +939,7 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
             html.append('          <div class="map-side side-right">' + " ".join(right_chips) + '</div>')
             html.append('        </div>')
 
-        # Totals (K/D summista vasemmalta)
+        # Totals
         if maps:
             tot_kills = sum(int((m.get("left") or {}).get("kills")  or 0) for m in maps)
             tot_death = sum(int((m.get("left") or {}).get("deaths") or 0) for m in maps)
@@ -977,14 +978,11 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
 
 def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, min_flashes: int = 10):
     """
-    Division summary + Leaders (korjattu):
-      - ADR/KR lasketaan kierros-painotettuna: sum(adr_i * rounds_i) / sum(rounds_i), KR = sum(kills)/sum(rounds)
-      - Per-round -leaderit vaativat min_rounds (oletus 40)
-      - "Most Enemies Flashed / round" vaatii lisäksi min_flashes (oletus 10 heittoa)
-      - Clutcher = 1v1 + 1v2 WR, vaatii min 10 yritystä
-      - Entry WR vaatii min 10 duelia
-      - Top Fragger / Most Deaths ovat absoluuttisia summia (ei min_rounds)
+    Division summary + Leaders (optimoitu DB-kierrosten määrä):
+      - yhdistetään teams/maps/rounds yhteen CTE-kyselyyn
+      - muu laskenta ennallaan
     """
+    # Pääjoukko pelaajakohtaisiin, kuten ennen
     rows = q(con, """
       SELECT
         ps.player_id,
@@ -1005,7 +1003,7 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
         SUM(COALESCE(ps.cl_1v2_wins,0))     AS c12_wins,
         SUM(COALESCE(ps.cl_1v2_attempts,0)) AS c12_atts,
 
-        -- kierrokset per kartta rivillä -> käytä painotukseen
+        -- kierrokset painotuksiin
         SUM(mp.score_team1 + mp.score_team2)                             AS rounds,
         SUM( (mp.score_team1 + mp.score_team2) * COALESCE(ps.adr,0) )    AS adr_weighted,
         SUM( (mp.score_team1 + mp.score_team2) * COALESCE(ps.kr,0) )     AS kr_weighted
@@ -1019,40 +1017,41 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
       GROUP BY ps.player_id
     """, (division_id,))
 
-    # Teams
-    teams = q(con, """
-      SELECT COUNT(*) AS c FROM (
-        SELECT DISTINCT team1_id AS tid FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
+    # --- Yhdistetyt aggregaatit yhdellä kyselyllä ---
+    agg = q(con, """
+      WITH
+      team_ids AS (
+        SELECT team1_id AS tid FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
         UNION
-        SELECT DISTINCT team2_id AS tid FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
+        SELECT team2_id AS tid FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
+      ),
+      rounds_cte AS (
+        SELECT SUM(mp.score_team1 + mp.score_team2) AS total_rounds
+        FROM maps mp JOIN matches m ON m.match_id=mp.match_id
+        WHERE m.championship_id=?
+      ),
+      maps_cte AS (
+        SELECT COUNT(*) AS maps_cnt
+        FROM maps mp JOIN matches m ON m.match_id=mp.match_id
+        WHERE m.championship_id=?
       )
-    """, (division_id, division_id))[0]["c"] or 0
+      SELECT
+        (SELECT COUNT(*) FROM team_ids)                       AS teams,
+        (SELECT maps_cnt FROM maps_cte)                       AS maps,
+        (SELECT total_rounds FROM rounds_cte)                 AS rounds
+    """, (division_id, division_id, division_id, division_id))
+    teams       = int((agg[0]["teams"] or 0)) if agg else 0
+    maps_cnt    = int((agg[0]["maps"]  or 0)) if agg else 0
+    total_rounds= int((agg[0]["rounds"] or 0)) if agg else 0
 
-    # Maps count
-    maps_cnt = q(con, """
-      SELECT COUNT(*) AS c
-      FROM maps mp JOIN matches m ON m.match_id=mp.match_id
-      WHERE m.championship_id=?
-    """, (division_id,))[0]["c"] or 0
-
-    # Total rounds
-    total_rounds = q(con, """
-      SELECT SUM(mp.score_team1 + mp.score_team2) AS r
-      FROM maps mp JOIN matches m ON m.match_id=mp.match_id
-      WHERE m.championship_id=?
-    """, (division_id,))[0]["r"] or 0
-
-
-
-    # Jakaumat (painotettu p25/p50/p75)
+    # --- jakaumat ja leaderit kuten ennen ---
     kd_vals, kd_w = [], []
     adr_vals, adr_w = [], []
     kr_vals,  kr_w  = [], []
     surv_vals, surv_w = [], []
     r1_vals, r1_w   = [], []
 
-    # Leaders-poolit
-    leaders_pool = []         # vain rounds >= min_rounds
+    leaders_pool = []
     totals_kills = []
     totals_deaths = []
 
@@ -1065,36 +1064,30 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
         deaths  = r["deaths"] or 0
         assists = r["assists"] or 0
 
-        # Kierros-painotetut mittarit
         adr = (r["adr_weighted"] / rounds) if rounds else 0.0
         kr  = (kills / rounds) if rounds else 0.0
-        kd  = (kills / deaths) if deaths else float(kills)   # jos 0 kuolemaa, aseta KD = kills
+        kd  = (kills / deaths) if deaths else float(kills)
 
-        # Survival% ja Rating1 (HLTV1.0-approks.)
         deaths_pr = (deaths / rounds) if rounds else 0.0
         survival_pct = max(0.0, 1.0 - deaths_pr) * 100.0
         surv_ratio = survival_pct / 100.0
         rating1 = ((kr / 0.679) + (surv_ratio / 0.317) + (adr / 79.9)) / 3.0 if rounds else 0.0
 
-        # jakaumiin painotus = pelatut kierrokset
         if rounds > 0:
-            kd_vals.append(kd);          kd_w.append(rounds)
-            adr_vals.append(adr);        adr_w.append(rounds)
-            kr_vals.append(kr);          kr_w.append(rounds)
-            surv_vals.append(survival_pct); surv_w.append(rounds)
-            r1_vals.append(rating1);     r1_w.append(rounds)
+            kd_vals.append(kd);              kd_w.append(rounds)
+            adr_vals.append(adr);            adr_w.append(rounds)
+            kr_vals.append(kr);              kr_w.append(rounds)
+            surv_vals.append(survival_pct);  surv_w.append(rounds)
+            r1_vals.append(rating1);         r1_w.append(rounds)
 
-        # absoluuttiset leaderit
         totals_kills.append( (nick, team, kills) )
         totals_deaths.append((nick, team, deaths))
 
-        # per-round leaderien rajaus
         if rounds >= min_rounds:
             udpr = (r["util_total"] or 0) / rounds
             flashed_pr = (r["flashed_total"] or 0) / rounds
             assist_pr  = assists / rounds
 
-            # entry/clutch – rajat
             ewin = r["entry_wins"] or 0
             eatt = r["entry_count"] or 0
             entry_wr = (100.0 * ewin / eatt) if eatt >= 10 else -1.0
@@ -1105,20 +1098,15 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
             c_atts = c11a + c12a
             clutch_wr = (100.0 * c_wins / c_atts) if c_atts >= 10 else -1.0
 
-            # Laske enemies-per-flash (EB/F) ja käytä sitä leaderiin
             flashed_total = r["flashed_total"] or 0
             flash_cnt_total = r["flash_cnt_total"] or 0
-
-            if flash_cnt_total >= min_flashes and rounds >= min_rounds:
-                enemies_per_flash = flashed_total / flash_cnt_total
-            else:
-                enemies_per_flash = -1.0  # suodata pois leader-vertailusta
+            enemies_per_flash = (flashed_total / flash_cnt_total) if (flash_cnt_total >= min_flashes and rounds >= min_rounds) else -1.0
 
             leaders_pool.append({
                 "nick": nick, "team": team, "rounds": rounds,
                 "kd": kd, "adr": adr, "kr": kr,
                 "udpr": udpr,
-                "enemies_per_flash": enemies_per_flash,   # <-- käytä tätä
+                "enemies_per_flash": enemies_per_flash,
                 "assist_pr":  assist_pr,
                 "entry_wr":   entry_wr,
                 "clutch_wr":  clutch_wr,
@@ -1136,7 +1124,6 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
     def _best(metric):
         if not leaders_pool:
             return ("-", "-", 0.0)
-        # suodata ulos negatiiviset "ei kelpaa" -arvot
         valid = [x for x in leaders_pool if x[metric] is not None and x[metric] >= 0]
         if not valid:
             return ("-", "-", 0.0)
@@ -1147,8 +1134,8 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
     most_deaths_total = max(totals_deaths, key=lambda x: x[2]) if totals_deaths else ("-", "-", 0)
 
     leaders = {
-        "top_frg_total":     top_frg_total,        # (nick, team, kills)
-        "most_deaths_total": most_deaths_total,    # (nick, team, deaths)
+        "top_frg_total":     top_frg_total,
+        "most_deaths_total": most_deaths_total,
         "adr":        _best("adr"),
         "kd":         _best("kd"),
         "kr":         _best("kr"),
@@ -1171,7 +1158,6 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
         "r1_p50": r1_p50,   "r1_p25": r1_p25,   "r1_p75": r1_p75,
         "leaders": leaders,
     }
-
 
 def _index_card_stats(con: sqlite3.Connection, championship_id: str) -> tuple[int, int, int]:
     """
