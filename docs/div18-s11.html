@@ -1,4 +1,4 @@
-<!-- GENVER:1 GENERATED_AT:1757361202 -->
+<!-- GENVER:2 GENERATED_AT:1757364802 -->
 <!doctype html>
 <html lang="fi">
 <head>
@@ -25,6 +25,12 @@
   --err:#f97066;
   --radius:14px;
   --shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+
+.subtitle {
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 /* Team logos: different size for index vs division */
@@ -225,6 +231,7 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   gap:.65rem;
   padding:.6rem 1rem;
   cursor:pointer;
+  transition: background 0.15s;
 }
 
 /* Vasen ja oikea asettuvat reunoihin, keskiblokki on aina keskellä */
@@ -270,6 +277,21 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   line-height:1.2;
   letter-spacing:.2px;
   white-space:nowrap;
+}
+
+.match-summary::after {
+  content: "▸"; /* oikealle osoittava kolmio */
+  font-size: 1.1em;
+  color: var(--muted);
+  margin-left: .5rem;
+  transition: transform .2s;
+}
+.match-row[open] .match-summary::after {
+  transform: rotate(90deg); /* kääntyy alas */
+}
+
+.match-summary:hover {
+  background: rgba(58,163,255,0.08);
 }
 
 .result-win{background:rgba(40,160,90,.16);border-color:rgba(40,160,90,.42);color:#64e09f;}
@@ -518,7 +540,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <div class="topbar">
         <div class="brand">
           <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
-          <span>AFI - Pappaliiga Stats v1.1</span>
+          <span>AFI - Pappaliiga Stats v1.2</span>
         </div>
         <div class="nav">
           <a class="btn btn-ghost" href="index.html">← Takaisin indexiin</a>
@@ -528,7 +550,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     
 <div class="container">
 <h1 style='text-align:center'>18 Divisioona S11 (Season 11)</h1>
-<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 2025-09-07 19:16</div>
+<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 07.09.2025 22:16</div>
 <div class="page">
 <div class="nav">
 <a href="#team-16f4650c-b4ed-40dd-b09c-16db36162000"><img class="logo nav-logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt="">5 buljuu</a>
@@ -576,11 +598,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 </tbody></table>
 </div>
 </div>
-<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.</div>
 <details class="team-section" id="team-16f4650c-b4ed-40dd-b09c-16db36162000" open>
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt="">5 buljuu</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 4-4</span> <span class="chip">±RD 7</span> <span class="chip">KD 0.98</span> <span class="chip">KR 0.70</span> <span class="chip">ADR 76.3</span> <span class="chip">Util 5094</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-16f4650c" class="tabs">
             <div class="tab-nav">
@@ -1128,12 +1150,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-16f4650c-b4ed-40dd-b09c-16db36162000"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-16f4650c-b4ed-40dd-b09c-16db36162000">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-17 Sun 17:53</span></div>
+          <div class="meta"><span class="date">17.08.2025 20:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1161,7 +1184,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 17:44</span></div>
+          <div class="meta"><span class="date">24.08.2025 20:44</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -1189,7 +1212,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-31 Sun 18:14</span></div>
+          <div class="meta"><span class="date">31.08.2025 21:14</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -1217,7 +1240,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-07 Sun 17:53</span></div>
+          <div class="meta"><span class="date">07.09.2025 20:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1245,7 +1268,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b175ea7f-6b8e-4a9d-bc79-9db96da257f1" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -1259,7 +1282,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d2a9a339-67a2-41b1-bcd1-da3d8d223b23" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -1273,7 +1296,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-e7979fe3-0aa3-4a0f-a940-94386b4b03f1" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -1287,7 +1310,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-73e44f11-1bdb-4bd4-a1d7-e3dac6f55371" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -1301,7 +1324,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5867ad9e-0e68-4f28-928d-7dc6f85dda62" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -1315,7 +1338,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-3b9e2a29-c3f9-4591-9dcc-26641f348846" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -1329,7 +1352,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e48d22f9-6f46-4c5a-8017-2c0e8e6aa1cf.jpeg" alt=""><div class="name">5 buljuu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-44877c59-8593-41c5-b73d-682d9ecb6249" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -1364,6 +1387,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt="">Bobers BackDoor</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 4-4</span> <span class="chip">±RD 0</span> <span class="chip">KD 0.97</span> <span class="chip">KR 0.70</span> <span class="chip">ADR 77.8</span> <span class="chip">Util 4716</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-709dba24" class="tabs">
             <div class="tab-nav">
@@ -1945,12 +1969,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-709dba24-823b-4f34-8047-2ef2942a744f"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-709dba24-823b-4f34-8047-2ef2942a744f">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-17 Sun 17:48</span></div>
+          <div class="meta"><span class="date">17.08.2025 20:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1978,7 +2003,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 17:42</span></div>
+          <div class="meta"><span class="date">24.08.2025 20:42</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2006,7 +2031,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-31 Sun 17:56</span></div>
+          <div class="meta"><span class="date">31.08.2025 20:56</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -2034,7 +2059,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-07 Sun 17:55</span></div>
+          <div class="meta"><span class="date">07.09.2025 20:55</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2062,7 +2087,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-bfc30224-260e-41b8-9702-62ee769dc1fa" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2076,7 +2101,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-670a21d5-8116-44f6-a2c6-f1691399f0aa" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2090,7 +2115,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-369116fd-537a-42f9-bcef-e2096553a81c" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2104,7 +2129,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-24f9059d-37fa-4e49-b61b-55fb97121b39" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2118,7 +2143,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9ca5dc51-63d8-4b82-8f17-eb2bdc778aed" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2132,7 +2157,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-3b9e2a29-c3f9-4591-9dcc-26641f348846" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2146,7 +2171,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""><div class="name">Bobers BackDoor</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-fe425b72-bc9d-42d9-a7d1-09bcc6e67b04" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2181,6 +2206,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt="">CarryModeEsport</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 4-4</span> <span class="chip">±RD 11</span> <span class="chip">KD 1.02</span> <span class="chip">KR 0.72</span> <span class="chip">ADR 78.5</span> <span class="chip">Util 6275</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-9d5dfd29" class="tabs">
             <div class="tab-nav">
@@ -2728,12 +2754,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-9d5dfd29-6e11-418a-90ae-9a4f2d5c3554"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-9d5dfd29-6e11-418a-90ae-9a4f2d5c3554">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-11 Mon 17:58</span></div>
+          <div class="meta"><span class="date">11.08.2025 20:58</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -2761,7 +2788,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 18:01</span></div>
+          <div class="meta"><span class="date">24.08.2025 21:01</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2789,7 +2816,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-31 Sun 17:56</span></div>
+          <div class="meta"><span class="date">31.08.2025 20:56</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -2817,7 +2844,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-02 Tue 17:46</span></div>
+          <div class="meta"><span class="date">02.09.2025 20:46</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2845,7 +2872,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-470a1e99-e420-4fc1-8e78-0bc63fb2e76d" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2859,7 +2886,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9e967788-593d-41b9-9e70-05127a234d25" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2873,7 +2900,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-57b8b58f-1cb3-47c5-9a7c-603fe40b8c9c" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2887,7 +2914,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b6b138e4-2d80-4936-afd2-0342c13e2ac0" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2901,7 +2928,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5867ad9e-0e68-4f28-928d-7dc6f85dda62" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2915,7 +2942,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-c9589148-47e2-4f87-aac6-afe659f2ee5f" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2929,7 +2956,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e9c1220e-3e06-4a8a-b753-0d6a8896c828.jpg" alt=""><div class="name">CarryModeEsport</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-650d9d9d-962f-44f2-a23d-0d5d67fd6a78" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -2964,6 +2991,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt="">CSPojat</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 3-5</span> <span class="chip">±RD -5</span> <span class="chip">KD 0.93</span> <span class="chip">KR 0.68</span> <span class="chip">ADR 76.0</span> <span class="chip">Util 5210</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-9bb80325" class="tabs">
             <div class="tab-nav">
@@ -3511,12 +3539,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-9bb80325-c03c-4202-8581-403e9e66744b"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-9bb80325-c03c-4202-8581-403e9e66744b">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-13 Wed 18:32</span></div>
+          <div class="meta"><span class="date">13.08.2025 21:32</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -3544,7 +3573,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-20 Wed 18:09</span></div>
+          <div class="meta"><span class="date">20.08.2025 21:09</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -3572,7 +3601,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-31 Sun 18:14</span></div>
+          <div class="meta"><span class="date">31.08.2025 21:14</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -3600,7 +3629,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-04 Thu 18:38</span></div>
+          <div class="meta"><span class="date">04.09.2025 21:38</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -3628,7 +3657,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-cc4c45b1-95de-4775-9bc0-5441ffb0beb8" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -3642,7 +3671,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-ae0ea6ef-dd15-418a-bd80-e6e8798416fe" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -3656,7 +3685,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-57b8b58f-1cb3-47c5-9a7c-603fe40b8c9c" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -3670,7 +3699,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-24f9059d-37fa-4e49-b61b-55fb97121b39" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -3684,7 +3713,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-0f4d773b-8f49-4bf4-ae1b-746cca7eedc2" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -3698,7 +3727,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-4bf5d5ad-6ebd-44f4-91bf-f39fcb8a66ad" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -3712,7 +3741,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/be1de5c4-ea31-4ad5-9cb2-1e86c865f47a.jpeg" alt=""><div class="name">CSPojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-bb3fe527-0bca-41eb-a0ee-2839339be113" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -3747,6 +3776,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt="">HC Rush</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 6-2</span> <span class="chip">±RD 30</span> <span class="chip">KD 1.25</span> <span class="chip">KR 0.79</span> <span class="chip">ADR 84.4</span> <span class="chip">Util 5783</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-99aa4e05" class="tabs">
             <div class="tab-nav">
@@ -4294,12 +4324,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-99aa4e05-5302-411e-ab90-85fbc319d7bb"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-99aa4e05-5302-411e-ab90-85fbc319d7bb">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-17 Sun 17:48</span></div>
+          <div class="meta"><span class="date">17.08.2025 20:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4327,7 +4358,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 17:47</span></div>
+          <div class="meta"><span class="date">24.08.2025 20:47</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4355,7 +4386,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-31 Sun 17:48</span></div>
+          <div class="meta"><span class="date">31.08.2025 20:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -4383,7 +4414,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-07 Sun 17:45</span></div>
+          <div class="meta"><span class="date">07.09.2025 20:45</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4411,7 +4442,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-cc4c45b1-95de-4775-9bc0-5441ffb0beb8" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -4425,7 +4456,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a4705960-4fc6-4e41-9159-0950dd4a8142" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -4439,7 +4470,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-e7979fe3-0aa3-4a0f-a940-94386b4b03f1" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -4453,7 +4484,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-6f51a0a9-e754-42b0-a655-6b5a40068b6f" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -4467,7 +4498,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-dc23b844-61cf-4d1b-bdd5-c77bbe306de1" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -4481,7 +4512,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1ba23543-70b9-449d-8dfb-891d547560f5" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -4495,7 +4526,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/54494da3-c776-43ae-8144-54dc8ae77ba8.jpeg" alt=""><div class="name">HC Rush</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-650d9d9d-962f-44f2-a23d-0d5d67fd6a78" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -4530,6 +4561,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt="">Kasioseta</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 7-1</span> <span class="chip">±RD 22</span> <span class="chip">KD 1.11</span> <span class="chip">KR 0.71</span> <span class="chip">ADR 76.8</span> <span class="chip">Util 5378</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-bc890016" class="tabs">
             <div class="tab-nav">
@@ -5077,12 +5109,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-bc890016-2ecd-4505-aa21-0928f7a6b9f7"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-bc890016-2ecd-4505-aa21-0928f7a6b9f7">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-17 Sun 18:33</span></div>
+          <div class="meta"><span class="date">17.08.2025 21:33</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -5110,7 +5143,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-20 Wed 18:09</span></div>
+          <div class="meta"><span class="date">20.08.2025 21:09</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5138,7 +5171,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-27 Wed 18:02</span></div>
+          <div class="meta"><span class="date">27.08.2025 21:02</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -5166,7 +5199,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-07 Sun 17:53</span></div>
+          <div class="meta"><span class="date">07.09.2025 20:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -5194,7 +5227,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-22ab4fc9-ee4b-469b-9d72-3ccdf15dc20f" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -5208,7 +5241,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a4705960-4fc6-4e41-9159-0950dd4a8142" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -5222,7 +5255,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5559e4ba-409c-45e8-81fe-8ed939e78a46" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -5236,7 +5269,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b6b138e4-2d80-4936-afd2-0342c13e2ac0" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -5250,7 +5283,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9ca5dc51-63d8-4b82-8f17-eb2bdc778aed" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -5264,7 +5297,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-c00beac1-00e7-4cb6-9154-d3307b58ab69" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -5278,7 +5311,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/321567ca-f225-4fbd-b592-92837d4adaeb.jpg" alt=""><div class="name">Kasioseta</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-10a95b31-5c34-4c67-bde8-6bb7fe786182" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -5313,6 +5346,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt="">keij0t</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 3-5</span> <span class="chip">±RD -21</span> <span class="chip">KD 0.92</span> <span class="chip">KR 0.67</span> <span class="chip">ADR 75.2</span> <span class="chip">Util 4618</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-d90be3ec" class="tabs">
             <div class="tab-nav">
@@ -5860,12 +5894,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-d90be3ec-0eb2-4418-8602-6dd664eb38e3"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-d90be3ec-0eb2-4418-8602-6dd664eb38e3">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-11 Mon 17:58</span></div>
+          <div class="meta"><span class="date">11.08.2025 20:58</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -5893,7 +5928,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 17:42</span></div>
+          <div class="meta"><span class="date">24.08.2025 20:42</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5921,7 +5956,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-28 Thu 17:52</span></div>
+          <div class="meta"><span class="date">28.08.2025 20:52</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -5949,7 +5984,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-07 Sun 18:12</span></div>
+          <div class="meta"><span class="date">07.09.2025 21:12</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -5977,7 +6012,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a6472144-9f7c-4fe2-a7fe-5df159a76ac2" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -5991,7 +6026,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-ae0ea6ef-dd15-418a-bd80-e6e8798416fe" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6005,7 +6040,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5559e4ba-409c-45e8-81fe-8ed939e78a46" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6019,7 +6054,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-73e44f11-1bdb-4bd4-a1d7-e3dac6f55371" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6033,7 +6068,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-607a621f-3f98-49c8-b9a2-b10c51b77a9b" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6047,7 +6082,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1ba23543-70b9-449d-8dfb-891d547560f5" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6061,7 +6096,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""><div class="name">keij0t</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1bda0382-a201-413c-aa43-d67107c63d59" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6096,6 +6131,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt="">Kioskinpojat</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 2-6</span> <span class="chip">±RD -12</span> <span class="chip">KD 0.92</span> <span class="chip">KR 0.69</span> <span class="chip">ADR 76.6</span> <span class="chip">Util 4480</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-0ae43503" class="tabs">
             <div class="tab-nav">
@@ -6677,12 +6713,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-0ae43503-13b1-4515-a4b2-c937e49f4edf"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-0ae43503-13b1-4515-a4b2-c937e49f4edf">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-17 Sun 17:51</span></div>
+          <div class="meta"><span class="date">17.08.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -6710,7 +6747,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 17:47</span></div>
+          <div class="meta"><span class="date">24.08.2025 20:47</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -6738,7 +6775,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-28 Thu 17:52</span></div>
+          <div class="meta"><span class="date">28.08.2025 20:52</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -6766,7 +6803,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-02 Tue 17:46</span></div>
+          <div class="meta"><span class="date">02.09.2025 20:46</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -6794,7 +6831,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-bfc30224-260e-41b8-9702-62ee769dc1fa" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6808,7 +6845,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9be92b28-bfb7-4811-af3f-c7f35d998955" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6822,7 +6859,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-33f5ac8a-05fd-4c6d-ae40-a31b9cd15d46" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6836,7 +6873,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b82f3bec-20b9-408f-968a-5dc1a128b0a3" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6850,7 +6887,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-0f4d773b-8f49-4bf4-ae1b-746cca7eedc2" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6864,7 +6901,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-c00beac1-00e7-4cb6-9154-d3307b58ab69" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6878,7 +6915,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/97ff9065-0603-4902-89fe-8fa8ee77c6a4.jpeg" alt=""><div class="name">Kioskinpojat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-44877c59-8593-41c5-b73d-682d9ecb6249" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -6913,6 +6950,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt="">Liikaa kokkeja</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 3-5</span> <span class="chip">±RD -16</span> <span class="chip">KD 1.00</span> <span class="chip">KR 0.67</span> <span class="chip">ADR 75.8</span> <span class="chip">Util 4818</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-1d3ae16a" class="tabs">
             <div class="tab-nav">
@@ -7460,12 +7498,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-1d3ae16a-a87b-4b18-9aa0-5de76f399e74"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-1d3ae16a-a87b-4b18-9aa0-5de76f399e74">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-13 Wed 18:32</span></div>
+          <div class="meta"><span class="date">13.08.2025 21:32</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -7493,7 +7532,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 18:01</span></div>
+          <div class="meta"><span class="date">24.08.2025 21:01</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -7521,7 +7560,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-27 Wed 18:02</span></div>
+          <div class="meta"><span class="date">27.08.2025 21:02</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -7549,7 +7588,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-07 Sun 17:55</span></div>
+          <div class="meta"><span class="date">07.09.2025 20:55</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -7577,7 +7616,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b175ea7f-6b8e-4a9d-bc79-9db96da257f1" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -7591,7 +7630,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9be92b28-bfb7-4811-af3f-c7f35d998955" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -7605,7 +7644,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-51ec9b47-6832-4a1e-ad24-ea9c413d06fa" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -7619,7 +7658,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d9092f1f-b381-47f4-a963-d894a0099700" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -7633,7 +7672,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-dc23b844-61cf-4d1b-bdd5-c77bbe306de1" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -7647,7 +7686,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-8db494f4-d0a8-4329-82f9-c4bd75038926" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -7661,7 +7700,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""><div class="name">Liikaa kokkeja</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1bda0382-a201-413c-aa43-d67107c63d59" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -7696,6 +7735,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt="">Painvastoin</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 1-7</span> <span class="chip">±RD -39</span> <span class="chip">KD 0.76</span> <span class="chip">KR 0.59</span> <span class="chip">ADR 69.5</span> <span class="chip">Util 6569</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-01e8601a" class="tabs">
             <div class="tab-nav">
@@ -8345,12 +8385,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-01e8601a-e9a2-4d98-8c41-5e7265b2911e"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-01e8601a-e9a2-4d98-8c41-5e7265b2911e">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-17 Sun 18:33</span></div>
+          <div class="meta"><span class="date">17.08.2025 21:33</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -8378,7 +8419,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 17:44</span></div>
+          <div class="meta"><span class="date">24.08.2025 20:44</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -8406,7 +8447,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-27 Wed 19:06</span></div>
+          <div class="meta"><span class="date">27.08.2025 22:06</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -8434,7 +8475,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-07 Sun 17:45</span></div>
+          <div class="meta"><span class="date">07.09.2025 20:45</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -8462,7 +8503,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a6472144-9f7c-4fe2-a7fe-5df159a76ac2" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -8476,7 +8517,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9e967788-593d-41b9-9e70-05127a234d25" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -8490,7 +8531,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-369116fd-537a-42f9-bcef-e2096553a81c" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -8504,7 +8545,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b82f3bec-20b9-408f-968a-5dc1a128b0a3" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -8518,7 +8559,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-beabfbdb-7dde-4534-8c0e-a25d2016d68f" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -8532,7 +8573,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-8db494f4-d0a8-4329-82f9-c4bd75038926" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -8546,7 +8587,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7568d241-5feb-455b-9faf-a4aad0809378.jpeg" alt=""><div class="name">Painvastoin</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-bb3fe527-0bca-41eb-a0ee-2839339be113" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -8581,6 +8622,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt="">team miu</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 7-1</span> <span class="chip">±RD 34</span> <span class="chip">KD 1.23</span> <span class="chip">KR 0.79</span> <span class="chip">ADR 83.7</span> <span class="chip">Util 5174</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-bd706914" class="tabs">
             <div class="tab-nav">
@@ -9128,12 +9170,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-bd706914-413d-433a-aad5-079bb4e655c3"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-bd706914-413d-433a-aad5-079bb4e655c3">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-17 Sun 17:53</span></div>
+          <div class="meta"><span class="date">17.08.2025 20:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -9161,7 +9204,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 17:52</span></div>
+          <div class="meta"><span class="date">24.08.2025 20:52</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -9189,7 +9232,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-31 Sun 17:48</span></div>
+          <div class="meta"><span class="date">31.08.2025 20:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -9217,7 +9260,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-07 Sun 18:12</span></div>
+          <div class="meta"><span class="date">07.09.2025 21:12</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -9245,7 +9288,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-470a1e99-e420-4fc1-8e78-0bc63fb2e76d" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -9259,7 +9302,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-670a21d5-8116-44f6-a2c6-f1691399f0aa" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -9273,7 +9316,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-33f5ac8a-05fd-4c6d-ae40-a31b9cd15d46" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -9287,7 +9330,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d9092f1f-b381-47f4-a963-d894a0099700" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -9301,7 +9344,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-beabfbdb-7dde-4534-8c0e-a25d2016d68f" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -9315,7 +9358,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-4bf5d5ad-6ebd-44f4-91bf-f39fcb8a66ad" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -9329,7 +9372,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/96ca5dc8-54a3-4f7d-951c-efc72745918a.jpeg" alt=""><div class="name">team miu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-10a95b31-5c34-4c67-bde8-6bb7fe786182" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -9364,6 +9407,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt="">Vakkilan Pandat</h2></summary>
 <div><span class="chip">Matches 4</span> <span class="chip">Maps 8</span> <span class="chip">W-L 4-4</span> <span class="chip">±RD -11</span> <span class="chip">KD 0.96</span> <span class="chip">KR 0.68</span> <span class="chip">ADR 75.9</span> <span class="chip">Util 5343</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-d8a7369a" class="tabs">
             <div class="tab-nav">
@@ -9945,12 +9989,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-d8a7369a-b6fa-478b-be10-3cd850ab117f"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-d8a7369a-b6fa-478b-be10-3cd850ab117f">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-17 Sun 17:51</span></div>
+          <div class="meta"><span class="date">17.08.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -9978,7 +10023,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-24 Sun 17:52</span></div>
+          <div class="meta"><span class="date">24.08.2025 20:52</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -10006,7 +10051,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-08-27 Wed 19:06</span></div>
+          <div class="meta"><span class="date">27.08.2025 22:06</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -10034,7 +10079,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-04 Thu 18:38</span></div>
+          <div class="meta"><span class="date">04.09.2025 21:38</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -10062,7 +10107,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-14 Sun 17:00</span></div>
+          <div class="meta"><span class="date">14.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-22ab4fc9-ee4b-469b-9d72-3ccdf15dc20f" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -10076,7 +10121,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-21 Sun 17:00</span></div>
+          <div class="meta"><span class="date">21.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d2a9a339-67a2-41b1-bcd1-da3d8d223b23" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -10090,7 +10135,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-09-28 Sun 17:00</span></div>
+          <div class="meta"><span class="date">28.09.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-51ec9b47-6832-4a1e-ad24-ea9c413d06fa" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -10104,7 +10149,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-05 Sun 17:00</span></div>
+          <div class="meta"><span class="date">05.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-6f51a0a9-e754-42b0-a655-6b5a40068b6f" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -10118,7 +10163,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-12 Sun 17:00</span></div>
+          <div class="meta"><span class="date">12.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-607a621f-3f98-49c8-b9a2-b10c51b77a9b" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -10132,7 +10177,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-19 Sun 17:00</span></div>
+          <div class="meta"><span class="date">19.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-c9589148-47e2-4f87-aac6-afe659f2ee5f" target="_blank" rel="noopener">Open on FACEIT</a>
@@ -10146,7 +10191,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/27e74e4c-0c0d-4b5a-9b02-9bbf458522e7.jpeg" alt=""><div class="name">Vakkilan Pandat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-10-26 Sun 18:00</span></div>
+          <div class="meta"><span class="date">26.10.2025 20:00</span></div>
           <div class="result-row"><span class="stage-chip">Scheduled</span></div>
           <div class="scoreline"><span class="maps-score">—</span></div>
           <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-fe425b72-bc9d-42d9-a7d1-09bcc6e67b04" target="_blank" rel="noopener">Open on FACEIT</a>

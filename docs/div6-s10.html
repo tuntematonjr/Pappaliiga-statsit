@@ -1,4 +1,4 @@
-<!-- GENVER:1 GENERATED_AT:1757361217 -->
+<!-- GENVER:2 GENERATED_AT:1757364817 -->
 <!doctype html>
 <html lang="fi">
 <head>
@@ -25,6 +25,12 @@
   --err:#f97066;
   --radius:14px;
   --shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+
+.subtitle {
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 /* Team logos: different size for index vs division */
@@ -225,6 +231,7 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   gap:.65rem;
   padding:.6rem 1rem;
   cursor:pointer;
+  transition: background 0.15s;
 }
 
 /* Vasen ja oikea asettuvat reunoihin, keskiblokki on aina keskellä */
@@ -270,6 +277,21 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   line-height:1.2;
   letter-spacing:.2px;
   white-space:nowrap;
+}
+
+.match-summary::after {
+  content: "▸"; /* oikealle osoittava kolmio */
+  font-size: 1.1em;
+  color: var(--muted);
+  margin-left: .5rem;
+  transition: transform .2s;
+}
+.match-row[open] .match-summary::after {
+  transform: rotate(90deg); /* kääntyy alas */
+}
+
+.match-summary:hover {
+  background: rgba(58,163,255,0.08);
 }
 
 .result-win{background:rgba(40,160,90,.16);border-color:rgba(40,160,90,.42);color:#64e09f;}
@@ -518,7 +540,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <div class="topbar">
         <div class="brand">
           <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
-          <span>AFI - Pappaliiga Stats v1.1</span>
+          <span>AFI - Pappaliiga Stats v1.2</span>
         </div>
         <div class="nav">
           <a class="btn btn-ghost" href="index.html">← Takaisin indexiin</a>
@@ -528,7 +550,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     
 <div class="container">
 <h1 style='text-align:center'>6 Divisioona S10 (Season 10)</h1>
-<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 2025-09-07 13:43</div>
+<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 07.09.2025 16:43</div>
 <div class="page">
 <div class="nav">
 <a href="#team-da163e83-7643-489d-9bc3-2ba9bfb4202c"><img class="logo nav-logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt="">++ crew</a>
@@ -576,11 +598,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 </tbody></table>
 </div>
 </div>
-<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.</div>
 <details class="team-section" id="team-da163e83-7643-489d-9bc3-2ba9bfb4202c" open>
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt="">++ crew</h2></summary>
 <div><span class="chip">Matches 10</span> <span class="chip">Maps 20</span> <span class="chip">W-L 9-11</span> <span class="chip">±RD 4</span> <span class="chip">KD 0.99</span> <span class="chip">KR 0.70</span> <span class="chip">ADR 76.8</span> <span class="chip">Util 14774</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-da163e83" class="tabs">
             <div class="tab-nav">
@@ -1162,12 +1184,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-da163e83-7643-489d-9bc3-2ba9bfb4202c"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-da163e83-7643-489d-9bc3-2ba9bfb4202c">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-23 Sun 16:48</span></div>
+          <div class="meta"><span class="date">23.02.2025 18:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -1195,7 +1218,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-02 Sun 19:23</span></div>
+          <div class="meta"><span class="date">02.03.2025 21:23</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -1223,7 +1246,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 18:46</span></div>
+          <div class="meta"><span class="date">09.03.2025 20:46</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -1251,7 +1274,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 18:51</span></div>
+          <div class="meta"><span class="date">16.03.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -1279,7 +1302,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 19:25</span></div>
+          <div class="meta"><span class="date">23.03.2025 21:25</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -1307,7 +1330,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 16:59</span></div>
+          <div class="meta"><span class="date">30.03.2025 19:59</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1335,7 +1358,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 18:08</span></div>
+          <div class="meta"><span class="date">06.04.2025 21:08</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1363,7 +1386,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-08 Tue 17:58</span></div>
+          <div class="meta"><span class="date">08.04.2025 20:58</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -1391,7 +1414,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-20 Sun 17:54</span></div>
+          <div class="meta"><span class="date">20.04.2025 20:54</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1419,7 +1442,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/20b17d8e-a612-416f-9a38-7af41b9127a8.jpeg" alt=""><div class="name">++ crew</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-24 Thu 17:01</span></div>
+          <div class="meta"><span class="date">24.04.2025 20:01</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1468,6 +1491,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt="">cM Esports</h2></summary>
 <div><span class="chip">Matches 10</span> <span class="chip">Maps 20</span> <span class="chip">W-L 7-13</span> <span class="chip">±RD -46</span> <span class="chip">KD 0.92</span> <span class="chip">KR 0.67</span> <span class="chip">ADR 74.5</span> <span class="chip">Util 12213</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-3120c1e1" class="tabs">
             <div class="tab-nav">
@@ -2049,12 +2073,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-3120c1e1-b24b-400c-8785-f9dcd9d6c8fa"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-3120c1e1-b24b-400c-8785-f9dcd9d6c8fa">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-17 Mon 19:00</span></div>
+          <div class="meta"><span class="date">17.02.2025 21:00</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2082,7 +2107,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-02 Sun 19:26</span></div>
+          <div class="meta"><span class="date">02.03.2025 21:26</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -2110,7 +2135,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 18:46</span></div>
+          <div class="meta"><span class="date">09.03.2025 20:46</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -2138,7 +2163,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 18:50</span></div>
+          <div class="meta"><span class="date">16.03.2025 20:50</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2166,7 +2191,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 18:51</span></div>
+          <div class="meta"><span class="date">23.03.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -2194,7 +2219,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 17:58</span></div>
+          <div class="meta"><span class="date">30.03.2025 20:58</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2222,7 +2247,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 18:12</span></div>
+          <div class="meta"><span class="date">06.04.2025 21:12</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2250,7 +2275,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 18:02</span></div>
+          <div class="meta"><span class="date">13.04.2025 21:02</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -2278,7 +2303,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-20 Sun 17:39</span></div>
+          <div class="meta"><span class="date">20.04.2025 20:39</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -2306,7 +2331,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://assets.faceit-cdn.net/avatars/e037267b-dd6b-483f-9baf-ae4d2d7047b9_1550612157525.jpg" alt=""><div class="name">cM Esports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 17:51</span></div>
+          <div class="meta"><span class="date">04.05.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -2355,6 +2380,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt="">GUUBAN</h2></summary>
 <div><span class="chip">Matches 11</span> <span class="chip">Maps 22</span> <span class="chip">W-L 11-11</span> <span class="chip">±RD 1</span> <span class="chip">KD 0.98</span> <span class="chip">KR 0.68</span> <span class="chip">ADR 75.9</span> <span class="chip">Util 16756</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-babdaa23" class="tabs">
             <div class="tab-nav">
@@ -2970,12 +2996,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-babdaa23-f6b2-4463-ae19-e680ded1088a"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-babdaa23-f6b2-4463-ae19-e680ded1088a">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-23 Sun 19:43</span></div>
+          <div class="meta"><span class="date">23.02.2025 21:43</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -3003,7 +3030,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-26 Wed 19:51</span></div>
+          <div class="meta"><span class="date">26.02.2025 21:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -3031,7 +3058,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 19:15</span></div>
+          <div class="meta"><span class="date">09.03.2025 21:15</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -3059,7 +3086,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 19:01</span></div>
+          <div class="meta"><span class="date">16.03.2025 21:01</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -3087,7 +3114,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 19:49</span></div>
+          <div class="meta"><span class="date">23.03.2025 21:49</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -3115,7 +3142,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 17:54</span></div>
+          <div class="meta"><span class="date">30.03.2025 20:54</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -3143,7 +3170,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 18:12</span></div>
+          <div class="meta"><span class="date">06.04.2025 21:12</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -3171,7 +3198,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-08 Tue 17:58</span></div>
+          <div class="meta"><span class="date">08.04.2025 20:58</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -3199,7 +3226,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-16 Wed 17:47</span></div>
+          <div class="meta"><span class="date">16.04.2025 20:47</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -3227,7 +3254,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:52</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:52</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -3255,7 +3282,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/616f26ad-4212-4631-89d2-37372f9dbf5c.jpeg" alt=""><div class="name">GUUBAN</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 18:20</span></div>
+          <div class="meta"><span class="date">04.05.2025 21:20</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -3304,6 +3331,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt="">HuoliSuutelu</h2></summary>
 <div><span class="chip">Matches 11</span> <span class="chip">Maps 22</span> <span class="chip">W-L 13-9</span> <span class="chip">±RD 26</span> <span class="chip">KD 1.03</span> <span class="chip">KR 0.70</span> <span class="chip">ADR 77.0</span> <span class="chip">Util 14278</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-1794744b" class="tabs">
             <div class="tab-nav">
@@ -3885,12 +3913,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-1794744b-c393-455e-9e61-d65c80d0355d"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-1794744b-c393-455e-9e61-d65c80d0355d">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-23 Sun 19:43</span></div>
+          <div class="meta"><span class="date">23.02.2025 21:43</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -3918,7 +3947,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-02 Sun 19:26</span></div>
+          <div class="meta"><span class="date">02.03.2025 21:26</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -3946,7 +3975,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-04 Tue 19:26</span></div>
+          <div class="meta"><span class="date">04.03.2025 21:26</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -3974,7 +4003,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 18:51</span></div>
+          <div class="meta"><span class="date">16.03.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -4002,7 +4031,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 18:54</span></div>
+          <div class="meta"><span class="date">23.03.2025 20:54</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4030,7 +4059,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 18:00</span></div>
+          <div class="meta"><span class="date">30.03.2025 21:00</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -4058,7 +4087,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 18:50</span></div>
+          <div class="meta"><span class="date">06.04.2025 21:50</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4086,7 +4115,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 17:52</span></div>
+          <div class="meta"><span class="date">13.04.2025 20:52</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -4114,7 +4143,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-14 Mon 17:50</span></div>
+          <div class="meta"><span class="date">14.04.2025 20:50</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4142,7 +4171,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 18:08</span></div>
+          <div class="meta"><span class="date">27.04.2025 21:08</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -4170,7 +4199,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/e1492c77-2562-47ad-99f2-aaeefaebd509.jpeg" alt=""><div class="name">HuoliSuutelu</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 17:53</span></div>
+          <div class="meta"><span class="date">04.05.2025 20:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -4219,6 +4248,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt="">Kevlar Cowboys</h2></summary>
 <div><span class="chip">Matches 11</span> <span class="chip">Maps 22</span> <span class="chip">W-L 9-13</span> <span class="chip">±RD -18</span> <span class="chip">KD 0.96</span> <span class="chip">KR 0.70</span> <span class="chip">ADR 77.6</span> <span class="chip">Util 11717</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-57adf2e8" class="tabs">
             <div class="tab-nav">
@@ -4732,12 +4762,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-57adf2e8-09f6-46c3-a75e-43be2e3b7a95"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-57adf2e8-09f6-46c3-a75e-43be2e3b7a95">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-23 Sun 18:55</span></div>
+          <div class="meta"><span class="date">23.02.2025 20:55</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4765,7 +4796,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-02 Sun 18:51</span></div>
+          <div class="meta"><span class="date">02.03.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -4793,7 +4824,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 17:16</span></div>
+          <div class="meta"><span class="date">09.03.2025 19:16</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -4821,7 +4852,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 18:36</span></div>
+          <div class="meta"><span class="date">16.03.2025 20:36</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -4849,7 +4880,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 18:51</span></div>
+          <div class="meta"><span class="date">23.03.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -4877,7 +4908,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 16:59</span></div>
+          <div class="meta"><span class="date">30.03.2025 19:59</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4905,7 +4936,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 17:14</span></div>
+          <div class="meta"><span class="date">06.04.2025 20:14</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -4933,7 +4964,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 17:52</span></div>
+          <div class="meta"><span class="date">13.04.2025 20:52</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -4961,7 +4992,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-20 Sun 17:49</span></div>
+          <div class="meta"><span class="date">20.04.2025 20:49</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -4989,7 +5020,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:52</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:52</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -5017,7 +5048,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/39fa9d88-cfd5-4287-86cd-ae84aacb542b.jpeg" alt=""><div class="name">Kevlar Cowboys</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 17:43</span></div>
+          <div class="meta"><span class="date">04.05.2025 20:43</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5066,6 +5097,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt="">KYROE eSports</h2></summary>
 <div><span class="chip">Matches 10</span> <span class="chip">Maps 20</span> <span class="chip">W-L 8-12</span> <span class="chip">±RD -43</span> <span class="chip">KD 0.93</span> <span class="chip">KR 0.66</span> <span class="chip">ADR 74.2</span> <span class="chip">Util 10880</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-3684f5ad" class="tabs">
             <div class="tab-nav">
@@ -5647,12 +5679,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-3684f5ad-5d94-48a9-a65d-465eb65fe760"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-3684f5ad-5d94-48a9-a65d-465eb65fe760">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-17 Mon 19:00</span></div>
+          <div class="meta"><span class="date">17.02.2025 21:00</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5680,7 +5713,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-02 Sun 19:23</span></div>
+          <div class="meta"><span class="date">02.03.2025 21:23</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5708,7 +5741,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 18:59</span></div>
+          <div class="meta"><span class="date">09.03.2025 20:59</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5736,7 +5769,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 18:36</span></div>
+          <div class="meta"><span class="date">16.03.2025 20:36</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5764,7 +5797,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 19:00</span></div>
+          <div class="meta"><span class="date">23.03.2025 21:00</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5792,7 +5825,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 17:54</span></div>
+          <div class="meta"><span class="date">30.03.2025 20:54</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -5820,7 +5853,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-31 Mon 18:20</span></div>
+          <div class="meta"><span class="date">31.03.2025 21:20</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -5848,7 +5881,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 18:05</span></div>
+          <div class="meta"><span class="date">13.04.2025 21:05</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5876,7 +5909,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:48</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5904,7 +5937,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4460c784-189f-4892-87e5-84d120100d2b.jpeg" alt=""><div class="name">KYROE eSports</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 17:53</span></div>
+          <div class="meta"><span class="date">04.05.2025 20:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -5953,6 +5986,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt="">MAHLA</h2></summary>
 <div><span class="chip">Matches 11</span> <span class="chip">Maps 22</span> <span class="chip">W-L 21-1</span> <span class="chip">±RD 110</span> <span class="chip">KD 1.24</span> <span class="chip">KR 0.77</span> <span class="chip">ADR 82.2</span> <span class="chip">Util 13655</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-034eff90" class="tabs">
             <div class="tab-nav">
@@ -6466,12 +6500,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-034eff90-c047-4d41-8c97-175cff891e98"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-034eff90-c047-4d41-8c97-175cff891e98">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-19 Wed 17:56</span></div>
+          <div class="meta"><span class="date">19.02.2025 19:56</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6499,7 +6534,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-26 Wed 19:51</span></div>
+          <div class="meta"><span class="date">26.02.2025 21:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6527,7 +6562,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-04 Tue 19:26</span></div>
+          <div class="meta"><span class="date">04.03.2025 21:26</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6555,7 +6590,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-13 Thu 18:53</span></div>
+          <div class="meta"><span class="date">13.03.2025 20:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6583,7 +6618,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 18:58</span></div>
+          <div class="meta"><span class="date">23.03.2025 20:58</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6611,7 +6646,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 17:47</span></div>
+          <div class="meta"><span class="date">30.03.2025 20:47</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6639,7 +6674,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-31 Mon 18:20</span></div>
+          <div class="meta"><span class="date">31.03.2025 21:20</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6667,7 +6702,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 18:02</span></div>
+          <div class="meta"><span class="date">13.04.2025 21:02</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6695,7 +6730,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-20 Sun 17:54</span></div>
+          <div class="meta"><span class="date">20.04.2025 20:54</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6723,7 +6758,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:48</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -6751,7 +6786,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/2ad1b829-e28d-495c-9c53-d68007228dd3.jpeg" alt=""><div class="name">MAHLA</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 17:43</span></div>
+          <div class="meta"><span class="date">04.05.2025 20:43</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -6800,6 +6835,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt="">PAHISKLUBI</h2></summary>
 <div><span class="chip">Matches 8</span> <span class="chip">Maps 16</span> <span class="chip">W-L 4-12</span> <span class="chip">±RD -42</span> <span class="chip">KD 0.86</span> <span class="chip">KR 0.65</span> <span class="chip">ADR 72.7</span> <span class="chip">Util 10455</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-f115c31c" class="tabs">
             <div class="tab-nav">
@@ -7313,12 +7349,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-f115c31c-67af-4022-94b2-2caa1269acf5"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-f115c31c-67af-4022-94b2-2caa1269acf5">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt=""><div class="name">PAHISKLUBI</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-23 Sun 19:53</span></div>
+          <div class="meta"><span class="date">23.02.2025 21:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -7346,7 +7383,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt=""><div class="name">PAHISKLUBI</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-02 Sun 18:51</span></div>
+          <div class="meta"><span class="date">02.03.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -7374,7 +7411,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt=""><div class="name">PAHISKLUBI</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 18:57</span></div>
+          <div class="meta"><span class="date">09.03.2025 20:57</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -7402,7 +7439,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt=""><div class="name">PAHISKLUBI</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 19:01</span></div>
+          <div class="meta"><span class="date">16.03.2025 21:01</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -7430,7 +7467,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt=""><div class="name">PAHISKLUBI</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 18:58</span></div>
+          <div class="meta"><span class="date">23.03.2025 20:58</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -7458,7 +7495,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt=""><div class="name">PAHISKLUBI</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 18:50</span></div>
+          <div class="meta"><span class="date">30.03.2025 21:50</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -7486,7 +7523,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt=""><div class="name">PAHISKLUBI</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 18:50</span></div>
+          <div class="meta"><span class="date">06.04.2025 21:50</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -7514,7 +7551,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/acb8ed03-237c-40ec-ac65-80b4ac13b36f.jpeg" alt=""><div class="name">PAHISKLUBI</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 17:49</span></div>
+          <div class="meta"><span class="date">13.04.2025 20:49</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -7563,6 +7600,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt="">Pulunaivot</h2></summary>
 <div><span class="chip">Matches 11</span> <span class="chip">Maps 22</span> <span class="chip">W-L 11-11</span> <span class="chip">±RD 7</span> <span class="chip">KD 1.02</span> <span class="chip">KR 0.71</span> <span class="chip">ADR 77.8</span> <span class="chip">Util 13682</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-69cca123" class="tabs">
             <div class="tab-nav">
@@ -8212,12 +8250,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-69cca123-36c1-45b1-ac0a-c8cd0390f311"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-69cca123-36c1-45b1-ac0a-c8cd0390f311">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-23 Sun 18:55</span></div>
+          <div class="meta"><span class="date">23.02.2025 20:55</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -8245,7 +8284,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-02 Sun 19:27</span></div>
+          <div class="meta"><span class="date">02.03.2025 21:27</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -8273,7 +8312,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 19:15</span></div>
+          <div class="meta"><span class="date">09.03.2025 21:15</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -8301,7 +8340,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-13 Thu 18:53</span></div>
+          <div class="meta"><span class="date">13.03.2025 20:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -8329,7 +8368,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 18:54</span></div>
+          <div class="meta"><span class="date">23.03.2025 20:54</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -8357,7 +8396,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 18:50</span></div>
+          <div class="meta"><span class="date">30.03.2025 21:50</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -8385,7 +8424,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 16:59</span></div>
+          <div class="meta"><span class="date">06.04.2025 19:59</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -8413,7 +8452,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 18:05</span></div>
+          <div class="meta"><span class="date">13.04.2025 21:05</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -8441,7 +8480,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-20 Sun 17:39</span></div>
+          <div class="meta"><span class="date">20.04.2025 20:39</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -8469,7 +8508,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-24 Thu 17:01</span></div>
+          <div class="meta"><span class="date">24.04.2025 20:01</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -8497,7 +8536,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/edbdc0ab-3bf5-4e0c-be54-215ce7baf567.jpeg" alt=""><div class="name">Pulunaivot</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-01 Thu 16:56</span></div>
+          <div class="meta"><span class="date">01.05.2025 19:56</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -8546,6 +8585,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt="">Rcave Veterans</h2></summary>
 <div><span class="chip">Matches 11</span> <span class="chip">Maps 22</span> <span class="chip">W-L 13-9</span> <span class="chip">±RD 26</span> <span class="chip">KD 1.06</span> <span class="chip">KR 0.70</span> <span class="chip">ADR 77.0</span> <span class="chip">Util 12868</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-f56dd02a" class="tabs">
             <div class="tab-nav">
@@ -9127,12 +9167,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-f56dd02a-6107-48e2-abfb-75e7ec7ebcb2"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-f56dd02a-6107-48e2-abfb-75e7ec7ebcb2">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-23 Sun 16:48</span></div>
+          <div class="meta"><span class="date">23.02.2025 18:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -9160,7 +9201,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-27 Thu 17:42</span></div>
+          <div class="meta"><span class="date">27.02.2025 19:42</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -9188,7 +9229,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 17:16</span></div>
+          <div class="meta"><span class="date">09.03.2025 19:16</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -9216,7 +9257,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 16:40</span></div>
+          <div class="meta"><span class="date">16.03.2025 18:40</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -9244,7 +9285,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 19:49</span></div>
+          <div class="meta"><span class="date">23.03.2025 21:49</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -9272,7 +9313,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 17:47</span></div>
+          <div class="meta"><span class="date">30.03.2025 20:47</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -9300,7 +9341,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 16:59</span></div>
+          <div class="meta"><span class="date">06.04.2025 19:59</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -9328,7 +9369,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 17:49</span></div>
+          <div class="meta"><span class="date">13.04.2025 20:49</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -9356,7 +9397,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-14 Mon 17:50</span></div>
+          <div class="meta"><span class="date">14.04.2025 20:50</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -9384,7 +9425,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:48</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -9412,7 +9453,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6e8feae5-303b-4bc2-a8bc-283d1b1e4c03.jpeg" alt=""><div class="name">Rcave Veterans</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 17:51</span></div>
+          <div class="meta"><span class="date">04.05.2025 20:51</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -9461,6 +9502,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt="">Tuuheet Tukat</h2></summary>
 <div><span class="chip">Matches 11</span> <span class="chip">Maps 22</span> <span class="chip">W-L 9-13</span> <span class="chip">±RD -28</span> <span class="chip">KD 0.95</span> <span class="chip">KR 0.68</span> <span class="chip">ADR 76.3</span> <span class="chip">Util 13790</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-8a3a4310" class="tabs">
             <div class="tab-nav">
@@ -10042,12 +10084,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-8a3a4310-49a9-4ca2-b61e-d90524f14e79"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-8a3a4310-49a9-4ca2-b61e-d90524f14e79">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-23 Sun 19:53</span></div>
+          <div class="meta"><span class="date">23.02.2025 21:53</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -10075,7 +10118,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-27 Thu 17:42</span></div>
+          <div class="meta"><span class="date">27.02.2025 19:42</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -10103,7 +10146,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 18:59</span></div>
+          <div class="meta"><span class="date">09.03.2025 20:59</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -10131,7 +10174,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 18:50</span></div>
+          <div class="meta"><span class="date">16.03.2025 20:50</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -10159,7 +10202,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 19:25</span></div>
+          <div class="meta"><span class="date">23.03.2025 21:25</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -10187,7 +10230,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 18:00</span></div>
+          <div class="meta"><span class="date">30.03.2025 21:00</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -10215,7 +10258,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 17:14</span></div>
+          <div class="meta"><span class="date">06.04.2025 20:14</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -10243,7 +10286,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 17:15</span></div>
+          <div class="meta"><span class="date">13.04.2025 20:15</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -10271,7 +10314,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-16 Wed 17:47</span></div>
+          <div class="meta"><span class="date">16.04.2025 20:47</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -10299,7 +10342,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:48</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:48</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -10327,7 +10370,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/9b58bd57-382c-47a5-aef2-d67610cff049.jpeg" alt=""><div class="name">Tuuheet Tukat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-01 Thu 16:56</span></div>
+          <div class="meta"><span class="date">01.05.2025 19:56</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -10376,6 +10419,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt="">Ukkirefut</h2></summary>
 <div><span class="chip">Matches 11</span> <span class="chip">Maps 22</span> <span class="chip">W-L 11-11</span> <span class="chip">±RD 3</span> <span class="chip">KD 1.03</span> <span class="chip">KR 0.71</span> <span class="chip">ADR 78.1</span> <span class="chip">Util 15228</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-90452aed" class="tabs">
             <div class="tab-nav">
@@ -11025,12 +11069,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-90452aed-d08a-48ed-ac78-40e7c09e7372"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-90452aed-d08a-48ed-ac78-40e7c09e7372">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-02-19 Wed 17:56</span></div>
+          <div class="meta"><span class="date">19.02.2025 19:56</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -11058,7 +11103,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-02 Sun 19:27</span></div>
+          <div class="meta"><span class="date">02.03.2025 21:27</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -11086,7 +11131,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-09 Sun 18:57</span></div>
+          <div class="meta"><span class="date">09.03.2025 20:57</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -11114,7 +11159,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-16 Sun 16:40</span></div>
+          <div class="meta"><span class="date">16.03.2025 18:40</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -11142,7 +11187,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-23 Sun 19:00</span></div>
+          <div class="meta"><span class="date">23.03.2025 21:00</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -11170,7 +11215,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-03-30 Sun 17:58</span></div>
+          <div class="meta"><span class="date">30.03.2025 20:58</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -11198,7 +11243,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-06 Sun 18:08</span></div>
+          <div class="meta"><span class="date">06.04.2025 21:08</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -11226,7 +11271,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-13 Sun 17:15</span></div>
+          <div class="meta"><span class="date">13.04.2025 20:15</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
@@ -11254,7 +11299,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-20 Sun 17:49</span></div>
+          <div class="meta"><span class="date">20.04.2025 20:49</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -11282,7 +11327,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 18:08</span></div>
+          <div class="meta"><span class="date">27.04.2025 21:08</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -11310,7 +11355,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/4204a5a5-70fb-4024-951b-15134cd59ad0.jpeg" alt=""><div class="name">Ukkirefut</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 18:20</span></div>
+          <div class="meta"><span class="date">04.05.2025 21:20</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>

@@ -1,4 +1,4 @@
-<!-- GENVER:1 GENERATED_AT:1757361238 -->
+<!-- GENVER:2 GENERATED_AT:1757364838 -->
 <!doctype html>
 <html lang="fi">
 <head>
@@ -25,6 +25,12 @@
   --err:#f97066;
   --radius:14px;
   --shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+
+.subtitle {
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 /* Team logos: different size for index vs division */
@@ -225,6 +231,7 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   gap:.65rem;
   padding:.6rem 1rem;
   cursor:pointer;
+  transition: background 0.15s;
 }
 
 /* Vasen ja oikea asettuvat reunoihin, keskiblokki on aina keskellä */
@@ -270,6 +277,21 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   line-height:1.2;
   letter-spacing:.2px;
   white-space:nowrap;
+}
+
+.match-summary::after {
+  content: "▸"; /* oikealle osoittava kolmio */
+  font-size: 1.1em;
+  color: var(--muted);
+  margin-left: .5rem;
+  transition: transform .2s;
+}
+.match-row[open] .match-summary::after {
+  transform: rotate(90deg); /* kääntyy alas */
+}
+
+.match-summary:hover {
+  background: rgba(58,163,255,0.08);
 }
 
 .result-win{background:rgba(40,160,90,.16);border-color:rgba(40,160,90,.42);color:#64e09f;}
@@ -518,7 +540,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <div class="topbar">
         <div class="brand">
           <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
-          <span>AFI - Pappaliiga Stats v1.1</span>
+          <span>AFI - Pappaliiga Stats v1.2</span>
         </div>
         <div class="nav">
           <a class="btn btn-ghost" href="index.html">← Takaisin indexiin</a>
@@ -528,7 +550,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     
 <div class="container">
 <h1 style='text-align:center'>19 divisioona playoffs S10 (Season 10)</h1>
-<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 2025-09-07 13:57</div>
+<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 07.09.2025 16:57</div>
 <div class="page">
 <div class="nav">
 <a href="#team-85cd3530-035b-41ae-a692-6962b9e81680"><img class="logo nav-logo" src="https://distribution.faceit-cdn.net/images/91f99aaf-1228-48dc-a673-11b405507222.jpeg" alt="">El Potatis</a>
@@ -572,11 +594,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 </tbody></table>
 </div>
 </div>
-<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.</div>
 <details class="team-section" id="team-85cd3530-035b-41ae-a692-6962b9e81680" open>
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/91f99aaf-1228-48dc-a673-11b405507222.jpeg" alt="">El Potatis</h2></summary>
 <div><span class="chip">Matches 1</span> <span class="chip">Maps 3</span> <span class="chip">W-L 0-3</span> <span class="chip">±RD -15</span> <span class="chip">KD 0.70</span> <span class="chip">KR 0.54</span> <span class="chip">ADR 66.2</span> <span class="chip">Util 1002</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-85cd3530" class="tabs">
             <div class="tab-nav">
@@ -1088,12 +1110,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-85cd3530-035b-41ae-a692-6962b9e81680"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-85cd3530-035b-41ae-a692-6962b9e81680">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/91f99aaf-1228-48dc-a673-11b405507222.jpeg" alt=""><div class="name">El Potatis</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:46</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:46</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1147,6 +1170,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/c5bbb1d4-e6ba-4679-bce5-b86e72e0185b.jpeg" alt="">Hero-Fi U</h2></summary>
 <div><span class="chip">Matches 1</span> <span class="chip">Maps 3</span> <span class="chip">W-L 0-3</span> <span class="chip">±RD -11</span> <span class="chip">KD 0.81</span> <span class="chip">KR 0.57</span> <span class="chip">ADR 67.8</span> <span class="chip">Util 1321</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-d15cc43e" class="tabs">
             <div class="tab-nav">
@@ -1658,12 +1682,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-d15cc43e-80ff-4f8d-a9ea-c93caa9a00a6"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-d15cc43e-80ff-4f8d-a9ea-c93caa9a00a6">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/c5bbb1d4-e6ba-4679-bce5-b86e72e0185b.jpeg" alt=""><div class="name">Hero-Fi U</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:57</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:57</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -1717,6 +1742,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/ccea1c6a-950f-4f58-9115-7a70c401b175.jpeg" alt="">HuKi</h2></summary>
 <div><span class="chip">Matches 2</span> <span class="chip">Maps 6</span> <span class="chip">W-L 3-3</span> <span class="chip">±RD 13</span> <span class="chip">KD 1.06</span> <span class="chip">KR 0.70</span> <span class="chip">ADR 78.3</span> <span class="chip">Util 3251</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-a508e6bd" class="tabs">
             <div class="tab-nav">
@@ -2298,12 +2324,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-a508e6bd-4241-477d-81eb-0252800cab06"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-a508e6bd-4241-477d-81eb-0252800cab06">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/ccea1c6a-950f-4f58-9115-7a70c401b175.jpeg" alt=""><div class="name">HuKi</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:46</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:46</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -2336,7 +2363,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/ccea1c6a-950f-4f58-9115-7a70c401b175.jpeg" alt=""><div class="name">HuKi</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 18:47</span></div>
+          <div class="meta"><span class="date">04.05.2025 21:47</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">1–2</span></div>
@@ -2390,6 +2417,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/6d297841-6c52-420a-b6cc-92f7a7051b58.jpeg" alt="">Liukas Silakka</h2></summary>
 <div><span class="chip">Matches 1</span> <span class="chip">Maps 3</span> <span class="chip">W-L 0-3</span> <span class="chip">±RD -14</span> <span class="chip">KD 0.76</span> <span class="chip">KR 0.58</span> <span class="chip">ADR 69.4</span> <span class="chip">Util 1459</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-dba2cc95" class="tabs">
             <div class="tab-nav">
@@ -2901,12 +2929,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-dba2cc95-92a4-4d55-9378-ed495df211cc"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-dba2cc95-92a4-4d55-9378-ed495df211cc">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/6d297841-6c52-420a-b6cc-92f7a7051b58.jpeg" alt=""><div class="name">Liukas Silakka</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:12</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:12</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -2960,6 +2989,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/43dcedba-a061-4ef9-8b26-9de716c6d466.jpeg" alt="">Marat myyrat</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 9</span> <span class="chip">W-L 6-3</span> <span class="chip">±RD 29</span> <span class="chip">KD 1.22</span> <span class="chip">KR 0.76</span> <span class="chip">ADR 82.8</span> <span class="chip">Util 5318</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-c14f113d" class="tabs">
             <div class="tab-nav">
@@ -3507,12 +3537,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-c14f113d-5b4f-458a-a105-660a84e30192"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-c14f113d-5b4f-458a-a105-660a84e30192">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/43dcedba-a061-4ef9-8b26-9de716c6d466.jpeg" alt=""><div class="name">Marat myyrat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:12</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:12</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -3545,7 +3576,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/43dcedba-a061-4ef9-8b26-9de716c6d466.jpeg" alt=""><div class="name">Marat myyrat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 18:38</span></div>
+          <div class="meta"><span class="date">04.05.2025 21:38</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–1</span></div>
@@ -3578,7 +3609,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/43dcedba-a061-4ef9-8b26-9de716c6d466.jpeg" alt=""><div class="name">Marat myyrat</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-11 Sun 18:06</span></div>
+          <div class="meta"><span class="date">11.05.2025 21:06</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -3632,6 +3663,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/7f7332b1-890c-4820-8294-2630061c500d.jpeg" alt="">Pallipylly</h2></summary>
 <div><span class="chip">Matches 2</span> <span class="chip">Maps 6</span> <span class="chip">W-L 3-3</span> <span class="chip">±RD 7</span> <span class="chip">KD 1.05</span> <span class="chip">KR 0.73</span> <span class="chip">ADR 78.4</span> <span class="chip">Util 2977</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-4c04b75d" class="tabs">
             <div class="tab-nav">
@@ -4145,12 +4177,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-4c04b75d-f3d5-4460-b8cc-0fba8f86d968"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-4c04b75d-f3d5-4460-b8cc-0fba8f86d968">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7f7332b1-890c-4820-8294-2630061c500d.jpeg" alt=""><div class="name">Pallipylly</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:55</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:55</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -4183,7 +4216,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/7f7332b1-890c-4820-8294-2630061c500d.jpeg" alt=""><div class="name">Pallipylly</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 18:38</span></div>
+          <div class="meta"><span class="date">04.05.2025 21:38</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">1–2</span></div>
@@ -4237,6 +4270,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/0beb8e1c-2f14-4b7c-bdc9-12c662befa4a.jpeg" alt="">tiistai</h2></summary>
 <div><span class="chip">Matches 1</span> <span class="chip">Maps 3</span> <span class="chip">W-L 0-3</span> <span class="chip">±RD -12</span> <span class="chip">KD 0.82</span> <span class="chip">KR 0.62</span> <span class="chip">ADR 70.3</span> <span class="chip">Util 701</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-a9d40f31" class="tabs">
             <div class="tab-nav">
@@ -4748,12 +4782,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-a9d40f31-2337-4afd-9f7b-8c547b90066f"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-a9d40f31-2337-4afd-9f7b-8c547b90066f">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/0beb8e1c-2f14-4b7c-bdc9-12c662befa4a.jpeg" alt=""><div class="name">tiistai</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:55</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:55</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
@@ -4807,6 +4842,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <summary><h2><img class="logo team-logo" src="https://distribution.faceit-cdn.net/images/a31def85-7530-4204-b1f9-73e3e8ca45ca.jpeg" alt="">Torkyministerio</h2></summary>
 <div><span class="chip">Matches 3</span> <span class="chip">Maps 9</span> <span class="chip">W-L 4-5</span> <span class="chip">±RD 3</span> <span class="chip">KD 0.99</span> <span class="chip">KR 0.66</span> <span class="chip">ADR 73.3</span> <span class="chip">Util 4664</span></div>
 <h3>Players</h3>
+<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>
 
           <div id="tabs-0b0198ff" class="tabs">
             <div class="tab-nav">
@@ -5422,12 +5458,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     <div class="title">Matches</div>
     <label class="toggle-played"><input type="checkbox" id="only-played-0b0198ff-81ea-4ad1-990a-c7c578b48538"><span> Näytä vain pelatut</span></label>
   </div>
+  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
   <div class="matches-list" id="matches-0b0198ff-81ea-4ad1-990a-c7c578b48538">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/a31def85-7530-4204-b1f9-73e3e8ca45ca.jpeg" alt=""><div class="name">Torkyministerio</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-04-27 Sun 17:57</span></div>
+          <div class="meta"><span class="date">27.04.2025 20:57</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
@@ -5460,7 +5497,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/a31def85-7530-4204-b1f9-73e3e8ca45ca.jpeg" alt=""><div class="name">Torkyministerio</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-04 Sun 18:47</span></div>
+          <div class="meta"><span class="date">04.05.2025 21:47</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–1</span></div>
@@ -5493,7 +5530,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <summary class="match-summary" role="button">
         <div class="team side-left"><img class="logo" src="https://distribution.faceit-cdn.net/images/a31def85-7530-4204-b1f9-73e3e8ca45ca.jpeg" alt=""><div class="name">Torkyministerio</div></div>
         <div class="center">
-          <div class="meta"><span class="date">2025-05-11 Sun 18:06</span></div>
+          <div class="meta"><span class="date">11.05.2025 21:06</span></div>
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
