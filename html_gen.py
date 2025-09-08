@@ -4,10 +4,11 @@ import sqlite3
 import os
 from collections import defaultdict
 from faceit_config import DIVISIONS
-from datetime import datetime
 from html import escape
 import hashlib, tempfile, re
 import time
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from db import (
     get_conn,
@@ -26,7 +27,9 @@ from db import (
 )
 
 # --- HTML/template versioning ---
-HTML_TEMPLATE_VERSION = 1
+HTML_TEMPLATE_VERSION = 2
+
+HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
 
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
@@ -58,6 +61,12 @@ UNIFIED_HEAD = """<!doctype html>
   --err:#f97066;
   --radius:14px;
   --shadow:0 10px 30px rgba(0,0,0,0.25);
+}
+
+.subtitle {
+  font-size: 0.85em;
+  color: var(--muted);
+  margin-top: 4px;
 }
 
 /* Team logos: different size for index vs division */
@@ -258,6 +267,7 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   gap:.65rem;
   padding:.6rem 1rem;
   cursor:pointer;
+  transition: background 0.15s;
 }
 
 /* Vasen ja oikea asettuvat reunoihin, keskiblokki on aina keskellä */
@@ -303,6 +313,21 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
   line-height:1.2;
   letter-spacing:.2px;
   white-space:nowrap;
+}
+
+.match-summary::after {
+  content: "▸"; /* oikealle osoittava kolmio */
+  font-size: 1.1em;
+  color: var(--muted);
+  margin-left: .5rem;
+  transition: transform .2s;
+}
+.match-row[open] .match-summary::after {
+  transform: rotate(90deg); /* kääntyy alas */
+}
+
+.match-summary:hover {
+  background: rgba(58,163,255,0.08);
 }
 
 .result-win{background:rgba(40,160,90,.16);border-color:rgba(40,160,90,.42);color:#64e09f;}
@@ -599,6 +624,16 @@ TOOLTIP_RATING1 = (
 # helpers
 # ------------------------------
 
+def format_ts(ts: int | None) -> str:
+    """
+    Convert UTC epoch → Europe/Helsinki local time string.
+    Returns '—' if ts is None/0/empty.
+    """
+    if not ts:
+        return "—"
+    dt = datetime.fromtimestamp(int(ts), tz=timezone.utc).astimezone(HELSINKI_TZ)
+    return dt.strftime("%d.%m.%Y %H:%M")
+
 def _fs_mtime(path: Path) -> int:
     try:
         return int(path.stat().st_mtime)
@@ -669,39 +704,6 @@ def q(con, sql, params=()):
     cur = con.execute(sql, params)
     rows = [dict(r) for r in cur.fetchall()]
     return rows
-
-def _safe_div(a, b):
-    return (a / b) if b else 0.0
-
-from datetime import datetime
-
-def _fmt_ts(ts: int) -> str:
-    try:
-        if not ts:
-            return "—"
-        # Show weekday too, e.g. 2025-08-31 Sun 21:27
-        return datetime.fromtimestamp(int(ts)).strftime("%Y-%m-%d %a %H:%M")
-    except Exception:
-        return "—"
-
-def _fmt_opt_stat(label: str, value: float | int, fmt: str) -> str:
-    """Return 'Label X' only if value is non-zero; otherwise empty string."""
-    try:
-        v = float(value)
-    except Exception:
-        v = 0.0
-    if abs(v) < 1e-9:
-        return ""
-    return f"{label} {fmt % v}"
-
-def _latest_mtime(paths: list[Path]) -> float:
-    mt = 0.0
-    for p in paths:
-        try:
-            mt = max(mt, p.stat().st_mtime)
-        except FileNotFoundError:
-            continue
-    return mt
 
 def _read_embedded_version(path: str) -> int:
     """
@@ -801,6 +803,7 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
     html.append('    <div class="title">Matches</div>')
     html.append(f'    <label class="toggle-played"><input type="checkbox" id="only-played-{team_id}"><span> Näytä vain pelatut</span></label>')
     html.append('  </div>')
+    html.append('  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>')
     html.append(f'  <div class="matches-list" id="matches-{team_id}">')
 
     for r in rows:
@@ -843,7 +846,7 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
         else:
             badge_cls, badge_txt = "result-upcoming", "upcoming"
 
-        date_s = _fmt_ts(_ts(r))
+        date_s = format_ts(_ts(r))
         stage  = _status(r).capitalize()
         maps_score = f"{mw}–{ml}" if played else "—"
         faceit_url = _faceit_url(r)
@@ -1169,21 +1172,6 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
         "leaders": leaders,
     }
 
-def _percentile(vals, p):
-    """Pieni prosenttipiste-funktio ilman numpyä (p 0..100)."""
-    if not vals:
-        return None
-    vals = sorted(vals)
-    if len(vals) == 1:
-        return vals[0]
-    k = (len(vals)-1) * (p/100.0)
-    f = int(k)
-    c = min(f+1, len(vals)-1)
-    if f == c:
-        return vals[f]
-    d0 = vals[f] * (c - k)
-    d1 = vals[c] * (k - f)
-    return d0 + d1
 
 def _index_card_stats(con: sqlite3.Connection, championship_id: str) -> tuple[int, int, int]:
     """
@@ -1329,9 +1317,9 @@ def render_division(con, div):
     div_avgs = compute_champ_map_avgs_data(con, div["championship_id"])
     thresholds = compute_champ_thresholds_data(con, div["championship_id"])
 
-    # Timestamp shown on page: use DB timestamp; fallback to dash if none
+    # Timestamp shown on page: use DB UTC epoch -> Helsinki local
     ts_epoch = get_division_generated_ts(con, div["championship_id"])
-    ts_str = datetime.fromtimestamp(int(ts_epoch)).strftime("%Y-%m-%d %H:%M") if ts_epoch else "—"
+    ts_str = (format_ts(ts_epoch) or "—")
 
     html = []
     title = f"{esc_title(div['name'])} (Season {div['season']}) — Pappaliiga Stats"
@@ -1497,7 +1485,6 @@ def render_division(con, div):
 
     html.append('</div>')  # /div-summary
 
-    html.append('<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.</div>')
 
     for ti, t in enumerate(teams, start=1):
         team_id = t["team_id"]; team_name = t["team_name"] or t["team_id"]
@@ -1506,8 +1493,7 @@ def render_division(con, div):
         team_avatar = next((t.get("avatar") for t in teams if t["team_id"] == team_id), None)
         logo = f'<img class="logo team-logo" src="{team_avatar}" alt="">' if team_avatar else ''
         html.append(f"<summary><h2>{logo}{escape(team_name)}</h2></summary>")
-
-
+        
         # --- Lataa pelaajadata ensin, jotta voidaan laskea varaluotettavat tiimikompaktit ---
         players = compute_player_table_data(con, div["championship_id"], team_id)
 
@@ -1633,6 +1619,7 @@ def render_division(con, div):
         tab_root_id = f"tabs-{team_id[:8]}"
 
         html.append('<h3>Players</h3>')
+        html.append('<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>')
         html.append(f"""
           <div id="{tab_root_id}" class="tabs">
             <div class="tab-nav">
