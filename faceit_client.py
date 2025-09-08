@@ -3,6 +3,7 @@
 # All comments in English.
 
 from __future__ import annotations
+import logging
 import time
 import requests
 from typing import Dict, Any, List, Optional
@@ -86,80 +87,72 @@ def _retry_after_seconds(resp: requests.Response) -> Optional[float]:
     except Exception:
         return None
 
-
-def _get(url: str, headers: Dict[str, str], params: Optional[Dict[str, Any]] = None) -> Any:
-    last_err: Optional[Exception] = None
-    for _ in range(ADAPT_MAX_RETRIES):
+def _get(url: str, headers: dict, params: dict | None = None, *, retries: int = 3, backoff: float = 0.8):
+    import logging, time, requests
+    last_err = None
+    for i in range(max(1, retries)):
         try:
-            resp = requests.get(url, headers=headers, params=params, timeout=DEFAULT_TIMEOUT)
-            if resp.status_code == 429:
-                _ADAPT.on_throttle()
-                ra = _retry_after_seconds(resp)
-                # Respect server hint if present; otherwise at least 1s, otherwise current adaptive delay.
-                delay = max(1.0, ra if ra is not None else _ADAPT.cur)
-                time.sleep(delay)
-                continue
+            resp = requests.get(url, headers=headers, params=params, timeout=20)
+            # << UUSI: pehmeä skip 403/404
+            if resp.status_code in (403, 404):
+                logging.info("[skip] GET %s -> %s (return None)", url, resp.status_code)
+                return None
             resp.raise_for_status()
-            _ADAPT.on_success()
             return resp.json()
-        except Exception as e:
+        except requests.HTTPError as e:
             last_err = e
-            _ADAPT.on_error()
-            _ADAPT.sleep()
+        except requests.RequestException as e:
+            last_err = e
+        time.sleep(backoff * (2 ** i))
     raise RuntimeError(f"GET failed for {url}: {last_err}")
 
-
-# --- Open Data v4 endpoints ---
-
-def list_championship_matches(championship_id: str, match_type: str = "all", limit: int = 100) -> List[Dict[str, Any]]:
+def list_championship_matches(championship_id: str, match_type: str = "all", limit: int = 100) -> list[dict]:
     """
-    Paginates until all items fetched.
-    match_type ∈ {'all','past','upcoming','live','ongoing'}.
-    - Faceit API hyväksyy 'ongoing' (alias 'live').
-    - Jos 'all', tehdään kolme erillistä hakua ja yhdistetään tulokset.
+    Palauttaa listan Faceit-matseja. Jos listaus päätyy 403/404 -> skip ja jatka.
+    match_type: "past" | "ongoing" | "upcoming" | "all"
     """
-    if match_type == "all":
-        out: List[Dict[str, Any]] = []
-        for mt in ("past", "upcoming", "ongoing"):
-            out.extend(list_championship_matches(championship_id, mt, limit=limit))
-        return out
+    types = ["past", "ongoing", "upcoming"] if match_type == "all" else [match_type]
+    out: list[dict] = []
+    base = f"{OPEN_BASE}/championships/{championship_id}/matches"
 
-    assert match_type in {"past", "upcoming", "live", "ongoing"}
-    if match_type == "live":
-        match_type = "ongoing"
+    for mt in types:
+        offset = 0
+        while True:
+            params = {"type": mt, "offset": offset, "limit": limit}
+            data = _get(base, HEADERS_OPEN, params=params)
+            if data is None:
+                logging.info("[skip] championship %s list %s -> None (403/404), ohitetaan", championship_id, mt)
+                break
 
-    url = f"{OPEN_BASE}/championships/{championship_id}/matches"
-    items: List[Dict[str, Any]] = []
-    offset = 0
-    while True:
-        params = {"type": match_type, "offset": offset, "limit": limit}
-        data = _get(url, HEADERS_OPEN, params=params)
-        batch = data.get("items", [])
-        if not batch:
-            break
-        items.extend(batch)
-        if len(batch) < limit:
-            break
-        offset += limit
-        _ADAPT.sleep()
-    return items
+            items = data.get("items") or []
+            if not items:
+                break
+
+            out.extend(items)
+            if len(items) < limit:
+                break
+            offset += limit
+
+    return out
 
 def get_match_details(match_id: str) -> Dict[str, Any]:
     url = f"{OPEN_BASE}/matches/{match_id}"
-    return _get(url, HEADERS_OPEN)
+    data = _get(url, HEADERS_OPEN)
+    return data or None
 
 
 def get_match_stats(match_id: str) -> Dict[str, Any]:
     url = f"{OPEN_BASE}/matches/{match_id}/stats"
-    return _get(url, HEADERS_OPEN)
+    data = _get(url, HEADERS_OPEN)
+    return data or None
 
 
 # --- Democracy history (veto tickets, including map drops/picks) ---
 
 def get_democracy_history(match_id: str) -> Dict[str, Any]:
     url = f"{DEMOCRACY_BASE}/match/{match_id}/history"
-    return _get(url, HEADERS_DEMOCRACY)
-
+    data = _get(url, HEADERS_DEMOCRACY)
+    return data or None
 
 def list_championships_for_organizer(organizer_id: str, limit: int = 100) -> List[Dict[str, Any]]:
     """List all championships for a given organizer_id."""

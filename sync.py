@@ -451,9 +451,23 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         _persist_map_catalog_from_details(con, details, season=champ_row["season"], game=champ_row.get("game") or "cs2")
 
     # STATS vain finished/past
-    stats = get_match_stats(match_id) if kind == "past" else {}
-    if not isinstance(stats, dict):
-        stats = {}
+    stats = {}
+    if kind == "past":
+        try:
+            stats = get_match_stats(match_id) or {}
+        except Exception as e:
+            logging.info("[skip] stats %s -> %s", match_id, e)
+            stats = {}
+
+        # Jos Faceit ei anna statseja (tyypilliset 404:t), älä spämmi varoituksia,
+        # vaan leimaa not_found ja lopeta käsittely tähän matsiin.
+        if not stats:
+            upsert_match(con, {
+                "match_id": match_id,
+                "championship_id": champ_row["championship_id"],
+                "status": "not_found",
+            })
+            return
 
     rounds = _extract_rounds_from_stats(stats)
     team1_id, team2_id = _derive_team_ids(details or {}, rounds)
