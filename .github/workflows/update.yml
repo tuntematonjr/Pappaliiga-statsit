@@ -1,7 +1,7 @@
 name: Weekly Python Tasks (Linux)
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -19,14 +19,6 @@ jobs:
     steps:
       # 1️⃣ Checkout repo
       - uses: actions/checkout@v3
-
-      # 2️⃣ Download previous SQLite DB if it exists
-      #- name: Download previous SQLite DB
-      #  uses: actions/download-artifact@v4
-      #  with:
-      #    name: sqlite-db
-      #    path: .
-      #    github-token: ${{ secrets.GITHUB_TOKEN }}
       
       # 3️⃣ Set up Python
       - name: Set up Python
@@ -54,12 +46,8 @@ jobs:
         shell: bash
         continue-on-error: false
 
-      # 7️⃣ Upload updated SQLite DB
-      - name: Upload SQLite DB
-        uses: actions/upload-artifact@v4
-        with:
-          name: sqlite-db
-          path: pappaliiga.db
+      - name: Add & Commit
+        uses: EndBug/add-and-commit@v9.1.4                
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
