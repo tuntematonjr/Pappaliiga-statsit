@@ -26,7 +26,7 @@ from db import (
 )
 
 # --- HTML/template versioning ---
-HTML_TEMPLATE_VERSION = 4
+HTML_TEMPLATE_VERSION = 3
 
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
@@ -1342,7 +1342,7 @@ def render_division(con, div):
     html.append(f"<h1 style='text-align:center'>{div['name']} (Season {div['season']})</h1>")
     html.append(
         f"<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>"
-        f"Generoitu {ts_str}"
+        f"Data päivitetty {ts_str}"
         f"</div>"
     )
     html.append('<div class="page">')
@@ -1593,9 +1593,9 @@ def render_division(con, div):
             c12_win = p.get("c12_win", 0) or 0
             p["c12_wr"] = (c12_win / c12_att * 100.0) if c12_att else 0.0
 
-            entry_att = p.get("entry_att", 0) or 0
+            entry_count = p.get("entry_count", 0) or 0
             entry_win = p.get("entry_win", 0) or 0
-            p["entry_wr"] = (entry_win / entry_att * 100.0) if entry_att else 0.0
+            p["entry_wr"] = (entry_win / entry_count * 100.0) if entry_count else 0.0
 
             # Utility damage per round
             rounds = p.get("rounds", 0) or 0
@@ -1650,22 +1650,22 @@ def render_division(con, div):
         html.append(f'<table id="{tid_basic}" data-sort-col="3" data-sort-dir="desc">')
         # Basic headers (esim. id = tid_basic)
         html.append(f"""<thead><tr>
-          <th onclick="sortTable('{tid_basic}',0,false)">Nickname</th>
-          <th onclick="sortTable('{tid_basic}',1,true)">Maps</th>
-          <th onclick="sortTable('{tid_basic}',2,true)" title="Total rounds">Rounds</th>
-          <th onclick="sortTable('{tid_basic}',3,true)" title="Kills/Deaths">KD</th>
-          <th onclick="sortTable('{tid_basic}',4,true)">ADR</th>
-          <th onclick="sortTable('{tid_basic}',5,true)">KR</th>
-          <th onclick="sortTable('{tid_basic}',6,true)">Damage</th>
-          <th onclick="sortTable('{tid_basic}',7,true)">Kills</th>
-          <th onclick="sortTable('{tid_basic}',8,true)">Deaths</th>
-          <th onclick="sortTable('{tid_basic}',9,true)">Assists</th>
-          <th onclick="sortTable('{tid_basic}',10,true)">HS%</th>
-          <th onclick="sortTable('{tid_basic}',11,true)">2K</th>
-          <th onclick="sortTable('{tid_basic}',12,true)">3K</th>
-          <th onclick="sortTable('{tid_basic}',13,true)">4K</th>
-          <th onclick="sortTable('{tid_basic}',14,true)">ACE</th>
-          <th onclick="sortTable('{tid_basic}',15,true)">MVPs</th>
+          <th onclick="sortTable('{tid_basic}',0,false)"  title="Player nickname (Faceit)">Nickname</th>
+          <th onclick="sortTable('{tid_basic}',1,true)"   title="Maps played">Maps</th>
+          <th onclick="sortTable('{tid_basic}',2,true)"   title="Total rounds played">Rounds</th>
+          <th onclick="sortTable('{tid_basic}',3,true)"   title="Kills divided by deaths">KD</th>
+          <th onclick="sortTable('{tid_basic}',4,true)"   title="Average damage per round">ADR</th>
+          <th onclick="sortTable('{tid_basic}',5,true)"   title="Kills per round">KR</th>
+          <th onclick="sortTable('{tid_basic}',6,true)"   title="Total damage dealt">Damage</th>
+          <th onclick="sortTable('{tid_basic}',7,true)"   title="Total kills">Kills</th>
+          <th onclick="sortTable('{tid_basic}',8,true)"   title="Total deaths">Deaths</th>
+          <th onclick="sortTable('{tid_basic}',9,true)"   title="Total assists">Assists</th>
+          <th onclick="sortTable('{tid_basic}',10,true)"  title="Headshot percentage">HS%</th>
+          <th onclick="sortTable('{tid_basic}',11,true)"  title="Rounds with exactly 2 kills (multi-kill 2K)">2K</th>
+          <th onclick="sortTable('{tid_basic}',12,true)"  title="Rounds with exactly 3 kills (multi-kill 3K)">3K</th>
+          <th onclick="sortTable('{tid_basic}',13,true)"  title="Rounds with exactly 4 kills (multi-kill 4K)">4K</th>
+          <th onclick="sortTable('{tid_basic}',14,true)"  title="Rounds with 5 kills (ace)">ACE</th>
+          <th onclick="sortTable('{tid_basic}',15,true)"  title="Match MVP awards">MVPs</th>
           </tr></thead>""")
         for p in players:
           deltas = _pd(p["player_id"])
@@ -1757,7 +1757,7 @@ def render_division(con, div):
 
         html.append(
             f"<th onclick=\"sortTable('{tid_adv}',{col_idx},true)\" "
-            "title='Number of enemies blinded by the player''s flashes'>Flashed</th>"
+            "title='Total enemies blinded by the player&#39;s flashes'>Flashed</th>"
         ); col_idx += 1
 
         html.append(
@@ -1777,7 +1777,7 @@ def render_division(con, div):
             d_c11w, prev_c11w = _dval(deltas, "c11_win")
             d_c12a, prev_c12a = _dval(deltas, "c12_att")
             d_c12w, prev_c12w = _dval(deltas, "c12_win")
-            d_ea,   prev_ea   = _dval(deltas, "entry_att")
+            d_ea,   prev_ea   = _dval(deltas, "entry_count")
             d_ew,   prev_ew   = _dval(deltas, "entry_win")
             d_util, prev_util = _dval(deltas, "util")
             d_udpr, prev_udpr = _dval(deltas, "udpr")
@@ -1816,9 +1816,9 @@ def render_division(con, div):
             entry_wr_prev = (100.0 * (prev_ew or 0) / (prev_ea or 0)) if (prev_ea or 0) > 0 else 0.0
             entry_wr_delta = p['entry_wr'] - entry_wr_prev
             html.append(
-                f"<td class='wr' data-zero='show' data-g='{p['entry_att']}' data-w='{p['entry_win']}' "
+                f"<td class='wr' data-zero='show' data-g='{p['entry_count']}' data-w='{p['entry_win']}' "
                 f"data-pct='{p['entry_wr']:.1f}' "
-                f"title='Attempts: {p['entry_att']} (Δ {_signed(d_ea,0)}), Wins: {p['entry_win']} (Δ {_signed(d_ew,0)}), Δ WR: {_signed(entry_wr_delta,1)} pp'>"
+                f"title='Attempts: {p['entry_count']} (Δ {_signed(d_ea,0)}), Wins: {p['entry_win']} (Δ {_signed(d_ew,0)}), Δ WR: {_signed(entry_wr_delta,1)} pp'>"
                 f"</td>"
             )
 
@@ -1838,9 +1838,34 @@ def render_division(con, div):
                 f"</td>"
             )
 
-            html.append(f"<td title='Δ vs prev: {_signed(d_flashed,0)} (prev {int(prev_flashed) if prev_flashed is not None else 0})'>{p.get('flashed', 0)}{_arrow(d_flashed)}</td>")
-            html.append(f"<td title='Δ vs prev: {_signed(d_pistol,0)} (prev {int(prev_pistol) if prev_pistol is not None else 0})'>{p.get('pistol_kills',0)}{_arrow(d_pistol)}</td>")
-            html.append(f"<td title='Δ vs prev: {_signed(d_awp,0)} (prev {int(prev_awp) if prev_awp is not None else 0})'>{p.get('awp_kills',0)}{_arrow(d_awp)}</td>")
+            # Flashed total
+            html.append(
+                f"<td title='Δ vs prev: {_signed(d_flashed,0)} (prev {int(prev_flashed) if prev_flashed is not None else 0})'>"
+                f"{p.get('flashed', 0)}{_arrow(d_flashed)}</td>"
+            )
+
+            # Enemies per flash (tehdään myös vertailu edelliseen: prev_flashed / prev_flash_count)
+            _curr_eff = p.get("enemies_per_flash", None)
+            _prev_eff = ((prev_flashed or 0) / (prev_fcnt or 0)) if (prev_fcnt or 0) > 0 else 0.0
+            if _curr_eff is None:
+                html.append("<td class='muted' title='No flash data'>—</td>")
+            else:
+                _delta_eff = _curr_eff - _prev_eff
+                html.append(
+                    f"<td title='Δ vs prev: {_signed(_delta_eff,2)} (prev {_prev_eff:.2f})'>"
+                    f"{_curr_eff:.2f}{_arrow(_delta_eff)}</td>"
+                )
+
+            # Pistol & Sniper (AWP) kills
+            html.append(
+                f"<td title='Δ vs prev: {_signed(d_pistol,0)} (prev {int(prev_pistol) if prev_pistol is not None else 0})'>"
+                f"{p.get('pistol_kills',0)}{_arrow(d_pistol)}</td>"
+            )
+            html.append(
+                f"<td title='Δ vs prev: {_signed(d_awp,0)} (prev {int(prev_awp) if prev_awp is not None else 0})'>"
+                f"{p.get('awp_kills',0)}{_arrow(d_awp)}</td>"
+            )
+
             html.append("</tr>")
             
         html.append("</tbody></table>")
@@ -2008,7 +2033,7 @@ def render_division(con, div):
 
     out_path = OUT_DIR / f"{div['slug']}.html"
     html_str = "\n".join(html)
-    # did_write = write_if_changed(out_path, html_str)
+    did_write = write_if_changed(out_path, html_str)
     # status = "OK] Wrote" if did_write else "skip ]"
     # print(f"[{status} {out_path}")
     return out_path

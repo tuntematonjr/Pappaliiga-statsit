@@ -272,7 +272,7 @@ def compute_player_table_data(con: sqlite3.Connection, division_id: int, team_id
         "SUM(COALESCE(ps.cl_1v1_wins,0))     AS c11_win",
         "SUM(COALESCE(ps.cl_1v2_attempts,0)) AS c12_att",
         "SUM(COALESCE(ps.cl_1v2_wins,0))     AS c12_win",
-        "SUM(COALESCE(ps.entry_count,0))     AS entry_att",
+        "SUM(COALESCE(ps.entry_count,0))     AS entry_count",
         "SUM(COALESCE(ps.entry_wins,0))      AS entry_win",
     ]
     if HAS_PISTOL:
@@ -329,7 +329,7 @@ def compute_player_table_data(con: sqlite3.Connection, division_id: int, team_id
             "c11_win": r["c11_win"] or 0,
             "c12_att": r["c12_att"] or 0,
             "c12_win": r["c12_win"] or 0,
-            "entry_att": r["entry_att"] or 0,
+            "entry_count": r["entry_count"] or 0,
             "entry_win": r["entry_win"] or 0,
             "damage": r["damage"] or 0,
         }
@@ -1152,17 +1152,17 @@ def _get_team_last_prev_ts(con: sqlite3.Connection, division_id: int, team_id: s
     prev_ts = rows[-2]["ts"] if len(rows) >= 2 else None
     return (curr_ts, prev_ts)
 
-
 def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, team_id: str) -> dict:
     """
-    Provides {curr, prev|None, delta|None} similar to compute_team_summary_data
-    but split into 'prev' (before last match) and 'curr' (after last match).
+    Team summary delta = (agg <= curr_ts) - (agg <= curr_ts-1)
+    Uses true per-round metrics for KR/ADR.
     """
-    curr_ts, prev_ts = _get_team_last_prev_ts(con, division_id, team_id)
+    curr_ts, _ = _get_team_last_prev_ts(con, division_id, team_id)
 
     def _summary_until(cutoff: int | None) -> dict:
         if cutoff is None:
             return {"matches_played":0,"maps_played":0,"w":0,"l":0,"rd":0,"kd":0.0,"kr":0.0,"adr":0.0,"util":0}
+
         rows = _q(con, f"""
             SELECT m.match_id, m.team1_id, m.team2_id,
                    mp.score_team1, mp.score_team2, mp.winner_team_id
@@ -1175,6 +1175,7 @@ def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, t
         maps_played = len(rows)
         matches_played = len(mids)
         maps_w = sum(1 for r in rows if r.get("winner_team_id") == team_id)
+
         rd = 0
         for r in rows:
             s1 = r.get("score_team1") or 0
@@ -1183,34 +1184,61 @@ def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, t
                 rd += (s1 - s2)
             elif r["team2_id"] == team_id:
                 rd += (s2 - s1)
+
+        if maps_played == 0:
+            return {"matches_played":0,"maps_played":0,"w":0,"l":0,"rd":0,"kd":0.0,"kr":0.0,"adr":0.0,"util":0}
+
         agg = _q(con, f"""
             SELECT
               SUM(COALESCE(ps.kills,0))           AS kills,
               SUM(COALESCE(ps.deaths,0))          AS deaths,
-              AVG(COALESCE(ps.kr,0))              AS kr,
-              AVG(COALESCE(ps.adr,0))             AS adr,
+              SUM(COALESCE(ps.damage,0))          AS damage,
+              SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds,
               SUM(COALESCE(ps.utility_damage,0))  AS util
             FROM player_stats ps
             JOIN matches m ON m.match_id = ps.match_id
+            JOIN maps mp    ON mp.match_id = m.match_id
             WHERE ps.team_id=? AND m.championship_id=? AND { _TS_EXPR } <= ?
-        """, (team_id, division_id, cutoff))[0] if maps_played > 0 else {"kills":0,"deaths":0,"kr":0.0,"adr":0.0,"util":0}
-        kills = agg["kills"] or 0
-        deaths = agg["deaths"] or 0
-        kd = (kills / deaths) if deaths else (float(kills) if maps_played > 0 else 0.0)
-        return {"matches_played":matches_played,"maps_played":maps_played,"w":maps_w,"l":maps_played-maps_w,
-                "rd":rd,"kd":kd,"kr":agg["kr"] or 0.0,"adr":agg["adr"] or 0.0,"util":agg["util"] or 0}
+        """, (team_id, division_id, cutoff))[0]
+
+        kills   = int(agg["kills"] or 0)
+        deaths  = int(agg["deaths"] or 0)
+        damage  = int(agg["damage"] or 0)
+        rounds  = int(agg["rounds"] or 0)
+        util    = int(agg["util"] or 0)
+
+        kd  = (kills / deaths) if deaths else (float(kills) if rounds else 0.0)
+        kr  = (kills / rounds) if rounds else 0.0
+        adr = (damage / rounds) if rounds else 0.0
+
+        return {
+            "matches_played": matches_played,
+            "maps_played": maps_played,
+            "w": maps_w,
+            "l": maps_played - maps_w,
+            "rd": rd,
+            "kd": float(kd),
+            "kr": float(kr),
+            "adr": float(adr),
+            "util": util
+        }
 
     if curr_ts is None:
         zero = _summary_until(None)
         return {"curr": zero, "prev": None, "delta": None}
 
-    prev = _summary_until(prev_ts)
-    curr = _summary_until(curr_ts)
-    delta = {k: (curr[k] - prev[k]) for k in ["matches_played","maps_played","w","l","rd","util"]}
-    for k in ["kd","kr","adr"]:
-        delta[k] = curr[k] - prev[k]
-    return {"curr": curr, "prev": prev if prev_ts is not None else None, "delta": delta}
+    prev_cutoff = max(0, int(curr_ts) - 1)
 
+    prev = _summary_until(prev_cutoff)
+    curr = _summary_until(curr_ts)
+
+    # Jos ennen viimeisintä ei ollut dataa → delta None
+    if (prev["matches_played"]==0 and prev["maps_played"]==0 and prev["w"]==0 and prev["l"]==0 and
+        prev["rd"]==0 and prev["kd"]==0.0 and prev["kr"]==0.0 and prev["adr"]==0.0 and prev["util"]==0):
+        return {"curr": curr, "prev": None, "delta": None}
+
+    delta = {k: (curr[k] - prev[k]) for k in ["matches_played","maps_played","w","l","rd","util","kd","kr","adr"]}
+    return {"curr": curr, "prev": prev, "delta": delta}
 
 # -----------------------------
 # Player deltas (row aggregates)
@@ -1218,8 +1246,11 @@ def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, t
 
 def _player_agg_until(con: sqlite3.Connection, division_id: int, team_id: str, player_id: str, cutoff: int | None) -> dict:
     """
-    Aggregates the same base columns used in compute_player_table_data but up to cutoff timestamp.
-    Returns 0/None defaults for missing data.
+    Aggregates player stats up to cutoff. Returns 0/None defaults for missing data.
+    Uses per-round true metrics:
+      - adr = total_damage / total_rounds
+      - kr  = total_kills  / total_rounds
+      - kd  = kills / deaths  (kills if deaths=0 and rounds>0 else 0.0)
     """
     if cutoff is None:
         return {
@@ -1229,7 +1260,7 @@ def _player_agg_until(con: sqlite3.Connection, division_id: int, team_id: str, p
             "hs_pct": 0.0, "k2": 0, "k3": 0, "k4": 0, "k5": 0,
             "mvps": 0, "util": 0, "udpr": 0.0,
             "flashed": 0, "flash_count": 0, "flash_successes": 0,
-            "entry_att": 0, "entry_win": 0,
+            "entry_count": 0, "entry_win": 0,
             "c11_att": 0, "c11_win": 0, "c12_att": 0, "c12_win": 0,
             "awp_kills": 0, "pistol_kills": 0,
             "clutch_kills": 0,
@@ -1238,85 +1269,79 @@ def _player_agg_until(con: sqlite3.Connection, division_id: int, team_id: str, p
     r = _q(con, f"""
       SELECT
         COUNT(*) AS maps_played,
-        SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0))          AS rounds,
-        SUM(COALESCE(ps.kills,0))                                             AS kills,
-        SUM(COALESCE(ps.deaths,0))                                            AS deaths,
-        SUM(COALESCE(ps.assists,0))                                           AS assists,
-        SUM(COALESCE(ps.damage,0))                                            AS damage,
-        AVG(COALESCE(ps.adr,0))                                               AS adr,
-        AVG(COALESCE(ps.kr,0))                                                AS kr,
-        AVG(COALESCE(ps.hs_pct,0))                                            AS hs_pct,
-        SUM(COALESCE(ps.mk_2k,0))                                             AS k2,
-        SUM(COALESCE(ps.mk_3k,0))                                             AS k3,
-        SUM(COALESCE(ps.mk_4k,0))                                             AS k4,
-        SUM(COALESCE(ps.mk_5k,0))                                             AS k5,
-        SUM(COALESCE(ps.mvps,0))                                              AS mvps,
-        SUM(COALESCE(ps.utility_damage,0))                                     AS util,
-        SUM(COALESCE(ps.enemies_flashed,0))                                    AS flashed,
-        SUM(COALESCE(ps.flash_count,0))                                        AS flash_count,
-        SUM(COALESCE(ps.flash_successes,0))                                    AS flash_successes,
-        SUM(COALESCE(ps.entry_count,0))                                        AS entry_att,
-        SUM(COALESCE(ps.entry_wins,0))                                         AS entry_win,
-        SUM(COALESCE(ps.cl_1v1_attempts,0))                                    AS c11_att,
-        SUM(COALESCE(ps.cl_1v1_wins,0))                                        AS c11_win,
-        SUM(COALESCE(ps.cl_1v2_attempts,0))                                    AS c12_att,
-        SUM(COALESCE(ps.cl_1v2_wins,0))                                        AS c12_win,
-        SUM(COALESCE(ps.sniper_kills,0))                                       AS awp_kills,
-        SUM(COALESCE(ps.pistol_kills,0))                                       AS pistol_kills,
-        SUM(COALESCE(ps.clutch_kills,0))                                       AS clutch_kills
+        SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0))             AS rounds,
+        SUM(COALESCE(ps.kills,0))                                                AS kills,
+        SUM(COALESCE(ps.deaths,0))                                               AS deaths,
+        SUM(COALESCE(ps.assists,0))                                              AS assists,
+        SUM(COALESCE(ps.damage,0))                                               AS damage,
+        AVG(COALESCE(ps.hs_pct,0))                                               AS hs_pct,
+        SUM(COALESCE(ps.mk_2k,0))                                                AS k2,
+        SUM(COALESCE(ps.mk_3k,0))                                                AS k3,
+        SUM(COALESCE(ps.mk_4k,0))                                                AS k4,
+        SUM(COALESCE(ps.mk_5k,0))                                                AS k5,
+        SUM(COALESCE(ps.mvps,0))                                                 AS mvps,
+        SUM(COALESCE(ps.utility_damage,0))                                       AS util,
+        SUM(COALESCE(ps.enemies_flashed,0))                                      AS flashed,
+        SUM(COALESCE(ps.flash_count,0))                                          AS flash_count,
+        SUM(COALESCE(ps.flash_successes,0))                                      AS flash_successes,
+        SUM(COALESCE(ps.entry_count,0))                                          AS entry_count,
+        SUM(COALESCE(ps.entry_wins,0))                                           AS entry_win,
+        SUM(COALESCE(ps.cl_1v1_attempts,0))                                      AS c11_att,
+        SUM(COALESCE(ps.cl_1v1_wins,0))                                          AS c11_win,
+        SUM(COALESCE(ps.cl_1v2_attempts,0))                                      AS c12_att,
+        SUM(COALESCE(ps.cl_1v2_wins,0))                                          AS c12_win,
+        SUM(COALESCE(ps.sniper_kills,0))                                         AS awp_kills,
+        SUM(COALESCE(ps.pistol_kills,0))                                         AS pistol_kills,
+        SUM(COALESCE(ps.clutch_kills,0))                                         AS clutch_kills
       FROM player_stats ps
       JOIN matches m ON m.match_id = ps.match_id
-      LEFT JOIN maps mp
-        ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-      WHERE m.championship_id = ? AND ps.team_id = ? AND ps.player_id = ?
-        AND { _TS_EXPR } <= ?
+      JOIN maps mp    ON mp.match_id = m.match_id
+      WHERE m.championship_id=? AND ps.team_id=? AND ps.player_id=? AND { _TS_EXPR } <= ?
     """, (division_id, team_id, player_id, cutoff))[0]
 
-    kills = r["kills"] or 0
-    deaths = r["deaths"] or 0
-    kd = (kills / deaths) if deaths else (float(kills) if (r["maps_played"] or 0) > 0 else 0.0)
+    rounds = int(r["rounds"] or 0)
+    kills  = int(r["kills"]  or 0)
+    deaths = int(r["deaths"] or 0)
+    damage = int(r["damage"] or 0)
 
-    rounds = r["rounds"] or 0
-    udpr = (r["util"] or 0) / rounds if rounds else 0.0
+    kr  = (kills  / rounds) if rounds else 0.0
+    adr = (damage / rounds) if rounds else 0.0
+    kd  = (kills / deaths) if deaths else (float(kills) if rounds else 0.0)
 
     return {
-        "maps_played": r["maps_played"] or 0,
+        "maps_played": int(r["maps_played"] or 0),
         "rounds": rounds,
-        "kills": kills,
-        "deaths": deaths,
-        "assists": r["assists"] or 0,
-        "damage": r["damage"] or 0,
-        "adr": r["adr"] or 0.0,
-        "kr": r["kr"] or 0.0,
-        "kd": kd,
-        "hs_pct": r["hs_pct"] or 0.0,
-        "k2": r["k2"] or 0, "k3": r["k3"] or 0, "k4": r["k4"] or 0, "k5": r["k5"] or 0,
-        "mvps": r["mvps"] or 0,
-        "util": r["util"] or 0,
-        "udpr": udpr,
-        "flashed": r["flashed"] or 0,
-        "flash_count": r["flash_count"] or 0,
-        "flash_successes": r["flash_successes"] or 0,
-        "entry_att": r["entry_att"] or 0,
-        "entry_win": r["entry_win"] or 0,
-        "c11_att": r["c11_att"] or 0, "c11_win": r["c11_win"] or 0,
-        "c12_att": r["c12_att"] or 0, "c12_win": r["c12_win"] or 0,
-        "awp_kills": r["awp_kills"] or 0,
-        "pistol_kills": r["pistol_kills"] or 0,
-        "clutch_kills": r["clutch_kills"] or 0,
+        "kills": kills, "deaths": deaths, "assists": int(r["assists"] or 0),
+        "damage": damage, "adr": float(adr), "kr": float(kr), "kd": float(kd),
+        "hs_pct": float(r["hs_pct"] or 0.0),
+        "k2": int(r["k2"] or 0), "k3": int(r["k3"] or 0), "k4": int(r["k4"] or 0), "k5": int(r["k5"] or 0),
+        "mvps": int(r["mvps"] or 0),
+        "util": int(r["util"] or 0),
+        "udpr": (float(r["util"] or 0) / rounds) if rounds else 0.0,
+        "flashed": int(r["flashed"] or 0),
+        "flash_count": int(r["flash_count"] or 0),
+        "flash_successes": int(r["flash_successes"] or 0),
+        "entry_count": int(r["entry_count"] or 0),
+        "entry_win": int(r["entry_win"] or 0),
+        "c11_att": int(r["c11_att"] or 0), "c11_win": int(r["c11_win"] or 0),
+        "c12_att": int(r["c12_att"] or 0), "c12_win": int(r["c12_win"] or 0),
+        "awp_kills": int(r["awp_kills"] or 0),
+        "pistol_kills": int(r["pistol_kills"] or 0),
+        "clutch_kills": int(r["clutch_kills"] or 0),
     }
 
 def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: str) -> dict[str, dict]:
     """
-    Returns a dict keyed by player_id:
-      pid -> { curr: {...}, prev: {...}|None, delta: {...}|None }
-    The set of metrics matches _player_agg_until keys.
+    Delta = (agg <= curr_ts) - (agg <= curr_ts-1)
+    eli viimeisimmän matsin nettovaikutus kumulatiivisiin arvoihin.
     """
-    curr_ts, prev_ts = _get_team_last_prev_ts(con, division_id, team_id)
+    curr_ts, _ = _get_team_last_prev_ts(con, division_id, team_id)
     if curr_ts is None:
         return {}
 
-    # Find players seen up to current cutoff (players on the team this season).
+    prev_cutoff = max(0, int(curr_ts) - 1)
+
+    # Kauden pelaajat (joilta on havaittu statsia)
     pids = [r["player_id"] for r in _q(con, """
       SELECT DISTINCT ps.player_id
       FROM player_stats ps
@@ -1326,9 +1351,11 @@ def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: st
 
     out: dict[str, dict] = {}
     for pid in pids:
-        prev = _player_agg_until(con, division_id, team_id, pid, prev_ts) if prev_ts is not None else None
+        prev = _player_agg_until(con, division_id, team_id, pid, prev_cutoff)
         curr = _player_agg_until(con, division_id, team_id, pid, curr_ts)
-        if prev is None:
+
+        # Jos ennen viimeisintä ei ollut mitään, näytä prev=None, delta=None (UI näyttää "(no prev)")
+        if prev["maps_played"] == 0 and prev["rounds"] == 0 and prev["kills"] == 0 and prev["deaths"] == 0 and prev["assists"] == 0:
             out[pid] = {"curr": curr, "prev": None, "delta": None}
         else:
             delta = {}
@@ -1336,7 +1363,6 @@ def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: st
                 delta[k] = (curr[k] - prev[k]) if isinstance(curr[k], (int, float)) else None
             out[pid] = {"curr": curr, "prev": prev, "delta": delta}
     return out
-
 
 # -----------------------------
 # Map deltas (per map rows)
@@ -1512,16 +1538,19 @@ def compute_map_stats_table_data_until(con: sqlite3.Connection, championship_id:
 
 def compute_map_stats_with_delta(con: sqlite3.Connection, championship_id: int, team_id: str) -> dict[str, dict]:
     """
-    Returns map -> {prev, curr, delta} using last/prev team match cutoffs.
+    Map-delta = (agg <= curr_ts) - (agg <= curr_ts-1)
     """
-    curr_ts, prev_ts = _get_team_last_prev_ts(con, championship_id, team_id)
+    curr_ts, _ = _get_team_last_prev_ts(con, championship_id, team_id)
     if curr_ts is None:
         return {}
+
+    prev_cutoff = max(0, int(curr_ts) - 1)
+
     curr = compute_map_stats_table_data_until(con, championship_id, team_id, curr_ts)
-    prev = compute_map_stats_table_data_until(con, championship_id, team_id, prev_ts) if prev_ts is not None else None
+    prev = compute_map_stats_table_data_until(con, championship_id, team_id, prev_cutoff)
 
     curr_by = {r["map"]: r for r in curr}
-    prev_by = {r["map"]: r for r in prev} if prev is not None else {}
+    prev_by = {r["map"]: r for r in prev}
 
     out: dict[str, dict] = {}
     for m, c in curr_by.items():
