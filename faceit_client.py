@@ -26,9 +26,11 @@ ADAPT_MAX_RETRIES = 4  # total attempts per request
 
 HEADERS_OPEN = {
     "Accept": "application/json",
-    "Authorization": f"Bearer {API_KEY}" if API_KEY else "",
     "User-Agent": "pappaliiga-stats/1.0",
 }
+if API_KEY:
+    HEADERS_OPEN["Authorization"] = f"Bearer {API_KEY}"
+    
 HEADERS_DEMOCRACY = {
     "Accept": "application/json",
     "User-Agent": "pappaliiga-stats/1.0",
@@ -88,23 +90,50 @@ def _retry_after_seconds(resp: requests.Response) -> Optional[float]:
         return None
 
 def _get(url: str, headers: dict, params: dict | None = None, *, retries: int = 3, backoff: float = 0.8):
-    import logging, time, requests
+    import logging, time, requests, os
     last_err = None
+    tried_unauth = False
+
     for i in range(max(1, retries)):
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=20)
-            # << UUSI: pehmeä skip 403/404
-            if resp.status_code in (403, 404):
-                logging.info("[skip] GET %s -> %s (return None)", url, resp.status_code)
+            sc = resp.status_code
+
+            # Näytä CI:ssä selkeä varoitus 403/404:stä
+            if sc in (403, 404):
+                # Pieni pätkä bodya debuggaukseen (ei tulosteta koko JSONia)
+                snippet = (resp.text or "")[:200].replace("\n", " ")
+                print(f"[warn] GET {url} -> {sc}. Body[:200]={snippet}", flush=True)
+
+                # Fallback: jos Authorizationia käytettiin ja tuli 403, kokeile kerran ilman Authorizationia
+                if sc == 403 and "Authorization" in headers and not tried_unauth:
+                    noauth = dict(headers)
+                    noauth.pop("Authorization", None)
+                    tried_unauth = True
+                    time.sleep(backoff * (2 ** i))
+                    resp2 = requests.get(url, headers=noauth, params=params, timeout=20)
+                    if resp2.ok:
+                        return resp2.json()
+                    else:
+                        print(f"[warn] Fallback unauth GET {url} -> {resp2.status_code}", flush=True)
+
+                # Palautetaan None, jotta kutsuja voi päättää skipata
                 return None
+
             resp.raise_for_status()
             return resp.json()
+
         except requests.HTTPError as e:
             last_err = e
+            print(f"[warn] HTTPError on GET {url}: {e}", flush=True)
         except requests.RequestException as e:
             last_err = e
+            print(f"[warn] RequestException on GET {url}: {e}", flush=True)
+
         time.sleep(backoff * (2 ** i))
+
     raise RuntimeError(f"GET failed for {url}: {last_err}")
+
 
 def list_championship_matches(championship_id: str, match_type: str = "all", limit: int = 100) -> list[dict]:
     """
@@ -121,7 +150,7 @@ def list_championship_matches(championship_id: str, match_type: str = "all", lim
             params = {"type": mt, "offset": offset, "limit": limit}
             data = _get(base, HEADERS_OPEN, params=params)
             if data is None:
-                logging.info("[skip] championship %s list %s -> None (403/404), ohitetaan", championship_id, mt)
+                print(f"[skip] championship {championship_id} list {mt} -> None (403/404)", flush=True)
                 break
 
             items = data.get("items") or []
