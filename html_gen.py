@@ -26,7 +26,7 @@ from db import (
 )
 
 # --- HTML/template versioning ---
-HTML_TEMPLATE_VERSION = 3
+HTML_TEMPLATE_VERSION = 1
 
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
