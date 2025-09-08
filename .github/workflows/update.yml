@@ -19,34 +19,6 @@ jobs:
     steps:
       # 1️⃣ Checkout repo
       - uses: actions/checkout@v3
-
-      # Step to get the latest artifact run ID
-      # Fetch the latest artifact run ID using GitHub API and jq
-      # Save the run ID as an environment variable
-      # If your repository is set to private, an OAuth app token or personal access token (classic) with repo scope is required
-      - name: Get latest artifact run id
-        run: |
-            ARTIFACT_RUN_ID=$(curl -s "https://api.github.com/repos/${{ github.repository }}/actions/artifacts?per_page=1" | jq '.artifacts[0].workflow_run.id')
-            echo "artifact_run_id=$ARTIFACT_RUN_ID" >> $GITHUB_ENV
-
-      # Download the artifact (our SQLite DB!) from the last run
-      - name: Download sqlite artifact
-        uses: actions/download-artifact@v4
-        with:
-            name: sqlite-db
-            path: .
-            run-id: ${{ env.artifact_run_id }} # Run ID of the artifact (SQLite DB) uploaded from the last run
-            github-token: ${{ secrets.GH_PAT  }} # REQUIRED. See https://github.com/actions/download-artifact?tab=readme-ov-file#download-artifacts-from-other-workflow-runs-or-repositories
-        continue-on-error: true # Set this to false after the first run
-
-      - name: Download pages artifact
-        uses: actions/download-artifact@v4
-        with:
-            name: github-pages
-            path: ./docs/
-            run-id: ${{ env.artifact_run_id }} 
-            github-token: ${{ secrets.GH_PAT  }}
-        continue-on-error: true
       
       # 3️⃣ Set up Python
       - name: Set up Python
@@ -74,12 +46,8 @@ jobs:
         shell: bash
         continue-on-error: false
 
-      - name: Upload updated artifact
-        uses: actions/upload-artifact@v4
-        with:
-            name: sqlite-db
-            path: pappaliiga.db
-            if-no-files-found: error
+      - name: Add & Commit
+        uses: EndBug/add-and-commit@v9.1.4                
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
