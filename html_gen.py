@@ -3,7 +3,7 @@ from pathlib import Path
 import sqlite3
 import os
 from collections import defaultdict
-from faceit_config import DIVISIONS
+from faceit_config import DIVISIONS, TOOL_VERSION
 from html import escape
 import hashlib, tempfile, re
 import time
@@ -412,8 +412,63 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
 @media (max-width:720px){
   .matches-mirror .map-row{grid-template-columns:1fr;row-gap:.45rem;}
 }
-</style>
 
+/* Collapsible Matches box */
+.card.matches-mirror { padding: 0; overflow: hidden; }
+.card.matches-mirror summary { list-style: none; }
+.card.matches-mirror summary::-webkit-details-marker { display: none; }
+
+.matches-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--head);
+  border-bottom: 1px solid transparent;
+  cursor: pointer; /* whole bar clickable */
+  user-select: none;
+}
+
+.card.matches-mirror[open] .matches-head {
+  border-bottom: 1px solid var(--border);
+}
+
+.matches-head .head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.matches-head .title {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.matches-head .chev {
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform .18s ease;
+}
+
+.card.matches-mirror[open] .matches-head .chev {
+  transform: rotate(90deg);
+}
+
+/* Keep the checkbox clickable without toggling the <details> accidentally */
+.matches-head .toggle-played {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default; /* label itself not a toggle for the box */
+}
+.matches-head .hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 8px;
+  opacity: 0.8;
+}
+</style>
 
 <script>
 function sortTable(tableId,n,numeric){
@@ -567,7 +622,20 @@ function renderSplitWR(td, played, wrPct){
     td.title = g ? `Wins: ${wins}, Losses: ${losses}, WR: ${pct.toFixed(1)}%` : 'No games';
   }
 }
-document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.tabs[id]').forEach(root=>initTabsAutoSort(root.id)); });
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tabs[id]').forEach(root => initTabsAutoSort(root.id));
+});
+(function(){
+  // Prevent checkbox clicks inside summary from toggling the <details>
+  document.addEventListener('click', function(e){
+    const target = e.target;
+    if (!target) return;
+    if (target.matches('.matches-head input[type="checkbox"], .matches-head label.toggle-played, .matches-head .toggle-played *')) {
+      e.stopPropagation();
+    }
+  }, {capture:true});
+})();
+
 </script>
 </head>
 <body class="{page_class}">
@@ -592,7 +660,7 @@ def topbar(show_back_to_index: bool):
       <div class="topbar">
         <div class="brand">
           <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
-          <span>AFI - Pappaliiga Stats v1.{HTML_TEMPLATE_VERSION}</span>
+          <span>AFI - Pappaliiga Stats v{TOOL_VERSION}</span>
         </div>
         <div class="nav">
           {back}
@@ -797,12 +865,21 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
     left_avatar = _avatar_of(team_id)
 
     html: list[str] = []
-    html.append(f'<div class="card matches-mirror" data-team-id="{team_id}">')
-    html.append('  <div class="matches-head">')
-    html.append('    <div class="title">Matches</div>')
-    html.append(f'    <label class="toggle-played"><input type="checkbox" id="only-played-{team_id}"><span> Näytä vain pelatut</span></label>')
-    html.append('  </div>')
-    html.append('  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>')
+    html.append(f'<details class="card matches-mirror" data-team-id="{team_id}">')
+
+    # Whole header bar toggles the box
+    html.append('  <summary class="matches-head" role="button">')
+    html.append('    <div class="head-left">')
+    html.append('      <span class="chev" aria-hidden="true">▸</span>')
+    html.append('      <div class="title">Matches</div>')
+    html.append('      <span class="hint">(Click to expand/collapse)</span>')
+    html.append('    </div>')
+    html.append('    <div class="head-right">')
+    html.append(f'      <label class="toggle-played"><input type="checkbox" id="only-played-{team_id}"><span> Näytä vain pelatut</span></label>')
+    html.append('    </div>')
+    html.append('  </summary>')
+
+    # Content
     html.append(f'  <div class="matches-list" id="matches-{team_id}">')
 
     for r in rows:
@@ -1210,7 +1287,7 @@ def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
         by_season.setdefault(s, []).append(div)
 
     html = []
-    html.append(page_start("Pappaliiga — Index", "is-index"))
+    html.append(page_start("AFI - Pappaliiga — Index", "is-index"))
     html.append(topbar(show_back_to_index=False))
 
     # Hero + container start (kept as in your original)
