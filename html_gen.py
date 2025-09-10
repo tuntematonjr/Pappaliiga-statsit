@@ -24,6 +24,7 @@ from db import (
     get_max_last_seen_for_champs,
     compute_player_deltas,
     compute_map_stats_with_delta,
+    get_team_matches_mirror,
 )
 
 # --- HTML/template versioning ---
@@ -752,8 +753,6 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
       - map_art_cache: kevyt välimuisti map_image_from_db()-kutsuille
       - siistit helperit (_m_side_val, _fmt_kd) ennallaan
     """
-    from db import get_team_matches_mirror
-    from html import escape
 
     rows = get_team_matches_mirror(con, division_id, team_id)
 
@@ -773,11 +772,9 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
     def _status(row) -> str:
         return str(row.get("status") or "—")
 
-    def _faceit_url(row) -> str:
-        if row.get("faceit_url"):
-            return row["faceit_url"]
-        fid = row.get("faceit_match_id")
-        return f"https://www.faceit.com/cs2/room/{fid}" if fid else "#"
+    def faceit_room_url(match_id: str) -> str:
+        """Build a public Faceit room URL from match_id (language-neutral)."""
+        return f"https://www.faceit.com/cs2/room/{match_id}"
 
     def _map_key(m: dict, *candidates: str, default=None):
         for k in candidates:
@@ -851,7 +848,8 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
         date_s = format_ts(_ts(r))
         stage  = _status(r).capitalize()
         maps_score = f"{mw}–{ml}" if played else "—"
-        faceit_url = _faceit_url(r)
+
+        faceit_url = faceit_room_url(r["match_id"])
 
         # --- SUMMARY ---
         html.append(f'  <details class="match-row" data-played={"1" if played else "0"}>')
@@ -1909,6 +1907,8 @@ def render_division(con, div):
         <th title="Times this map was your second ban" onclick="sortTable('{tid2}',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('{tid2}',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('{tid2}',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('{tid2}',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         """)
 
@@ -1975,6 +1975,9 @@ def render_division(con, div):
             <td title="{_pp('ban2',0)}">{r["ban2"]}{_arrow(dlt.get('ban2') if dlt else None)}</td>
             <td title="{_pp('opp_ban',0)}">{r["opp_ban"]}{_arrow(dlt.get('opp_ban') if dlt else None)}</td>
             <td title="{_pp('total_own_ban',0)}">{r["total_own_ban"]}{_arrow(dlt.get('total_own_ban') if dlt else None)}</td>
+            <td title="{_pp('decov',0)}">
+              {r.get("decov", 0)}{_arrow(dlt.get('decov') if dlt else None)}
+            </td>
             </tr>""")
 
         html.append("</tbody></table>")

@@ -378,32 +378,24 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
     Palauttaa listan rivejä [{map, played, picks, opp_picks, wins, games, wr,
                                wins_own, games_own, wr_own,
                                wins_opp, games_opp, wr_opp,
-                               kd, adr, rd, ban1, ban2, opp_ban, total_own_ban}]
-    - Näyttää kaikki kartat (myös ne joita ei ole pelattu)
-    - Pick/ban: democracy map_votes
-      * ban1/ban2: 1. ja 2. joukkueen drop kyseisessä ottelussa (ei round_num=1/2)
-      * total_own_ban: kaikki joukkueen dropit kartalle
-      * opp_ban: vain vastustajan dropit niissä matseissa, joissa :team pelasi
-    - KD/ADR: aggregoitu player_statsista per kartta; ADR kierros-painotettuna ja /5
+                               kd, adr, rd, ban1, ban2, opp_ban, total_own_ban,
+                               decov}]
     """
-
-    # Hae map-pooli championshipin seasonilta; fallbackina käytä kannasta löytyviä tai perinteistä listaa
+    # Map pool for the season; fallbacks if not present
     pool = get_season_map_pool(con, championship_id)
     if pool:
         all_maps = [r["map_id"] for r in pool]
     else:
-        # Fallback 1: kaikki kannassa pelatut tässä championshipissa
         rows = _q(con, """
             SELECT DISTINCT mp.map_name AS map_id
             FROM maps mp
             JOIN matches m ON m.match_id = mp.match_id
             WHERE m.championship_id = ?
-            AND mp.map_name IS NOT NULL AND mp.map_name <> ''
+              AND mp.map_name IS NOT NULL AND mp.map_name <> ''
         """, (championship_id,))
         if rows:
             all_maps = [r["map_id"] for r in rows]
         else:
-            # Fallback 2: staattinen lista viimeisin pooli
             all_maps = ["de_nuke","de_inferno","de_mirage","de_overpass","de_dust2","de_ancient","de_train","de_anubis"]
 
     values_sql = ", ".join([f"('{m}')" for m in all_maps])
@@ -419,9 +411,9 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
               AND (:team = m.team1_id OR :team = m.team2_id)
         ),
         team_maps AS (
-            -- Kaikki tämän joukkueen pelatut kartat
+            -- Pelatut kartat + W/L sekä pick-alkuperä
             SELECT
-                mp.map_name                         AS map,
+                mp.map_name AS map,
                 CASE WHEN m.team1_id = :team THEN mp.score_team1 ELSE mp.score_team2 END AS rounds_for,
                 CASE WHEN m.team1_id = :team THEN mp.score_team2 ELSE mp.score_team1 END AS rounds_against,
                 CASE
@@ -430,18 +422,17 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
                     ELSE 0
                 END AS win,
                 1 AS game,
-                -- own/opp pick tästä ottelusta
                 CASE WHEN EXISTS (
                     SELECT 1 FROM map_votes v
                     WHERE v.match_id = m.match_id
-                      AND v.status = 'pick'
+                      AND LOWER(v.status) = 'pick'
                       AND v.map_name = mp.map_name
                       AND v.selected_by_team_id = :team
                 ) THEN 1 ELSE 0 END AS own_pick,
                 CASE WHEN EXISTS (
                     SELECT 1 FROM map_votes v
                     WHERE v.match_id = m.match_id
-                      AND v.status = 'pick'
+                      AND LOWER(v.status) = 'pick'
                       AND v.map_name = mp.map_name
                       AND v.selected_by_team_id IS NOT NULL
                       AND v.selected_by_team_id <> :team
@@ -451,7 +442,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
               ON mp.match_id = m.match_id
              AND mp.round_index IS NOT NULL
         ),
-        -- Joukkueen omat dropit indeksoituna ottelukohtaisesti (1. drop, 2. drop, …)
+        -- Omat dropit indeksoituna (1./2. ban)
         team_drops AS (
             SELECT
                 v.match_id,
@@ -464,17 +455,15 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
                 ) AS drop_idx
             FROM map_votes v
             JOIN my_matches m ON m.match_id = v.match_id
-            WHERE v.status = 'drop'
+            WHERE LOWER(v.status) = 'drop'
               AND v.selected_by_team_id = :team
         ),
-        -- Vastustajan dropit samoista matseista
+        -- Vastustajan dropit niissä matseissa joissa :team pelasi
         opp_drops AS (
-            SELECT
-                v.match_id,
-                v.map_name
+            SELECT v.match_id, v.map_name
             FROM map_votes v
             JOIN my_matches m ON m.match_id = v.match_id
-            WHERE v.status = 'drop'
+            WHERE LOWER(v.status) = 'drop'
               AND (
                     (m.team1_id = :team AND v.selected_by_team_id = m.team2_id) OR
                     (m.team2_id = :team AND v.selected_by_team_id = m.team1_id)
@@ -483,36 +472,20 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
         ban_counts AS (
             SELECT
                 am.map,
-                -- 1. ja 2. oma ban (indeksoitu per ottelu)
-                COALESCE((
-                    SELECT COUNT(*) FROM team_drops td
-                    WHERE td.map_name = am.map AND td.drop_idx = 1
-                ), 0) AS ban1,
-                COALESCE((
-                    SELECT COUNT(*) FROM team_drops td
-                    WHERE td.map_name = am.map AND td.drop_idx = 2
-                ), 0) AS ban2,
-                -- vastustajan banit niissä matseissa joissa :team pelasi
-                COALESCE((
-                    SELECT COUNT(*) FROM opp_drops od
-                    WHERE od.map_name = am.map
-                ), 0) AS opp_ban,
-                -- kaikki oman joukkueen dropit tälle kartalle
-                COALESCE((
-                    SELECT COUNT(*) FROM team_drops td
-                    WHERE td.map_name = am.map
-                    AND td.drop_idx IN (1,2)
-                ), 0) AS total_own_ban
+                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx = 1), 0) AS ban1,
+                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx = 2), 0) AS ban2,
+                COALESCE((SELECT COUNT(*) FROM opp_drops od WHERE od.map_name = am.map), 0) AS opp_ban,
+                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx IN (1,2)), 0) AS total_own_ban
             FROM allmaps am
         ),
+        -- Joukkueen KD/ADR karttatasolla
         perf AS (
-            -- Joukkueen KD + ADR karttatasolla player_statsista
             SELECT
                 mp.map_name AS map,
                 SUM(ps.kills)  AS kills,
                 SUM(ps.deaths) AS deaths,
-                SUM( (mp.score_team1 + mp.score_team2) * COALESCE(ps.adr,0) ) AS adr_weighted,
-                SUM( mp.score_team1 + mp.score_team2 )                          AS rounds_weight
+                SUM( (COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) * COALESCE(ps.adr,0) ) AS adr_weighted,
+                SUM(  COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0) )                          AS rounds_weight
             FROM player_stats ps
             JOIN my_matches m
               ON m.match_id = ps.match_id
@@ -521,7 +494,18 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
              AND mp.round_index = ps.round_index
             WHERE ps.team_id = :team
             GROUP BY mp.map_name
+        ),
+
+        decov AS (
+            SELECT
+                v.map_name AS map,
+                COUNT(*)   AS decov_cnt
+            FROM map_votes v
+            JOIN my_matches m ON m.match_id = v.match_id
+            WHERE LOWER(v.status) IN ('decider','overflow')
+            GROUP BY v.map_name
         )
+
         SELECT
             am.map                                                        AS map,
             COALESCE(COUNT(tm.map), 0)                                    AS played,
@@ -531,93 +515,52 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
             COALESCE(SUM(tm.win), 0)                                      AS wins,
             COALESCE(SUM(tm.game), 0)                                     AS games,
             CASE WHEN COALESCE(SUM(tm.game),0)=0 THEN 0.0
-                 ELSE 100.0 * SUM(tm.win) / SUM(tm.game)
-            END                                                           AS wr,
+                 ELSE 100.0 * SUM(tm.win) / SUM(tm.game) END              AS wr,
 
             COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.win  ELSE 0 END),0) AS wins_own,
             COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END),0) AS games_own,
             CASE WHEN COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END),0)=0 THEN 0.0
                  ELSE 100.0 * SUM(CASE WHEN tm.own_pick=1 THEN tm.win ELSE 0 END)
-                              / SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END)
-            END                                                           AS wr_own,
+                              / SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END) END AS wr_own,
 
             COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.win  ELSE 0 END),0) AS wins_opp,
             COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END),0) AS games_opp,
             CASE WHEN COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END),0)=0 THEN 0.0
                  ELSE 100.0 * SUM(CASE WHEN tm.opp_pick=1 THEN tm.win ELSE 0 END)
-                              / SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END)
-            END                                                           AS wr_opp,
+                              / SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END) END AS wr_opp,
 
             COALESCE(SUM(tm.rounds_for), 0) - COALESCE(SUM(tm.rounds_against), 0) AS rd,
 
             COALESCE(bc.ban1, 0)                                          AS ban1,
             COALESCE(bc.ban2, 0)                                          AS ban2,
             COALESCE(bc.opp_ban, 0)                                       AS opp_ban,
-            COALESCE(bc.total_own_ban, 0)                                  AS total_own_ban,
+            COALESCE(bc.total_own_ban, 0)                                 AS total_own_ban,
 
             COALESCE(1.0 * p.kills / NULLIF(p.deaths,0), 0.0)             AS kd,
-            COALESCE(1.0 * p.adr_weighted / NULLIF(p.rounds_weight,0), 0.0) AS adr
+            COALESCE(1.0 * p.adr_weighted / NULLIF(p.rounds_weight,0), 0.0) AS adr,
+
+            COALESCE(dc.decov_cnt, 0)                                     AS decov
 
         FROM allmaps am
         LEFT JOIN team_maps tm ON tm.map = am.map
         LEFT JOIN ban_counts bc ON bc.map = am.map
         LEFT JOIN perf p        ON p.map  = am.map
+        LEFT JOIN decov dc      ON dc.map = am.map
         GROUP BY am.map
         ORDER BY am.map
     """
 
     rows = _q(con, sql, {"champ": championship_id, "team": team_id})
 
+    # pretty names
+    catalog = get_maps_catalog_lookup(con)
     out = []
     for r in rows:
-        wins      = r["wins"] or 0
-        games     = r["games"] or 0
-        wins_own  = r["wins_own"] or 0
-        games_own = r["games_own"] or 0
-        wins_opp  = r["wins_opp"] or 0
-        games_opp = r["games_opp"] or 0
-
-        out.append({
-            "map": r["map"],
-            "played": r["played"] or 0,
-            "picks": r["picks"] or 0,
-            "opp_picks": r["opp_picks"] or 0,
-
-            "wins": wins,
-            "games": games,
-            "wr": 100.0 * wins / games if games else 0.0,
-
-            "wins_own": wins_own,
-            "games_own": games_own,
-            "wr_own": 100.0 * wins_own / games_own if games_own else 0.0,
-
-            "wins_opp": wins_opp,
-            "games_opp": games_opp,
-            "wr_opp": 100.0 * wins_opp / games_opp if games_opp else 0.0,
-
-            "kd": float(r["kd"]) if r["kd"] is not None else 0.0,
-            "adr": float(r["adr"]) if r["adr"] is not None else 0.0,
-            "rd": r["rd"] or 0,
-
-            "ban1": r["ban1"] or 0,
-            "ban2": r["ban2"] or 0,
-            "opp_ban": r["opp_ban"] or 0,
-            "total_own_ban": r["total_own_ban"] or 0,
-        })
-        
-    # Korvaa tulosten 'map' näyttönimellä (pretty) jos löytyy
-    catalog = get_maps_catalog_lookup(con)
-    for r in out:
         mid = r.get("map")
         pretty = catalog.get(mid, {}).get("pretty_name")
-        if pretty:
-            r["map_pretty"] = pretty
-        else:
-            # Kevyt fallback – siisti raw (poista 'de_')
-            r["map_pretty"] = (mid or "").replace("de_", "").title()
-
+        r["map_pretty"] = pretty if pretty else (mid or "").replace("de_", "").title()
+        out.append(r)
     return out
-
 
 def compute_champ_map_summary_data(con: sqlite3.Connection, division_id: int) -> dict:
     played_rows = _q(con, """
@@ -778,24 +721,22 @@ def upsert_match(con: sqlite3.Connection, row: dict) -> None:
     sql = """
     INSERT INTO matches(
       match_id, championship_id,
-      competition_id, competition_name, best_of, game, faceit_url,
+      competition_name, best_of, game, 
       configured_at, started_at, finished_at, scheduled_at, status,
       last_seen_at,
       team1_id, team1_name, team2_id, team2_name, winner_team_id
     ) VALUES (
       :match_id, :championship_id,
-      :competition_id, :competition_name, :best_of, :game, :faceit_url,
+      :competition_name, :best_of, :game, 
       :configured_at, :started_at, :finished_at, :scheduled_at, :status,
       strftime('%s','now'),
       :team1_id, :team1_name, :team2_id, :team2_name, :winner_team_id
     )
     ON CONFLICT(match_id) DO UPDATE SET
       -- meta
-      competition_id   = COALESCE(excluded.competition_id,   matches.competition_id),
       competition_name = COALESCE(excluded.competition_name, matches.competition_name),
       best_of          = COALESCE(excluded.best_of,          matches.best_of),
       game             = COALESCE(excluded.game,             matches.game),
-      faceit_url       = COALESCE(excluded.faceit_url,       matches.faceit_url),
 
       -- times & status
       configured_at = COALESCE(excluded.configured_at, matches.configured_at),
@@ -881,7 +822,7 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
     Ei käytä team_stats-taulua; kaikki aggregaatit player_statsista.
 
     Palautetun rakenteen avaimet (per ottelu):
-      - match_id, status, best_of, faceit_url, ts, played
+      - match_id, status, best_of, ts, played
       - left/right: { team_id, team_name, avatar? }
       - maps: list of {
           round_index, map, rf, ra, pick_team_id,
@@ -896,7 +837,7 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
     WITH my_matches AS (
       SELECT
         m.match_id, m.championship_id, m.team1_id, m.team1_name, m.team2_id, m.team2_name,
-        m.best_of, m.faceit_url, m.status,
+        m.best_of, m.status,
         COALESCE(m.started_at, m.scheduled_at, m.configured_at, 0) AS ts,
         CASE WHEN m.finished_at IS NOT NULL THEN 1 ELSE 0 END AS played
       FROM matches m
@@ -907,7 +848,7 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
     mp AS (
       SELECT
         mm.match_id, mm.team1_id, mm.team2_id, mm.team1_name, mm.team2_name,
-        mm.best_of, mm.faceit_url, mm.status, mm.ts, mm.played,
+        mm.best_of, mm.status, mm.ts, mm.played,
         ma.round_index, ma.map_name, ma.score_team1, ma.score_team2
       FROM my_matches mm
       LEFT JOIN maps ma
@@ -935,7 +876,7 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
     )
 
     SELECT
-      mp.match_id, mp.ts, mp.status, mp.best_of, mp.faceit_url, mp.played,
+      mp.match_id, mp.ts, mp.status, mp.best_of, mp.played,
       mp.team1_id, mp.team1_name, mp.team2_id, mp.team2_name,
       mp.round_index, mp.map_name, mp.score_team1, mp.score_team2,
       pk.pick_team_id,
@@ -980,7 +921,6 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
                 "match_id": mid,
                 "status": r["status"],
                 "best_of": r["best_of"],
-                "faceit_url": r["faceit_url"],
                 "ts": r["ts"],
                 "played": int(r["played"] or 0),
                 "left": {
@@ -1370,10 +1310,10 @@ def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: st
 
 def compute_map_stats_table_data_until(con: sqlite3.Connection, championship_id: int, team_id: str, cutoff_ts: int) -> list[dict]:
     """
-    Sama kuin compute_map_stats_table_data, mutta rajaa matsit _TS_EXPR <= cutoff_ts.
+    Same as compute_map_stats_table_data but only counting matches where _TS_EXPR <= cutoff_ts.
+    Note: 'dates' removed; only 'decov' is returned.
     """
-    # 1) Kokoa map-lista: ensisijaisesti season pool, muuten maps_catalog
-    pool = get_season_map_pool(con, championship_id)  # [{map_id, pretty_name}]
+    pool = get_season_map_pool(con, championship_id)
     if pool:
         all_maps = [r["map_id"] for r in pool]
     else:
@@ -1381,7 +1321,6 @@ def compute_map_stats_table_data_until(con: sqlite3.Connection, championship_id:
         all_maps = [r["map_id"] for r in rows] if rows else [
             "de_nuke","de_inferno","de_mirage","de_overpass","de_dust2","de_ancient","de_train","de_anubis"
         ]
-
     values_sql = ", ".join([f"('{m}')" for m in all_maps])
 
     sql = f"""
@@ -1395,146 +1334,140 @@ def compute_map_stats_table_data_until(con: sqlite3.Connection, championship_id:
               AND { _TS_EXPR } <= :cutoff
         ),
 
-        -- Joukkueen pickit (status='pick') ja vastustajan pickit map_votes-taulusta
-        team_picks AS (
-            SELECT v.match_id, v.map_name
-            FROM map_votes v
-            JOIN my_matches m ON m.match_id = v.match_id
-            WHERE v.status = 'pick' AND v.selected_by_team_id = :team
-        ),
-        opp_picks AS (
-            SELECT v.match_id, v.map_name
-            FROM map_votes v
-            JOIN my_matches m ON m.match_id = v.match_id
-            WHERE v.status = 'pick'
-              AND (
-                (m.team1_id = :team AND v.selected_by_team_id = m.team2_id) OR
-                (m.team2_id = :team AND v.selected_by_team_id = m.team1_id)
-              )
-        ),
-
         team_maps AS (
-            -- :team näkökulmasta kierrokset, voitot ja pick-tyypit karttatasolla
             SELECT
                 mp.map_name AS map,
                 CASE WHEN m.team1_id = :team THEN mp.score_team1 ELSE mp.score_team2 END AS rounds_for,
                 CASE WHEN m.team1_id = :team THEN mp.score_team2 ELSE mp.score_team1 END AS rounds_against,
-                CASE WHEN (m.team1_id = :team AND mp.score_team1 > mp.score_team2)
-                       OR (m.team2_id = :team AND mp.score_team2 > mp.score_team1) THEN 1 ELSE 0 END AS win,
+                CASE
+                    WHEN m.team1_id = :team AND mp.score_team1 > mp.score_team2 THEN 1
+                    WHEN m.team2_id = :team AND mp.score_team2 > mp.score_team1 THEN 1
+                    ELSE 0
+                END AS win,
                 1 AS game,
                 CASE WHEN EXISTS (
-                    SELECT 1 FROM team_picks tp
-                    WHERE tp.match_id = m.match_id AND tp.map_name = mp.map_name
+                    SELECT 1 FROM map_votes v
+                    WHERE v.match_id = m.match_id
+                      AND LOWER(v.status) = 'pick'
+                      AND v.map_name = mp.map_name
+                      AND v.selected_by_team_id = :team
                 ) THEN 1 ELSE 0 END AS own_pick,
                 CASE WHEN EXISTS (
-                    SELECT 1 FROM opp_picks op
-                    WHERE op.match_id = m.match_id AND op.map_name = mp.map_name
+                    SELECT 1 FROM map_votes v
+                    WHERE v.match_id = m.match_id
+                      AND LOWER(v.status) = 'pick'
+                      AND v.map_name = mp.map_name
+                      AND v.selected_by_team_id IS NOT NULL
+                      AND v.selected_by_team_id <> :team
                 ) THEN 1 ELSE 0 END AS opp_pick
-            FROM maps mp
-            JOIN my_matches m ON m.match_id = mp.match_id
+            FROM my_matches m
+            JOIN maps mp ON mp.match_id = m.match_id AND mp.round_index IS NOT NULL
         ),
 
-        -- Joukkueen KD + ADR karttatasolla player_statsista, ADR painotetaan kierrosmäärällä
-        perf AS (
-            SELECT
-                mp.map_name AS map,
-                SUM(COALESCE(ps.kills, 0))  AS kills,
-                SUM(COALESCE(ps.deaths, 0)) AS deaths,
-                SUM( (mp.score_team1 + mp.score_team2) * COALESCE(ps.adr, 0) ) AS adr_weighted,
-                SUM(  mp.score_team1 + mp.score_team2 )                          AS rounds_weight
-            FROM player_stats ps
-            JOIN my_matches m
-              ON m.match_id = ps.match_id
-            JOIN maps mp
-              ON mp.match_id    = ps.match_id
-             AND mp.round_index = ps.round_index
-            WHERE ps.team_id = :team
-              AND { _TS_EXPR } <= :cutoff
-            GROUP BY mp.map_name
-        ),
-
-        -- Omien bannien indeksointi per ottelu (1. ja 2. ban)
         team_drops AS (
             SELECT
                 v.match_id,
                 v.map_name,
+                v.selected_by_team_id,
+                v.round_num,
                 ROW_NUMBER() OVER (
                     PARTITION BY v.match_id, v.selected_by_team_id
-                    ORDER BY v.round_num
+                    ORDER BY COALESCE(v.round_num, 999), v.map_name
                 ) AS drop_idx
             FROM map_votes v
             JOIN my_matches m ON m.match_id = v.match_id
-            WHERE v.status = 'drop' AND v.selected_by_team_id = :team
+            WHERE LOWER(v.status) = 'drop' AND v.selected_by_team_id = :team
         ),
 
-        -- Vastustajan banit otteluissa, joissa :team pelasi
         opp_drops AS (
             SELECT v.match_id, v.map_name
             FROM map_votes v
             JOIN my_matches m ON m.match_id = v.match_id
-            WHERE v.status = 'drop' AND (
+            WHERE LOWER(v.status) = 'drop' AND (
                 (m.team1_id = :team AND v.selected_by_team_id = m.team2_id) OR
                 (m.team2_id = :team AND v.selected_by_team_id = m.team1_id)
             )
         ),
 
         ban_counts AS (
-            SELECT
-                am.map,
-                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx = 1), 0) AS ban1,
-                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx = 2), 0) AS ban2,
-                COALESCE((SELECT COUNT(*) FROM opp_drops  od WHERE od.map_name = am.map), 0) AS opp_ban,
-                COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx IN (1,2)), 0) AS total_own_ban
+            SELECT am.map,
+                   COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx = 1), 0) AS ban1,
+                   COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx = 2), 0) AS ban2,
+                   COALESCE((SELECT COUNT(*) FROM opp_drops  od WHERE od.map_name = am.map), 0) AS opp_ban,
+                   COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx IN (1,2)), 0) AS total_own_ban
             FROM allmaps am
+        ),
+
+        perf AS (
+            SELECT mp.map_name AS map,
+                   SUM(ps.kills) AS kills,
+                   SUM(ps.deaths) AS deaths,
+                   SUM( (COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) * COALESCE(ps.adr,0) ) AS adr_weighted,
+                   SUM( COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0) ) AS rounds_weight
+            FROM player_stats ps
+            JOIN my_matches m ON m.match_id = ps.match_id
+            JOIN maps mp       ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+            WHERE ps.team_id = :team
+            GROUP BY mp.map_name
+        ),
+
+        decov AS (
+            SELECT
+                v.map_name AS map,
+                COUNT(*)   AS decov_cnt
+            FROM map_votes v
+            JOIN my_matches m ON m.match_id = v.match_id
+            WHERE LOWER(v.status) IN ('decider','overflow')
+            GROUP BY v.map_name
         )
 
-        SELECT
-            am.map                                                        AS map,
+        SELECT am.map AS map,
 
-            COALESCE(COUNT(tm.map), 0)                                    AS played,
-            COALESCE(SUM(tm.own_pick), 0)                                 AS picks,
-            COALESCE(SUM(tm.opp_pick), 0)                                 AS opp_picks,
+               COALESCE(COUNT(tm.map), 0) AS played,
+               COALESCE(SUM(tm.own_pick), 0) AS picks,
+               COALESCE(SUM(tm.opp_pick), 0) AS opp_picks,
 
-            COALESCE(SUM(tm.win), 0)                                      AS wins,
-            COALESCE(SUM(tm.game), 0)                                     AS games,
-            CASE WHEN COALESCE(SUM(tm.game),0)=0 THEN 0.0
-                 ELSE 100.0 * SUM(tm.win) / SUM(tm.game)
-            END                                                           AS wr,
+               COALESCE(SUM(tm.win), 0) AS wins,
+               COALESCE(SUM(tm.game), 0) AS games,
+               CASE WHEN COALESCE(SUM(tm.game),0)=0 THEN 0.0
+                    ELSE 100.0 * SUM(tm.win) / SUM(tm.game) END AS wr,
 
-            COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.win  ELSE 0 END),0) AS wins_own,
-            COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END),0) AS games_own,
-            CASE WHEN COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END),0)=0 THEN 0.0
-                 ELSE 100.0 * SUM(CASE WHEN tm.own_pick=1 THEN tm.win ELSE 0 END)
-                              / SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END)
-            END                                                           AS wr_own,
+               COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.win  ELSE 0 END),0) AS wins_own,
+               COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END),0) AS games_own,
+               CASE WHEN COALESCE(SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END),0)=0 THEN 0.0
+                    ELSE 100.0 * SUM(CASE WHEN tm.own_pick=1 THEN tm.win ELSE 0 END)
+                                 / SUM(CASE WHEN tm.own_pick=1 THEN tm.game ELSE 0 END) END AS wr_own,
 
-            COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.win  ELSE 0 END),0) AS wins_opp,
-            COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END),0) AS games_opp,
-            CASE WHEN COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END),0)=0 THEN 0.0
-                 ELSE 100.0 * SUM(CASE WHEN tm.opp_pick=1 THEN tm.win ELSE 0 END)
-                              / SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END)
-            END                                                           AS wr_opp,
+               COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.win  ELSE 0 END),0) AS wins_opp,
+               COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END),0) AS games_opp,
+               CASE WHEN COALESCE(SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END),0)=0 THEN 0.0
+                    ELSE 100.0 * SUM(CASE WHEN tm.opp_pick=1 THEN tm.win ELSE 0 END)
+                                 / SUM(CASE WHEN tm.opp_pick=1 THEN tm.game ELSE 0 END) END AS wr_opp,
 
-            COALESCE(SUM(tm.rounds_for), 0) - COALESCE(SUM(tm.rounds_against), 0) AS rd,
+               COALESCE(SUM(tm.rounds_for), 0) - COALESCE(SUM(tm.rounds_against), 0) AS rd,
 
-            COALESCE(bc.ban1, 0)                                          AS ban1,
-            COALESCE(bc.ban2, 0)                                          AS ban2,
-            COALESCE(bc.opp_ban, 0)                                       AS opp_ban,
-            COALESCE(bc.total_own_ban, 0)                                 AS total_own_ban,
+               COALESCE(bc.ban1, 0) AS ban1,
+               COALESCE(bc.ban2, 0) AS ban2,
+               COALESCE(bc.opp_ban, 0) AS opp_ban,
+               COALESCE(bc.total_own_ban, 0) AS total_own_ban,
 
-            COALESCE(1.0 * p.kills / NULLIF(p.deaths, 0), 0.0)            AS kd,
-            COALESCE(1.0 * p.adr_weighted / NULLIF(p.rounds_weight, 0), 0.0) AS adr
+               COALESCE(1.0 * p.kills / NULLIF(p.deaths, 0), 0.0)            AS kd,
+               COALESCE(1.0 * p.adr_weighted / NULLIF(p.rounds_weight, 0), 0.0) AS adr,
+
+               COALESCE(dc.decov_cnt, 0) AS decov
 
         FROM allmaps am
         LEFT JOIN team_maps tm ON tm.map = am.map
         LEFT JOIN ban_counts bc ON bc.map = am.map
         LEFT JOIN perf p        ON p.map  = am.map
+        LEFT JOIN decov dc      ON dc.map = am.map
         GROUP BY am.map
         ORDER BY am.map COLLATE NOCASE
     """
 
     res = con.execute(sql, {"champ": championship_id, "team": team_id, "cutoff": cutoff_ts}).fetchall()
-    return [dict(r) for r in res]
+    out = [dict(r) for r in res]
+    return out
 
 def compute_map_stats_with_delta(con: sqlite3.Connection, championship_id: int, team_id: str) -> dict[str, dict]:
     """

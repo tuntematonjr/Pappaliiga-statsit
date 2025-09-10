@@ -47,12 +47,9 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE TABLE IF NOT EXISTS matches (
   match_id        TEXT PRIMARY KEY,
   championship_id TEXT NOT NULL REFERENCES championships(championship_id) ON DELETE CASCADE,
-
-  competition_id   TEXT,
   competition_name TEXT,
   best_of          INTEGER,
   game             TEXT,
-  faceit_url       TEXT,
 
   -- Aiemmat (pidä):
   configured_at    INTEGER,

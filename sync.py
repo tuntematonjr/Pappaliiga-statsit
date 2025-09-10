@@ -481,16 +481,8 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         pass
 
     # --- build upsert payload for 'matches' ---
-    comp_id   = (details.get("competition_id") if isinstance(details, dict) else None) \
-                or (summary.get("_raw", {}).get("competition_id") if summary else None)
     comp_name = (details.get("competition_name") if isinstance(details, dict) else None) \
                 or (summary.get("_raw", {}).get("competition_name") if summary else None)
-    faceit_url = (details.get("faceit_url") if isinstance(details, dict) else None) \
-                 or (summary.get("_raw", {}).get("faceit_url") if summary else None)
-
-    # Halutessasi voit pitää tämän normalisoinnin (nopeuteen ei vaikutusta)
-    if faceit_url and "faceit.com" in faceit_url:
-        faceit_url = re.sub(r"https://www\.faceit\.com/[a-z\-]+/", "https://www.faceit.com/", faceit_url)
 
     configured_at = safe_int(
         (details.get("configured_at") if isinstance(details, dict) else None) \
@@ -500,10 +492,7 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     m = {
         "match_id": match_id,
         "championship_id": champ_row["championship_id"],
-
-        "competition_id": comp_id,
         "competition_name": comp_name,
-        "faceit_url": faceit_url,
         "configured_at": configured_at,
 
         "game": game_name or champ_row.get("game") or "cs2",
@@ -628,11 +617,13 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     if map_rows:
         upsert_maps(con, match_id, map_rows)
 
-    # --- Democracy / map_votes --- (käytä samaa demo_jsonia)
+    # --- Democracy / map_votes ---
     try:
         votes = []
         payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
         tickets = payload.get("tickets", []) if isinstance(payload, dict) else []
+
+        # Kerää vain map-vedot
         for ticket in tickets:
             if not isinstance(ticket, dict):
                 continue
@@ -642,15 +633,43 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                 if not isinstance(ent, dict):
                     continue
                 sel = ent.get("selected_by")
+                status = (ent.get("status") or "").lower()
+
                 votes.append({
                     "round_num": ent.get("round"),
-                    "map_name": ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"),
-                    "status": ent.get("status"),
+                    "map_name":  ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"),
+                    "status":    status,
                     "selected_by_faction": sel,
                     "selected_by_team_id": _normalize_team_ref(sel, team1_id, team2_id),
                 })
+
         if votes:
-            upsert_map_votes(con, match_id, votes)  # db.py tekee replace-tyylin
+            # 1) Järjestä kierroksen mukaan (None lopuksi)
+            votes.sort(key=lambda x: (x.get("round_num") is None, x.get("round_num"), x.get("map_name") or ""))
+
+            # 2) 7. map-veto on aina overflow (BO2) tai decider (BO3):
+            #    - jos pick/selected/decider -rivejä on ≥3 -> viimeinen = decider
+            #    - muutoin viimeinen = overflow
+            if len(votes) >= 7:
+                pick_like = sum(1 for v in votes if (v.get("status") or "") in ("pick", "selected", "decider"))
+                last = votes[-1]
+                if pick_like >= 3:
+                    last["status"] = "decider"
+                    # decider voi säilyttää mahdollisen selected_by_* -tiedon
+                else:
+                    last["status"] = "overflow"
+                    # overflow ei ole kummankaan ban: nollaa valitsijat
+                    last["selected_by_team_id"] = None
+                    last["selected_by_faction"] = None
+
+            # 3) Yhtenäistä 'selected' -> 'pick' (EI koske äsken asetettua viimeistä riviä)
+            for v in votes:
+                if v["status"] == "selected":
+                    v["status"] = "pick"
+
+            # 4) Talleta
+            upsert_map_votes(con, match_id, votes)
+
     except Exception:
         pass
 
@@ -673,7 +692,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     # if team_rows:
     if player_rows:
         upsert_player_stats(con, match_id, player_rows)
-
 
 # ---- main sync --------------------------------------------------------------
 
