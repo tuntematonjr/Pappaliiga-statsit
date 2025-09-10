@@ -1,4 +1,4 @@
-<!-- GENVER:2 GENERATED_AT:1757364838 -->
+<!-- GENVER:3 GENERATED_AT:1757498323 -->
 <!doctype html>
 <html lang="fi">
 <head>
@@ -375,8 +375,63 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
 @media (max-width:720px){
   .matches-mirror .map-row{grid-template-columns:1fr;row-gap:.45rem;}
 }
-</style>
 
+/* Collapsible Matches box */
+.card.matches-mirror { padding: 0; overflow: hidden; }
+.card.matches-mirror summary { list-style: none; }
+.card.matches-mirror summary::-webkit-details-marker { display: none; }
+
+.matches-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--head);
+  border-bottom: 1px solid transparent;
+  cursor: pointer; /* whole bar clickable */
+  user-select: none;
+}
+
+.card.matches-mirror[open] .matches-head {
+  border-bottom: 1px solid var(--border);
+}
+
+.matches-head .head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.matches-head .title {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.matches-head .chev {
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform .18s ease;
+}
+
+.card.matches-mirror[open] .matches-head .chev {
+  transform: rotate(90deg);
+}
+
+/* Keep the checkbox clickable without toggling the <details> accidentally */
+.matches-head .toggle-played {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default; /* label itself not a toggle for the box */
+}
+.matches-head .hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 8px;
+  opacity: 0.8;
+}
+</style>
 
 <script>
 function sortTable(tableId,n,numeric){
@@ -530,7 +585,20 @@ function renderSplitWR(td, played, wrPct){
     td.title = g ? `Wins: ${wins}, Losses: ${losses}, WR: ${pct.toFixed(1)}%` : 'No games';
   }
 }
-document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.tabs[id]').forEach(root=>initTabsAutoSort(root.id)); });
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tabs[id]').forEach(root => initTabsAutoSort(root.id));
+});
+(function(){
+  // Prevent checkbox clicks inside summary from toggling the <details>
+  document.addEventListener('click', function(e){
+    const target = e.target;
+    if (!target) return;
+    if (target.matches('.matches-head input[type="checkbox"], .matches-head label.toggle-played, .matches-head .toggle-played *')) {
+      e.stopPropagation();
+    }
+  }, {capture:true});
+})();
+
 </script>
 </head>
 <body class="is-division">
@@ -540,7 +608,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <div class="topbar">
         <div class="brand">
           <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
-          <span>AFI - Pappaliiga Stats v1.2</span>
+          <span>AFI - Pappaliiga Stats v0.2</span>
         </div>
         <div class="nav">
           <a class="btn btn-ghost" href="index.html">← Takaisin indexiin</a>
@@ -550,7 +618,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     
 <div class="container">
 <h1 style='text-align:center'>20 Divisioona S10 (Season 10)</h1>
-<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 07.09.2025 16:58</div>
+<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 10.09.2025 11:42</div>
 <div class="page">
 <div class="nav">
 <a href="#team-709dba24-823b-4f34-8047-2ef2942a744f"><img class="logo nav-logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt="">Bobers BackDoor</a>
@@ -580,7 +648,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 <div class="summary-item" title="Painotettu mediaani: pelaajakohtaiset arvot lajitellaan, paino = pelatut kierrokset divisioonassa. p50 on pienin arvo, jossa kumulatiiviset painot ylittävät 50% (p25/p75 vastaavasti 25%/75%)."><div class="label">Median Survival% (p50)</div><div class="val">29% <div class="label">p25-p75</div><span class="cell-muted" style="font-weight:400;">26%–33%</span></div></div>
 <div class="summary-item" title="Rating1 ≈ HLTV 1.0:&#10;  ( KR/0.679 + SURV/0.317 + ADR/79.9 ) / 3&#10;Missä:&#10;  KR   = Kills per Round (kills / rounds)&#10;  SURV = Survived per Round = 1 - (deaths / rounds)&#10;  ADR  = Average Damage per Round&#10;Baselinet on kalibroitu niin, että ~1.00 ≈ sarjan keskitason suoritus."><div class="label">Median Rating1 (p50)</div><div class="val">0.96 <div class="label">p25-p75</div><span class="cell-muted" style="font-weight:400;">0.87-1.10</span></div></div>
 <div class='summary-item'>  <div class='label'>Most played (top4)</div>  <div class='val' style='line-height:1.25'>Ancient <span class='cell-muted'>(32×)</span><br>Nuke <span class='cell-muted'>(25×)</span><br>Inferno <span class='cell-muted'>(22×)</span><br>Anubis <span class='cell-muted'>(21×)</span></div></div>
-<div class='summary-item'>  <div class='label'>Most banned (top4)</div>  <div class='val' style='line-height:1.25'>Mirage <span class='cell-muted'>(57×)</span><br>Train <span class='cell-muted'>(57×)</span><br>Dust II <span class='cell-muted'>(51×)</span><br>Anubis <span class='cell-muted'>(44×)</span></div></div>
+<div class='summary-item'>  <div class='label'>Most banned (top4)</div>  <div class='val' style='line-height:1.25'>Train <span class='cell-muted'>(49×)</span><br>Dust II <span class='cell-muted'>(43×)</span><br>Mirage <span class='cell-muted'>(43×)</span><br>Anubis <span class='cell-muted'>(36×)</span></div></div>
 </div>
 </div>
 <div class="card leaders">
@@ -982,6 +1050,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-1',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-1',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-1',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-1',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -1011,8 +1081,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 23)">23</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
+            <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -1041,8 +1114,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -1071,8 +1147,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 8)">8</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
-            <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -1103,6 +1182,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -1131,8 +1213,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 5)">5</td>
             <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
-            <td title="Δ vs prev: +0 (prev 2)">2</td>
+            <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 7)">8 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -1163,6 +1248,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -1191,8 +1279,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
-            <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +1 (prev 3)">
+              4 ▲
+            </td>
             </tr>
 </tbody></table>
 
@@ -1213,12 +1304,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-1', 'maps-1-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="709dba24-823b-4f34-8047-2ef2942a744f">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-709dba24-823b-4f34-8047-2ef2942a744f"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="709dba24-823b-4f34-8047-2ef2942a744f">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-709dba24-823b-4f34-8047-2ef2942a744f"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-709dba24-823b-4f34-8047-2ef2942a744f">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -1228,7 +1324,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-ecc98fcc-3a2a-4b5f-aa98-ed23e3639fe2" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-ecc98fcc-3a2a-4b5f-aa98-ed23e3639fe2" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -1256,7 +1352,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-bb240c4e-e3d6-41cc-b4a9-51e1735690db" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-bb240c4e-e3d6-41cc-b4a9-51e1735690db" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -1284,7 +1380,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-d468031f-6467-4067-93ec-089a6e9fcde8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d468031f-6467-4067-93ec-089a6e9fcde8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -1312,7 +1408,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9a8f8e14-42a5-4b76-810f-d21a9a95d4b9" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9a8f8e14-42a5-4b76-810f-d21a9a95d4b9" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -1340,7 +1436,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-387c33da-d502-4264-88c2-42cd88f7c8ca" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-387c33da-d502-4264-88c2-42cd88f7c8ca" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -1368,7 +1464,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-884a4544-b549-49e9-8b04-38368d430622" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-884a4544-b549-49e9-8b04-38368d430622" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -1396,7 +1492,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-76382848-44e9-4f54-86b3-607812f0787e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-76382848-44e9-4f54-86b3-607812f0787e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -1424,7 +1520,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-d0c1579a-5147-456f-95ce-f1c32b32445c" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d0c1579a-5147-456f-95ce-f1c32b32445c" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -1452,7 +1548,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-38e228be-c402-416e-a0c3-fe09594bc46d" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-38e228be-c402-416e-a0c3-fe09594bc46d" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -1480,7 +1576,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-cad893ad-31dd-4ee1-8b19-cb84a7c0af02" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-cad893ad-31dd-4ee1-8b19-cb84a7c0af02" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -1508,7 +1604,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-b38d0d35-82c6-4c09-959f-1a6f41f79d29" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b38d0d35-82c6-4c09-959f-1a6f41f79d29" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -1899,6 +1995,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-2',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-2',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-2',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-2',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -1930,6 +2028,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -1960,6 +2061,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 10)">11 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -1988,8 +2092,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +6 (prev -12)">-6 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -2020,6 +2127,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -2048,8 +2158,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
-            <td title="Δ vs prev: +1 (prev 6)">7 ▲</td>
+            <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -2078,8 +2191,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 3)">
+              4 ▲
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -2108,8 +2224,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
-            <td title="Δ vs prev: +0 (prev 6)">6</td>
+            <td title="Δ vs prev: +0 (prev 5)">5</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 </tbody></table>
 
@@ -2130,12 +2249,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-2', 'maps-2-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="5da2db9a-311d-44c6-acf7-97f8a756777e">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-5da2db9a-311d-44c6-acf7-97f8a756777e"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="5da2db9a-311d-44c6-acf7-97f8a756777e">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-5da2db9a-311d-44c6-acf7-97f8a756777e"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-5da2db9a-311d-44c6-acf7-97f8a756777e">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -2145,7 +2269,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-e0c755cd-b3f3-49d9-92ff-654585094778" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-e0c755cd-b3f3-49d9-92ff-654585094778" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -2173,7 +2297,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-dd41e577-a6b4-479b-8c81-ad173847812a" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-dd41e577-a6b4-479b-8c81-ad173847812a" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -2201,7 +2325,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-43149ee9-8058-426b-8268-148f51e52871" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-43149ee9-8058-426b-8268-148f51e52871" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -2229,7 +2353,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9a8f8e14-42a5-4b76-810f-d21a9a95d4b9" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9a8f8e14-42a5-4b76-810f-d21a9a95d4b9" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -2257,7 +2381,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-06b2a6bb-4890-415a-ac31-5d2bf888f8bc" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-06b2a6bb-4890-415a-ac31-5d2bf888f8bc" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -2285,7 +2409,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-1e5a6f10-c1d5-4201-a04d-634380389471" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1e5a6f10-c1d5-4201-a04d-634380389471" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -2313,7 +2437,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-08f3c1c3-225c-4796-a1b9-54bcfc92aae6" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-08f3c1c3-225c-4796-a1b9-54bcfc92aae6" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -2341,7 +2465,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-1523895c-c42c-4acd-9112-84f87e7c6a47" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1523895c-c42c-4acd-9112-84f87e7c6a47" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -2369,7 +2493,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-f8763fd8-9f02-4abe-8232-2d70686289dd" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-f8763fd8-9f02-4abe-8232-2d70686289dd" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -2397,7 +2521,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9bcf2448-3c68-4407-8631-35ed574a8346" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9bcf2448-3c68-4407-8631-35ed574a8346" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -2425,7 +2549,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-f7afe827-2e21-4669-ac35-6c6ca6c85c84" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-f7afe827-2e21-4669-ac35-6c6ca6c85c84" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -2850,6 +2974,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-3',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-3',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-3',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-3',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -2879,8 +3005,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -20)">-20</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
+            <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 3)">
+              3
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -2911,6 +3040,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -2941,6 +3073,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 6)">6</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -2969,8 +3104,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +0 (prev 3)">
+              3
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -3001,6 +3139,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 6)">6</td>
+            <td title="Δ vs prev: +1 (prev 1)">
+              2 ▲
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -3029,8 +3170,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +4 (prev 7)">11 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -3061,6 +3205,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -3081,12 +3228,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-3', 'maps-3-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="526fab8b-d95e-485b-89a9-5b22f40c8fa7">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-526fab8b-d95e-485b-89a9-5b22f40c8fa7"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="526fab8b-d95e-485b-89a9-5b22f40c8fa7">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-526fab8b-d95e-485b-89a9-5b22f40c8fa7"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-526fab8b-d95e-485b-89a9-5b22f40c8fa7">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -3096,7 +3248,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-e0c755cd-b3f3-49d9-92ff-654585094778" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-e0c755cd-b3f3-49d9-92ff-654585094778" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -3124,7 +3276,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-42637b75-1a37-46c8-bbb8-d17099fbce8b" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-42637b75-1a37-46c8-bbb8-d17099fbce8b" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -3152,7 +3304,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-d468031f-6467-4067-93ec-089a6e9fcde8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d468031f-6467-4067-93ec-089a6e9fcde8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -3180,7 +3332,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-7cfb8936-1d61-473b-ae48-f30795209bae" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-7cfb8936-1d61-473b-ae48-f30795209bae" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -3208,7 +3360,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a52582f9-4839-47df-baf8-d0ab54f8b31f" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a52582f9-4839-47df-baf8-d0ab54f8b31f" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -3236,7 +3388,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-16ccebe6-d4cb-46cc-a6ef-42d457d9cffa" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-16ccebe6-d4cb-46cc-a6ef-42d457d9cffa" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -3264,7 +3416,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-44071e2f-b9b6-4d61-a2d2-8739d12f7544" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-44071e2f-b9b6-4d61-a2d2-8739d12f7544" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -3292,7 +3444,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-300c6e82-1cbd-4f0e-95ed-8934b0e41784" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-300c6e82-1cbd-4f0e-95ed-8934b0e41784" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -3320,7 +3472,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-754ab593-7bb9-46df-92d9-245fca1afc59" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-754ab593-7bb9-46df-92d9-245fca1afc59" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -3348,7 +3500,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-05eeeaf9-9f87-4bd0-9f99-eb916383520c" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-05eeeaf9-9f87-4bd0-9f99-eb916383520c" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -3807,6 +3959,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-4',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-4',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-4',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-4',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -3836,8 +3990,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -27)">-27</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -3866,8 +4023,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -7)">-7</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +1 (prev 2)">
+              3 ▲
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -3896,8 +4056,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -9)">-9</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
-            <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
+            <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -3928,6 +4091,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 9)">10 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -3956,8 +4122,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: -5 (prev 4)">-1 ▼</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
-            <td title="Δ vs prev: +0 (prev 5)">5</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 3)">
+              3
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -3986,8 +4155,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +2 (prev -7)">-5 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -4018,6 +4190,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 6)">7 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -4038,12 +4213,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-4', 'maps-4-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="a061295f-5d19-4921-840a-f3715ed80220">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-a061295f-5d19-4921-840a-f3715ed80220"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="a061295f-5d19-4921-840a-f3715ed80220">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-a061295f-5d19-4921-840a-f3715ed80220"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-a061295f-5d19-4921-840a-f3715ed80220">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -4053,7 +4233,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a3e1da14-b68b-4753-9768-68a547f6719f" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a3e1da14-b68b-4753-9768-68a547f6719f" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -4081,7 +4261,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-4bc7d5c7-ea77-4497-8139-690f7316538e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-4bc7d5c7-ea77-4497-8139-690f7316538e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -4109,7 +4289,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a07b6131-8f68-47d7-b616-8cd36fc68e55" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a07b6131-8f68-47d7-b616-8cd36fc68e55" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -4137,7 +4317,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-aeeccd12-a878-48a0-9dcf-454757604d10" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-aeeccd12-a878-48a0-9dcf-454757604d10" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -4165,7 +4345,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-61471a9e-d9a6-4d80-8ba6-9d0a969081a4" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-61471a9e-d9a6-4d80-8ba6-9d0a969081a4" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -4193,7 +4373,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-16ccebe6-d4cb-46cc-a6ef-42d457d9cffa" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-16ccebe6-d4cb-46cc-a6ef-42d457d9cffa" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -4221,7 +4401,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-08f3c1c3-225c-4796-a1b9-54bcfc92aae6" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-08f3c1c3-225c-4796-a1b9-54bcfc92aae6" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -4249,7 +4429,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a9fab847-e21c-4102-a42d-8b3102050f49" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a9fab847-e21c-4102-a42d-8b3102050f49" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -4277,7 +4457,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-38e228be-c402-416e-a0c3-fe09594bc46d" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-38e228be-c402-416e-a0c3-fe09594bc46d" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -4305,7 +4485,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-22af3c9a-47db-49a8-b3a6-f8cd5fdca6f8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-22af3c9a-47db-49a8-b3a6-f8cd5fdca6f8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -4333,7 +4513,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-34a277b9-978d-4866-aad1-326815ec3b9e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-34a277b9-978d-4866-aad1-326815ec3b9e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -4724,6 +4904,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-5',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-5',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-5',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-5',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -4755,6 +4937,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -4783,8 +4968,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +5 (prev 20)">25 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -4815,6 +5003,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 9)">10 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -4843,8 +5034,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 7)">7</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
+            <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -4875,6 +5069,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 6)">6</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 3)">
+              4 ▲
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -4903,8 +5100,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -8)">-8</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 4)">
+              4
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -4935,6 +5135,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 7)">8 ▲</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +1 (prev 8)">9 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -4955,12 +5158,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-5', 'maps-5-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="a932dfba-911b-4d2e-884e-562c99465554">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-a932dfba-911b-4d2e-884e-562c99465554"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="a932dfba-911b-4d2e-884e-562c99465554">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-a932dfba-911b-4d2e-884e-562c99465554"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-a932dfba-911b-4d2e-884e-562c99465554">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -4970,7 +5178,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9d89b612-66c0-465d-a0ec-3bb4fca5b917" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9d89b612-66c0-465d-a0ec-3bb4fca5b917" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -4998,7 +5206,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-4bc7d5c7-ea77-4497-8139-690f7316538e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-4bc7d5c7-ea77-4497-8139-690f7316538e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -5026,7 +5234,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-53cef67d-3c79-4d7e-9621-205a03d18b44" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-53cef67d-3c79-4d7e-9621-205a03d18b44" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -5054,7 +5262,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-591d5f34-5f2d-488b-9c5b-9d9ec9ad5401" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-591d5f34-5f2d-488b-9c5b-9d9ec9ad5401" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -5082,7 +5290,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-040a0aa8-8a9b-4bc4-8d31-b3adef93c02f" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-040a0aa8-8a9b-4bc4-8d31-b3adef93c02f" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -5110,7 +5318,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-1828bcd2-0f22-4b17-a850-456ac2b427e5" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1828bcd2-0f22-4b17-a850-456ac2b427e5" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -5138,7 +5346,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-44071e2f-b9b6-4d61-a2d2-8739d12f7544" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-44071e2f-b9b6-4d61-a2d2-8739d12f7544" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -5166,7 +5374,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-1523895c-c42c-4acd-9112-84f87e7c6a47" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1523895c-c42c-4acd-9112-84f87e7c6a47" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -5194,7 +5402,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-5d97b652-3b3e-4d72-84ea-4ce5b8dfbe69" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5d97b652-3b3e-4d72-84ea-4ce5b8dfbe69" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -5222,7 +5430,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-cad893ad-31dd-4ee1-8b19-cb84a7c0af02" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-cad893ad-31dd-4ee1-8b19-cb84a7c0af02" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -5250,7 +5458,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-5f9d5fa4-3740-48df-baf4-2596f8b34626" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5f9d5fa4-3740-48df-baf4-2596f8b34626" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -5709,6 +5917,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-6',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-6',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-6',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-6',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -5740,6 +5950,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -5770,6 +5983,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 6)">6</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -5798,8 +6014,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 5)">5</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 6)">7 ▲</td>
+            <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 3)">
+              3
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -5830,6 +6049,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -5858,8 +6080,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -10)">-10</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +1 (prev 2)">
+              3 ▲
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -5888,8 +6113,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 6)">6</td>
             <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
-            <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 8)">9 ▲</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -5920,6 +6148,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 6)">6</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 8)">8</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 </tbody></table>
 
@@ -5940,12 +6171,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-6', 'maps-6-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="006c6abf-bb95-4437-851f-78799673d371">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-006c6abf-bb95-4437-851f-78799673d371"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="006c6abf-bb95-4437-851f-78799673d371">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-006c6abf-bb95-4437-851f-78799673d371"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-006c6abf-bb95-4437-851f-78799673d371">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -5955,7 +6191,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-5312bf38-80f0-4aed-af22-cf0dd2b9627e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5312bf38-80f0-4aed-af22-cf0dd2b9627e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -5983,7 +6219,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a9020910-0a96-4b7f-b87d-3c83dd18742d" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a9020910-0a96-4b7f-b87d-3c83dd18742d" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -6011,7 +6247,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-8d462897-8b81-491a-b268-5f0bf32d8cb7" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-8d462897-8b81-491a-b268-5f0bf32d8cb7" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -6039,7 +6275,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-7cfb8936-1d61-473b-ae48-f30795209bae" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-7cfb8936-1d61-473b-ae48-f30795209bae" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -6067,7 +6303,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-06b2a6bb-4890-415a-ac31-5d2bf888f8bc" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-06b2a6bb-4890-415a-ac31-5d2bf888f8bc" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -6095,7 +6331,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-4ed4fa2b-51c2-47b4-b81f-c7522b6635ed" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-4ed4fa2b-51c2-47b4-b81f-c7522b6635ed" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -6123,7 +6359,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-76382848-44e9-4f54-86b3-607812f0787e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-76382848-44e9-4f54-86b3-607812f0787e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -6151,7 +6387,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9fcb33d6-d689-46c4-9bbb-d51b6414c41d" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9fcb33d6-d689-46c4-9bbb-d51b6414c41d" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -6179,7 +6415,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-b008d63a-7125-465b-b6e4-c83225c3635e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b008d63a-7125-465b-b6e4-c83225c3635e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -6207,7 +6443,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-22af3c9a-47db-49a8-b3a6-f8cd5fdca6f8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-22af3c9a-47db-49a8-b3a6-f8cd5fdca6f8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -6235,7 +6471,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-5f9d5fa4-3740-48df-baf4-2596f8b34626" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5f9d5fa4-3740-48df-baf4-2596f8b34626" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -6592,6 +6828,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-7',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-7',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-7',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-7',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -6623,6 +6861,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +1 (prev 1)">
+              2 ▲
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -6651,8 +6892,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +2 (prev -2)">0 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -6683,6 +6927,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 9)">10 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -6711,8 +6958,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 3)">
+              3
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -6741,8 +6991,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +1 (prev 6)">7 ▲</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -6773,6 +7026,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -6801,8 +7057,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -11)">-11</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 </tbody></table>
 
@@ -6823,12 +7082,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-7', 'maps-7-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="23d8f220-be14-4ad9-88ce-278582466c7d">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-23d8f220-be14-4ad9-88ce-278582466c7d"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="23d8f220-be14-4ad9-88ce-278582466c7d">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-23d8f220-be14-4ad9-88ce-278582466c7d"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-23d8f220-be14-4ad9-88ce-278582466c7d">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -6838,7 +7102,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-ecc98fcc-3a2a-4b5f-aa98-ed23e3639fe2" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-ecc98fcc-3a2a-4b5f-aa98-ed23e3639fe2" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -6866,7 +7130,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a9020910-0a96-4b7f-b87d-3c83dd18742d" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a9020910-0a96-4b7f-b87d-3c83dd18742d" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -6894,7 +7158,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-8ae01710-a656-4474-af6f-ba68dc271269" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-8ae01710-a656-4474-af6f-ba68dc271269" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -6922,7 +7186,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-aeeccd12-a878-48a0-9dcf-454757604d10" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-aeeccd12-a878-48a0-9dcf-454757604d10" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -6950,7 +7214,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-040a0aa8-8a9b-4bc4-8d31-b3adef93c02f" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-040a0aa8-8a9b-4bc4-8d31-b3adef93c02f" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -6978,7 +7242,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-e043c66a-1061-46b1-8485-1577d21b9dda" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-e043c66a-1061-46b1-8485-1577d21b9dda" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -7006,7 +7270,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-d0bc89d1-9382-45be-a0b7-4127dd5ecee2" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d0bc89d1-9382-45be-a0b7-4127dd5ecee2" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -7034,7 +7298,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-f88192c5-4209-41be-a99f-636cd8e3e392" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-f88192c5-4209-41be-a99f-636cd8e3e392" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -7062,7 +7326,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-754ab593-7bb9-46df-92d9-245fca1afc59" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-754ab593-7bb9-46df-92d9-245fca1afc59" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -7090,7 +7354,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9bcf2448-3c68-4407-8631-35ed574a8346" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9bcf2448-3c68-4407-8631-35ed574a8346" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -7118,7 +7382,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-faa65cfe-4e84-4026-be5d-87733dbc3b5a" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-faa65cfe-4e84-4026-be5d-87733dbc3b5a" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -7509,6 +7773,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-8',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-8',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-8',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-8',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -7538,8 +7804,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -15)">-15</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -7570,6 +7839,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -7600,6 +7872,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -7628,8 +7903,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: -2 (prev -19)">-21 ▼</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -7658,8 +7936,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -7688,8 +7969,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -2)">-2</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
+            <td title="Δ vs prev: +1 (prev 1)">
+              2 ▲
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -7720,6 +8004,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 7)">8 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -7740,12 +8027,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-8', 'maps-8-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="c4bf949c-e6e7-4fef-8020-d03013d26a0f">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-c4bf949c-e6e7-4fef-8020-d03013d26a0f"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="c4bf949c-e6e7-4fef-8020-d03013d26a0f">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-c4bf949c-e6e7-4fef-8020-d03013d26a0f"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-c4bf949c-e6e7-4fef-8020-d03013d26a0f">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -7755,7 +8047,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a3e1da14-b68b-4753-9768-68a547f6719f" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a3e1da14-b68b-4753-9768-68a547f6719f" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -7783,7 +8075,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-dd41e577-a6b4-479b-8c81-ad173847812a" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-dd41e577-a6b4-479b-8c81-ad173847812a" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -7811,7 +8103,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-53cef67d-3c79-4d7e-9621-205a03d18b44" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-53cef67d-3c79-4d7e-9621-205a03d18b44" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -7839,7 +8131,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-6a1a3001-ed23-4517-85b2-87868c2bc96a" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-6a1a3001-ed23-4517-85b2-87868c2bc96a" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -7867,7 +8159,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-582fa9e0-7242-4a37-9feb-4181c5e3ce30" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-582fa9e0-7242-4a37-9feb-4181c5e3ce30" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -7895,7 +8187,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-884a4544-b549-49e9-8b04-38368d430622" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-884a4544-b549-49e9-8b04-38368d430622" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -7923,7 +8215,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-d0bc89d1-9382-45be-a0b7-4127dd5ecee2" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d0bc89d1-9382-45be-a0b7-4127dd5ecee2" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -7951,7 +8243,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9fcb33d6-d689-46c4-9bbb-d51b6414c41d" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9fcb33d6-d689-46c4-9bbb-d51b6414c41d" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -7979,7 +8271,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-4c3e5076-9d64-4a23-b5ae-5f60d3b3f153" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-4c3e5076-9d64-4a23-b5ae-5f60d3b3f153" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -8007,7 +8299,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-8b5b086a-427e-48dc-9327-e8ca3a9b7805" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-8b5b086a-427e-48dc-9327-e8ca3a9b7805" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -8398,6 +8690,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-9',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-9',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-9',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-9',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -8429,6 +8723,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 10)">11 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -8459,6 +8756,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -8487,8 +8787,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: -6 (prev -3)">-9 ▼</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -8519,6 +8822,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 5)">5</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -8547,8 +8853,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -13)">-13</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
+            <td title="Δ vs prev: +0 (prev 4)">
+              4
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -8577,8 +8886,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -19)">-19</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 2)">
+              3 ▲
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -8607,8 +8919,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -9)">-9</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
-            <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 </tbody></table>
 
@@ -8629,12 +8944,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-9', 'maps-9-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="a2d27172-8c68-4986-b1cf-c95450749eeb">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-a2d27172-8c68-4986-b1cf-c95450749eeb"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="a2d27172-8c68-4986-b1cf-c95450749eeb">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-a2d27172-8c68-4986-b1cf-c95450749eeb"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-a2d27172-8c68-4986-b1cf-c95450749eeb">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -8644,7 +8964,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-72eca03d-c1b4-4b78-883c-0607f971cd3a" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-72eca03d-c1b4-4b78-883c-0607f971cd3a" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -8672,7 +8992,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-bb240c4e-e3d6-41cc-b4a9-51e1735690db" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-bb240c4e-e3d6-41cc-b4a9-51e1735690db" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -8700,7 +9020,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-8d462897-8b81-491a-b268-5f0bf32d8cb7" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-8d462897-8b81-491a-b268-5f0bf32d8cb7" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -8728,7 +9048,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-1ac44de1-53c4-46ac-9a20-bb650c413584" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1ac44de1-53c4-46ac-9a20-bb650c413584" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -8756,7 +9076,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-61471a9e-d9a6-4d80-8ba6-9d0a969081a4" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-61471a9e-d9a6-4d80-8ba6-9d0a969081a4" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -8784,7 +9104,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-1828bcd2-0f22-4b17-a850-456ac2b427e5" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1828bcd2-0f22-4b17-a850-456ac2b427e5" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -8812,7 +9132,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-bd8faf36-5b71-4900-baf1-2bb679f05d7f" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-bd8faf36-5b71-4900-baf1-2bb679f05d7f" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -8840,7 +9160,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-f88192c5-4209-41be-a99f-636cd8e3e392" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-f88192c5-4209-41be-a99f-636cd8e3e392" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -8868,7 +9188,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-4c3e5076-9d64-4a23-b5ae-5f60d3b3f153" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-4c3e5076-9d64-4a23-b5ae-5f60d3b3f153" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -8896,7 +9216,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-05eeeaf9-9f87-4bd0-9f99-eb916383520c" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-05eeeaf9-9f87-4bd0-9f99-eb916383520c" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -8924,7 +9244,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-f7afe827-2e21-4669-ac35-6c6ca6c85c84" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-f7afe827-2e21-4669-ac35-6c6ca6c85c84" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -9315,6 +9635,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-10',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-10',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-10',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-10',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -9346,6 +9668,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -9374,8 +9699,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
-            <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +1 (prev 3)">
+              4 ▲
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -9404,8 +9732,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -3)">-3</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -9436,6 +9767,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -9464,8 +9798,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +5 (prev 7)">12 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +0 (prev 8)">8</td>
+            <td title="Δ vs prev: +0 (prev 7)">7</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -9494,8 +9831,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: -2 (prev 2)">0 ▼</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -9524,8 +9864,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -2)">-2</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 </tbody></table>
 
@@ -9546,12 +9889,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-10', 'maps-10-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="8e938486-9b54-4cdc-ae53-01152a463ca8">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-8e938486-9b54-4cdc-ae53-01152a463ca8"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="8e938486-9b54-4cdc-ae53-01152a463ca8">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-8e938486-9b54-4cdc-ae53-01152a463ca8"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-8e938486-9b54-4cdc-ae53-01152a463ca8">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -9561,7 +9909,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9d89b612-66c0-465d-a0ec-3bb4fca5b917" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9d89b612-66c0-465d-a0ec-3bb4fca5b917" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -9589,7 +9937,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-f8e24dbf-c2d9-43e2-b737-d35e6e00a31c" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-f8e24dbf-c2d9-43e2-b737-d35e6e00a31c" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -9617,7 +9965,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-8ae01710-a656-4474-af6f-ba68dc271269" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-8ae01710-a656-4474-af6f-ba68dc271269" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -9645,7 +9993,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-1ac44de1-53c4-46ac-9a20-bb650c413584" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1ac44de1-53c4-46ac-9a20-bb650c413584" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -9673,7 +10021,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a52582f9-4839-47df-baf8-d0ab54f8b31f" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a52582f9-4839-47df-baf8-d0ab54f8b31f" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -9701,7 +10049,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-1e5a6f10-c1d5-4201-a04d-634380389471" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-1e5a6f10-c1d5-4201-a04d-634380389471" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -9729,7 +10077,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9e51a643-97ad-46a3-b847-61ebd07af9f9" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9e51a643-97ad-46a3-b847-61ebd07af9f9" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -9757,7 +10105,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-d0c1579a-5147-456f-95ce-f1c32b32445c" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-d0c1579a-5147-456f-95ce-f1c32b32445c" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -9785,7 +10133,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-b008d63a-7125-465b-b6e4-c83225c3635e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b008d63a-7125-465b-b6e4-c83225c3635e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -9813,7 +10161,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-8b5b086a-427e-48dc-9327-e8ca3a9b7805" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-8b5b086a-427e-48dc-9327-e8ca3a9b7805" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -9841,7 +10189,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-34a277b9-978d-4866-aad1-326815ec3b9e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-34a277b9-978d-4866-aad1-326815ec3b9e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -10232,6 +10580,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-11',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-11',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-11',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-11',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -10261,8 +10611,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -2)">-2</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -10291,8 +10644,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -2)">-2</td>
             <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -10323,6 +10679,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -10351,8 +10710,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: -9 (prev 11)">2 ▼</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -10383,6 +10745,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 7)">8 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -10411,8 +10776,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +3 (prev 13)">16 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 3)">
+              3
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -10441,8 +10809,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
-            <td title="Δ vs prev: +0 (prev 3)">3</td>
+            <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 7)">7</td>
+            <td title="Δ vs prev: +1 (prev 1)">
+              2 ▲
+            </td>
             </tr>
 </tbody></table>
 
@@ -10463,12 +10834,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-11', 'maps-11-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="6cea7ff2-3f87-4fb7-9e4b-6d80968cddcb">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-6cea7ff2-3f87-4fb7-9e4b-6d80968cddcb"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="6cea7ff2-3f87-4fb7-9e4b-6d80968cddcb">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-6cea7ff2-3f87-4fb7-9e4b-6d80968cddcb"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-6cea7ff2-3f87-4fb7-9e4b-6d80968cddcb">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -10478,7 +10854,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-5312bf38-80f0-4aed-af22-cf0dd2b9627e" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5312bf38-80f0-4aed-af22-cf0dd2b9627e" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -10506,7 +10882,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-f8e24dbf-c2d9-43e2-b737-d35e6e00a31c" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-f8e24dbf-c2d9-43e2-b737-d35e6e00a31c" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -10534,7 +10910,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a07b6131-8f68-47d7-b616-8cd36fc68e55" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a07b6131-8f68-47d7-b616-8cd36fc68e55" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -10562,7 +10938,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-591d5f34-5f2d-488b-9c5b-9d9ec9ad5401" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-591d5f34-5f2d-488b-9c5b-9d9ec9ad5401" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -10590,7 +10966,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-582fa9e0-7242-4a37-9feb-4181c5e3ce30" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-582fa9e0-7242-4a37-9feb-4181c5e3ce30" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -10618,7 +10994,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-e043c66a-1061-46b1-8485-1577d21b9dda" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-e043c66a-1061-46b1-8485-1577d21b9dda" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>
@@ -10646,7 +11022,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-bd8faf36-5b71-4900-baf1-2bb679f05d7f" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-bd8faf36-5b71-4900-baf1-2bb679f05d7f" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -10674,7 +11050,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-300c6e82-1cbd-4f0e-95ed-8934b0e41784" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-300c6e82-1cbd-4f0e-95ed-8934b0e41784" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -10702,7 +11078,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-f8763fd8-9f02-4abe-8232-2d70686289dd" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-f8763fd8-9f02-4abe-8232-2d70686289dd" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -10730,7 +11106,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-27910165-a39d-47c7-8388-13d37caac7cf" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-27910165-a39d-47c7-8388-13d37caac7cf" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">YIKN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5b2aca5b-ad3e-4a05-aaa3-997dcb60f5a7.jpeg" alt=""></div>
       </summary>
@@ -10758,7 +11134,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-b38d0d35-82c6-4c09-959f-1a6f41f79d29" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-b38d0d35-82c6-4c09-959f-1a6f41f79d29" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -11183,6 +11559,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-12',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-12',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-12',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-12',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -11212,8 +11590,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev -25)">-25</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 0)">
+              1 ▲
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -11244,6 +11625,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 4)">4</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -11272,8 +11656,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 7)">7</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +1 (prev 6)">7 ▲</td>
+            <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -11304,6 +11691,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 8)">9 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -11332,8 +11722,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
-            <td title="Δ vs prev: +1 (prev 3)">4 ▲</td>
+            <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 5)">5</td>
+            <td title="Δ vs prev: +0 (prev 4)">
+              4
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -11362,8 +11755,11 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +8 (prev 16)">24 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +0 (prev 4)">4</td>
+            <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -11394,6 +11790,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 4)">5 ▲</td>
             <td title="Δ vs prev: +0 (prev 3)">3</td>
             <td title="Δ vs prev: +1 (prev 5)">6 ▲</td>
+            <td title="Δ vs prev: +0 (prev 2)">
+              2
+            </td>
             </tr>
 </tbody></table>
 
@@ -11414,12 +11813,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-12', 'maps-12-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="49cc816b-8af2-4761-87fa-1153946dd4e2">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-49cc816b-8af2-4761-87fa-1153946dd4e2"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="49cc816b-8af2-4761-87fa-1153946dd4e2">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-49cc816b-8af2-4761-87fa-1153946dd4e2"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-49cc816b-8af2-4761-87fa-1153946dd4e2">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -11429,7 +11833,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-72eca03d-c1b4-4b78-883c-0607f971cd3a" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-72eca03d-c1b4-4b78-883c-0607f971cd3a" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Superlatiivit</div><img class="logo" src="https://distribution.faceit-cdn.net/images/480f0c28-43d4-4014-a65e-e2b8b82bba00.jpeg" alt=""></div>
       </summary>
@@ -11457,7 +11861,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-42637b75-1a37-46c8-bbb8-d17099fbce8b" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-42637b75-1a37-46c8-bbb8-d17099fbce8b" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">KuskiOnTulossa</div><img class="logo" src="https://distribution.faceit-cdn.net/images/44b6d93e-6219-44b2-9b75-6bffea8243bd.jpeg" alt=""></div>
       </summary>
@@ -11485,7 +11889,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-43149ee9-8058-426b-8268-148f51e52871" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-43149ee9-8058-426b-8268-148f51e52871" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Team Hugoust</div><img class="logo" src="https://distribution.faceit-cdn.net/images/a8d53641-b9e5-4812-a361-195df183c63a.jpeg" alt=""></div>
       </summary>
@@ -11513,7 +11917,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-6a1a3001-ed23-4517-85b2-87868c2bc96a" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-6a1a3001-ed23-4517-85b2-87868c2bc96a" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">semi Simoilijat</div><img class="logo" src="https://distribution.faceit-cdn.net/images/144e9da2-9eaf-46d4-b149-d717f301e95a.jpeg" alt=""></div>
       </summary>
@@ -11541,7 +11945,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-387c33da-d502-4264-88c2-42cd88f7c8ca" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-387c33da-d502-4264-88c2-42cd88f7c8ca" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Bobers BackDoor</div><img class="logo" src="https://distribution.faceit-cdn.net/images/e58d4040-11b5-43f7-bbdf-92e7601c9e0a.jpeg" alt=""></div>
       </summary>
@@ -11569,7 +11973,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-4ed4fa2b-51c2-47b4-b81f-c7522b6635ed" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-4ed4fa2b-51c2-47b4-b81f-c7522b6635ed" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Pappa Roast</div><img class="logo" src="https://distribution.faceit-cdn.net/images/141a51e2-8a08-4037-b1f0-d3d91af16dd5.jpeg" alt=""></div>
       </summary>
@@ -11597,7 +12001,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-9e51a643-97ad-46a3-b847-61ebd07af9f9" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-9e51a643-97ad-46a3-b847-61ebd07af9f9" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Tuhti7</div><img class="logo" src="https://distribution.faceit-cdn.net/images/52253298-94fd-409c-9cc3-4706d6800f6a.jpeg" alt=""></div>
       </summary>
@@ -11625,7 +12029,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-a9fab847-e21c-4102-a42d-8b3102050f49" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-a9fab847-e21c-4102-a42d-8b3102050f49" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Mature Dolleri</div><img class="logo" src="https://distribution.faceit-cdn.net/images/2dd49c4c-c558-4277-99bd-14e684562248.jpeg" alt=""></div>
       </summary>
@@ -11653,7 +12057,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-5d97b652-3b3e-4d72-84ea-4ce5b8dfbe69" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-5d97b652-3b3e-4d72-84ea-4ce5b8dfbe69" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">MyyraMafia</div><img class="logo" src="https://distribution.faceit-cdn.net/images/db85952d-1657-490d-9a58-f520965aa8cc.jpeg" alt=""></div>
       </summary>
@@ -11681,7 +12085,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-27910165-a39d-47c7-8388-13d37caac7cf" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-27910165-a39d-47c7-8388-13d37caac7cf" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">VILLIAINEN</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c8b8ad25-d956-403e-91c6-fea85d344b3e.jpeg" alt=""></div>
       </summary>
@@ -11709,7 +12113,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-draw">D</span></div>
           <div class="scoreline"><span class="maps-score">1–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-faa65cfe-4e84-4026-be5d-87733dbc3b5a" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-faa65cfe-4e84-4026-be5d-87733dbc3b5a" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Salty Fun</div><img class="logo" src="https://distribution.faceit-cdn.net/images/5844a8bd-d6a6-43d9-85ee-3530f532cf7f.jpeg" alt=""></div>
       </summary>

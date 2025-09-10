@@ -1,4 +1,4 @@
-<!-- GENVER:2 GENERATED_AT:1757364841 -->
+<!-- GENVER:3 GENERATED_AT:1757498324 -->
 <!doctype html>
 <html lang="fi">
 <head>
@@ -375,8 +375,63 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
 @media (max-width:720px){
   .matches-mirror .map-row{grid-template-columns:1fr;row-gap:.45rem;}
 }
-</style>
 
+/* Collapsible Matches box */
+.card.matches-mirror { padding: 0; overflow: hidden; }
+.card.matches-mirror summary { list-style: none; }
+.card.matches-mirror summary::-webkit-details-marker { display: none; }
+
+.matches-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--head);
+  border-bottom: 1px solid transparent;
+  cursor: pointer; /* whole bar clickable */
+  user-select: none;
+}
+
+.card.matches-mirror[open] .matches-head {
+  border-bottom: 1px solid var(--border);
+}
+
+.matches-head .head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.matches-head .title {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.matches-head .chev {
+  display: inline-block;
+  transform: rotate(0deg);
+  transition: transform .18s ease;
+}
+
+.card.matches-mirror[open] .matches-head .chev {
+  transform: rotate(90deg);
+}
+
+/* Keep the checkbox clickable without toggling the <details> accidentally */
+.matches-head .toggle-played {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default; /* label itself not a toggle for the box */
+}
+.matches-head .hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 8px;
+  opacity: 0.8;
+}
+</style>
 
 <script>
 function sortTable(tableId,n,numeric){
@@ -530,7 +585,20 @@ function renderSplitWR(td, played, wrPct){
     td.title = g ? `Wins: ${wins}, Losses: ${losses}, WR: ${pct.toFixed(1)}%` : 'No games';
   }
 }
-document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.tabs[id]').forEach(root=>initTabsAutoSort(root.id)); });
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tabs[id]').forEach(root => initTabsAutoSort(root.id));
+});
+(function(){
+  // Prevent checkbox clicks inside summary from toggling the <details>
+  document.addEventListener('click', function(e){
+    const target = e.target;
+    if (!target) return;
+    if (target.matches('.matches-head input[type="checkbox"], .matches-head label.toggle-played, .matches-head .toggle-played *')) {
+      e.stopPropagation();
+    }
+  }, {capture:true});
+})();
+
 </script>
 </head>
 <body class="is-division">
@@ -540,7 +608,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
       <div class="topbar">
         <div class="brand">
           <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
-          <span>AFI - Pappaliiga Stats v1.2</span>
+          <span>AFI - Pappaliiga Stats v0.2</span>
         </div>
         <div class="nav">
           <a class="btn btn-ghost" href="index.html">← Takaisin indexiin</a>
@@ -550,7 +618,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
     
 <div class="container">
 <h1 style='text-align:center'>21 divisioona playoffs S10 (Season 10)</h1>
-<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 07.09.2025 16:59</div>
+<div class='muted' style='text-align:center; margin-top:-6px; font-size:0.9em;'>Data päivitetty 10.09.2025 11:43</div>
 <div class="page">
 <div class="nav">
 <a href="#team-3f3441c8-df02-472e-8895-53ae8f04f7ab"><img class="logo nav-logo" src="https://distribution.faceit-cdn.net/images/655bd40b-d6ff-42f6-b50c-628782f5aff3.jpeg" alt="">Cripplers</a>
@@ -875,6 +943,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-1',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-1',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-1',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-1',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -906,6 +976,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -936,6 +1009,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -966,6 +1042,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -996,12 +1075,15 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
             <!-- WR % (overall) with delta in title -->
@@ -1015,7 +1097,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR opp pick % -->
-            <td class="wr" data-w="0" data-g="1" data-pct="0.0"
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
                 title="Δ WR opp: +0.0 pp; prev 0/0">
             </td>
 
@@ -1026,6 +1108,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 0)">
+              1 ▲
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -1056,6 +1141,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -1086,6 +1174,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -1106,12 +1197,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-1', 'maps-1-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="3f3441c8-df02-472e-8895-53ae8f04f7ab">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-3f3441c8-df02-472e-8895-53ae8f04f7ab"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="3f3441c8-df02-472e-8895-53ae8f04f7ab">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-3f3441c8-df02-472e-8895-53ae8f04f7ab"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-3f3441c8-df02-472e-8895-53ae8f04f7ab">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -1121,7 +1217,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">1–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-de87ddd7-b912-41dc-b1f6-9c9c35eb3405" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-de87ddd7-b912-41dc-b1f6-9c9c35eb3405" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">lunki-GG</div><img class="logo" src="https://distribution.faceit-cdn.net/images/b815b511-8a46-4190-8912-a5f6ad45ac52.jpg" alt=""></div>
       </summary>
@@ -1139,7 +1235,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <div class="map-row">
           <div class="map-side side-left"><span class="chip round loss">R 14</span> <span class="chip stat"><span class="stat-label">ADR</span> 78.9</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.03</span> <span class="chip stat"><span class="stat-label">DMG</span> 11836</span></div>
           <div class="map-name">Mirage            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7fb7d725-e44d-4e3c-b557-e1d19b260ab8_1695819144685.jpeg" alt="Mirage" onerror="this.style.display='none'">          </div>
-          <div class="map-side side-right"><span class="chip round win">R 16</span> <span class="chip stat"><span class="stat-label">ADR</span> 74.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.96</span> <span class="chip stat"><span class="stat-label">DMG</span> 11189</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-right"><span class="chip round win">R 16</span> <span class="chip stat"><span class="stat-label">ADR</span> 74.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.96</span> <span class="chip stat"><span class="stat-label">DMG</span> 11189</span></div>
         </div>
         <div class="aggregate">
           <div class="totals"><span class="label">Totals:</span> <span>Maps 3 (1-2)</span> <span>RD -6</span> <span>K/D 1.00</span></div>
@@ -1483,6 +1579,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-2',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-2',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-2',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-2',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -1514,6 +1612,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -1544,6 +1645,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -1574,6 +1678,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -1604,6 +1711,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -1634,12 +1744,15 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
             <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
-            <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
-            <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
             <!-- WR % (overall) with delta in title -->
@@ -1648,13 +1761,13 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR own pick % -->
-            <td class="wr" data-w="1" data-g="2" data-pct="50.0"
-                title="Δ WR own: -50.0 pp; prev 1/1">
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
+                title="Δ WR own: +0.0 pp; prev 0/0">
             </td>
 
             <!-- WR opp pick % -->
-            <td class="wr" data-w="1" data-g="1" data-pct="100.0"
-                title="Δ WR opp: +0.0 pp; prev 1/1">
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
+                title="Δ WR opp: +0.0 pp; prev 0/0">
             </td>
 
             <td title="Δ vs prev: +0.00 (prev 1.14); Δ vs div avg: +0.14">1.14</td>
@@ -1664,6 +1777,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 2)">
+              3 ▲
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -1694,6 +1810,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -1714,12 +1833,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-2', 'maps-2-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="ee607038-b238-4c60-81dc-acc04b9d661c">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-ee607038-b238-4c60-81dc-acc04b9d661c"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="ee607038-b238-4c60-81dc-acc04b9d661c">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-ee607038-b238-4c60-81dc-acc04b9d661c"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-ee607038-b238-4c60-81dc-acc04b9d661c">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -1729,7 +1853,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-fef83225-f5fb-4d32-b880-9be55b6c5ac4" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-fef83225-f5fb-4d32-b880-9be55b6c5ac4" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Keijo-Klaani</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c5b75f3d-4b03-45ac-bc3a-5d306e7d667c.jpeg" alt=""></div>
       </summary>
@@ -1747,7 +1871,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <div class="map-row">
           <div class="map-side side-left"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 83.7</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.25</span> <span class="chip stat"><span class="stat-label">DMG</span> 8792</span></div>
           <div class="map-name">Nuke            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7197a969-81e4-4fef-8764-55f46c7cec6e_1695819158849.jpeg" alt="Nuke" onerror="this.style.display='none'">          </div>
-          <div class="map-side side-right"><span class="chip round loss">R 8</span> <span class="chip stat"><span class="stat-label">ADR</span> 68.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.80</span> <span class="chip stat"><span class="stat-label">DMG</span> 7207</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-right"><span class="chip round loss">R 8</span> <span class="chip stat"><span class="stat-label">ADR</span> 68.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.80</span> <span class="chip stat"><span class="stat-label">DMG</span> 7207</span></div>
         </div>
         <div class="aggregate">
           <div class="totals"><span class="label">Totals:</span> <span>Maps 3 (2-1)</span> <span>RD +2</span> <span>K/D 1.09</span></div>
@@ -1762,7 +1886,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-70e7e6a1-0b8a-48a5-8993-e1696e3e86ee" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-70e7e6a1-0b8a-48a5-8993-e1696e3e86ee" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Liikaa kokkeja</div><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""></div>
       </summary>
@@ -1778,7 +1902,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="map-side side-right"><span class="chip round loss">R 11</span> <span class="chip stat"><span class="stat-label">ADR</span> 79.2</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.02</span> <span class="chip stat"><span class="stat-label">DMG</span> 9507</span> <span class="chip stat pick">Pick</span></div>
         </div>
         <div class="map-row">
-          <div class="map-side side-left"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 78.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.05</span> <span class="chip stat"><span class="stat-label">DMG</span> 9461</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-left"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 78.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.05</span> <span class="chip stat"><span class="stat-label">DMG</span> 9461</span></div>
           <div class="map-name">Nuke            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7197a969-81e4-4fef-8764-55f46c7cec6e_1695819158849.jpeg" alt="Nuke" onerror="this.style.display='none'">          </div>
           <div class="map-side side-right"><span class="chip round loss">R 11</span> <span class="chip stat"><span class="stat-label">ADR</span> 74.5</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.93</span> <span class="chip stat"><span class="stat-label">DMG</span> 8940</span></div>
         </div>
@@ -1795,7 +1919,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-2fa75294-e651-4d3c-87d9-9e445949cde8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-2fa75294-e651-4d3c-87d9-9e445949cde8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">keij0t</div><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""></div>
       </summary>
@@ -1811,7 +1935,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 83.9</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.33</span> <span class="chip stat"><span class="stat-label">DMG</span> 7554</span> <span class="chip stat pick">Pick</span></div>
         </div>
         <div class="map-row">
-          <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
           <div class="map-name">Nuke            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7197a969-81e4-4fef-8764-55f46c7cec6e_1695819158849.jpeg" alt="Nuke" onerror="this.style.display='none'">          </div>
           <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
         </div>
@@ -2121,6 +2245,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-3',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-3',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-3',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-3',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -2152,6 +2278,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -2182,6 +2311,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -2212,6 +2344,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -2242,11 +2377,14 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
-            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
@@ -2256,7 +2394,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR own pick % -->
-            <td class="wr" data-w="0" data-g="1" data-pct="0.0"
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
                 title="Δ WR own: +0.0 pp; prev 0/0">
             </td>
 
@@ -2272,6 +2410,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 0)">
+              1 ▲
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -2302,6 +2443,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -2332,6 +2476,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -2352,12 +2499,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-3', 'maps-3-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="e40bc0b5-8d6b-4873-83a4-23ff1755bf5b">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-e40bc0b5-8d6b-4873-83a4-23ff1755bf5b"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="e40bc0b5-8d6b-4873-83a4-23ff1755bf5b">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-e40bc0b5-8d6b-4873-83a4-23ff1755bf5b"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-e40bc0b5-8d6b-4873-83a4-23ff1755bf5b">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -2367,7 +2519,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-c65298b5-d993-4dc1-bb27-a537042da2cd" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-c65298b5-d993-4dc1-bb27-a537042da2cd" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">keij0t</div><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""></div>
       </summary>
@@ -2383,7 +2535,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 85.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.40</span> <span class="chip stat"><span class="stat-label">DMG</span> 8992</span> <span class="chip stat pick">Pick</span></div>
         </div>
         <div class="map-row">
-          <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
           <div class="map-name">Mirage            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7fb7d725-e44d-4e3c-b557-e1d19b260ab8_1695819144685.jpeg" alt="Mirage" onerror="this.style.display='none'">          </div>
           <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
         </div>
@@ -2668,7 +2820,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 </div>
 <div class="chips">
 <span class="chip">Most banned: Nuke (1×)</span>
-<span class="chip">Most picked: Anubis (1×)</span>
+<span class="chip">Most picked: Mirage (1×)</span>
 <span class="chip">Best WR: Mirage (100%)</span>
 </div>
 
@@ -2694,6 +2846,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-4',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-4',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-4',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-4',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -2725,11 +2879,14 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
-            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
@@ -2739,7 +2896,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR own pick % -->
-            <td class="wr" data-w="0" data-g="1" data-pct="0.0"
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
                 title="Δ WR own: +0.0 pp; prev 0/0">
             </td>
 
@@ -2755,6 +2912,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 0)">
+              1 ▲
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -2785,6 +2945,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -2815,6 +2978,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -2845,6 +3011,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -2875,6 +3044,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -2905,6 +3077,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -2925,12 +3100,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-4', 'maps-4-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="fc3805ae-2595-48b1-82a9-87b960b14100">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-fc3805ae-2595-48b1-82a9-87b960b14100"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="fc3805ae-2595-48b1-82a9-87b960b14100">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-fc3805ae-2595-48b1-82a9-87b960b14100"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-fc3805ae-2595-48b1-82a9-87b960b14100">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -2940,7 +3120,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">1–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-915e0c92-f53e-4475-a035-f9b9ebb1dce8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-915e0c92-f53e-4475-a035-f9b9ebb1dce8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Liikaa kokkeja</div><img class="logo" src="https://distribution.faceit-cdn.net/images/fd06f840-12c8-45d0-b294-3d85bf68a7b8.jpeg" alt=""></div>
       </summary>
@@ -2956,7 +3136,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 87.1</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.40</span> <span class="chip stat"><span class="stat-label">DMG</span> 7404</span> <span class="chip stat pick">Pick</span></div>
         </div>
         <div class="map-row">
-          <div class="map-side side-left"><span class="chip round loss">R 11</span> <span class="chip stat"><span class="stat-label">ADR</span> 72.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.94</span> <span class="chip stat"><span class="stat-label">DMG</span> 8733</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-left"><span class="chip round loss">R 11</span> <span class="chip stat"><span class="stat-label">ADR</span> 72.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.94</span> <span class="chip stat"><span class="stat-label">DMG</span> 8733</span></div>
           <div class="map-name">Anubis            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/31f01daf-e531-43cf-b949-c094ebc9b3ea_1695819235255.jpeg" alt="Anubis" onerror="this.style.display='none'">          </div>
           <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 79.1</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.06</span> <span class="chip stat"><span class="stat-label">DMG</span> 9493</span></div>
         </div>
@@ -3268,13 +3448,15 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-5',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-5',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-5',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-5',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
             <td>Ancient</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
+            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
 
 
             <!-- WR % (overall) with delta in title -->
@@ -3288,8 +3470,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR opp pick % -->
-            <td class="wr" data-w="1" data-g="2" data-pct="50.0"
-                title="Δ WR opp: +50.0 pp; prev 0/1">
+            <td class="wr" data-w="1" data-g="1" data-pct="100.0"
+                title="Δ WR opp: +100.0 pp; prev 0/0">
             </td>
 
             <td title="Δ vs prev: +1.58 (prev 0.00); Δ vs div avg: +0.59">1.58 ▲</td>
@@ -3299,6 +3481,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -3329,6 +3514,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 2)">3 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -3359,6 +3547,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -3389,12 +3580,15 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
             <td title="Δ vs prev: +0 (prev 2)">2</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +0 (prev 2)">2</td>
+            <td title="Δ vs prev: +0 (prev 1)">1</td>
 
 
             <!-- WR % (overall) with delta in title -->
@@ -3408,8 +3602,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR opp pick % -->
-            <td class="wr" data-w="1" data-g="2" data-pct="50.0"
-                title="Δ WR opp: +0.0 pp; prev 1/2">
+            <td class="wr" data-w="1" data-g="1" data-pct="100.0"
+                title="Δ WR opp: +0.0 pp; prev 1/1">
             </td>
 
             <td title="Δ vs prev: +0.00 (prev 2.24); Δ vs div avg: +1.24">2.24</td>
@@ -3419,12 +3613,15 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
-            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
             <!-- WR % (overall) with delta in title -->
@@ -3438,7 +3635,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR opp pick % -->
-            <td class="wr" data-w="0" data-g="1" data-pct="0.0"
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
                 title="Δ WR opp: +0.0 pp; prev 0/0">
             </td>
 
@@ -3449,6 +3646,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +1 (prev 0)">
+              1 ▲
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -3479,6 +3679,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -3499,12 +3702,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-5', 'maps-5-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="d90be3ec-0eb2-4418-8602-6dd664eb38e3">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-d90be3ec-0eb2-4418-8602-6dd664eb38e3"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="d90be3ec-0eb2-4418-8602-6dd664eb38e3">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-d90be3ec-0eb2-4418-8602-6dd664eb38e3"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-d90be3ec-0eb2-4418-8602-6dd664eb38e3">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -3514,7 +3722,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-c65298b5-d993-4dc1-bb27-a537042da2cd" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-c65298b5-d993-4dc1-bb27-a537042da2cd" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Easy Eight</div><img class="logo" src="https://distribution.faceit-cdn.net/images/15b99d49-c0f4-4ea9-9ea2-9e698288fa86.jpg" alt=""></div>
       </summary>
@@ -3532,7 +3740,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <div class="map-row">
           <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
           <div class="map-name">Mirage            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7fb7d725-e44d-4e3c-b557-e1d19b260ab8_1695819144685.jpeg" alt="Mirage" onerror="this.style.display='none'">          </div>
-          <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
         </div>
         <div class="aggregate">
           <div class="totals"><span class="label">Totals:</span> <span>Maps 2 (2-0)</span> <span>RD +8</span> <span>K/D 1.20</span></div>
@@ -3547,7 +3755,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-c0f99bac-9cc3-4f70-94e2-85a787f201e8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-c0f99bac-9cc3-4f70-94e2-85a787f201e8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">lunki-GG</div><img class="logo" src="https://distribution.faceit-cdn.net/images/b815b511-8a46-4190-8912-a5f6ad45ac52.jpg" alt=""></div>
       </summary>
@@ -3565,7 +3773,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <div class="map-row">
           <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
           <div class="map-name">Ancient            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/5b844241-5b15-45bf-a304-ad6df63b5ce5_1695819190976.jpeg" alt="Ancient" onerror="this.style.display='none'">          </div>
-          <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
         </div>
         <div class="aggregate">
           <div class="totals"><span class="label">Totals:</span> <span>Maps 2 (2-0)</span> <span>RD +17</span> <span>K/D 1.56</span></div>
@@ -3580,7 +3788,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–0</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-2fa75294-e651-4d3c-87d9-9e445949cde8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-2fa75294-e651-4d3c-87d9-9e445949cde8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">drkSLAYez</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c7c83ae6-54a8-4ac8-a859-0564adbd1502.jpeg" alt=""></div>
       </summary>
@@ -3598,7 +3806,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <div class="map-row">
           <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
           <div class="map-name">Nuke            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7197a969-81e4-4fef-8764-55f46c7cec6e_1695819158849.jpeg" alt="Nuke" onerror="this.style.display='none'">          </div>
-          <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
         </div>
         <div class="aggregate">
           <div class="totals"><span class="label">Totals:</span> <span>Maps 2 (2-0)</span> <span>RD +16</span> <span>K/D 1.45</span></div>
@@ -3907,6 +4115,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-6',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-6',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-6',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-6',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -3938,6 +4148,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -3968,6 +4181,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -3998,6 +4214,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -4028,6 +4247,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -4058,11 +4280,14 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
-            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
@@ -4072,7 +4297,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR own pick % -->
-            <td class="wr" data-w="0" data-g="1" data-pct="0.0"
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
                 title="Δ WR own: +0.0 pp; prev 0/0">
             </td>
 
@@ -4088,6 +4313,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 0)">
+              1 ▲
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -4118,6 +4346,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -4138,12 +4369,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-6', 'maps-6-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="ef14c381-6cd0-4fd8-bf6e-4e24701a8f74">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-ef14c381-6cd0-4fd8-bf6e-4e24701a8f74"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="ef14c381-6cd0-4fd8-bf6e-4e24701a8f74">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-ef14c381-6cd0-4fd8-bf6e-4e24701a8f74"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-ef14c381-6cd0-4fd8-bf6e-4e24701a8f74">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -4153,7 +4389,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">1–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-fef83225-f5fb-4d32-b880-9be55b6c5ac4" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-fef83225-f5fb-4d32-b880-9be55b6c5ac4" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">drkSLAYez</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c7c83ae6-54a8-4ac8-a859-0564adbd1502.jpeg" alt=""></div>
       </summary>
@@ -4169,7 +4405,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 83.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.08</span> <span class="chip stat"><span class="stat-label">DMG</span> 10058</span> <span class="chip stat pick">Pick</span></div>
         </div>
         <div class="map-row">
-          <div class="map-side side-left"><span class="chip round loss">R 8</span> <span class="chip stat"><span class="stat-label">ADR</span> 68.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.80</span> <span class="chip stat"><span class="stat-label">DMG</span> 7207</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-left"><span class="chip round loss">R 8</span> <span class="chip stat"><span class="stat-label">ADR</span> 68.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.80</span> <span class="chip stat"><span class="stat-label">DMG</span> 7207</span></div>
           <div class="map-name">Nuke            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7197a969-81e4-4fef-8764-55f46c7cec6e_1695819158849.jpeg" alt="Nuke" onerror="this.style.display='none'">          </div>
           <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 83.7</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.25</span> <span class="chip stat"><span class="stat-label">DMG</span> 8792</span></div>
         </div>
@@ -4481,6 +4717,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-7',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-7',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-7',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-7',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
@@ -4512,12 +4750,15 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
             <!-- WR % (overall) with delta in title -->
@@ -4531,8 +4772,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR opp pick % -->
-            <td class="wr" data-w="1" data-g="1" data-pct="100.0"
-                title="Δ WR opp: +0.0 pp; prev 1/1">
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
+                title="Δ WR opp: +0.0 pp; prev 0/0">
             </td>
 
             <td title="Δ vs prev: +0.00 (prev 1.06); Δ vs div avg: +0.06">1.06</td>
@@ -4542,6 +4783,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -4572,6 +4816,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -4602,6 +4849,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
@@ -4632,12 +4882,15 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
-            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
             <!-- WR % (overall) with delta in title -->
@@ -4651,7 +4904,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR opp pick % -->
-            <td class="wr" data-w="0" data-g="1" data-pct="0.0"
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
                 title="Δ WR opp: +0.0 pp; prev 0/0">
             </td>
 
@@ -4662,6 +4915,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 0)">
+              1 ▲
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -4692,6 +4948,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -4712,12 +4971,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-7', 'maps-7-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="1d3ae16a-a87b-4b18-9aa0-5de76f399e74">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-1d3ae16a-a87b-4b18-9aa0-5de76f399e74"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="1d3ae16a-a87b-4b18-9aa0-5de76f399e74">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-1d3ae16a-a87b-4b18-9aa0-5de76f399e74"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-1d3ae16a-a87b-4b18-9aa0-5de76f399e74">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -4727,7 +4991,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-915e0c92-f53e-4475-a035-f9b9ebb1dce8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-915e0c92-f53e-4475-a035-f9b9ebb1dce8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Hamyt</div><img class="logo" src="https://distribution.faceit-cdn.net/images/0fbd6e2d-fdef-423d-9619-a4a530afb2f8.jpeg" alt=""></div>
       </summary>
@@ -4745,7 +5009,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <div class="map-row">
           <div class="map-side side-left"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 79.1</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.06</span> <span class="chip stat"><span class="stat-label">DMG</span> 9493</span></div>
           <div class="map-name">Anubis            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/31f01daf-e531-43cf-b949-c094ebc9b3ea_1695819235255.jpeg" alt="Anubis" onerror="this.style.display='none'">          </div>
-          <div class="map-side side-right"><span class="chip round loss">R 11</span> <span class="chip stat"><span class="stat-label">ADR</span> 72.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.94</span> <span class="chip stat"><span class="stat-label">DMG</span> 8733</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-right"><span class="chip round loss">R 11</span> <span class="chip stat"><span class="stat-label">ADR</span> 72.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.94</span> <span class="chip stat"><span class="stat-label">DMG</span> 8733</span></div>
         </div>
         <div class="aggregate">
           <div class="totals"><span class="label">Totals:</span> <span>Maps 3 (2-1)</span> <span>RD +4</span> <span>K/D 0.98</span></div>
@@ -4760,7 +5024,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">1–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-70e7e6a1-0b8a-48a5-8993-e1696e3e86ee" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-70e7e6a1-0b8a-48a5-8993-e1696e3e86ee" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">drkSLAYez</div><img class="logo" src="https://distribution.faceit-cdn.net/images/c7c83ae6-54a8-4ac8-a859-0564adbd1502.jpeg" alt=""></div>
       </summary>
@@ -4778,7 +5042,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <div class="map-row">
           <div class="map-side side-left"><span class="chip round loss">R 11</span> <span class="chip stat"><span class="stat-label">ADR</span> 74.5</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.93</span> <span class="chip stat"><span class="stat-label">DMG</span> 8940</span></div>
           <div class="map-name">Nuke            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7197a969-81e4-4fef-8764-55f46c7cec6e_1695819158849.jpeg" alt="Nuke" onerror="this.style.display='none'">          </div>
-          <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 78.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.05</span> <span class="chip stat"><span class="stat-label">DMG</span> 9461</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 78.8</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.05</span> <span class="chip stat"><span class="stat-label">DMG</span> 9461</span></div>
         </div>
         <div class="aggregate">
           <div class="totals"><span class="label">Totals:</span> <span>Maps 3 (1-2)</span> <span>RD -2</span> <span>K/D 1.04</span></div>
@@ -5061,7 +5325,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
 </div>
 <div class="chips">
 <span class="chip">Most banned: Inferno (2×)</span>
-<span class="chip">Most picked: Mirage (2×)</span>
+<span class="chip">Most picked: Mirage (1×)</span>
 <span class="chip">Best WR: Train (100%)</span>
 <span class="chip">Map to avoid: Nuke (0%)</span>
 </div>
@@ -5088,12 +5352,14 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         <th title="Times this map was your second ban" onclick="sortTable('maps-8',11,true)">2nd ban</th>
         <th title="Matches where opponent banned this map" onclick="sortTable('maps-8',12,true)">Opp ban</th>
         <th title="Your total bans (1st+2nd)" onclick="sortTable('maps-8',13,true)">Total own ban</th>
+        <th title="Times this map was BO3 decider or BO2 overflow"
+            onclick="sortTable('maps-8',14,true)">Dec/Overflow</th>
         </tr></thead><tbody>
         
 <tr>
             <td>Ancient</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
-            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
@@ -5103,7 +5369,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR own pick % -->
-            <td class="wr" data-w="0" data-g="1" data-pct="0.0"
+            <td class="wr" data-w="0" data-g="0" data-pct="0.0"
                 title="Δ WR own: +0.0 pp; prev 0/0">
             </td>
 
@@ -5119,6 +5385,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +1 (prev 0)">
+              1 ▲
+            </td>
             </tr>
 <tr>
             <td>Anubis</td>
@@ -5149,6 +5418,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Dust II</td>
@@ -5179,6 +5451,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 1)">1</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Inferno</td>
@@ -5209,11 +5484,14 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Mirage</td>
             <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
-            <td title="Δ vs prev: +1 (prev 1)">2 ▲</td>
+            <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
 
 
@@ -5223,8 +5501,8 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             </td>
 
             <!-- WR own pick % -->
-            <td class="wr" data-w="1" data-g="2" data-pct="50.0"
-                title="Δ WR own: -50.0 pp; prev 1/1">
+            <td class="wr" data-w="0" data-g="1" data-pct="0.0"
+                title="Δ WR own: +0.0 pp; prev 0/0">
             </td>
 
             <!-- WR opp pick % -->
@@ -5239,6 +5517,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 1)">
+              1
+            </td>
             </tr>
 <tr>
             <td>Nuke</td>
@@ -5269,6 +5550,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 <tr>
             <td>Train</td>
@@ -5299,6 +5583,9 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
             <td title="Δ vs prev: +0 (prev 0)">0</td>
             <td title="Δ vs prev: +1 (prev 0)">1 ▲</td>
             <td title="Δ vs prev: +0 (prev 0)">0</td>
+            <td title="Δ vs prev: +0 (prev 0)">
+              0
+            </td>
             </tr>
 </tbody></table>
 
@@ -5319,12 +5606,17 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
         bindPlayedOnly('maps-8', 'maps-8-played-only');
         </script>
         
-<div class="card matches-mirror" data-team-id="a111063c-6d41-4e0c-b0e6-3f8c4f3aac65">
-  <div class="matches-head">
-    <div class="title">Matches</div>
-    <label class="toggle-played"><input type="checkbox" id="only-played-a111063c-6d41-4e0c-b0e6-3f8c4f3aac65"><span> Näytä vain pelatut</span></label>
-  </div>
-  <div class="subtitle">Klikkaa ottelua nähdäksesi tarkemmat tilastot</div>
+<details class="card matches-mirror" data-team-id="a111063c-6d41-4e0c-b0e6-3f8c4f3aac65">
+  <summary class="matches-head" role="button">
+    <div class="head-left">
+      <span class="chev" aria-hidden="true">▸</span>
+      <div class="title">Matches</div>
+      <span class="hint">(Click to expand/collapse)</span>
+    </div>
+    <div class="head-right">
+      <label class="toggle-played"><input type="checkbox" id="only-played-a111063c-6d41-4e0c-b0e6-3f8c4f3aac65"><span> Näytä vain pelatut</span></label>
+    </div>
+  </summary>
   <div class="matches-list" id="matches-a111063c-6d41-4e0c-b0e6-3f8c4f3aac65">
   <details class="match-row" data-played=1>
       <summary class="match-summary" role="button">
@@ -5334,7 +5626,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-win">W</span></div>
           <div class="scoreline"><span class="maps-score">2–1</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-de87ddd7-b912-41dc-b1f6-9c9c35eb3405" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-de87ddd7-b912-41dc-b1f6-9c9c35eb3405" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">Cripplers</div><img class="logo" src="https://distribution.faceit-cdn.net/images/655bd40b-d6ff-42f6-b50c-628782f5aff3.jpeg" alt=""></div>
       </summary>
@@ -5350,7 +5642,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 78.9</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.01</span> <span class="chip stat"><span class="stat-label">DMG</span> 9465</span> <span class="chip stat pick">Pick</span></div>
         </div>
         <div class="map-row">
-          <div class="map-side side-left"><span class="chip round win">R 16</span> <span class="chip stat"><span class="stat-label">ADR</span> 74.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.96</span> <span class="chip stat"><span class="stat-label">DMG</span> 11189</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-left"><span class="chip round win">R 16</span> <span class="chip stat"><span class="stat-label">ADR</span> 74.6</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.96</span> <span class="chip stat"><span class="stat-label">DMG</span> 11189</span></div>
           <div class="map-name">Mirage            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/7fb7d725-e44d-4e3c-b557-e1d19b260ab8_1695819144685.jpeg" alt="Mirage" onerror="this.style.display='none'">          </div>
           <div class="map-side side-right"><span class="chip round loss">R 14</span> <span class="chip stat"><span class="stat-label">ADR</span> 78.9</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.03</span> <span class="chip stat"><span class="stat-label">DMG</span> 11836</span></div>
         </div>
@@ -5367,7 +5659,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="result-row"><span class="stage-chip">Finished</span></div>
           <div class="result-row"><span class="chip result-loss">L</span></div>
           <div class="scoreline"><span class="maps-score">0–2</span></div>
-          <a class="faceit-link" href="https://www.faceit.com/{lang}/cs2/room/1-c0f99bac-9cc3-4f70-94e2-85a787f201e8" target="_blank" rel="noopener">Open on FACEIT</a>
+          <a class="faceit-link" href="https://www.faceit.com/cs2/room/1-c0f99bac-9cc3-4f70-94e2-85a787f201e8" target="_blank" rel="noopener">Open on FACEIT</a>
         </div>
         <div class="team side-right"><div class="name">keij0t</div><img class="logo" src="https://distribution.faceit-cdn.net/images/dfb45953-1276-4a37-91b2-57785651a9c4.jpg" alt=""></div>
       </summary>
@@ -5383,7 +5675,7 @@ document.addEventListener('DOMContentLoaded',()=>{ document.querySelectorAll('.t
           <div class="map-side side-right"><span class="chip round win">R 13</span> <span class="chip stat"><span class="stat-label">ADR</span> 87.1</span> <span class="chip stat"><span class="stat-label">K/D</span> 1.27</span> <span class="chip stat"><span class="stat-label">DMG</span> 9143</span> <span class="chip stat pick">Pick</span></div>
         </div>
         <div class="map-row">
-          <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span> <span class="chip stat pick">Pick</span></div>
+          <div class="map-side side-left"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
           <div class="map-name">Ancient            <img class="map-img" src="https://assets.faceit-cdn.net/third_party/games/ce652bd4-0abb-4c90-9936-1133965ca38b/assets/votables/5b844241-5b15-45bf-a304-ad6df63b5ce5_1695819190976.jpeg" alt="Ancient" onerror="this.style.display='none'">          </div>
           <div class="map-side side-right"><span class="chip round draw">R 0</span> <span class="chip stat"><span class="stat-label">ADR</span> 0.0</span> <span class="chip stat"><span class="stat-label">K/D</span> 0.00</span> <span class="chip stat"><span class="stat-label">DMG</span> 0</span></div>
         </div>
