@@ -1316,7 +1316,7 @@ def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
             </div>
           </div>
         </section>
-    """) 
+    """)
 
     # Render sections per season (new)
     for season in sorted(by_season.keys(), reverse=True):
@@ -1327,9 +1327,13 @@ def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
         for div in divs:
             title = esc_title(div.get("name", "Division"))
             slug = (div.get("slug") or "").strip()
-            season_num = int(div.get("season") or 0)
             href = f"{slug}.html" if slug else "index.html"
 
+            # --- uudet rivit: haetaan päivitysaika ja muotoillaan Helsingin aikaan ---
+            ts_epoch = get_division_generated_ts(con, div["championship_id"])
+            updated_str = format_ts(ts_epoch)  # palauttaa '—' jos None
+
+            # peruskortin statsit
             teams, played, total = _index_card_stats(con, div["championship_id"])
 
             html.append(f"""
@@ -1337,6 +1341,7 @@ def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
                 <div>
                   <h3>{title}</h3>
                   <small>{teams} joukkuetta<br>{played}/{total} ottelua pelattu</small>
+                  <div class="subtitle">Päivitetty {updated_str}</div>
                 </div>
               </a>
             """)
@@ -1353,9 +1358,6 @@ def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
     html.append(floating_back())
     html.append(page_end())
     return "\n".join(html)
-
-
-
 
 # ------------------------------
 # Rendering
