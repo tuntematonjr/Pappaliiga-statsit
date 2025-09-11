@@ -28,7 +28,7 @@ from db import (
 )
 
 # --- HTML/template versioning ---
-HTML_TEMPLATE_VERSION = 3
+HTML_TEMPLATE_VERSION = 4
 
 HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
 _GENVER_RE = re.compile(r"<!--\s*GENVER:(\d+)\s*(?:\S+)?\s*-->", re.IGNORECASE)
@@ -871,7 +871,7 @@ def render_team_matches_mirror(con: sqlite3.Connection, division_id: int, team_i
     html.append('  <summary class="matches-head" role="button">')
     html.append('    <div class="head-left">')
     html.append('      <span class="chev" aria-hidden="true">▸</span>')
-    html.append('      <div class="title">Matches</div>')
+    html.append('      <div class="title">Ottelut</div>')
     html.append('      <span class="hint">(Click to expand/collapse)</span>')
     html.append('    </div>')
     html.append('    <div class="head-right">')
@@ -1418,10 +1418,10 @@ def render_division(con, div):
                     "jossa kumulatiiviset painot ylittävät 50% (p25/p75 vastaavasti 25%/75%).")
 
     html.append('<div class="summary-grid">')
-    html.append(f'<div class="summary-item"><div class="label">Teams</div><div class="val">{divsum["teams"]}</div></div>')
-    html.append(f'<div class="summary-item"><div class="label">Players</div><div class="val">{divsum["players"]}</div></div>')
-    html.append(f'<div class="summary-item"><div class="label">Maps</div><div class="val">{divsum["maps"]}</div></div>')
-    html.append(f'<div class="summary-item"><div class="label">Rounds</div><div class="val">{divsum["rounds"]}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Joukkueet</div><div class="val">{divsum["teams"]}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Pelaajia divisioonassa</div><div class="val">{divsum["players"]}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Pelatut karta</div><div class="val">{divsum["maps"]}</div></div>')
+    html.append(f'<div class="summary-item"><div class="label">Pelatut erät</div><div class="val">{divsum["rounds"]}</div></div>')
 
     # KD: mediaani + IQR
     html.append(
@@ -1476,7 +1476,7 @@ def render_division(con, div):
     lines = "<br>".join([f"{map_pretty_name(con, n)} <span class='cell-muted'>({c}×)</span>" for n, c in mp_sum["top_played"]])
     html.append(
         f"<div class='summary-item'>"
-        f"  <div class='label'>Most played (top4)</div>"
+        f"  <div class='label'>Pelatuimmant (top4)</div>"
         f"  <div class='val' style='line-height:1.25'>{lines}</div>"
         f"</div>"
     )
@@ -1485,7 +1485,7 @@ def render_division(con, div):
     lines = "<br>".join([f"{map_pretty_name(con, n)} <span class='cell-muted'>({c}×)</span>" for n, c in mp_sum["top_banned"]])
     html.append(
         f"<div class='summary-item'>"
-        f"  <div class='label'>Most banned (top4)</div>"
+        f"  <div class='label'>Eniten bannattu (top4)</div>"
         f"  <div class='val' style='line-height:1.25'>{lines}</div>"
         f"</div>"
     )
@@ -1615,8 +1615,8 @@ def render_division(con, div):
 
         # Sirut
         chips = [
-            f'<span class="chip">Matches {s["matches_played"]}</span>',
-            f'<span class="chip">Maps {s["maps_played"]}</span>',
+            f'<span class="chip">Ottelut {s["matches_played"]}</span>',
+            f'<span class="chip">Kartat {s["maps_played"]}</span>',
             f'<span class="chip">W-L {s["w"]}-{s["l"]}</span>',
             f'<span class="chip">±RD {s["rd"]}</span>',
             f'<span class="chip">KD {s["kd"]:.2f}</span>',
@@ -1679,7 +1679,7 @@ def render_division(con, div):
 
         tab_root_id = f"tabs-{team_id[:8]}"
 
-        html.append('<h3>Players</h3>')
+        html.append('<h3>Pelaajat</h3>')
         html.append('<div class="muted">Joillakin arvoilla on tooltip missä lisää tietoa.<br></div>')
         html.append(f"""
           <div id="{tab_root_id}" class="tabs">
@@ -1966,7 +1966,7 @@ def render_division(con, div):
         </div>
         """)
 
-        html.append(f'<h3>Map Stats</h3>')
+        html.append(f'<h3>Kartta tilastot</h3>')
         html.append(f'<table id="{tid2}" data-sort-col="1" data-sort-dir="desc">')
         html.append(f"""
         <thead><tr>
