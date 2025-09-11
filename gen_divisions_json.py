@@ -17,18 +17,23 @@ from typing import Any, Dict, List, Optional
 from faceit_client import list_championships_for_organizer
 from faceit_config import PAPPALIGA_ORG_ID
 
-DIV_RX    = re.compile(r"(divisioona|division)", re.IGNORECASE)
-LEAD_NUM  = re.compile(r"^\s*(\d{1,3})\s*[\.\-]?\s*")
-SEASON_RX = re.compile(r"(?:S|Season)\s*([0-9]{1,2})", re.IGNORECASE)
-POFF_RX   = re.compile(r"playoff", re.IGNORECASE)
+DIV_RX     = re.compile(r"(divisioona|division|mestaruussarja)", re.IGNORECASE)
+LEAD_NUM   = re.compile(r"^\s*(\d{1,3})\s*[\.\-]?\s*")
+SEASON_RX  = re.compile(r"(?:S|Season)\s*([0-9]{1,2})", re.IGNORECASE)
+POFF_RX    = re.compile(r"playoff", re.IGNORECASE)
+MESTAR_RX  = re.compile(r"mestaruussarja", re.IGNORECASE)
 
 CS_TAGS = {"cs2"}
 
 
 def parse_leading_divnum(name: str) -> Optional[int]:
     m = LEAD_NUM.match(name or "")
-    return int(m.group(1)) if m else None
-
+    if m:
+        return int(m.group(1))
+    # Mestaruussarja: ei numeroa → käytetään aina 0, jotta pysyy listan kärjessä
+    if MESTAR_RX.search(name or ""):
+        return 0
+    return None
 
 def parse_season(name: str) -> int:
     m = SEASON_RX.search(name or "")
@@ -84,7 +89,10 @@ def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[s
         season = parse_season(name)
         po     = is_playoffs(name)
 
-        # NEW: skip if season too old
+        # NEW: Mestaruussarja fallback (jos parse ei jo palauttanut 0)
+        if dnum is None and MESTAR_RX.search(name):
+            dnum = 0
+
         if season < min_season:
             continue
 
@@ -95,7 +103,7 @@ def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[s
             "name": name,
             "season": season,
             "division_num": dnum if dnum is not None else 0,
-            "slug": base_slug(dnum, season, po),
+            "slug": base_slug(dnum if dnum is not None else 0, season, po),
             "game": game if game in CS_TAGS else "cs2",
             "is_playoffs": 1 if po else 0,
         }
