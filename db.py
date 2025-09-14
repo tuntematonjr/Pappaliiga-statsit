@@ -1128,23 +1128,23 @@ def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, t
         if maps_played == 0:
             return {"matches_played":0,"maps_played":0,"w":0,"l":0,"rd":0,"kd":0.0,"kr":0.0,"adr":0.0,"util":0}
 
+        rounds_sum = sum(((r.get("score_team1") or 0) + (r.get("score_team2") or 0)) for r in rows)
+
         agg = _q(con, f"""
             SELECT
-              SUM(COALESCE(ps.kills,0))           AS kills,
-              SUM(COALESCE(ps.deaths,0))          AS deaths,
-              SUM(COALESCE(ps.damage,0))          AS damage,
-              SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds,
-              SUM(COALESCE(ps.utility_damage,0))  AS util
+            SUM(COALESCE(ps.kills,0))           AS kills,
+            SUM(COALESCE(ps.deaths,0))          AS deaths,
+            SUM(COALESCE(ps.damage,0))          AS damage,
+            SUM(COALESCE(ps.utility_damage,0))  AS util
             FROM player_stats ps
             JOIN matches m ON m.match_id = ps.match_id
-            JOIN maps mp    ON mp.match_id = m.match_id
             WHERE ps.team_id=? AND m.championship_id=? AND { _TS_EXPR } <= ?
         """, (team_id, division_id, cutoff))[0]
 
         kills   = int(agg["kills"] or 0)
         deaths  = int(agg["deaths"] or 0)
         damage  = int(agg["damage"] or 0)
-        rounds  = int(agg["rounds"] or 0)
+        rounds  = int(rounds_sum)
         util    = int(agg["util"] or 0)
 
         kd  = (kills / deaths) if deaths else (float(kills) if rounds else 0.0)
@@ -1200,74 +1200,71 @@ def _player_agg_until(con: sqlite3.Connection, division_id: int, team_id: str, p
             "hs_pct": 0.0, "k2": 0, "k3": 0, "k4": 0, "k5": 0,
             "mvps": 0, "util": 0, "udpr": 0.0,
             "flashed": 0, "flash_count": 0, "flash_successes": 0,
-            "entry_count": 0, "entry_win": 0,
-            "c11_att": 0, "c11_win": 0, "c12_att": 0, "c12_win": 0,
-            "awp_kills": 0, "pistol_kills": 0,
-            "clutch_kills": 0,
+            "entry_count": 0, "entry_wins": 0,
+            "clutch_kills": 0, "c11_att": 0, "c11_win": 0, "c12_att": 0, "c12_win": 0,
+            "awp": 0, "pistol_kills": 0
         }
 
-    r = _q(con, f"""
-      SELECT
-        COUNT(*) AS maps_played,
-        SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0))             AS rounds,
-        SUM(COALESCE(ps.kills,0))                                                AS kills,
-        SUM(COALESCE(ps.deaths,0))                                               AS deaths,
-        SUM(COALESCE(ps.assists,0))                                              AS assists,
-        SUM(COALESCE(ps.damage,0))                                               AS damage,
-        AVG(COALESCE(ps.hs_pct,0))                                               AS hs_pct,
-        SUM(COALESCE(ps.mk_2k,0))                                                AS k2,
-        SUM(COALESCE(ps.mk_3k,0))                                                AS k3,
-        SUM(COALESCE(ps.mk_4k,0))                                                AS k4,
-        SUM(COALESCE(ps.mk_5k,0))                                                AS k5,
-        SUM(COALESCE(ps.mvps,0))                                                 AS mvps,
-        SUM(COALESCE(ps.utility_damage,0))                                       AS util,
-        SUM(COALESCE(ps.enemies_flashed,0))                                      AS flashed,
-        SUM(COALESCE(ps.flash_count,0))                                          AS flash_count,
-        SUM(COALESCE(ps.flash_successes,0))                                      AS flash_successes,
-        SUM(COALESCE(ps.entry_count,0))                                          AS entry_count,
-        SUM(COALESCE(ps.entry_wins,0))                                           AS entry_win,
-        SUM(COALESCE(ps.cl_1v1_attempts,0))                                      AS c11_att,
-        SUM(COALESCE(ps.cl_1v1_wins,0))                                          AS c11_win,
-        SUM(COALESCE(ps.cl_1v2_attempts,0))                                      AS c12_att,
-        SUM(COALESCE(ps.cl_1v2_wins,0))                                          AS c12_win,
-        SUM(COALESCE(ps.sniper_kills,0))                                         AS awp_kills,
-        SUM(COALESCE(ps.pistol_kills,0))                                         AS pistol_kills,
-        SUM(COALESCE(ps.clutch_kills,0))                                         AS clutch_kills
-      FROM player_stats ps
-      JOIN matches m ON m.match_id = ps.match_id
-      JOIN maps mp    ON mp.match_id = m.match_id
-      WHERE m.championship_id=? AND ps.team_id=? AND ps.player_id=? AND { _TS_EXPR } <= ?
+    row = _q(con, f"""
+        SELECT
+          COUNT(*) AS maps_played,
+          SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds,
+          SUM(COALESCE(ps.kills,0))          AS kills,
+          SUM(COALESCE(ps.deaths,0))         AS deaths,
+          SUM(COALESCE(ps.assists,0))        AS assists,
+          SUM(COALESCE(ps.damage,0))         AS damage,
+          AVG(COALESCE(ps.hs_pct,0))         AS hs_pct,
+          SUM(COALESCE(ps.mk_2k,0))          AS k2,
+          SUM(COALESCE(ps.mk_3k,0))          AS k3,
+          SUM(COALESCE(ps.mk_4k,0))          AS k4,
+          SUM(COALESCE(ps.mk_5k,0))          AS k5,
+          SUM(COALESCE(ps.mvps,0))           AS mvps,
+          SUM(COALESCE(ps.utility_damage,0)) AS util,
+          SUM(COALESCE(ps.enemies_flashed,0)) AS flashed,
+          SUM(COALESCE(ps.flash_count,0))     AS flash_count,
+          SUM(COALESCE(ps.flash_successes,0)) AS flash_successes,
+          SUM(COALESCE(ps.entry_count,0))     AS entry_count,
+          SUM(COALESCE(ps.entry_wins,0))      AS entry_wins,
+          SUM(COALESCE(ps.clutch_kills,0))    AS clutch_kills,
+          SUM(COALESCE(ps.cl_1v1_attempts,0)) AS c11_att,
+          SUM(COALESCE(ps.cl_1v1_wins,0))     AS c11_win,
+          SUM(COALESCE(ps.cl_1v2_attempts,0)) AS c12_att,
+          SUM(COALESCE(ps.cl_1v2_wins,0))     AS c12_win,
+          SUM(COALESCE(ps.sniper_kills,0))    AS awp,
+          SUM(COALESCE(ps.pistol_kills,0))    AS pistol_kills
+        FROM player_stats ps
+        JOIN matches m ON m.match_id = ps.match_id
+        JOIN maps    mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+        WHERE m.championship_id=? AND ps.team_id=? AND ps.player_id=? AND { _TS_EXPR } <= ?
     """, (division_id, team_id, player_id, cutoff))[0]
 
-    rounds = int(r["rounds"] or 0)
-    kills  = int(r["kills"]  or 0)
-    deaths = int(r["deaths"] or 0)
-    damage = int(r["damage"] or 0)
+    rounds = int(row["rounds"] or 0)
+    kills  = int(row["kills"]  or 0)
+    deaths = int(row["deaths"] or 0)
+    damage = int(row["damage"] or 0)
 
-    kr  = (kills  / rounds) if rounds else 0.0
-    adr = (damage / rounds) if rounds else 0.0
     kd  = (kills / deaths) if deaths else (float(kills) if rounds else 0.0)
+    kr  = (kills / rounds) if rounds else 0.0
+    adr = (damage / rounds) if rounds else 0.0
+    udpr = (float(row["util"] or 0) / rounds) if rounds else 0.0
 
     return {
-        "maps_played": int(r["maps_played"] or 0),
+        "maps_played": int(row["maps_played"] or 0),
         "rounds": rounds,
-        "kills": kills, "deaths": deaths, "assists": int(r["assists"] or 0),
-        "damage": damage, "adr": float(adr), "kr": float(kr), "kd": float(kd),
-        "hs_pct": float(r["hs_pct"] or 0.0),
-        "k2": int(r["k2"] or 0), "k3": int(r["k3"] or 0), "k4": int(r["k4"] or 0), "k5": int(r["k5"] or 0),
-        "mvps": int(r["mvps"] or 0),
-        "util": int(r["util"] or 0),
-        "udpr": (float(r["util"] or 0) / rounds) if rounds else 0.0,
-        "flashed": int(r["flashed"] or 0),
-        "flash_count": int(r["flash_count"] or 0),
-        "flash_successes": int(r["flash_successes"] or 0),
-        "entry_count": int(r["entry_count"] or 0),
-        "entry_win": int(r["entry_win"] or 0),
-        "c11_att": int(r["c11_att"] or 0), "c11_win": int(r["c11_win"] or 0),
-        "c12_att": int(r["c12_att"] or 0), "c12_win": int(r["c12_win"] or 0),
-        "awp_kills": int(r["awp_kills"] or 0),
-        "pistol_kills": int(r["pistol_kills"] or 0),
-        "clutch_kills": int(r["clutch_kills"] or 0),
+        "kills": kills, "deaths": deaths, "assists": int(row["assists"] or 0),
+        "damage": damage,
+        "adr": float(adr), "kr": float(kr), "kd": float(kd),
+        "hs_pct": float(row["hs_pct"] or 0.0),
+        "k2": int(row["k2"] or 0), "k3": int(row["k3"] or 0), "k4": int(row["k4"] or 0), "k5": int(row["k5"] or 0),
+        "mvps": int(row["mvps"] or 0),
+        "util": int(row["util"] or 0), "udpr": float(udpr),
+        "flashed": int(row["flashed"] or 0), "flash_count": int(row["flash_count"] or 0), "flash_successes": int(row["flash_successes"] or 0),
+        "entry_count": int(row["entry_count"] or 0), "entry_wins": int(row["entry_wins"] or 0),
+        "clutch_kills": int(row["clutch_kills"] or 0),
+        "c11_att": int(row["c11_att"] or 0), "c11_win": int(row["c11_win"] or 0),
+        "c12_att": int(row["c12_att"] or 0), "c12_win": int(row["c12_win"] or 0),
+        "awp": int(row["awp"] or 0),
+        "pistol_kills": int(row["pistol_kills"] or 0),
     }
 
 def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: str) -> dict[str, dict]:

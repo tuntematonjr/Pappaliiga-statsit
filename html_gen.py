@@ -1569,7 +1569,8 @@ def render_division(con, div):
         def _dval(d: dict | None, key: str):
             if not d or not d.get("delta"):
                 return None, None
-            return d["delta"].get(key), (d["prev"][key] if d["prev"] is not None else None)
+            prev = None if d.get("prev") is None else d["prev"].get(key)
+            return d["delta"].get(key), prev
 
         def _signed(x, prec=2):
             if x is None: return ""
