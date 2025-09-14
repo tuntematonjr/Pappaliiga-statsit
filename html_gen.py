@@ -28,7 +28,7 @@ from db import (
 )
 
 # --- HTML/template versioning ---
-HTML_TEMPLATE_VERSION = 4
+HTML_TEMPLATE_VERSION = 5
 
 HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
 _GENVER_RE = re.compile(r"<!--\s*GENVER:(\d+)\s*(?:\S+)?\s*-->", re.IGNORECASE)
