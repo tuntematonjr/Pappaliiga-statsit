@@ -56,6 +56,18 @@ def safe_float(v: Any, default: Optional[float] = None) -> Optional[float]:
     except Exception:
         return default
 
+def _is_bye_id(x: Optional[str]) -> bool:
+    return str(x or "").lower() == "bye"
+
+def _is_bye_match_summary(m: dict) -> bool:
+    return _is_bye_id(m.get("team1_id")) or _is_bye_id(m.get("team2_id"))
+
+def _is_bye_match_details(details: dict) -> bool:
+    teams = (details or {}).get("teams") or {}
+    f1 = teams.get("faction1") or {}
+    f2 = teams.get("faction2") or {}
+    return _is_bye_id(f1.get("faction_id")) or _is_bye_id(f2.get("faction_id"))
+
 # --- progress bar with ETA --------------------------------------------------
 
 def _fmt_hms(seconds: float) -> str:
@@ -375,6 +387,7 @@ def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
     Commit once per match. Skip logic:
       - If DB already has status='finished' AND full stats exist → skip (no API calls)
       - If summary shows no header changes vs DB for non-past → skip
+      - NEW: If either faction is 'bye' → skip hard (no DB writes)
     """
     matches = _list_matches_all(champ_row["championship_id"])
     div_title = champ_row.get("name") or champ_row.get("slug") or f"Div{champ_row.get('division_num','?')}-S{champ_row.get('season','?')}"
@@ -391,6 +404,13 @@ def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
         mid = m.get("match_id")
         if not mid or mid in seen:
             _progress_bar(title, i, total, start_ts, skipped); continue
+
+        # NEW: Skip BYE matches early to avoid any DB writes or API calls.
+        if _is_bye_match_summary(m):
+            logging.info("[skip] bye match %s (%s vs %s)", mid, m.get("team1_name"), m.get("team2_name"))
+            seen.add(mid); skipped += 1
+            _progress_bar(title, i, total, start_ts, skipped)
+            continue
 
         # 1) Finished in DB + stats present -> skip entirely
         if SKIP_FINISHED_IN_DB and _is_finished_in_db(con, mid) and _has_full_stats(con, mid):
@@ -441,6 +461,10 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     else:
         # Past → tarvitaan aina tarkemmat detailit + statsit
         details = get_match_details(match_id) or {}
+        # NEW: hard guard — if this is a BYE, skip without touching DB
+        if _is_bye_match_details(details):
+            logging.info("[skip] bye (details) %s", match_id)
+            return
         teams_d = details.get("teams") or {}
         f1 = teams_d.get("faction1") or {}
         f2 = teams_d.get("faction2") or {}
@@ -459,9 +483,14 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
             logging.info("[skip] stats %s -> %s", match_id, e)
             stats = {}
 
-        # Jos Faceit ei anna statseja (tyypilliset 404:t), älä spämmi varoituksia,
-        # vaan leimaa not_found ja lopeta käsittely tähän matsiin.
-        if not stats:
+    rounds = _extract_rounds_from_stats(stats)
+
+    # UUSI: jos stats puuttuu, mutta detailsissa on pisteet (detailed_results TAI results.score),
+    # jatketaan normaalisti ja talletetaan maps-rivit details-datasta. Bailataan vain jos ei ole mitään pisteitä.
+    if kind == "past" and not rounds:
+        has_detailed = isinstance(details.get("detailed_results"), list) and len(details.get("detailed_results") or []) > 0
+        has_score = bool(((details.get("results") or {}).get("score") or {}))
+        if not has_detailed and not has_score:
             upsert_match(con, {
                 "match_id": match_id,
                 "championship_id": champ_row["championship_id"],
