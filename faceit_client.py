@@ -89,51 +89,69 @@ def _retry_after_seconds(resp: requests.Response) -> Optional[float]:
     except Exception:
         return None
 
-def _get(url: str, headers: dict, params: dict | None = None, *, retries: int = 3, backoff: float = 0.8):
-    import logging, time, requests, os
+def _get(url: str, headers: dict, params: dict | None = None, *, retries: int = ADAPT_MAX_RETRIES, backoff: float = 0.8):
+    """
+    GET with adaptive sleep + Retry-After support.
+    - Uses DEFAULT_TIMEOUT for all calls
+    - Honors 429 Retry-After
+    - Falls back once without Authorization on 403 (as before)
+    - Advances _ADAPT on success/error
+    """
     last_err = None
     tried_unauth = False
 
-    for i in range(max(1, retries)):
+    for attempt in range(max(1, retries)):
+        # adaptive pre-sleep
+        _ADAPT.sleep()
         try:
-            resp = requests.get(url, headers=headers, params=params, timeout=20)
+            resp = requests.get(url, headers=headers, params=params, timeout=DEFAULT_TIMEOUT)
             sc = resp.status_code
 
-            # Näytä CI:ssä selkeä varoitus 403/404:stä
+            # Handle 429 with Retry-After
+            if sc == 429:
+                ra = _retry_after_seconds(resp)
+                if ra is not None and ra > 0:
+                    time.sleep(ra)
+                else:
+                    _ADAPT.on_throttle()
+                continue
+
+            # CI-friendly warning for 403/404 (unchanged)
             if sc in (403, 404):
-                # Pieni pätkä bodya debuggaukseen (ei tulosteta koko JSONia)
                 snippet = (resp.text or "")[:200].replace("\n", " ")
                 print(f"[warn] GET {url} -> {sc}. Body[:200]={snippet}", flush=True)
 
-                # Fallback: jos Authorizationia käytettiin ja tuli 403, kokeile kerran ilman Authorizationia
                 if sc == 403 and "Authorization" in headers and not tried_unauth:
                     noauth = dict(headers)
                     noauth.pop("Authorization", None)
                     tried_unauth = True
-                    time.sleep(backoff * (2 ** i))
-                    resp2 = requests.get(url, headers=noauth, params=params, timeout=20)
+                    time.sleep(backoff * (2 ** attempt))
+                    resp2 = requests.get(url, headers=noauth, params=params, timeout=DEFAULT_TIMEOUT)
                     if resp2.ok:
+                        _ADAPT.on_success()
                         return resp2.json()
                     else:
                         print(f"[warn] Fallback unauth GET {url} -> {resp2.status_code}", flush=True)
 
-                # Palautetaan None, jotta kutsuja voi päättää skipata
                 return None
 
             resp.raise_for_status()
+            _ADAPT.on_success()
             return resp.json()
 
         except requests.HTTPError as e:
             last_err = e
             print(f"[warn] HTTPError on GET {url}: {e}", flush=True)
+            _ADAPT.on_error()
         except requests.RequestException as e:
             last_err = e
             print(f"[warn] RequestException on GET {url}: {e}", flush=True)
+            _ADAPT.on_error()
 
-        time.sleep(backoff * (2 ** i))
+        # simple exponential backoff between attempts
+        time.sleep(backoff * (2 ** attempt))
 
     raise RuntimeError(f"GET failed for {url}: {last_err}")
-
 
 def list_championship_matches(championship_id: str, match_type: str = "all", limit: int = 100) -> list[dict]:
     """

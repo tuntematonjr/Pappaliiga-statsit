@@ -37,7 +37,7 @@ def get_conn(path: str) -> sqlite3.Connection:
     except Exception:
         pass
     try:
-        con.execute("PRAGMA mmap_size=30000000000;") # per-connection, best-effort
+        con.execute("PRAGMA mmap_size=1073741824;")  # 1 GiB
     except Exception:
         pass
 
@@ -149,9 +149,10 @@ def upsert_player(con: sqlite3.Connection, player: Dict[str, Any]) -> None:
 # Query functions for stats (used by html_gen.py)
 # -------------------------
 
-def _q(con: sqlite3.Connection, sql: str, params: tuple = ()) -> list[dict]:
+def query(con: sqlite3.Connection, sql: str, params: tuple = ()) -> list[dict]:
     cur = con.execute(sql, params)
-    return [dict(r) for r in cur.fetchall()]
+    rows = [dict(r) for r in cur.fetchall()]
+    return rows
 
 def has_column(con: sqlite3.Connection, table: str, col: str) -> bool:
     cur = con.execute(f"PRAGMA table_info({table})")
@@ -172,12 +173,12 @@ def get_teams_in_championship(con: sqlite3.Connection, division_id: int) -> list
     LEFT JOIN teams t ON t.team_id = x.team_id
     ORDER BY x.team_name COLLATE NOCASE
     """
-    rows = _q(con, sql, (division_id, division_id))
+    rows = query(con, sql, (division_id, division_id))
     return [r for r in rows if r["team_id"]]
 
 def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id: str) -> dict:
     # Haetaan VAIN pelatut kartat (join maps) → näistä johdetaan kaikki
-    rows = _q(con, """
+    rows = query(con, """
         SELECT m.match_id, m.team1_id, m.team2_id,
                p.round_index, p.map_name, p.score_team1, p.score_team2, p.winner_team_id
         FROM matches m
@@ -201,7 +202,7 @@ def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id
             rd += (s2 - s1)
 
     # Aggregaatit suoraan player_statsista (ei team_stats-taulua)
-    agg = _q(con, """
+    agg = query(con, """
         SELECT
           SUM(ps.kills)           AS kills,
           SUM(ps.deaths)          AS deaths,
@@ -292,7 +293,7 @@ def compute_player_table_data(con: sqlite3.Connection, division_id: int, team_id
       GROUP BY ps.player_id
       ORDER BY kills DESC
     """
-    rows = _q(con, sql, (division_id, team_id))
+    rows = query(con, sql, (division_id, team_id))
 
     out = []
     for r in rows:
@@ -350,7 +351,7 @@ def compute_champ_map_avgs_data(con: sqlite3.Connection, division_id: int) -> di
       - kd = SUM(kills) / SUM(deaths) kartalla
       - adr = kierros-painotettu ADR kartalla (paino = kartan pelatut kierrokset = score1+score2)
     """
-    rows = _q(con, """
+    rows = query(con, """
         SELECT
           mp.map_name                                     AS map,
           SUM(ps.kills)                                   AS kills,
@@ -386,7 +387,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
     if pool:
         all_maps = [r["map_id"] for r in pool]
     else:
-        rows = _q(con, """
+        rows = query(con, """
             SELECT DISTINCT mp.map_name AS map_id
             FROM maps mp
             JOIN matches m ON m.match_id = mp.match_id
@@ -550,7 +551,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
         ORDER BY am.map
     """
 
-    rows = _q(con, sql, {"champ": championship_id, "team": team_id})
+    rows = query(con, sql, {"champ": championship_id, "team": team_id})
 
     # pretty names
     catalog = get_maps_catalog_lookup(con)
@@ -563,7 +564,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
     return out
 
 def compute_champ_map_summary_data(con: sqlite3.Connection, division_id: int) -> dict:
-    played_rows = _q(con, """
+    played_rows = query(con, """
         SELECT mp.map_name AS map_name, COUNT(*) AS c
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
@@ -574,7 +575,7 @@ def compute_champ_map_summary_data(con: sqlite3.Connection, division_id: int) ->
     """, (division_id,))
     top_played = [(r["map_name"], r["c"]) for r in played_rows]
 
-    ban_rows = _q(con, """
+    ban_rows = query(con, """
         SELECT v.map_name AS map_name, COUNT(*) AS c
         FROM map_votes v
         JOIN matches m ON m.match_id = v.match_id
@@ -591,7 +592,7 @@ def compute_champ_map_summary_data(con: sqlite3.Connection, division_id: int) ->
 
 
 def compute_champ_thresholds_data(con: sqlite3.Connection, division_id: int) -> dict:
-    rows = _q(con, """
+    rows = query(con, """
       SELECT
         ps.player_id,
         SUM(ps.kills)                     AS kills,
@@ -1035,13 +1036,13 @@ def get_season_map_pool(con: sqlite3.Connection, championship_id: int) -> list[d
     WHERE c.championship_id = ?
     ORDER BY pretty_name COLLATE NOCASE
     """
-    return _q(con, sql, (championship_id,))
+    return query(con, sql, (championship_id,))
 
 def get_maps_catalog_lookup(con: sqlite3.Connection) -> dict[str, dict]:
     """
     map_id -> {pretty_name, image_sm, image_lg}
     """
-    rows = _q(con, "SELECT map_id, pretty_name, image_sm, image_lg FROM maps_catalog", ())
+    rows = query(con, "SELECT map_id, pretty_name, image_sm, image_lg FROM maps_catalog", ())
     return {r["map_id"]: r for r in rows}
 
 def get_division_generated_ts(con: sqlite3.Connection, championship_id: str) -> int | None:
@@ -1079,7 +1080,7 @@ def _get_team_last_prev_ts(con: sqlite3.Connection, division_id: int, team_id: s
     curr_ts = timestamp of most recent match the team played (with at least one map row)
     prev_ts = previous one, or None if not available
     """
-    rows = _q(con, f"""
+    rows = query(con, f"""
         SELECT DISTINCT { _TS_EXPR } AS ts
         FROM matches m
         WHERE m.championship_id=? AND (m.team1_id=? OR m.team2_id=?)
@@ -1103,7 +1104,7 @@ def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, t
         if cutoff is None:
             return {"matches_played":0,"maps_played":0,"w":0,"l":0,"rd":0,"kd":0.0,"kr":0.0,"adr":0.0,"util":0}
 
-        rows = _q(con, f"""
+        rows = query(con, f"""
             SELECT m.match_id, m.team1_id, m.team2_id,
                    mp.score_team1, mp.score_team2, mp.winner_team_id
             FROM matches m
@@ -1130,7 +1131,7 @@ def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, t
 
         rounds_sum = sum(((r.get("score_team1") or 0) + (r.get("score_team2") or 0)) for r in rows)
 
-        agg = _q(con, f"""
+        agg = query(con, f"""
             SELECT
             SUM(COALESCE(ps.kills,0))           AS kills,
             SUM(COALESCE(ps.deaths,0))          AS deaths,
@@ -1205,7 +1206,7 @@ def _player_agg_until(con: sqlite3.Connection, division_id: int, team_id: str, p
             "awp": 0, "pistol_kills": 0
         }
 
-    row = _q(con, f"""
+    row = query(con, f"""
         SELECT
           COUNT(*) AS maps_played,
           SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds,
@@ -1279,7 +1280,7 @@ def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: st
     prev_cutoff = max(0, int(curr_ts) - 1)
 
     # Kauden pelaajat (joilta on havaittu statsia)
-    pids = [r["player_id"] for r in _q(con, """
+    pids = [r["player_id"] for r in query(con, """
       SELECT DISTINCT ps.player_id
       FROM player_stats ps
       JOIN matches m ON m.match_id = ps.match_id
@@ -1314,7 +1315,7 @@ def compute_map_stats_table_data_until(con: sqlite3.Connection, championship_id:
     if pool:
         all_maps = [r["map_id"] for r in pool]
     else:
-        rows = _q(con, "SELECT DISTINCT map_id FROM maps_catalog", ())
+        rows = query(con, "SELECT DISTINCT map_id FROM maps_catalog", ())
         all_maps = [r["map_id"] for r in rows] if rows else [
             "de_nuke","de_inferno","de_mirage","de_overpass","de_dust2","de_ancient","de_train","de_anubis"
         ]

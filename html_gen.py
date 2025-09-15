@@ -25,10 +25,11 @@ from db import (
     compute_player_deltas,
     compute_map_stats_with_delta,
     get_team_matches_mirror,
+    query,
 )
 
 # --- HTML/template versioning ---
-HTML_TEMPLATE_VERSION = 5
+HTML_TEMPLATE_VERSION = 6
 
 HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
 _GENVER_RE = re.compile(r"<!--\s*GENVER:(\d+)\s*(?:\S+)?\s*-->", re.IGNORECASE)
@@ -297,7 +298,7 @@ th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cu
 
 .match-summary::-webkit-details-marker{display:none;}
 .match-summary .team{display:flex;align-items:center;gap:.55rem;min-width:0;}
-.match-summary .team .logo{width:100px;height:100px;border-radius:8px;object-fit:contain;box-shadow:0 0 0 1px rgba(255,255,255,.06) inset;}
+.match-summary .team .logo{width:100px;height:100px;border-radius:8px;object-fit:contain;box-shadow:0 0 0 1px rgba(255,255,255,0.06) inset;}
 .match-summary .team .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
 .match-summary .meta{font-size:.9rem;color:var(--muted);display:flex;align-items:center;gap:.35rem;}
@@ -764,16 +765,6 @@ def map_pretty_name(con: sqlite3.Connection, raw: str) -> str:
     slug = normalize_map_id(raw).replace("de_", "").replace("_", " ")
     return slug.title()
 
-
-def has_column(con, table: str, col: str) -> bool:
-    cur = con.execute(f"PRAGMA table_info({table})")
-    return any(r[1] == col for r in cur.fetchall())
-
-def q(con, sql, params=()):
-    cur = con.execute(sql, params)
-    rows = [dict(r) for r in cur.fetchall()]
-    return rows
-
 def _read_embedded_version(path: str) -> int:
     """
     Reads the file and looks for <!-- GENVER:x --> token anywhere.
@@ -1058,7 +1049,7 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
       - muu laskenta ennallaan
     """
     # Pääjoukko pelaajakohtaisiin, kuten ennen
-    rows = q(con, """
+    rows = query(con, """
       SELECT
         ps.player_id,
         COALESCE(pl.nickname, MAX(ps.nickname)) AS nick,
@@ -1093,7 +1084,7 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
     """, (division_id,))
 
     # --- Yhdistetyt aggregaatit yhdellä kyselyllä ---
-    agg = q(con, """
+    agg = query(con, """
       WITH
       team_ids AS (
         SELECT team1_id AS tid FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
@@ -1241,7 +1232,7 @@ def _index_card_stats(con: sqlite3.Connection, championship_id: str) -> tuple[in
     - played: pelatut matsit (finished_at IS NOT NULL TAI status='finished')
     - total: kaikki matsit kannassa
     """
-    r = q(con, """
+    r = query(con, """
       SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN finished_at IS NOT NULL OR LOWER(COALESCE(status,''))='finished'
@@ -1252,7 +1243,7 @@ def _index_card_stats(con: sqlite3.Connection, championship_id: str) -> tuple[in
     total = int((r[0]["total"] or 0)) if r else 0
     played = int((r[0]["played"] or 0)) if r else 0
 
-    teams = q(con, """
+    teams = query(con, """
       SELECT COUNT(*) AS c FROM (
         SELECT team1_id AS tid FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
         UNION

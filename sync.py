@@ -221,26 +221,52 @@ def _extract_map_rows_from_stats(match_id: str, rounds: List[Dict[str, Any]]) ->
         })
     return rows
 
-
-def _extract_map_rows_from_details(match_id: str, details: Dict[str, Any], team1_id: Optional[str], team2_id: Optional[str]) -> List[Dict[str, Any]]:
-    """Extract map data from match_details for canceled matches or free wins."""
+def _extract_map_rows_from_details(match_id: str, details: Dict[str, Any],
+                                   team1_id: Optional[str], team2_id: Optional[str]) -> List[Dict[str, Any]]:
+    """
+    Luo maps-rivit match_details-datasta, kun stats puuttuu (luovutus, peruttu tms).
+    Tukee sekä detailed_results (useita karttoja) että results.score (yksi rivi).
+    """
     rows: List[Dict[str, Any]] = []
-    results = details.get("results", {})
-    score = results.get("score", {})
-    score1 = safe_int(score.get("faction1"))
-    score2 = safe_int(score.get("faction2"))
-    winner_team_id = details.get("winner_team_id")  # Already set in persist_match
-    map_name = None  # Faceit may not provide map_name for canceled matches
 
-    if score1 is not None and score2 is not None:
-        rows.append({
-            "match_id": match_id,
-            "round_index": 1,  # Assume single map for canceled/free win
-            "map_name": map_name or "unknown",
-            "score_team1": score1,
-            "score_team2": score2,
-            "winner_team_id": winner_team_id,
-        })
+    # 1) Uudempi: detailed_results (lista per kartta; sisältää voittajan ja pisteet)
+    det = details.get("detailed_results")
+    if isinstance(det, list) and det:
+        for idx, item in enumerate(det, start=1):
+            factions = item.get("factions") or {}
+            s1 = safe_int((factions.get("faction1") or {}).get("score"))
+            s2 = safe_int((factions.get("faction2") or {}).get("score"))
+            w  = item.get("winner")  # 'faction1' / 'faction2' tai jo id
+            w_norm = _normalize_team_ref(w, team1_id, team2_id)
+
+            rows.append({
+                "match_id": match_id,
+                "round_index": idx,
+                "map_name": None,     # usein ei ole nimeä luovutuksissa
+                "score_team1": s1,
+                "score_team2": s2,
+                "winner_team_id": w_norm,
+            })
+
+    # 2) Fallback: results.score (vain kokonaiskarttojen lukumäärä, esim. BO2: 2–0)
+    if not rows:
+        results = details.get("results", {}) or {}
+        score   = results.get("score", {}) or {}
+        s1 = safe_int(score.get("faction1"))
+        s2 = safe_int(score.get("faction2"))
+        w  = results.get("winner") or details.get("winner_team_id")
+        w_norm = _normalize_team_ref(w, team1_id, team2_id)
+
+        if s1 is not None and s2 is not None:
+            rows.append({
+                "match_id": match_id,
+                "round_index": 1,
+                "map_name": None,
+                "score_team1": s1,
+                "score_team2": s2,
+                "winner_team_id": w_norm,
+            })
+
     return rows
 
 def _extract_rounds_from_stats(stats_json: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -249,11 +275,13 @@ def _extract_rounds_from_stats(stats_json: Dict[str, Any]) -> List[Dict[str, Any
         return []
     rounds = stats_json.get("rounds") or stats_json.get("roundsStats") or []
     return rounds if isinstance(rounds, list) else []
+
 def _derive_team_ids(details: Dict[str, Any], rounds: List[Dict[str, Any]]) -> tuple[Optional[str], Optional[str]]:
     """
-    Palauta (team1_id, team2_id) käyttäen ensisijaisesti rounds[*].teams[*].team_id -arvoja.
-    Yritä matchata nimet: details.teams.faction1.name / faction2.name vs. team_stats.Team.
-    Jos nimi-matchia ei saada, ota kaksi ensimmäistä uniikkia team_id:tä rounds-datasta.
+    Palauta (team1_id, team2_id) käyttäen:
+      1) rounds[*].teams[*].team_id (jos statsit on)
+      2) nimi-matchi rounds-datan tiiminimistä
+      3) FALLBACK: details.teams.faction*.faction_id (toimii ilman statseja)
     """
     f1_name = ((details.get("teams") or {}).get("faction1") or {}).get("name")
     f2_name = ((details.get("teams") or {}).get("faction2") or {}).get("name")
@@ -273,16 +301,23 @@ def _derive_team_ids(details: Dict[str, Any], rounds: List[Dict[str, Any]]) -> t
             if f2_name and tname and tname == f2_name and not t2_id:
                 t2_id = tid
 
-    # Fallback: jos nimi-matchi ei onnistunut mutta roundsissa on tasan 2 eri tiimiä
+    # Jos nimi-match ei onnistunut, mutta roundsissa on 2 tiimiä
     if (t1_id is None or t2_id is None) and len(seen_ids) >= 2:
         if t1_id is None:
             t1_id = seen_ids[0]
         if t2_id is None:
-            # jos sama kuin t1_id, koita seuraavaa
             t2_id = next((x for x in seen_ids if x != t1_id), seen_ids[1])
 
-    return t1_id, t2_id
+    # UUSI: varmistus ilman statseja — poimi suoraan details.teams.faction*.faction_id
+    if t1_id is None or t2_id is None:
+        t1_fid = (((details.get("teams") or {}).get("faction1") or {}).get("faction_id")) or None
+        t2_fid = (((details.get("teams") or {}).get("faction2") or {}).get("faction_id")) or None
+        if t1_id is None and t1_fid:
+            t1_id = t1_fid
+        if t2_id is None and t2_fid:
+            t2_id = t2_fid
 
+    return t1_id, t2_id
 
 def _normalize_team_ref(ref: Any, team1_id: Optional[str], team2_id: Optional[str]) -> Optional[str]:
     """
@@ -303,7 +338,9 @@ SKIP_FINISHED_IN_DB = True
 
 def _is_finished_in_db(con: sqlite3.Connection, match_id: str) -> bool:
     row = con.execute("SELECT status FROM matches WHERE match_id=?", (match_id,)).fetchone()
-    return bool(row and str(row[0] or "").lower() == "finished")
+    if not row:
+        return False
+    return (row["status"] or "").lower() in {"finished", "played", "closed"}
 
 def _has_full_stats(con: sqlite3.Connection, match_id: str) -> bool:
     """Return True if both maps and player_stats exist for this match_id."""
@@ -342,15 +379,13 @@ def _is_header_unchanged_by_summary(con: sqlite3.Connection, match_id: str, summ
 
 def _target_kind_from_status(item: dict) -> str:
     """
-    Map Faceit status → meidän käsittelyluokka.
-    - finished → 'past' (haetaan statsit)
-    - ongoing → 'upcoming' (käsitellään kuin scheduled)
-    - upcoming/whatever else → 'upcoming'
+    Map Faceit status → käsittelyluokka.
+      - 'finished' / 'closed' / 'played' → 'past' (haetaan statsit)
+      - muut ('ongoing', 'live', 'upcoming', 'scheduled', tms.) → 'upcoming'
     """
     st = str(item.get("status") or "").lower()
-    if st == "finished":
-        return "past"
-    return "upcoming"  # ongoing/live + upcoming
+    past_statuses = {"finished", "closed", "played"}
+    return "past" if st in past_statuses else "upcoming"
 
 def _list_matches_all(championship_id: str) -> list[dict]:
     """
@@ -452,6 +487,10 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     f2: Dict[str, Any] = {}
     game_name: Optional[str] = None
 
+    if kind != "past" and isinstance(summary, dict) and _is_bye_match_summary(summary):
+        logging.info("[skip] bye (summary) %s", match_id)
+        return
+
     if kind != "past" and isinstance(summary, dict):
         # Käytä list endpointin tietoja suoraan
         details = summary.get("_raw") or {}
@@ -461,7 +500,7 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     else:
         # Past → tarvitaan aina tarkemmat detailit + statsit
         details = get_match_details(match_id) or {}
-        # NEW: hard guard — if this is a BYE, skip without touching DB
+        # Skip BYE
         if _is_bye_match_details(details):
             logging.info("[skip] bye (details) %s", match_id)
             return
@@ -470,26 +509,46 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         f2 = teams_d.get("faction2") or {}
         game_field = details.get("game")
         game_name = game_field.get("name") if isinstance(game_field, dict) else (game_field if isinstance(game_field, str) else None)
-
-        # Päivitä myös karttakatalogi/pooli tästä matsista
+        # Katalogi/pooli talteen
         _persist_map_catalog_from_details(con, details, season=champ_row["season"], game=champ_row.get("game") or "cs2")
+
+        # Detect forfeit-like finished match:
+        # Only treat as forfeit if 'detailed_results' exists, has numeric scores for BOTH
+        # sides on EVERY map, and on each map one of the scores is exactly 0.
+        det = details.get("detailed_results") or []
+        forfeit_like = False
+        if isinstance(det, list) and det:
+            numeric_pairs = []
+            for it in det:
+                if not isinstance(it, dict):
+                    continue
+                fac = it.get("factions") or {}
+                s1 = safe_int((fac.get("faction1") or {}).get("score"), None)
+                s2 = safe_int((fac.get("faction2") or {}).get("score"), None)
+                if s1 is None or s2 is None:
+                    numeric_pairs = []
+                    break
+                numeric_pairs.append((s1, s2))
+            if numeric_pairs and all(a == 0 or b == 0 for (a, b) in numeric_pairs):
+                forfeit_like = True
 
     # STATS vain finished/past
     stats = {}
+    rounds = []
     if kind == "past":
         try:
             stats = get_match_stats(match_id) or {}
         except Exception as e:
             logging.info("[skip] stats %s -> %s", match_id, e)
             stats = {}
-
     rounds = _extract_rounds_from_stats(stats)
 
-    # UUSI: jos stats puuttuu, mutta detailsissa on pisteet (detailed_results TAI results.score),
-    # jatketaan normaalisti ja talletetaan maps-rivit details-datasta. Bailataan vain jos ei ole mitään pisteitä.
+    # Statsien jälkeen: päättele forfeit yksinkertaisesti siitä, pelattiinko karttoja (rounds).
+    has_detailed = isinstance(details.get("detailed_results"), list) and len(details.get("detailed_results") or []) > 0
+    has_score    = bool(((details.get("results") or {}).get("score") or {}))
+
     if kind == "past" and not rounds:
-        has_detailed = isinstance(details.get("detailed_results"), list) and len(details.get("detailed_results") or []) > 0
-        has_score = bool(((details.get("results") or {}).get("score") or {}))
+        # Ei raundeja statsissa → jos detai­leissa ei ole minkäänlaista tulostietoa, bailaa "not_found".
         if not has_detailed and not has_score:
             upsert_match(con, {
                 "match_id": match_id,
@@ -498,18 +557,23 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
             })
             return
 
-    rounds = _extract_rounds_from_stats(stats)
+    # Forfeit-tulkinta: ei raundeja, mutta detalhesissa on tulosta → luovutus/tekninen voitto
+    forfeit_like = (kind == "past" and not rounds and (has_detailed or has_score))
+
+
+    # Team-id:t myös ilman statseja (fallback details.teams.faction*.faction_id)
     team1_id, team2_id = _derive_team_ids(details or {}, rounds)
 
-    # Winner detailsista (fallback list)
-    winner_team_id = None
+    # Winner (normalize 'faction1'/'faction2' -> team_id)
+    winner_raw = None
     try:
         res = (details.get("results") or {})
-        winner_team_id = res.get("winner") or res.get("winner_team_id")
+        winner_raw = res.get("winner") or res.get("winner_team_id")
     except Exception:
         pass
+    winner_team_id = _normalize_team_ref(winner_raw, team1_id, team2_id)
 
-    # --- build upsert payload for 'matches' ---
+    # Upsert MATCH header
     comp_name = (details.get("competition_name") if isinstance(details, dict) else None) \
                 or (summary.get("_raw", {}).get("competition_name") if summary else None)
 
@@ -541,13 +605,13 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         "winner_team_id": winner_team_id,
     }
 
-    # Upsert teams (avatar mukaan jos löytyy)
+    # Teams talteen (avatarit)
     if m["team1_id"] or m["team1_name"]:
         upsert_team(con, {"team_id": m["team1_id"], "name": m["team1_name"], "avatar": (summary.get("team1_avatar") if summary else f1.get("avatar")), "updated_at": None})
     if m["team2_id"] or m["team2_name"]:
         upsert_team(con, {"team_id": m["team2_id"], "name": m["team2_name"], "avatar": (summary.get("team2_avatar") if summary else f2.get("avatar")), "updated_at": None})
 
-    # Rosterit talteen
+    # Rosterit
     if kind != "past" and summary:
         for pr in (summary.get("team1_roster") or []):
             upsert_player(con, {"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
@@ -565,19 +629,20 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     if kind != "past":
         return
 
-    # --- Vain yksi Democracy-kutsu; käytetään kahteen tarkoitukseen ---
+    # Democracy (voi olla 404 → ok). Skip totally for forfeits to avoid 404 noise.
     demo_json = None
-    try:
-        demo_json = get_democracy_history(match_id)
-    except Exception:
-        demo_json = None
+    if not forfeit_like:
+        try:
+            demo_json = get_democracy_history(match_id)
+        except Exception:
+            demo_json = None
 
-    # --- MAPS round_statsista ---
+    # MAPS round_statsista
     map_rows = _extract_map_rows_from_stats(match_id, rounds)
     for r in map_rows:
         r["winner_team_id"] = _normalize_team_ref(r.get("winner_team_id"), team1_id, team2_id)
 
-    # Täydennä puuttuvat kartat democracy → details fallback
+    # Picks democracy → details.voting
     picks = []
     try:
         payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
@@ -640,19 +705,20 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                     "winner_team_id": None,
                 })
 
+    # Fallback: details.detailed_results → LUOVUTUS/13–0 jne
     if not map_rows:
         map_rows = _extract_map_rows_from_details(match_id, details, team1_id, team2_id)
+        if map_rows:
+            logging.info("[forfeit] %s: inserted %d map rows from detailed_results/results.score", match_id, len(map_rows))
 
     if map_rows:
         upsert_maps(con, match_id, map_rows)
 
-    # --- Democracy / map_votes ---
+    # Democracy / map_votes
     try:
         votes = []
         payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
         tickets = payload.get("tickets", []) if isinstance(payload, dict) else []
-
-        # Kerää vain map-vedot
         for ticket in tickets:
             if not isinstance(ticket, dict):
                 continue
@@ -663,53 +729,35 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                     continue
                 sel = ent.get("selected_by")
                 status = (ent.get("status") or "").lower()
-
                 votes.append({
                     "round_num": ent.get("round"),
                     "map_name":  ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"),
-                    "status":    status,
+                    "status":    "pick" if status == "selected" else status,
                     "selected_by_faction": sel,
                     "selected_by_team_id": _normalize_team_ref(sel, team1_id, team2_id),
                 })
 
         if votes:
-            # 1) Järjestä kierroksen mukaan (None lopuksi)
             votes.sort(key=lambda x: (x.get("round_num") is None, x.get("round_num"), x.get("map_name") or ""))
-
-            # 2) 7. map-veto on aina overflow (BO2) tai decider (BO3):
-            #    - jos pick/selected/decider -rivejä on ≥3 -> viimeinen = decider
-            #    - muutoin viimeinen = overflow
             if len(votes) >= 7:
                 pick_like = sum(1 for v in votes if (v.get("status") or "") in ("pick", "selected", "decider"))
                 last = votes[-1]
                 if pick_like >= 3:
                     last["status"] = "decider"
-                    # decider voi säilyttää mahdollisen selected_by_* -tiedon
                 else:
                     last["status"] = "overflow"
-                    # overflow ei ole kummankaan ban: nollaa valitsijat
                     last["selected_by_team_id"] = None
                     last["selected_by_faction"] = None
-
-            # 3) Yhtenäistä 'selected' -> 'pick' (EI koske äsken asetettua viimeistä riviä)
-            for v in votes:
-                if v["status"] == "selected":
-                    v["status"] = "pick"
-
-            # 4) Talleta
             upsert_map_votes(con, match_id, votes)
-
     except Exception:
         pass
 
-    # --- TEAM & PLAYER STATS ---  
-
+    # TEAM & PLAYER STATS
     player_rows = _extract_player_rows(match_id, rounds)
     for r in player_rows:
         r["team_id"] = _normalize_team_ref(r.get("team_id"), team1_id, team2_id)
     player_rows = [r for r in player_rows if r.get("team_id")]
 
-    # varmista players-FK ennen player_statsia
     uniq_players: dict[str, str] = {}
     for r in player_rows:
         pid = r.get("player_id")
@@ -718,7 +766,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     for pid, nick in uniq_players.items():
         upsert_player(con, {"player_id": pid, "nickname": nick, "updated_at": None})
 
-    # if team_rows:
     if player_rows:
         upsert_player_stats(con, match_id, player_rows)
 
