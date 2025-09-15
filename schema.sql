@@ -68,7 +68,6 @@ CREATE TABLE IF NOT EXISTS matches (
   winner_team_id   TEXT
 );
 
-CREATE INDEX IF NOT EXISTS ix_matches_champ        ON matches(championship_id);
 CREATE INDEX IF NOT EXISTS ix_matches_scheduled    ON matches(scheduled_at);
 CREATE INDEX IF NOT EXISTS ix_matches_status       ON matches(status);
 
@@ -86,8 +85,6 @@ CREATE TABLE IF NOT EXISTS maps (
   UNIQUE(match_id, round_index)
 );
 
-CREATE INDEX IF NOT EXISTS ix_maps_match ON maps(match_id);
-
 -- Map veto votes (Faceit Democracy API), per match
 CREATE TABLE IF NOT EXISTS map_votes (
   id                  INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,8 +96,6 @@ CREATE TABLE IF NOT EXISTS map_votes (
   -- resolved team (nullable if mapping unknown)
   selected_by_team_id TEXT
 );
-
-CREATE INDEX IF NOT EXISTS ix_votes_match ON map_votes(match_id);
 
 -- Player stats per map (per match_id + round_index).
 CREATE TABLE IF NOT EXISTS player_stats (
@@ -141,8 +136,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
   UNIQUE(match_id, round_index, player_id, nickname)
 );
 
-CREATE INDEX IF NOT EXISTS ix_playerstats_team         ON player_stats(team_id);
-CREATE INDEX IF NOT EXISTS ix_playerstats_match_round  ON player_stats(match_id, round_index);
+CREATE INDEX IF NOT EXISTS ix_playerstats_team ON player_stats(team_id);
 CREATE INDEX IF NOT EXISTS idx_matches_champ ON matches(championship_id);
 CREATE INDEX IF NOT EXISTS idx_ps_match_round ON player_stats(match_id, round_index, player_id);
 CREATE INDEX IF NOT EXISTS idx_maps_match_round ON maps(match_id, round_index);
