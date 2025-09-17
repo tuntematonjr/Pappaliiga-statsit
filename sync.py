@@ -752,8 +752,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     if forfeit_like:
         map_rows = _extract_map_rows_from_details(match_id, details, team1_id, team2_id)
 
-
-
     if map_rows:
         upsert_maps(con, match_id, map_rows)
 
