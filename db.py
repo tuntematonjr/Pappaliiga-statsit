@@ -184,6 +184,7 @@ def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id
         FROM matches m
         JOIN maps p ON p.match_id = m.match_id
         WHERE m.championship_id=? AND (m.team1_id=? OR m.team2_id=?)
+        AND p.map_name <> 'forfeit'
     """, (division_id, team_id, team_id))
 
     # Pelatut ottelut = distinct match_id karttariveistä
@@ -362,6 +363,7 @@ def compute_champ_map_avgs_data(con: sqlite3.Connection, division_id: int) -> di
         JOIN maps    mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
         JOIN matches m  ON m.match_id  = ps.match_id
         WHERE m.championship_id = ?
+        AND mp.map_name <> 'forfeit'
         GROUP BY mp.map_name
     """, (division_id,))
 
@@ -392,7 +394,8 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
             FROM maps mp
             JOIN matches m ON m.match_id = mp.match_id
             WHERE m.championship_id = ?
-              AND mp.map_name IS NOT NULL AND mp.map_name <> ''
+                AND mp.map_name IS NOT NULL AND mp.map_name <> ''
+                AND mp.map_name <> 'forfeit'
         """, (championship_id,))
         if rows:
             all_maps = [r["map_id"] for r in rows]
@@ -569,6 +572,7 @@ def compute_champ_map_summary_data(con: sqlite3.Connection, division_id: int) ->
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
         WHERE m.championship_id = ? AND mp.map_name IS NOT NULL
+        AND mp.map_name <> 'forfeit'
         GROUP BY mp.map_name
         ORDER BY c DESC, mp.map_name ASC
         LIMIT 4
@@ -1111,6 +1115,7 @@ def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, t
             JOIN maps mp ON mp.match_id = m.match_id
             WHERE m.championship_id=? AND (m.team1_id=? OR m.team2_id=?)
               AND { _TS_EXPR } <= ?
+              AND mp.map_name <> 'forfeit'
         """, (division_id, team_id, team_id, cutoff))
         mids = {r["match_id"] for r in rows}
         maps_played = len(rows)

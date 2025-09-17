@@ -142,7 +142,11 @@ CREATE INDEX IF NOT EXISTS idx_ps_match_round ON player_stats(match_id, round_in
 CREATE INDEX IF NOT EXISTS idx_maps_match_round ON maps(match_id, round_index);
 CREATE INDEX IF NOT EXISTS idx_votes_match ON map_votes(match_id);
 CREATE INDEX IF NOT EXISTS ix_playerstats_match_team ON player_stats(match_id, team_id);
-
+CREATE INDEX IF NOT EXISTS idx_matches_champ_team1 ON matches(championship_id, team1_id);
+CREATE INDEX IF NOT EXISTS idx_matches_champ_team2 ON matches(championship_id, team2_id);
+CREATE INDEX IF NOT EXISTS ix_matches_finished  ON matches(finished_at);
+CREATE INDEX IF NOT EXISTS ix_matches_last_seen ON matches(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_maps_name ON maps(map_name);
 
 ------------------------------------------------------------
 -- Maps catalog (from FACEIT voting.map.entities)

@@ -68,6 +68,12 @@ def _is_bye_match_details(details: dict) -> bool:
     f2 = teams.get("faction2") or {}
     return _is_bye_id(f1.get("faction_id")) or _is_bye_id(f2.get("faction_id"))
 
+def _map_tickets_from_democracy(demo_json: dict) -> list[dict]:
+    payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
+    tickets = payload.get("tickets", []) if isinstance(payload, dict) else []
+    return [tk for tk in tickets
+            if isinstance(tk, dict) and str(tk.get("entity_type") or "").lower() == "map"]
+
 # --- progress bar with ETA --------------------------------------------------
 
 def _fmt_hms(seconds: float) -> str:
@@ -224,49 +230,58 @@ def _extract_map_rows_from_stats(match_id: str, rounds: List[Dict[str, Any]]) ->
 def _extract_map_rows_from_details(match_id: str, details: Dict[str, Any],
                                    team1_id: Optional[str], team2_id: Optional[str]) -> List[Dict[str, Any]]:
     """
-    Luo maps-rivit match_details-datasta, kun stats puuttuu (luovutus, peruttu tms).
-    Tukee sekä detailed_results (useita karttoja) että results.score (yksi rivi).
+    Build placeholder map rows for forfeits when round stats are missing.
+    We convert Faceit `detailed_results` 1–0 / 0–1 map wins into 13–0 / 0–13,
+    and always set map_name to 'forfeit' so downstream aggregations can skip them.
+    If only `results.score` exists (e.g., 2–0), create that many 'forfeit' maps.
     """
     rows: List[Dict[str, Any]] = []
 
-    # 1) Uudempi: detailed_results (lista per kartta; sisältää voittajan ja pisteet)
-    det = details.get("detailed_results")
+    # Case A: detailed_results (preferred)
+    det = (details or {}).get("detailed_results")
     if isinstance(det, list) and det:
         for idx, item in enumerate(det, start=1):
             factions = item.get("factions") or {}
             s1 = safe_int((factions.get("faction1") or {}).get("score"))
             s2 = safe_int((factions.get("faction2") or {}).get("score"))
-            w  = item.get("winner")  # 'faction1' / 'faction2' tai jo id
-            w_norm = _normalize_team_ref(w, team1_id, team2_id)
+            w_raw = item.get("winner")
+
+            # Normalize 1–0 to 13–0
+            if s1 is not None and s2 is not None:
+                if {s1, s2} == {0, 1}:
+                    s1, s2 = (13, 0) if s1 == 1 else (0, 13)
 
             rows.append({
                 "match_id": match_id,
                 "round_index": idx,
-                "map_name": None,     # usein ei ole nimeä luovutuksissa
+                "map_name": "forfeit",
                 "score_team1": s1,
                 "score_team2": s2,
-                "winner_team_id": w_norm,
+                "winner_team_id": _normalize_team_ref(w_raw, team1_id, team2_id),
             })
+        return rows
 
-    # 2) Fallback: results.score (vain kokonaiskarttojen lukumäärä, esim. BO2: 2–0)
-    if not rows:
-        results = details.get("results", {}) or {}
-        score   = results.get("score", {}) or {}
-        s1 = safe_int(score.get("faction1"))
-        s2 = safe_int(score.get("faction2"))
-        w  = results.get("winner") or details.get("winner_team_id")
-        w_norm = _normalize_team_ref(w, team1_id, team2_id)
-
-        if s1 is not None and s2 is not None:
-            rows.append({
-                "match_id": match_id,
-                "round_index": 1,
-                "map_name": None,
-                "score_team1": s1,
-                "score_team2": s2,
-                "winner_team_id": w_norm,
-            })
-
+    # Case B: only results.score (e.g., 2–0)
+    res = (details or {}).get("results") or {}
+    score = res.get("score") or {}
+    m1 = safe_int(score.get("faction1"), None)
+    m2 = safe_int(score.get("faction2"), None)
+    if m1 is not None and m2 is not None:
+        best = max(m1, m2)
+        if best > 0:
+            w_raw = res.get("winner") or res.get("winner_team_id")
+            w_team = _normalize_team_ref(w_raw, team1_id, team2_id)
+            # Direction 13–0 for the winner across all maps
+            s1, s2 = (13, 0) if (w_team == team1_id) else (0, 13)
+            for idx in range(1, best + 1):
+                rows.append({
+                    "match_id": match_id,
+                    "round_index": idx,
+                    "map_name": "forfeit",
+                    "score_team1": s1,
+                    "score_team2": s2,
+                    "winner_team_id": w_team,
+                })
     return rows
 
 def _extract_rounds_from_stats(stats_json: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -342,11 +357,20 @@ def _is_finished_in_db(con: sqlite3.Connection, match_id: str) -> bool:
         return False
     return (row["status"] or "").lower() in {"finished", "played", "closed"}
 
-def _has_full_stats(con: sqlite3.Connection, match_id: str) -> bool:
-    """Return True if both maps and player_stats exist for this match_id."""
-    r1 = con.execute("SELECT 1 FROM maps WHERE match_id=? LIMIT 1", (match_id,)).fetchone()
-    r2 = con.execute("SELECT 1 FROM player_stats WHERE match_id=? LIMIT 1", (match_id,)).fetchone()
-    return bool(r1 and r2)
+def _is_complete_in_db(con: sqlite3.Connection, match_id: str) -> bool:
+    """
+    Riittääkö data skipille?
+      - TRUE jos on player_stats (normaali pelattu matsi), TAI
+      - TRUE jos maps-taulussa on vähintään yksi 'forfeit'-kartta (geneerinen forfeit).
+    """
+    r_maps = con.execute("SELECT 1 FROM maps WHERE match_id=? LIMIT 1", (match_id,)).fetchone()
+    if not r_maps:
+        return False
+    r_ps = con.execute("SELECT 1 FROM player_stats WHERE match_id=? LIMIT 1", (match_id,)).fetchone()
+    if r_ps:
+        return True
+    r_ff = con.execute("SELECT 1 FROM maps WHERE match_id=? AND map_name='forfeit' LIMIT 1", (match_id,)).fetchone()
+    return bool(r_ff)
 
 def _is_header_unchanged_by_summary(con: sqlite3.Connection, match_id: str, summary: dict) -> bool:
     """
@@ -448,7 +472,7 @@ def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
             continue
 
         # 1) Finished in DB + stats present -> skip entirely
-        if SKIP_FINISHED_IN_DB and _is_finished_in_db(con, mid) and _has_full_stats(con, mid):
+        if SKIP_FINISHED_IN_DB and _is_finished_in_db(con, mid) and _is_complete_in_db(con, mid):
             seen.add(mid); skipped += 1
             _progress_bar(title, i, total, start_ts, skipped)
             continue
@@ -512,30 +536,12 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         # Katalogi/pooli talteen
         _persist_map_catalog_from_details(con, details, season=champ_row["season"], game=champ_row.get("game") or "cs2")
 
-        # Detect forfeit-like finished match:
-        # Only treat as forfeit if 'detailed_results' exists, has numeric scores for BOTH
-        # sides on EVERY map, and on each map one of the scores is exactly 0.
-        det = details.get("detailed_results") or []
         forfeit_like = False
-        if isinstance(det, list) and det:
-            numeric_pairs = []
-            for it in det:
-                if not isinstance(it, dict):
-                    continue
-                fac = it.get("factions") or {}
-                s1 = safe_int((fac.get("faction1") or {}).get("score"), None)
-                s2 = safe_int((fac.get("faction2") or {}).get("score"), None)
-                if s1 is None or s2 is None:
-                    numeric_pairs = []
-                    break
-                numeric_pairs.append((s1, s2))
-            if numeric_pairs and all(a == 0 or b == 0 for (a, b) in numeric_pairs):
-                forfeit_like = True
 
     # STATS vain finished/past
     stats = {}
     rounds = []
-    if kind == "past":
+    if kind == "past" and not forfeit_like:
         try:
             stats = get_match_stats(match_id) or {}
         except Exception as e:
@@ -546,6 +552,17 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     # Statsien jälkeen: päättele forfeit yksinkertaisesti siitä, pelattiinko karttoja (rounds).
     has_detailed = isinstance(details.get("detailed_results"), list) and len(details.get("detailed_results") or []) > 0
     has_score    = bool(((details.get("results") or {}).get("score") or {}))
+
+    # Forfeit = finished/past, EI raundeja (stats tyhjät), mutta detailsissä on sarjatulos
+    forfeit_like = (kind == "past" and not rounds and (has_detailed or has_score))
+
+    # Democracy history haetaan vain ei-forfeiteille
+    demo_json = {}
+    if kind == "past" and not forfeit_like:
+        try:
+            demo_json = get_democracy_history(match_id) or {}
+        except Exception:
+            demo_json = {}
 
     if kind == "past" and not rounds:
         # Ei raundeja statsissa → jos detai­leissa ei ole minkäänlaista tulostietoa, bailaa "not_found".
@@ -558,7 +575,7 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
             return
 
     # Forfeit-tulkinta: ei raundeja, mutta detalhesissa on tulosta → luovutus/tekninen voitto
-    forfeit_like = (kind == "past" and not rounds and (has_detailed or has_score))
+    #forfeit_like = (kind == "past" and not rounds and (has_detailed or has_score))
 
 
     # Team-id:t myös ilman statseja (fallback details.teams.faction*.faction_id)
@@ -629,128 +646,116 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     if kind != "past":
         return
 
-    # Democracy (voi olla 404 → ok). Skip totally for forfeits to avoid 404 noise.
-    demo_json = None
-    if not forfeit_like:
-        try:
-            demo_json = get_democracy_history(match_id)
-        except Exception:
-            demo_json = None
-
     # MAPS round_statsista
     map_rows = _extract_map_rows_from_stats(match_id, rounds)
     for r in map_rows:
         r["winner_team_id"] = _normalize_team_ref(r.get("winner_team_id"), team1_id, team2_id)
 
-    # Picks democracy → details.voting
-    picks = []
-    try:
-        payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
-        tickets = payload.get("tickets", []) if isinstance(payload, dict) else []
-        cand = []
-        for tk in tickets:
-            if not isinstance(tk, dict):
-                continue
-            if str(tk.get("entity_type") or "").lower() != "map":
-                continue
-            for ent in (tk.get("entities") or []):
-                if not isinstance(ent, dict):
-                    continue
-                status = str(ent.get("status") or "").lower()
-                if status not in ("pick", "decider", "selected"):
-                    continue
-                name = (ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"))
-                rnd = ent.get("round")
-                order_key = rnd if isinstance(rnd, int) else 10**9
-                if name:
-                    cand.append((order_key, name))
-        cand.sort(key=lambda x: x[0])
-        for _, n in cand:
-            if n not in picks:
-                picks.append(n)
-    except Exception:
-        picks = []
-
-    if picks:
-        for idx, name in enumerate(picks, start=1):
-            if idx - 1 < len(map_rows):
-                if not map_rows[idx - 1].get("map_name"):
-                    map_rows[idx - 1]["map_name"] = name
-            else:
-                map_rows.append({
-                    "match_id": match_id,
-                    "round_index": idx,
-                    "map_name": name,
-                    "score_team1": None,
-                    "score_team2": None,
-                    "winner_team_id": None,
-                })
-
-    if not any(r.get("map_name") for r in map_rows):
+    # Democracy / map_votes + picks (vain ei-forfeit)
+    if not forfeit_like:
+        # 1) Veto/votes talteen democracy-historiasta
         try:
-            picks2 = ((details.get("voting") or {}).get("map") or {}).get("pick") or []
+            votes = []
+            for ticket in _map_tickets_from_democracy(demo_json):
+                if not isinstance(ticket, dict):
+                    continue
+                if str(ticket.get("entity_type") or "").lower() != "map":
+                    continue
+                for ent in (ticket.get("entities") or []):
+                    if not isinstance(ent, dict):
+                        continue
+                    sel = ent.get("selected_by")
+                    status = (ent.get("status") or "").lower()
+                    votes.append({
+                        "round_num": ent.get("round"),
+                        "map_name":  ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"),
+                        "status":    "pick" if status == "selected" else status,
+                        "selected_by_faction": sel,
+                        "selected_by_team_id": _normalize_team_ref(sel, team1_id, team2_id),
+                    })
+            if votes:
+                votes.sort(key=lambda x: (x.get("round_num") is None, x.get("round_num"), x.get("map_name") or ""))
+                if len(votes) >= 7:
+                    pick_like = sum(1 for v in votes if (v.get("status") or "") in ("pick","selected","decider"))
+                    last = votes[-1]
+                    last["status"] = "decider" if pick_like >= 3 else "overflow"
+                    if last["status"] == "overflow":
+                        last["selected_by_team_id"] = None
+                        last["selected_by_faction"] = None
+                upsert_map_votes(con, match_id, votes)
         except Exception:
-            picks2 = []
-        for idx, name in enumerate(picks2, start=1):
-            if idx - 1 < len(map_rows):
-                if not map_rows[idx - 1].get("map_name"):
-                    map_rows[idx - 1]["map_name"] = name
-            else:
-                map_rows.append({
-                    "match_id": match_id,
-                    "round_index": idx,
-                    "map_name": name,
-                    "score_team1": None,
-                    "score_team2": None,
-                    "winner_team_id": None,
-                })
+            pass
 
-    # Fallback: details.detailed_results → LUOVUTUS/13–0 jne
-    if not map_rows:
+        # 2) Täydennä map_rows.map_name pickeistä
+        picks = []
+        try:
+            cand = []
+            for ticket in _map_tickets_from_democracy(demo_json):
+                if not isinstance(ticket, dict):
+                    continue
+                if str(ticket.get("entity_type") or "").lower() != "map":
+                    continue
+                for ent in (ticket.get("entities") or []):
+                    if not isinstance(ent, dict):
+                        continue
+                    status = str(ent.get("status") or "").lower()
+                    if status not in ("pick","decider","selected"):
+                        continue
+                    name = (ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"))
+                    rnd = ent.get("round")
+                    order_key = rnd if isinstance(rnd, int) else 10**9
+                    if name:
+                        cand.append((order_key, name))
+            cand.sort(key=lambda x: x[0])
+            for _, n in cand:
+                if n and n not in picks:
+                    picks.append(n)
+        except Exception:
+            picks = []
+
+        if picks:
+            for idx, name in enumerate(picks, start=1):
+                if idx - 1 < len(map_rows):
+                    if not map_rows[idx - 1].get("map_name"):
+                        map_rows[idx - 1]["map_name"] = name
+                else:
+                    map_rows.append({
+                        "match_id": match_id,
+                        "round_index": idx,
+                        "map_name": name,
+                        "score_team1": None,
+                        "score_team2": None,
+                        "winner_team_id": None,
+                    })
+
+        # 3) Fallback: details.voting.map.pick jos democracy-history puuttuu
+        if not any(r.get("map_name") for r in map_rows):
+            try:
+                picks2 = ((details.get("voting") or {}).get("map") or {}).get("pick") or []
+            except Exception:
+                picks2 = []
+            for idx, name in enumerate(picks2, start=1):
+                if idx - 1 < len(map_rows):
+                    if not map_rows[idx - 1].get("map_name"):
+                        map_rows[idx - 1]["map_name"] = name
+                else:
+                    map_rows.append({
+                        "match_id": match_id,
+                        "round_index": idx,
+                        "map_name": name,
+                        "score_team1": None,
+                        "score_team2": None,
+                        "winner_team_id": None,
+                    })
+
+    # Forfeit: ei round-statseja → rakenna placeholder-kartat detailsistä
+    if forfeit_like:
         map_rows = _extract_map_rows_from_details(match_id, details, team1_id, team2_id)
-        if map_rows:
-            logging.info("[forfeit] %s: inserted %d map rows from detailed_results/results.score", match_id, len(map_rows))
+
+
 
     if map_rows:
         upsert_maps(con, match_id, map_rows)
-
-    # Democracy / map_votes
-    try:
-        votes = []
-        payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
-        tickets = payload.get("tickets", []) if isinstance(payload, dict) else []
-        for ticket in tickets:
-            if not isinstance(ticket, dict):
-                continue
-            if str(ticket.get("entity_type") or "").lower() != "map":
-                continue
-            for ent in (ticket.get("entities") or []):
-                if not isinstance(ent, dict):
-                    continue
-                sel = ent.get("selected_by")
-                status = (ent.get("status") or "").lower()
-                votes.append({
-                    "round_num": ent.get("round"),
-                    "map_name":  ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name"),
-                    "status":    "pick" if status == "selected" else status,
-                    "selected_by_faction": sel,
-                    "selected_by_team_id": _normalize_team_ref(sel, team1_id, team2_id),
-                })
-
-        if votes:
-            votes.sort(key=lambda x: (x.get("round_num") is None, x.get("round_num"), x.get("map_name") or ""))
-            if len(votes) >= 7:
-                pick_like = sum(1 for v in votes if (v.get("status") or "") in ("pick", "selected", "decider"))
-                last = votes[-1]
-                if pick_like >= 3:
-                    last["status"] = "decider"
-                else:
-                    last["status"] = "overflow"
-                    last["selected_by_team_id"] = None
-                    last["selected_by_faction"] = None
-            upsert_map_votes(con, match_id, votes)
-    except Exception:
-        pass
 
     # TEAM & PLAYER STATS
     player_rows = _extract_player_rows(match_id, rounds)
