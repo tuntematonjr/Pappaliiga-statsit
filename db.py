@@ -47,6 +47,19 @@ def get_conn(path: str) -> sqlite3.Connection:
 def init_db(con: sqlite3.Connection, schema_path: Path = SCHEMA_PATH) -> None:
     sql = schema_path.read_text(encoding="utf-8")
     con.executescript(sql)
+    con.executescript("""
+    CREATE INDEX IF NOT EXISTS idx_matches_champ      ON matches(championship_id);
+    CREATE INDEX IF NOT EXISTS idx_matches_status     ON matches(status);
+    CREATE INDEX IF NOT EXISTS idx_matches_ts         ON matches(championship_id, finished_at, started_at, scheduled_at, configured_at, last_seen_at);
+
+    CREATE INDEX IF NOT EXISTS idx_maps_match         ON maps(match_id);
+    CREATE INDEX IF NOT EXISTS idx_maps_match_round   ON maps(match_id, round_index);
+
+    CREATE INDEX IF NOT EXISTS idx_map_votes_match    ON map_votes(match_id);
+
+    CREATE INDEX IF NOT EXISTS idx_ps_match_round     ON player_stats(match_id, round_index);
+    CREATE INDEX IF NOT EXISTS idx_ps_team_match      ON player_stats(team_id, match_id);
+    """)
     con.commit()
 
 # -------------------------
@@ -154,9 +167,17 @@ def query(con: sqlite3.Connection, sql: str, params: tuple = ()) -> list[dict]:
     rows = [dict(r) for r in cur.fetchall()]
     return rows
 
+_COLS_CACHE: dict[tuple[int, str], set[str]] = {}
+
 def has_column(con: sqlite3.Connection, table: str, col: str) -> bool:
-    cur = con.execute(f"PRAGMA table_info({table})")
-    return any(r[1] == col for r in cur.fetchall())
+    key = (id(con), table)
+    cols = _COLS_CACHE.get(key)
+    if cols is None:
+        cur = con.execute(f"PRAGMA table_info({table})")
+        cols = {r[1] for r in cur.fetchall()}
+        _COLS_CACHE[key] = cols
+    return col in cols
+
 
 def get_teams_in_championship(con: sqlite3.Connection, division_id: int) -> list[dict]:
     sql = """
@@ -608,10 +629,10 @@ def compute_champ_thresholds_data(con: sqlite3.Connection, division_id: int) -> 
         SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds,
         SUM(COALESCE(ps.entry_wins,0))    AS entry_wins,
         SUM(COALESCE(ps.entry_count,0))   AS entry_count,
-        SUM(COALESCE(ps.cl_1v1_Wins,0))   AS cl_1v1_Wins,
-        SUM(COALESCE(ps.cl_1v1_Attempts,0))   AS cl_1v1_Attempts,
-        SUM(COALESCE(ps.cl_1v2_Wins,0))   AS cl_1v2_Wins,
-        SUM(COALESCE(ps.cl_1v2_Attempts,0))   AS cl_1v2_Attempts,
+        SUM(COALESCE(ps.cl_1v1_wins,0))   AS cl_1v1_wins,
+        SUM(COALESCE(ps.cl_1v1_attempts,0))   AS cl_1v1_attempts,
+        SUM(COALESCE(ps.cl_1v2_wins,0))   AS cl_1v2_wins,
+        SUM(COALESCE(ps.cl_1v2_attempts,0))   AS cl_1v2_attempts,
         SUM(COALESCE(ps.enemies_flashed,0)) AS enemies_flashed,
         SUM(COALESCE(ps.flash_count,0))     AS flash_count,
         SUM(COALESCE(ps.flash_successes,0)) AS flash_successes
@@ -672,12 +693,12 @@ def compute_champ_thresholds_data(con: sqlite3.Connection, division_id: int) -> 
         eatt = r["entry_count"] or 0
         entry_wr = (100.0 * ewin / eatt) if eatt else None
 
-        c11_att = r.get("cl_1v1_Attempts", 0) or 0
-        c11_win = r.get("cl_1v1_Wins", 0) or 0
+        c11_att = r.get("cl_1v1_attempts", 0) or 0
+        c11_win = r.get("cl_1v1_wins", 0) or 0
         c11_wr = (c11_win / c11_att * 100.0) if c11_att else 0.0
 
-        c12_att = r.get("cl_1v2_Attempts", 0) or 0
-        c12_win = r.get("cl_1v2_Wins", 0) or 0
+        c12_att = r.get("cl_1v2_attempts", 0) or 0
+        c12_win = r.get("cl_1v2_wins", 0) or 0
         c12_wr = (c12_win / c12_att * 100.0) if c12_att else 0.0
 
         efl = r["enemies_flashed"] or 0
@@ -823,22 +844,11 @@ def upsert_player_stats(con, match_id: str, rows: list[dict]):
 
 def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_id: str) -> list[dict]:
     """
-    Palauttaa kaikki annetun joukkueen ottelut kyseisessä championshipissa aikajärjestyksessä.
-    Ei käytä team_stats-taulua; kaikki aggregaatit player_statsista.
-
-    Palautetun rakenteen avaimet (per ottelu):
-      - match_id, status, best_of, ts, played
-      - left/right: { team_id, team_name, avatar? }
-      - maps: list of {
-          round_index, map, rf, ra, pick_team_id,
-          left:  { adr, kd, dmg, kills, deaths },
-          right: { adr, kd, dmg, kills, deaths }
-        }
-      - maps_won, maps_lost
+    Same API, avoids per-match team avatar query by joining teams once.
     """
     cur = con.cursor()
 
-    sql = """
+    sql = f"""
     WITH my_matches AS (
       SELECT
         m.match_id, m.championship_id, m.team1_id, m.team1_name, m.team2_id, m.team2_name,
@@ -860,7 +870,6 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
         ON ma.match_id = mm.match_id
     ),
 
-    -- Player_stats kooste (molemmille joukkueille)
     ps_agg AS (
       SELECT
         ps.match_id, ps.round_index, ps.team_id,
@@ -869,6 +878,7 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
         SUM(COALESCE(ps.damage,0))  AS dmg,
         AVG(NULLIF(ps.adr,0))       AS adr_avg
       FROM player_stats ps
+      JOIN my_matches m ON m.match_id = ps.match_id
       GROUP BY ps.match_id, ps.round_index, ps.team_id
     ),
 
@@ -876,6 +886,7 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
       SELECT v.match_id, v.map_name,
              MAX(v.selected_by_team_id) AS pick_team_id
       FROM map_votes v
+      JOIN my_matches m ON m.match_id = v.match_id
       WHERE v.status = 'pick'
       GROUP BY v.match_id, v.map_name
     )
@@ -885,42 +896,34 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
       mp.team1_id, mp.team1_name, mp.team2_id, mp.team2_name,
       mp.round_index, mp.map_name, mp.score_team1, mp.score_team2,
       pk.pick_team_id,
-
-      -- T1 stats (vain player_statsista)
       COALESCE(ps1.kills, 0)      AS t1_kills,
       COALESCE(ps1.deaths, 0)     AS t1_deaths,
       COALESCE(ps1.adr_avg, 0.0)  AS t1_adr,
       COALESCE(ps1.dmg, 0)        AS t1_dmg,
-
-      -- T2 stats
       COALESCE(ps2.kills, 0)      AS t2_kills,
       COALESCE(ps2.deaths, 0)     AS t2_deaths,
       COALESCE(ps2.adr_avg, 0.0)  AS t2_adr,
-      COALESCE(ps2.dmg, 0)        AS t2_dmg
-
+      COALESCE(ps2.dmg, 0)        AS t2_dmg,
+      t1.avatar AS t1_avatar,
+      t2.avatar AS t2_avatar
     FROM mp
     LEFT JOIN ps_agg ps1 ON ps1.match_id=mp.match_id AND ps1.round_index=mp.round_index AND ps1.team_id=mp.team1_id
     LEFT JOIN ps_agg ps2 ON ps2.match_id=mp.match_id AND ps2.round_index=mp.round_index AND ps2.team_id=mp.team2_id
     LEFT JOIN picks pk    ON pk.match_id=mp.match_id AND pk.map_name=mp.map_name
-
-    -- SQLite: pusketaan NULL-ts rivit viimeiseksi
+    LEFT JOIN teams t1    ON t1.team_id = mp.team1_id
+    LEFT JOIN teams t2    ON t2.team_id = mp.team2_id
     ORDER BY (mp.ts IS NULL) ASC, mp.ts ASC, mp.match_id ASC, mp.round_index ASC
     """
     rows = cur.execute(sql, {"champ": championship_id, "team": team_id}).fetchall()
 
-    # Ryhmitellään otteluksi ja kerätään maps-lista
     out: dict[str, dict] = {}
     for r in rows:
         mid = r["match_id"]
         if mid not in out:
             me_on_left = (r["team1_id"] == team_id)
             opp_id = r["team2_id"] if me_on_left else r["team1_id"]
-            opp_row = con.execute(
-                "SELECT name, avatar FROM teams WHERE team_id = ?", (opp_id,)
-            ).fetchone()
-            opp_name = (opp_row["name"] if (opp_row and opp_row["name"]) else
-                        (r["team2_name"] if me_on_left else r["team1_name"]))
-            opp_avatar = opp_row["avatar"] if opp_row else None
+            opp_name = (r["team2_name"] if me_on_left else r["team1_name"])
+            opp_avatar = (r["t2_avatar"] if me_on_left else r["t1_avatar"])
 
             out[mid] = {
                 "match_id": mid,
@@ -940,7 +943,6 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
                 "maps": []
             }
 
-        # Upcoming-ottelu voi olla ilman mappeja
         if r["round_index"] is None:
             continue
 
@@ -971,7 +973,6 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
             "right": {"adr": float(opp_adr or 0.0), "kd": float(opp_kd), "dmg": int(opp_damage), "kills": int(opp_kills), "deaths": int(opp_deaths)}
         })
 
-    # Listaksi + maps_won/lost
     result = []
     for m in sorted(out.values(), key=lambda x: (x["ts"] is None, x["ts"] or 0, x["match_id"])):
         maps = m["maps"]
@@ -1513,3 +1514,26 @@ def get_champ_last_seen(con: sqlite3.Connection, championship_id: int | str) -> 
     """, (championship_id,)).fetchone()
     ts = row["ts"] if row else None
     return int(ts) if ts else None
+
+def upsert_players_bulk(con: sqlite3.Connection, players: list[dict]) -> None:
+    """
+    Bulk upsert for players to reduce per-row INSERT/UPDATE overhead.
+    players: list of dicts with keys {player_id, nickname, updated_at?}
+    """
+    if not players:
+        return
+    payload = []
+    for p in players:
+        payload.append({
+            "player_id":  p.get("player_id"),
+            "nickname":   (p.get("nickname") or ""),
+            "updated_at": p.get("updated_at"),
+        })
+    sql = """
+    INSERT INTO players (player_id, nickname, updated_at)
+    VALUES (:player_id, :nickname, COALESCE(:updated_at, strftime('%s','now')))
+    ON CONFLICT(player_id) DO UPDATE SET
+      nickname   = CASE WHEN players.nickname IS NULL OR players.nickname='' THEN excluded.nickname ELSE players.nickname END,
+      updated_at = COALESCE(excluded.updated_at, players.updated_at)
+    """
+    con.executemany(sql, payload)
