@@ -94,7 +94,6 @@ CREATE TABLE IF NOT EXISTS player_stats (
   match_id         TEXT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
   round_index      INTEGER NOT NULL,
   player_id        TEXT REFERENCES players(player_id) ON DELETE SET NULL,
-  nickname         TEXT,
   team_id          TEXT REFERENCES teams(team_id) ON DELETE SET NULL,
   kills            INTEGER,
   deaths           INTEGER,
@@ -123,7 +122,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
   pistol_kills     INTEGER,
   damage           INTEGER,
 
-  UNIQUE(match_id, round_index, player_id, nickname)
+  UNIQUE(match_id, round_index, player_id)
 );
 
 CREATE INDEX IF NOT EXISTS ix_playerstats_team ON player_stats(team_id);

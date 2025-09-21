@@ -1053,7 +1053,7 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
     rows = query(con, """
       SELECT
         ps.player_id,
-        COALESCE(pl.nickname, MAX(ps.nickname)) AS nick,
+        COALESCE(MAX(pl.nickname), '') AS nick,
         MAX(t.name) AS team_name,
 
         -- summat

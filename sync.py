@@ -720,10 +720,10 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     if map_rows:
         upsert_maps(con, match_id, map_rows)
 
-    # PLAYER STATS (EI team_name)
+    # PLAYER STATS
     player_rows = _extract_player_rows(match_id, rounds)
     for r in player_rows:
-        r.pop("team_name", None)  # varmistus jos jäänyt
+        r.pop("nickname", None)  # varmistus
         r["team_id"] = _normalize_team_ref(r.get("team_id"), team1_id, team2_id)
     player_rows = [r for r in player_rows if r.get("team_id")]
     if player_rows:

@@ -254,7 +254,7 @@ def compute_player_table_data(con: sqlite3.Connection, division_id: int, team_id
 
     select_cols = [
         "ps.player_id AS player_id",
-        "COALESCE(pl.nickname, MAX(ps.nickname)) AS nickname_display",
+        "COALESCE(MAX(pl.nickname),'') AS nickname_display",
         "COUNT(*) AS maps_played",
         "SUM(COALESCE(ps.kills,0)) AS kills",
         "SUM(COALESCE(ps.deaths,0)) AS deaths",
@@ -795,7 +795,7 @@ def upsert_map_votes(con, match_id: str, votes: list[dict]):
 def upsert_player_stats(con, match_id: str, rows: list[dict]):
     sql = """
     INSERT INTO player_stats(
-      match_id, round_index, player_id, nickname, team_id,
+      match_id, round_index, player_id, team_id,
       kills, deaths, assists, kd, kr, adr, hs_pct, mvps, sniper_kills, utility_damage,
       enemies_flashed, flash_count, flash_successes,
       mk_2k, mk_3k, mk_4k, mk_5k,
@@ -803,14 +803,14 @@ def upsert_player_stats(con, match_id: str, rows: list[dict]):
       entry_count, entry_wins, pistol_kills, damage
     )
     VALUES(
-      :match_id, :round_index, :player_id, :nickname, :team_id,
+      :match_id, :round_index, :player_id, :team_id,
       :kills, :deaths, :assists, :kd, :kr, :adr, :hs_pct, :mvps, :sniper_kills, :utility_damage,
       :enemies_flashed, :flash_count, :flash_successes,
       :mk_2k, :mk_3k, :mk_4k, :mk_5k,
       :clutch_kills, :cl_1v1_attempts, :cl_1v1_wins, :cl_1v2_attempts, :cl_1v2_wins,
       :entry_count, :entry_wins, :pistol_kills, :damage
     )
-    ON CONFLICT(match_id, round_index, player_id, nickname) DO UPDATE SET
+    ON CONFLICT(match_id, round_index, player_id) DO UPDATE SET
       team_id=excluded.team_id,
       kills=excluded.kills, deaths=excluded.deaths, assists=excluded.assists, kd=excluded.kd,
       kr=excluded.kr, adr=excluded.adr, hs_pct=excluded.hs_pct, mvps=excluded.mvps,
@@ -819,7 +819,8 @@ def upsert_player_stats(con, match_id: str, rows: list[dict]):
       mk_2k=excluded.mk_2k, mk_3k=excluded.mk_3k, mk_4k=excluded.mk_4k, mk_5k=excluded.mk_5k,
       clutch_kills=excluded.clutch_kills, cl_1v1_attempts=excluded.cl_1v1_attempts, cl_1v1_wins=excluded.cl_1v1_wins,
       cl_1v2_attempts=excluded.cl_1v2_attempts, cl_1v2_wins=excluded.cl_1v2_wins,
-      entry_count=excluded.entry_count, entry_wins=excluded.entry_wins, pistol_kills=excluded.pistol_kills, damage=excluded.damage
+      entry_count=excluded.entry_count, entry_wins=excluded.entry_wins,
+      pistol_kills=excluded.pistol_kills, damage=excluded.damage
     """
     payload = [{**r, "match_id": match_id} for r in rows]
     con.executemany(sql, payload)
