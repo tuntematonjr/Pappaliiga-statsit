@@ -662,6 +662,7 @@ def topbar(show_back_to_index: bool):
         <div class="brand">
           <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
           <span>AFI - Unofficial Pappaliiga Stats v{TOOL_VERSION}</span>
+          <img src="https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png" alt="AFI logo" class="logo promo-logo"/>
         </div>
         <div class="nav">
           {back}
