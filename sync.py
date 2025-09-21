@@ -112,29 +112,22 @@ def _progress_bar(prefix: str, i: int, total: int, start_ts: float, skipped: int
 
 # ---- transformers for stats payload ---------------------------------------
 
-def _persist_map_catalog_from_details(con: sqlite3.Connection, details: dict, season: int, game: str = "cs2") -> None:
-    """
-    Read voting.map.entities from match details and persist maps_catalog + map_pool_seasons.
-    """
+def _persist_map_catalog_from_details(con: sqlite3.Connection, details: dict, season: int) -> None:
     voting = (details or {}).get("voting") or {}
     msec = voting.get("map") or {}
     entities = msec.get("entities") or []
 
     def _pretty_for(ent: dict, map_id: str) -> str:
-        # 1) Faceitin nimi
         raw = (ent.get("name") or "").strip()
-        # 2) Erikoiskaunistukset
         mid = (map_id or "").lower()
         if raw.lower() == "dust2" or "dust2" in mid:
             return "Dust II"
-        # 3) Fallback: slug -> Title
         if raw:
             return raw
         slug = (map_id or "").replace("de_", "").replace("_", " ").strip()
         return slug.title() if slug else map_id
 
     for ent in entities:
-        # Prefer stable id in order: class_name, game_map_id, guid
         map_id = ent.get("class_name") or ent.get("game_map_id") or ent.get("guid") or ""
         if not map_id:
             continue
@@ -147,7 +140,6 @@ def _persist_map_catalog_from_details(con: sqlite3.Connection, details: dict, se
             "pretty_name": pretty,
             "image_sm": img_sm,
             "image_lg": img_lg,
-            "game": game,
         }
         upsert_map_catalog(con, row)
         add_map_to_season_pool(con, season, row["map_id"])
@@ -173,7 +165,6 @@ def _extract_player_rows(match_id: str, rounds: List[Dict[str, Any]]) -> List[Di
                     "player_id": p.get("player_id") or p.get("id"),
                     "nickname": p.get("nickname") or p.get("name"),
                     "team_id": tid,
-                    "team_name": tname,
                     "kills": safe_int(ps.get("Kills"), 0),
                     "deaths": safe_int(ps.get("Deaths"), 0),
                     "assists": safe_int(ps.get("Assists"), 0),
@@ -527,30 +518,19 @@ def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
         logging.warning("division commit failed: %s", e)
 
 def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: str, kind: str, summary: Optional[Dict[str, Any]] = None) -> None:
-    """
-    Persist match header always.
-    - kind == 'past': also fetch stats + maps (unless forfeit-like)
-    - kind != 'past': uses summary (from list endpoint) without details call
-    Optimizations:
-      * Bulk upsert rosters via upsert_players_bulk
-    """
     details: Dict[str, Any] = {}
     f1: Dict[str, Any] = {}
     f2: Dict[str, Any] = {}
-    game_name: Optional[str] = None
 
     if kind != "past" and isinstance(summary, dict) and _is_bye_match_summary(summary):
         logging.info("[skip] bye (summary) %s", match_id)
         return
 
     if kind != "past" and isinstance(summary, dict):
-        # Use list endpoint raw as details
         details = summary.get("_raw") or {}
         f1 = {"name": summary.get("team1_name"), "avatar": summary.get("team1_avatar"), "roster": summary.get("team1_roster") or []}
         f2 = {"name": summary.get("team2_name"), "avatar": summary.get("team2_avatar"), "roster": summary.get("team2_roster") or []}
-        game_name = (details.get("game") or None)
     else:
-        # Past → need full details
         details = get_match_details(match_id) or {}
         if _is_bye_match_details(details):
             logging.info("[skip] bye (details) %s", match_id)
@@ -558,12 +538,9 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         teams_d = details.get("teams") or {}
         f1 = teams_d.get("faction1") or {}
         f2 = teams_d.get("faction2") or {}
-        game_field = details.get("game")
-        game_name = game_field.get("name") if isinstance(game_field, dict) else (game_field if isinstance(game_field, str) else None)
-        # Persist map catalog / season pool
-        _persist_map_catalog_from_details(con, details, season=champ_row["season"], game=champ_row.get("game") or "cs2")
+        _persist_map_catalog_from_details(con, details, season=champ_row["season"])
 
-    # STATS fetch
+    # STATS
     stats = {}
     rounds = []
     forfeit_like = False
@@ -575,12 +552,10 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
             stats = {}
         rounds = _extract_rounds_from_stats(stats)
 
-    # Simple forfeit detection: finished/past but no rounds, yet details show results
     has_detailed = isinstance(details.get("detailed_results"), list) and len(details.get("detailed_results") or []) > 0
     has_score    = bool(((details.get("results") or {}).get("score") or {}))
     forfeit_like = (kind == "past" and not rounds and (has_detailed or has_score))
 
-    # Democracy only for non-forfeit
     demo_json = {}
     if kind == "past" and not forfeit_like:
         try:
@@ -589,7 +564,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
             demo_json = {}
 
     if kind == "past" and not rounds and not (has_detailed or has_score):
-        # No stats and no any score information → mark as not_found
         upsert_match(con, {
             "match_id": match_id,
             "championship_id": champ_row["championship_id"],
@@ -609,37 +583,30 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         pass
     winner_team_id = _normalize_team_ref(winner_raw, team1_id, team2_id)
 
-    # Upsert teams (avatars)
+    # Upsert teams (names & avatars live only in teams)
     if team1_id or (summary and summary.get("team1_name")) or f1.get("name"):
         upsert_team(con, {"team_id": team1_id, "name": (summary.get("team1_name") if summary else f1.get("name")), "avatar": (summary.get("team1_avatar") if summary else f1.get("avatar")), "updated_at": None})
     if team2_id or (summary and summary.get("team2_name")) or f2.get("name"):
         upsert_team(con, {"team_id": team2_id, "name": (summary.get("team2_name") if summary else f2.get("name")), "avatar": (summary.get("team2_avatar") if summary else f2.get("avatar")), "updated_at": None})
 
-    # Bulk upsert rosters
+    # Bulk upsert rosters (players)
     roster_players = []
-    # From summary (non-past)
     if kind != "past" and summary:
         for pr in (summary.get("team1_roster") or []):
             roster_players.append({"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
         for pr in (summary.get("team2_roster") or []):
             roster_players.append({"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
     else:
-        # From details (past)
         for fac in (f1, f2):
             for pr in (fac.get("roster") or []):
                 roster_players.append({"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
     if roster_players:
-        # Remove Nones and duplicates
         uniq = {}
         for p in roster_players:
             pid = p.get("player_id")
             if pid:
                 uniq[pid] = p
         upsert_players_bulk(con, list(uniq.values()))
-
-    # Upsert match header
-    comp_name = (details.get("competition_name") if isinstance(details, dict) else None) \
-                or (summary.get("_raw", {}).get("competition_name") if summary else None)
 
     configured_at = safe_int(
         (details.get("configured_at") if isinstance(details, dict) else None) \
@@ -649,42 +616,31 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
     m = {
         "match_id": match_id,
         "championship_id": champ_row["championship_id"],
-        "competition_name": comp_name,
         "configured_at": configured_at,
-
-        "game": game_name or champ_row.get("game") or "cs2",
         "round": safe_int(details.get("round"), None),
         "best_of": safe_int(details.get("best_of"), None),
-
         "started_at":  safe_int(summary.get("started_at")  if summary else details.get("started_at"),  None),
         "finished_at": safe_int(summary.get("finished_at") if summary else details.get("finished_at"), None),
         "scheduled_at":safe_int(summary.get("scheduled_at")if summary else details.get("scheduled_at"),None),
         "status": (summary.get("status") if summary else details.get("status") or "").lower() or None,
         "last_seen_at": int(time.time()),
-
         "team1_id":   team1_id or (summary.get("team1_id") if summary else None),
-        "team1_name": (summary.get("team1_name") if summary else f1.get("name")),
         "team2_id":   team2_id or (summary.get("team2_id") if summary else None),
-        "team2_name": (summary.get("team2_name") if summary else f2.get("name")),
         "winner_team_id": winner_team_id,
     }
-
     upsert_match(con, m)
 
-    # Stop early for upcoming/ongoing
     if kind != "past":
         return
 
-    # MAPS from stats
+    # MAPS
     map_rows = _extract_map_rows_from_stats(match_id, rounds)
     for r in map_rows:
         r["winner_team_id"] = _normalize_team_ref(r.get("winner_team_id"), team1_id, team2_id)
 
-    # Democracy & picks (non-forfeit)
+    # Democracy
     if not forfeit_like:
-        # Build votes and picks in a single pass
-        votes = []
-        picks = []
+        votes, picks = [], []
         try:
             for ticket in _map_tickets_from_democracy(demo_json):
                 for ent in (ticket.get("entities") or []):
@@ -694,7 +650,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                     sel = ent.get("selected_by")
                     name = ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name")
                     rnd = ent.get("round")
-                    # votes payload
                     votes.append({
                         "round_num": rnd,
                         "map_name": name,
@@ -702,7 +657,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                         "selected_by_faction": sel,
                         "selected_by_team_id": _normalize_team_ref(sel, team1_id, team2_id),
                     })
-                    # collect picks order
                     if status in ("pick", "selected", "decider") and name:
                         order_key = rnd if isinstance(rnd, int) else 10**9
                         picks.append((order_key, name))
@@ -711,7 +665,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
 
         if votes:
             votes.sort(key=lambda x: (x.get("round_num") is None, x.get("round_num"), x.get("map_name") or ""))
-            # Heuristic for last 'decider' vs 'overflow'
             pick_like = sum(1 for v in votes if (v.get("status") or "") in ("pick","selected","decider"))
             last = votes[-1]
             if pick_like >= 3:
@@ -722,7 +675,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                 last["selected_by_faction"] = None
             upsert_map_votes(con, match_id, votes)
 
-        # Fill map_rows names from picks
         if picks:
             picks.sort(key=lambda x: x[0])
             names_in_order = []
@@ -743,7 +695,6 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                         "winner_team_id": None,
                     })
 
-        # Fallback to details.voting.map.pick if still unnamed
         if not any(r.get("map_name") for r in map_rows):
             try:
                 picks2 = ((details.get("voting") or {}).get("map") or {}).get("pick") or []
@@ -763,19 +714,18 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
                         "winner_team_id": None,
                     })
 
-    # Forfeit placeholder maps (13–0 etc.)
     if forfeit_like:
         map_rows = _extract_map_rows_from_details(match_id, details, team1_id, team2_id)
 
     if map_rows:
         upsert_maps(con, match_id, map_rows)
 
-    # TEAM & PLAYER STATS
+    # PLAYER STATS (EI team_name)
     player_rows = _extract_player_rows(match_id, rounds)
     for r in player_rows:
+        r.pop("team_name", None)  # varmistus jos jäänyt
         r["team_id"] = _normalize_team_ref(r.get("team_id"), team1_id, team2_id)
     player_rows = [r for r in player_rows if r.get("team_id")]
-
     if player_rows:
         upsert_player_stats(con, match_id, player_rows)
 
@@ -796,7 +746,6 @@ def main(db_path: str) -> None:
                 "season": d["season"],
                 "division_num": d["division_num"],
                 "name": d["name"],
-                "game": d.get("game", "cs2"),
                 "is_playoffs": d.get("is_playoffs", 0),
                 "slug": d["slug"],
             })

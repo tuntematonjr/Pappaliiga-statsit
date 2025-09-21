@@ -1,7 +1,7 @@
 -- schema.sql
 -- Pappaliiga (CS2) stats — championship-centric schema
 -- Preserves all fields from the older schema (maps, map_votes, per-map team/player stats)
--- and adds season/division_num/slug/game/is_playoffs for stable HTML + joins.
+-- and adds season/division_num/slug/is_playoffs for stable HTML + joins.
 
 PRAGMA foreign_keys = ON;
 
@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS championships (
   season          INTEGER NOT NULL,                 -- e.g., 11
   division_num    INTEGER NOT NULL,                 -- number parsed from name (1..25)
   name            TEXT NOT NULL,                    -- "1 Divisioona S11", etc.
-  game            TEXT NOT NULL DEFAULT 'cs2',      -- 'cs2'
   is_playoffs     INTEGER NOT NULL DEFAULT 0,       -- 0/1
   slug            TEXT NOT NULL,                    -- unique page/file slug, e.g. 'div1-s11' or 'div1-s11-po'
   CONSTRAINT uq_champ_slug UNIQUE (slug),
@@ -23,7 +22,6 @@ CREATE TABLE IF NOT EXISTS championships (
 );
 
 CREATE INDEX IF NOT EXISTS ix_champ_season ON championships(season);
-CREATE INDEX IF NOT EXISTS ix_champ_game   ON championships(game);
 
 -- Reference entities
 CREATE TABLE IF NOT EXISTS teams (
@@ -45,32 +43,25 @@ CREATE TABLE IF NOT EXISTS players (
 
 -- Single row per match within a championship.
 CREATE TABLE IF NOT EXISTS matches (
-  match_id        TEXT PRIMARY KEY,
-  championship_id TEXT NOT NULL REFERENCES championships(championship_id) ON DELETE CASCADE,
-  competition_name TEXT,
+  match_id         TEXT PRIMARY KEY,
+  championship_id  TEXT NOT NULL REFERENCES championships(championship_id) ON DELETE CASCADE, 
   best_of          INTEGER,
-  game             TEXT,
 
-  -- Aiemmat (pidä):
   configured_at    INTEGER,
   started_at       INTEGER,
   finished_at      INTEGER,
 
-  -- Uudet header-kentät upcoming/live-seurantaan:
-  scheduled_at     INTEGER,            -- Faceitin ilmoittama suunniteltu aloitus (epoch)
-  status           TEXT,               -- 'upcoming' | 'live' | 'played' | 'canceled' tms.
-  last_seen_at     INTEGER,            -- päivittyy jokaisessa synkassa
+  scheduled_at     INTEGER,
+  status           TEXT,
+  last_seen_at     INTEGER,
 
   team1_id         TEXT REFERENCES teams(team_id),
-  team1_name       TEXT,
   team2_id         TEXT REFERENCES teams(team_id),
-  team2_name       TEXT,
   winner_team_id   TEXT
 );
 
 CREATE INDEX IF NOT EXISTS ix_matches_scheduled    ON matches(scheduled_at);
-CREATE INDEX IF NOT EXISTS ix_matches_status       ON matches(status);
-
+CREATE INDEX IF NOT EXISTS ix_matches_status       ON matches(status);    
 CREATE INDEX IF NOT EXISTS ix_matches_started ON matches(started_at);
 
 -- One row per played map within a match (for BO2/BO3).
@@ -101,11 +92,10 @@ CREATE TABLE IF NOT EXISTS map_votes (
 CREATE TABLE IF NOT EXISTS player_stats (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   match_id         TEXT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
-  round_index      INTEGER NOT NULL,               -- map index in the BO series
+  round_index      INTEGER NOT NULL,
   player_id        TEXT REFERENCES players(player_id) ON DELETE SET NULL,
   nickname         TEXT,
   team_id          TEXT REFERENCES teams(team_id) ON DELETE SET NULL,
-  team_name        TEXT,
   kills            INTEGER,
   deaths           INTEGER,
   assists          INTEGER,
@@ -119,7 +109,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
   enemies_flashed  INTEGER,
   flash_count      INTEGER,
   flash_successes  INTEGER,
-  mk_2k            INTEGER, 
+  mk_2k            INTEGER,
   mk_3k            INTEGER,
   mk_4k            INTEGER,
   mk_5k            INTEGER,
@@ -156,7 +146,6 @@ CREATE TABLE IF NOT EXISTS maps_catalog (
   pretty_name  TEXT,                          -- e.g. 'Ancient'
   image_sm     TEXT,                          -- small image URL from FACEIT
   image_lg     TEXT,                          -- large image URL from FACEIT
-  game         TEXT NOT NULL DEFAULT 'cs2',
   first_seen_at INTEGER DEFAULT (strftime('%s','now')),
   last_seen_at  INTEGER DEFAULT (strftime('%s','now'))
 );

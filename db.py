@@ -71,10 +71,9 @@ def upsert_championship(con: sqlite3.Connection, row: Dict[str, Any]) -> Dict[st
     Merge by (season, division_num, is_playoffs) OR by championship_id.
     Returns the canonical row dict with the championship_id you must use downstream.
     """
-    # 1) Onko sama (season, division_num, is_playoffs) jo kannassa?
     cur = con.execute(
         """
-        SELECT championship_id, season, division_num, name, game, is_playoffs, slug
+        SELECT championship_id, season, division_num, name, is_playoffs, slug
         FROM championships
         WHERE season=? AND division_num=? AND is_playoffs=?
         LIMIT 1
@@ -84,32 +83,27 @@ def upsert_championship(con: sqlite3.Connection, row: Dict[str, Any]) -> Dict[st
 
     if cur:
         existing_id = cur[0]
-        # Päivitä vain puuttuvat kentät (coalesce-tyylisesti), älä luo uutta riviä.
         con.execute(
             """
             UPDATE championships SET
               name = CASE WHEN name IS NULL OR name='' THEN :name ELSE name END,
-              game = CASE WHEN game IS NULL OR game='' THEN :game ELSE game END,
               slug = CASE WHEN slug IS NULL OR slug='' THEN :slug ELSE slug END
             WHERE season=:season AND division_num=:division_num AND is_playoffs=:is_playoffs
             """,
             row
         )
         con.commit()
-        # Palautetaan kanoninen rivi olemassa olevalla championship_id:llä
         out = dict(row)
         out["championship_id"] = existing_id
         return out
 
-    # 2) Ei löytynyt kombolla → upsertataan id:llä
     sql = """
-    INSERT INTO championships (championship_id, season, division_num, name, game, is_playoffs, slug)
-    VALUES (:championship_id, :season, :division_num, :name, :game, :is_playoffs, :slug)
+    INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug)
+    VALUES (:championship_id, :season, :division_num, :name, :is_playoffs, :slug)
     ON CONFLICT(championship_id) DO UPDATE SET
       season       = COALESCE(championships.season, excluded.season),
       division_num = COALESCE(championships.division_num, excluded.division_num),
       name         = CASE WHEN championships.name IS NULL OR championships.name='' THEN excluded.name ELSE championships.name END,
-      game         = CASE WHEN championships.game IS NULL OR championships.game='' THEN excluded.game ELSE championships.game END,
       is_playoffs  = COALESCE(championships.is_playoffs, excluded.is_playoffs),
       slug         = CASE WHEN championships.slug IS NULL OR championships.slug='' THEN excluded.slug ELSE championships.slug END
     """
@@ -178,21 +172,19 @@ def has_column(con: sqlite3.Connection, table: str, col: str) -> bool:
         _COLS_CACHE[key] = cols
     return col in cols
 
-
 def get_teams_in_championship(con: sqlite3.Connection, division_id: int) -> list[dict]:
     sql = """
-    SELECT x.team_id,
-           x.team_name,
-           t.avatar
-    FROM (
-      SELECT DISTINCT team1_id AS team_id, team1_name AS team_name
-      FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
+    WITH team_ids AS (
+      SELECT DISTINCT team1_id AS team_id FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
       UNION
-      SELECT DISTINCT team2_id AS team_id, team2_name AS team_name
-      FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
-    ) AS x
+      SELECT DISTINCT team2_id AS team_id FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
+    )
+    SELECT t.team_id,
+           COALESCE(t.name, '') AS team_name,
+           t.avatar
+    FROM team_ids x
     LEFT JOIN teams t ON t.team_id = x.team_id
-    ORDER BY x.team_name COLLATE NOCASE
+    ORDER BY team_name COLLATE NOCASE
     """
     rows = query(con, sql, (division_id, division_id))
     return [r for r in rows if r["team_id"]]
@@ -740,49 +732,39 @@ def compute_champ_thresholds_data(con: sqlite3.Connection, division_id: int) -> 
 
 def upsert_match(con: sqlite3.Connection, row: dict) -> None:
     """
-    Upsert 'matches' header. Always refreshes last_seen_at.
-    Respects existing non-null values when new is NULL.
-    Expects at least: match_id, championship_id, (optional) competition_*, times, teams.
+    Upsert 'matches' header. last_seen_at päivittyy aina.
+    Ei tallenna joukkueiden nimiä; nimet haetaan teams-taulusta.
     """
     sql = """
     INSERT INTO matches(
       match_id, championship_id,
-      competition_name, best_of, game, 
+      best_of,
       configured_at, started_at, finished_at, scheduled_at, status,
       last_seen_at,
-      team1_id, team1_name, team2_id, team2_name, winner_team_id
+      team1_id, team2_id, winner_team_id
     ) VALUES (
       :match_id, :championship_id,
-      :competition_name, :best_of, :game, 
+      :best_of,
       :configured_at, :started_at, :finished_at, :scheduled_at, :status,
       strftime('%s','now'),
-      :team1_id, :team1_name, :team2_id, :team2_name, :winner_team_id
+      :team1_id, :team2_id, :winner_team_id
     )
     ON CONFLICT(match_id) DO UPDATE SET
-      -- meta
-      competition_name = COALESCE(excluded.competition_name, matches.competition_name),
-      best_of          = COALESCE(excluded.best_of,          matches.best_of),
-      game             = COALESCE(excluded.game,             matches.game),
+      best_of       = COALESCE(excluded.best_of,       matches.best_of),
 
-      -- times & status
       configured_at = COALESCE(excluded.configured_at, matches.configured_at),
       started_at    = COALESCE(excluded.started_at,    matches.started_at),
       finished_at   = COALESCE(excluded.finished_at,   matches.finished_at),
       scheduled_at  = COALESCE(excluded.scheduled_at,  matches.scheduled_at),
       status        = COALESCE(excluded.status,        matches.status),
 
-      -- teams
       team1_id      = COALESCE(excluded.team1_id,      matches.team1_id),
-      team1_name    = COALESCE(excluded.team1_name,    matches.team1_name),
       team2_id      = COALESCE(excluded.team2_id,      matches.team2_id),
-      team2_name    = COALESCE(excluded.team2_name,    matches.team2_name),
       winner_team_id= COALESCE(excluded.winner_team_id, matches.winner_team_id),
 
-      -- heartbeat
       last_seen_at  = strftime('%s','now')
     """
     con.execute(sql, row)
-
 
 def upsert_maps(con, match_id: str, rounds: list[dict]):
     sql = """
@@ -813,7 +795,7 @@ def upsert_map_votes(con, match_id: str, votes: list[dict]):
 def upsert_player_stats(con, match_id: str, rows: list[dict]):
     sql = """
     INSERT INTO player_stats(
-      match_id, round_index, player_id, nickname, team_id, team_name,
+      match_id, round_index, player_id, nickname, team_id,
       kills, deaths, assists, kd, kr, adr, hs_pct, mvps, sniper_kills, utility_damage,
       enemies_flashed, flash_count, flash_successes,
       mk_2k, mk_3k, mk_4k, mk_5k,
@@ -821,7 +803,7 @@ def upsert_player_stats(con, match_id: str, rows: list[dict]):
       entry_count, entry_wins, pistol_kills, damage
     )
     VALUES(
-      :match_id, :round_index, :player_id, :nickname, :team_id, :team_name,
+      :match_id, :round_index, :player_id, :nickname, :team_id,
       :kills, :deaths, :assists, :kd, :kr, :adr, :hs_pct, :mvps, :sniper_kills, :utility_damage,
       :enemies_flashed, :flash_count, :flash_successes,
       :mk_2k, :mk_3k, :mk_4k, :mk_5k,
@@ -829,7 +811,7 @@ def upsert_player_stats(con, match_id: str, rows: list[dict]):
       :entry_count, :entry_wins, :pistol_kills, :damage
     )
     ON CONFLICT(match_id, round_index, player_id, nickname) DO UPDATE SET
-      team_id=excluded.team_id, team_name=excluded.team_name,
+      team_id=excluded.team_id,
       kills=excluded.kills, deaths=excluded.deaths, assists=excluded.assists, kd=excluded.kd,
       kr=excluded.kr, adr=excluded.adr, hs_pct=excluded.hs_pct, mvps=excluded.mvps,
       sniper_kills=excluded.sniper_kills, utility_damage=excluded.utility_damage,
@@ -843,15 +825,11 @@ def upsert_player_stats(con, match_id: str, rows: list[dict]):
     con.executemany(sql, payload)
 
 def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_id: str) -> list[dict]:
-    """
-    Same API, avoids per-match team avatar query by joining teams once.
-    """
     cur = con.cursor()
-
-    sql = f"""
+    sql = """
     WITH my_matches AS (
       SELECT
-        m.match_id, m.championship_id, m.team1_id, m.team1_name, m.team2_id, m.team2_name,
+        m.match_id, m.championship_id, m.team1_id, m.team2_id,
         m.best_of, m.status,
         COALESCE(m.started_at, m.scheduled_at, m.configured_at, 0) AS ts,
         CASE WHEN m.finished_at IS NOT NULL THEN 1 ELSE 0 END AS played
@@ -859,17 +837,14 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
       WHERE m.championship_id = :champ
         AND (:team = m.team1_id OR :team = m.team2_id)
     ),
-
     mp AS (
       SELECT
-        mm.match_id, mm.team1_id, mm.team2_id, mm.team1_name, mm.team2_name,
+        mm.match_id, mm.team1_id, mm.team2_id,
         mm.best_of, mm.status, mm.ts, mm.played,
         ma.round_index, ma.map_name, ma.score_team1, ma.score_team2
       FROM my_matches mm
-      LEFT JOIN maps ma
-        ON ma.match_id = mm.match_id
+      LEFT JOIN maps ma ON ma.match_id = mm.match_id
     ),
-
     ps_agg AS (
       SELECT
         ps.match_id, ps.round_index, ps.team_id,
@@ -881,7 +856,6 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
       JOIN my_matches m ON m.match_id = ps.match_id
       GROUP BY ps.match_id, ps.round_index, ps.team_id
     ),
-
     picks AS (
       SELECT v.match_id, v.map_name,
              MAX(v.selected_by_team_id) AS pick_team_id
@@ -890,10 +864,11 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
       WHERE v.status = 'pick'
       GROUP BY v.match_id, v.map_name
     )
-
     SELECT
       mp.match_id, mp.ts, mp.status, mp.best_of, mp.played,
-      mp.team1_id, mp.team1_name, mp.team2_id, mp.team2_name,
+      mp.team1_id, mp.team2_id,
+      t1.name AS team1_name, t2.name AS team2_name,
+      t1.avatar AS t1_avatar, t2.avatar AS t2_avatar,
       mp.round_index, mp.map_name, mp.score_team1, mp.score_team2,
       pk.pick_team_id,
       COALESCE(ps1.kills, 0)      AS t1_kills,
@@ -903,9 +878,7 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
       COALESCE(ps2.kills, 0)      AS t2_kills,
       COALESCE(ps2.deaths, 0)     AS t2_deaths,
       COALESCE(ps2.adr_avg, 0.0)  AS t2_adr,
-      COALESCE(ps2.dmg, 0)        AS t2_dmg,
-      t1.avatar AS t1_avatar,
-      t2.avatar AS t2_avatar
+      COALESCE(ps2.dmg, 0)        AS t2_dmg
     FROM mp
     LEFT JOIN ps_agg ps1 ON ps1.match_id=mp.match_id AND ps1.round_index=mp.round_index AND ps1.team_id=mp.team1_id
     LEFT JOIN ps_agg ps2 ON ps2.match_id=mp.match_id AND ps2.round_index=mp.round_index AND ps2.team_id=mp.team2_id
@@ -922,8 +895,9 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
         if mid not in out:
             me_on_left = (r["team1_id"] == team_id)
             opp_id = r["team2_id"] if me_on_left else r["team1_id"]
-            opp_name = (r["team2_name"] if me_on_left else r["team1_name"])
-            opp_avatar = (r["t2_avatar"] if me_on_left else r["t1_avatar"])
+            opp_name  = (r["team2_name"] if me_on_left else r["team1_name"])
+            opp_avatar= (r["t2_avatar"]  if me_on_left else r["t1_avatar"])
+            my_name   = (r["team1_name"] if me_on_left else r["team2_name"])
 
             out[mid] = {
                 "match_id": mid,
@@ -931,15 +905,8 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
                 "best_of": r["best_of"],
                 "ts": r["ts"],
                 "played": int(r["played"] or 0),
-                "left": {
-                    "team_id": team_id,
-                    "team_name": r["team1_name"] if me_on_left else r["team2_name"],
-                },
-                "right": {
-                    "team_id": opp_id,
-                    "team_name": opp_name,
-                    "avatar": opp_avatar,
-                },
+                "left":  {"team_id": team_id, "team_name": my_name or ""},
+                "right": {"team_id": opp_id,   "team_name": opp_name or "", "avatar": opp_avatar},
                 "maps": []
             }
 
@@ -973,16 +940,7 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
             "right": {"adr": float(opp_adr or 0.0), "kd": float(opp_kd), "dmg": int(opp_damage), "kills": int(opp_kills), "deaths": int(opp_deaths)}
         })
 
-    result = []
-    for m in sorted(out.values(), key=lambda x: (x["ts"] is None, x["ts"] or 0, x["match_id"])):
-        maps = m["maps"]
-        mw = sum(1 for mm in maps if isinstance(mm.get("rf"), int) and isinstance(mm.get("ra"), int) and (mm["rf"] > mm["ra"]))
-        ml = sum(1 for mm in maps if isinstance(mm.get("rf"), int) and isinstance(mm.get("ra"), int) and (mm["rf"] < mm["ra"]))
-        m["maps_won"] = mw
-        m["maps_lost"] = ml
-        result.append(m)
-
-    return result
+    return [out[mid] for mid in sorted(out, key=lambda k: (out[k]["ts"] is None, out[k]["ts"] or 0, k))]
 
 # --- Maps catalog helpers ----------------------------------------------------
 
@@ -997,19 +955,19 @@ def normalize_map_id(name: str) -> str:
 
 def upsert_map_catalog(con: sqlite3.Connection, row: dict) -> None:
     """
-    row: {map_id, pretty_name, image_sm, image_lg, game?}
+    row: {map_id, pretty_name, image_sm, image_lg}
     """
     sql = """
-    INSERT INTO maps_catalog (map_id, pretty_name, image_sm, image_lg, game, first_seen_at, last_seen_at)
-    VALUES (:map_id, :pretty_name, :image_sm, :image_lg, COALESCE(:game,'cs2'), strftime('%s','now'), strftime('%s','now'))
+    INSERT INTO maps_catalog (map_id, pretty_name, image_sm, image_lg, first_seen_at, last_seen_at)
+    VALUES (:map_id, :pretty_name, :image_sm, :image_lg, strftime('%s','now'), strftime('%s','now'))
     ON CONFLICT(map_id) DO UPDATE SET
       pretty_name = COALESCE(excluded.pretty_name, maps_catalog.pretty_name),
       image_sm    = COALESCE(NULLIF(excluded.image_sm,''), maps_catalog.image_sm),
       image_lg    = COALESCE(NULLIF(excluded.image_lg,''), maps_catalog.image_lg),
-      game        = COALESCE(excluded.game, maps_catalog.game),
       last_seen_at= strftime('%s','now')
     """
     con.execute(sql, row)
+
 
 def add_map_to_season_pool(con: sqlite3.Connection, season: int, map_id: str) -> None:
     con.execute(
