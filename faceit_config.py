@@ -8,7 +8,7 @@ from pathlib import Path
 
 API_KEY = os.environ.get("FACEIT_API_KEY", "").strip()
 
-CURRENT_SEASON = 10
+CURRENT_SEASON = 11
 TOOL_VERSION = 0.4
 
 # Lue .env vain jos ympäristömuuttuja puuttuu
