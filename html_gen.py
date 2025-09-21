@@ -29,7 +29,7 @@ from db import (
 )
 
 # --- HTML/template versioning ---
-HTML_TEMPLATE_VERSION = 6
+HTML_TEMPLATE_VERSION = 7
 
 HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
 _GENVER_RE = re.compile(r"<!--\s*GENVER:(\d+)\s*(?:\S+)?\s*-->", re.IGNORECASE)
@@ -660,9 +660,23 @@ def topbar(show_back_to_index: bool):
     <div class="container">
       <div class="topbar">
         <div class="brand">
-          <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" alt="AFI logo" class="logo promo-logo"/>
+          <a href="https://armafinland.fi" target="_blank">
+            <img src="https://armafinland.fi/css/gfx/armafin-logo-200px.png" 
+                alt="AFI logo" 
+                title="ArmaFinland netti sivut"
+                class="logo promo-logo"/>
+                
+          </a>
+
           <span>AFI - Unofficial Pappaliiga CS Stats v{TOOL_VERSION}</span>
-          <img src="https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png" alt="AFI logo" class="logo promo-logo"/>
+
+          <a href="https://pappaliiga.fi" target="_blank">
+            <img src="https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png" 
+                alt="Pappaliiga logo" 
+                title="Pappaliiga netti sivut"
+                class="logo promo-logo"/>
+                
+          </a>
         </div>
         <div class="nav">
           {back}
@@ -1289,7 +1303,7 @@ def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
           <div class="hero-card">
             <h1>Armafinland</h1>
             <p>
-              Arma Finland on suomenkielisille pelaajille ja peliporukoille tarkoitettu avoin peliyhteisö. Yhteisö tarjoaa Arman pelaamista taktisessa ympäristössä mahdollisimman monen suomalaisen pelaajan kanssa. Pelitapahtumissa keskitytään realismiin, toimintaan joukkueissa ja yhteistyöhön. Tapahtumissa on usein erilaisia ajoneuvoja ja aseita. Teemat vaihtelevat toisen maailmansodan, kylmän sodan ja nykyajan konfliktien välillä.
+              Arma Finland on suomenkielisille pelaajille ja peliporukoille tarkoitettu avoin peliyhteisö. Yhteisö tarjoaa Arman pelaamista taktisessa ympäristössä mahdollisimman monen suomalaisen pelaajan kanssa. Pelitapahtumissa keskitytään realismiin, toimintaan joukkueissa ja yhteistyöhön.
             </p>
             <div class="hero-cta">
               <a class="btn btn-primary" href="https://armafinland.fi/discord" title="Liity Armafinland Discordiin">Liity AFI Discord</a>
