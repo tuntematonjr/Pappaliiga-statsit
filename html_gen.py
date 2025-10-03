@@ -1355,7 +1355,7 @@ def render_index(con: sqlite3.Connection, divisions: list[dict]) -> str:
 
     html.append("""
       <div class="footer">
-        By Tuntematon from Armafinland
+        Made by Tuntematon & Cultti from Armafinland
       </div>
     </div>
     """)  # /container
