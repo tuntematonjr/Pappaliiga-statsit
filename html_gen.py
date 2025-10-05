@@ -646,7 +646,6 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
         <!-- Enhanced Hero Section -->
         <section class="hero-enhanced">
             <div class="hero-card afi-card">
-                <div class="hero-icon">🎯</div>
                 <h1>Armafinland</h1>
                 <p>
                     Arma Finland on suomenkielisille pelaajille ja peliporukoille tarkoitettu avoin peliyhteisö. Yhteisö tarjoaa Arman pelaamista taktisessa ympäristössä mahdollisimman monen suomalaisen pelaajan kanssa. Pelitapahtumissa keskitytään realismiin, toimintaan joukkueissa ja yhteistyöhön.
@@ -658,7 +657,6 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
             </div>
 
             <div class="hero-card pappa-card">
-                <div class="hero-icon">🏆</div>
                 <h1>Pappaliiga</h1>
                 <p>
                     Pappaliigan tarkoituksena on tarjota varttuneemmalle väelle mahdollisuus kilpapelaamiseen; tosissaan ja `ei niin tosissaan`.
