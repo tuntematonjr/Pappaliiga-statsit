@@ -568,6 +568,7 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
             "match_id": match_id,
             "championship_id": champ_row["championship_id"],
             "status": "not_found",
+            "is_forfeit": 0,
         })
         return
 
@@ -627,6 +628,7 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         "team1_id":   team1_id or (summary.get("team1_id") if summary else None),
         "team2_id":   team2_id or (summary.get("team2_id") if summary else None),
         "winner_team_id": winner_team_id,
+        "is_forfeit": 1 if forfeit_like else 0,
     }
     upsert_match(con, m)
 
@@ -731,7 +733,7 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
 
 # ---- main sync --------------------------------------------------------------
 
-def main(db_path: str) -> None:
+def main(db_path: str, division_num: int = None) -> None:
     con = get_conn(db_path)
     try:
         init_db(con)
@@ -741,6 +743,8 @@ def main(db_path: str) -> None:
         for d in DIVISIONS:
             if int(d.get("season", 0)) < CURRENT_SEASON:
                 continue  # skip older seasons
+            if division_num is not None and d.get("division_num") != division_num:
+                continue  # skip divisions not matching the filter
             row = upsert_championship(con, {
                 "championship_id": d["championship_id"],
                 "season": d["season"],
@@ -768,5 +772,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Sync Pappaliiga data into SQLite (championship-centric).")
     p.add_argument("--db", default=str(Path(__file__).with_name("pappaliiga.db")),
                    help="SQLite path (default: pappaliiga.db next to this file)")
+    p.add_argument("--div", type=int, metavar="N",
+                   help="Sync only division N (e.g., --div 1 for Division 1)")
     args = p.parse_args()
-    main(args.db)
+    main(args.db, args.div)
