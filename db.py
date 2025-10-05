@@ -298,7 +298,7 @@ def compute_player_table_data(con: sqlite3.Connection, division_id: int, team_id
         {", ".join(select_cols)}
       FROM player_stats ps
       JOIN matches m
-        ON m.match_id = ps.match_id
+        ON m.match_id = ps.match_id AND m.is_forfeit = 0
       JOIN maps mp
         ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
       LEFT JOIN players pl
@@ -741,13 +741,13 @@ def upsert_match(con: sqlite3.Connection, row: dict) -> None:
       best_of,
       configured_at, started_at, finished_at, scheduled_at, status,
       last_seen_at,
-      team1_id, team2_id, winner_team_id
+      team1_id, team2_id, winner_team_id, is_forfeit
     ) VALUES (
       :match_id, :championship_id,
       :best_of,
       :configured_at, :started_at, :finished_at, :scheduled_at, :status,
       strftime('%s','now'),
-      :team1_id, :team2_id, :winner_team_id
+      :team1_id, :team2_id, :winner_team_id, COALESCE(:is_forfeit, 0)
     )
     ON CONFLICT(match_id) DO UPDATE SET
       best_of       = COALESCE(excluded.best_of,       matches.best_of),
@@ -761,6 +761,7 @@ def upsert_match(con: sqlite3.Connection, row: dict) -> None:
       team1_id      = COALESCE(excluded.team1_id,      matches.team1_id),
       team2_id      = COALESCE(excluded.team2_id,      matches.team2_id),
       winner_team_id= COALESCE(excluded.winner_team_id, matches.winner_team_id),
+      is_forfeit    = COALESCE(excluded.is_forfeit,    matches.is_forfeit),
 
       last_seen_at  = strftime('%s','now')
     """
@@ -768,16 +769,47 @@ def upsert_match(con: sqlite3.Connection, row: dict) -> None:
 
 def upsert_maps(con, match_id: str, rounds: list[dict]):
     sql = """
-    INSERT INTO maps(match_id, round_index, map_name, score_team1, score_team2, winner_team_id)
-    VALUES(:match_id, :round_index, :map_name, :score_team1, :score_team2, :winner_team_id)
+    INSERT INTO maps(match_id, round_index, map_name, score_team1, score_team2, winner_team_id, is_forfeit)
+    VALUES(:match_id, :round_index, :map_name, :score_team1, :score_team2, :winner_team_id, :is_forfeit)
     ON CONFLICT(match_id, round_index) DO UPDATE SET
       map_name=excluded.map_name,
       score_team1=excluded.score_team1,
       score_team2=excluded.score_team2,
-      winner_team_id=excluded.winner_team_id
+      winner_team_id=excluded.winner_team_id,
+      is_forfeit=excluded.is_forfeit
     """
-    payload = [{**r, "match_id": match_id} for r in rounds]
+    # Add is_forfeit flag based on map_name
+    payload = []
+    for r in rounds:
+        map_data = {**r, "match_id": match_id}
+        # Set is_forfeit = 1 if map_name indicates a forfeit
+        map_data["is_forfeit"] = 1 if (map_data.get("map_name") == "forfeit") else 0
+        payload.append(map_data)
+    
     con.executemany(sql, payload)
+    
+    # Update match is_forfeit status based on maps
+    _update_match_forfeit_status(con, match_id)
+
+def _update_match_forfeit_status(con, match_id: str):
+    """
+    Update matches.is_forfeit based on maps data.
+    A match is forfeit if ALL its maps are forfeits.
+    """
+    sql = """
+    UPDATE matches 
+    SET is_forfeit = (
+        SELECT CASE 
+            WHEN COUNT(*) > 0 AND COUNT(*) = COUNT(CASE WHEN is_forfeit = 1 THEN 1 END)
+            THEN 1 
+            ELSE 0 
+        END
+        FROM maps 
+        WHERE maps.match_id = matches.match_id
+    )
+    WHERE match_id = ?
+    """
+    con.execute(sql, (match_id,))
 
 def upsert_map_votes(con, match_id: str, votes: list[dict]):
     """
@@ -1199,7 +1231,7 @@ def _player_agg_until(con: sqlite3.Connection, division_id: int, team_id: str, p
           SUM(COALESCE(ps.sniper_kills,0))    AS awp,
           SUM(COALESCE(ps.pistol_kills,0))    AS pistol_kills
         FROM player_stats ps
-        JOIN matches m ON m.match_id = ps.match_id
+        JOIN matches m ON m.match_id = ps.match_id AND m.is_forfeit = 0
         JOIN maps    mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
         WHERE m.championship_id=? AND ps.team_id=? AND ps.player_id=? AND { _TS_EXPR } <= ?
     """, (division_id, team_id, player_id, cutoff))[0]

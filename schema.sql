@@ -57,7 +57,8 @@ CREATE TABLE IF NOT EXISTS matches (
 
   team1_id         TEXT REFERENCES teams(team_id),
   team2_id         TEXT REFERENCES teams(team_id),
-  winner_team_id   TEXT
+  winner_team_id   TEXT,
+  is_forfeit       INTEGER NOT NULL DEFAULT 0       -- 1 if entire match is forfeit, 0 if real match
 );
 
 CREATE INDEX IF NOT EXISTS ix_matches_scheduled    ON matches(scheduled_at);
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS maps (
   score_team1   INTEGER,
   score_team2   INTEGER,
   winner_team_id TEXT,
+  is_forfeit    INTEGER NOT NULL DEFAULT 0,        -- 1 if forfeit, 0 if real game 
   UNIQUE(match_id, round_index)
 );
 

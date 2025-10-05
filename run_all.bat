@@ -14,7 +14,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [2/2] Generating HTML...
+echo [2/2] Generating HTML (async by default)...
 python html_gen.py
 if errorlevel 1 (
   echo [ERROR] html_gen.py failed.
