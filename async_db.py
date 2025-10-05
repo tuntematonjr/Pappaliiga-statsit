@@ -2105,7 +2105,8 @@ async def _render_single_match_async(pool: AsyncConnectionPool, html: list[str],
 
     html.append(f'  <details class="match-row" data-played={int(match.get("played", 0))}>')
     html.append(f'    <summary class="match-summary" role="button">')
-    html.append(f'      <div class="team side-left">{f"<img class=\"logo\" src=\"{left_logo}\" alt=\"\">" if left_logo else ""}<div class="name">{left_link}</div></div>')
+    left_logo_html = f'<img class="logo" src="{left_logo}" alt="">' if left_logo else ""
+    html.append(f'      <div class="team side-left">{left_logo_html}<div class="name">{left_link}</div></div>')
     html.append(f'      <div class="center">')
     html.append(f'        <div class="meta"><span class="date">{date_str}</span></div>')
     status_text = match.get("status") or ""
@@ -2116,7 +2117,8 @@ async def _render_single_match_async(pool: AsyncConnectionPool, html: list[str],
     html.append(f'        <div class="scoreline"><span class="maps-score">{scoreline}</span></div>')
     html.append(f'        {faceit_link}')
     html.append(f'      </div>')
-    html.append(f'      <div class="team side-right"><div class="name">{right_link}</div>{f"<img class=\"logo\" src=\"{right_logo}\" alt=\"\">" if right_logo else ""}</div>')
+    right_logo_html = f'<img class="logo" src="{right_logo}" alt="">' if right_logo else ""
+    html.append(f'      <div class="team side-right"><div class="name">{right_link}</div>{right_logo_html}</div>')
     html.append(f'    </summary>')
     html.append(f'    <div class="match-details">')
     # Render individual maps and accumulate totals
