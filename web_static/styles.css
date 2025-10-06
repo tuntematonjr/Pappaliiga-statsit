@@ -897,20 +897,32 @@ a{ color:var(--accent); text-decoration:none; }
 	height: 100%;
 	background: linear-gradient(90deg, var(--accent), var(--accent-2));
 	border-radius: 4px;
-	transition: all 0.3s ease;
+	/* Only animate width for smoother updates and avoid unexpected side-effects */
+	transition: width 0.6s ease;
 	position: relative;
+	overflow: hidden;
 }
 
+/* Shimmer lives on a wider pseudo-element and uses opacity transitions so toggling
+   the visual glow doesn't reset the animation state (prevents flashing at 0/100).
+   The shimmer moves continuously; we control visibility with opacity. */
 .progress-fill::after {
 	content: '';
 	position: absolute;
 	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-	animation: shimmer 2s infinite;
+	left: -150%;
+	width: 250%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, rgba(255,255,255,0.24), transparent);
+	animation: shimmer 2.5s linear infinite;
+	opacity: 0.9;
+	pointer-events: none;
+	transition: opacity 0.35s ease;
 }
+
+/* Make sure a 'progress-glow' class only tweaks opacity (no reset of animation)
+   JS should avoid removing the class; we keep it idempotent. */
+.progress-fill.progress-glow::after { opacity: 1; }
 
 @keyframes shimmer {
 	0% { transform: translateX(-100%); }

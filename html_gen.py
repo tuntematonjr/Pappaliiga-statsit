@@ -37,7 +37,7 @@ from async_db import (
 
 
 # --- HTML/template versioning ---
-HTML_TEMPLATE_VERSION = 8
+HTML_TEMPLATE_VERSION = 9
 
 # Parse command line arguments
 def parse_args():
@@ -1791,13 +1791,28 @@ async def copy_static_files_async():
         await asyncio.gather(*copy_tasks)
 
 async def _copy_file_async(src: Path, dst: Path):
-    """Helper function to copy a single file asynchronously"""
+    """Helper function to copy a single file asynchronously with content comparison"""
     try:
+        # Read source content
         async with aiofiles.open(src, 'rb') as src_file:
-            content = await src_file.read()
+            src_content = await src_file.read()
         
+        # Check if destination exists and compare content
+        try:
+            async with aiofiles.open(dst, 'rb') as dst_file:
+                dst_content = await dst_file.read()
+            
+            # Compare content - if identical, skip copy
+            if src_content == dst_content:
+                # Files are identical, no need to copy
+                return
+        except FileNotFoundError:
+            # Destination doesn't exist, proceed with copy
+            pass
+        
+        # Content differs or destination doesn't exist, copy the file
         async with aiofiles.open(dst, 'wb') as dst_file:
-            await dst_file.write(content)
+            await dst_file.write(src_content)
         
         print(f"[static] Copied {src} -> {dst}")
     except Exception as e:

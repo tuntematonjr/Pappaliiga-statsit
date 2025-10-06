@@ -228,10 +228,25 @@ document.addEventListener('DOMContentLoaded', () => {
 		// Always keep matches collapsed, regardless of screen size
 		document.querySelectorAll('.matches-mirror .match-row').forEach(d=>{ d.removeAttribute('open'); });
 		// Also keep all team sections collapsed
-		document.querySelectorAll('.team-section').forEach(d=>{ d.removeAttribute('open'); });
+		document.querySelectorAll('.team-section').forEach(d=>{ 
+			d.removeAttribute('open'); 
+			// Log forced collapse
+			try {
+				if (!navigator.sendBeacon && !fetch) return;
+				const url = 'http://192.168.0.13:8765/log';
+				const payload = JSON.stringify({ts: Date.now(), evt: 'forced-collapse', id: d.id || null, source: 'adaptDetails'});
+				if (navigator.sendBeacon) {
+					navigator.sendBeacon(url, payload);
+				} else {
+					fetch(url, {method:'POST', body: payload, headers: {'Content-Type':'application/json'}}).catch(()=>{});
+				}
+			} catch (e) {
+				// ignore
+			}
+		});
 	}
 	document.addEventListener('DOMContentLoaded', adaptDetails);
-	window.addEventListener('resize', adaptDetails);
+	// REMOVED: window.addEventListener('resize', adaptDetails); - this was causing constant collapse on mobile
 })();
 
 // Handle team link clicks to auto-expand target team sections
@@ -260,13 +275,13 @@ document.addEventListener('DOMContentLoaded', () => {
 					if (!teamSection.classList.contains('custom-expanded')) {
 						const summaryEl = teamSection.querySelector('summary');
 						if (summaryEl) {
-							// Create and dispatch a synthetic click event
-							const clickEvent = new MouseEvent('click', { 
-								bubbles: true, 
-								cancelable: true,
-								view: window
-							});
-							summaryEl.dispatchEvent(clickEvent);
+							// Strict: call programmatic toggle only to avoid synthetic events triggering multiple handlers
+							if (typeof summaryEl._toggle === 'function') {
+								summaryEl._toggle();
+							} else {
+								// No programmatic toggle available => mark expanded as minimal fallback
+								teamSection.classList.add('custom-expanded');
+							}
 						} else {
 							// Fallback: mark expanded to rotate arrow even if summary not found
 							teamSection.classList.add('custom-expanded');
@@ -289,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			if (!content) return;
 
 			// Always keep content visible and use custom class for state
-			details.setAttribute('open', '');
+			// Note: do NOT force the native `open` attribute here — adaptDetails() manages initial collapse.
 			if (!details.classList.contains('custom-expanded')) {
 				// Start collapsed
 				content.style.height = '0px';
@@ -301,17 +316,75 @@ document.addEventListener('DOMContentLoaded', () => {
 			const summary = details.querySelector('summary');
 			if (!summary) return;
 
-			summary.addEventListener('click', function(e) {
+			// Prevent multiple listeners from being attached to the same summary
+			if (summary.dataset.hasSummaryListener) return;
+			summary.dataset.hasSummaryListener = '1';
+
+			// Helper: send log to local collector (no-op if unreachable)
+			function sendClientLog(obj) {
+				try {
+					if (!navigator.sendBeacon && !fetch) return;
+					const url = 'http://192.168.0.13:8765/log';
+					const payload = JSON.stringify(Object.assign({ts: Date.now()}, obj));
+					// best-effort: use sendBeacon when available
+					if (navigator.sendBeacon) {
+						navigator.sendBeacon(url, payload);
+						return;
+					}
+					fetch(url, {method:'POST', body: payload, headers: {'Content-Type':'application/json'}}).catch(()=>{});
+				} catch (e) {
+					// ignore
+				}
+			}
+
+			// Observer to detect when custom-expanded class is removed unexpectedly
+			const observer = new MutationObserver(mutations => {
+				mutations.forEach(mutation => {
+					if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+						const target = mutation.target;
+						if (target.tagName === 'DETAILS' && target.classList.contains('team-section')) {
+							const hadExpanded = mutation.oldValue && mutation.oldValue.includes('custom-expanded');
+							const hasExpanded = target.classList.contains('custom-expanded');
+							if (hadExpanded && !hasExpanded) {
+								sendClientLog({evt: 'class-removed', id: target.id || null, source: 'observer'});
+							}
+						}
+					}
+				});
+			});
+			observer.observe(details, {attributes: true, attributeOldValue: true, attributeFilter: ['class']});
+
+			// Helper: toggle details with fallback for mobile
+			function toggleDetails(e) {
 				// Only animate if clicking directly on summary (not on controls inside)
-				if (e.target !== summary && !summary.contains(e.target)) return;
-				if (e.target.matches('input, label, a, button, .faceit-link, .toggle-played, .toggle-played *')) {
+				if (e && e.target !== summary && !summary.contains(e.target)) return;
+				if (e && e.target.matches('input, label, a, button, .faceit-link, .toggle-played, .toggle-played *')) {
 					return;
 				}
-				e.preventDefault();
-				e.stopPropagation();
+				if (e) {
+					e.preventDefault();
+					e.stopPropagation();
+				}
 
+				// Quick guard: avoid double toggles from synthetic events
+				if (summary._recentlyToggled) {
+					sendClientLog({evt: 'guard-block', id: summary.id || null});
+					return;
+				}
+				summary._recentlyToggled = true;
+				setTimeout(() => { summary._recentlyToggled = false; }, 300);
+
+				// Always set/remove open attribute for reliable expand/collapse
+				if (!details.classList.contains('custom-expanded')) {
+					details.open = true;
+				} else {
+					details.open = false;
+				}
+
+				sendClientLog({evt: 'toggle-start', id: summary.id || null, open: !details.classList.contains('custom-expanded')});
 				if (details.classList.contains('custom-expanded')) {
 					// Closing animation
+					sendClientLog({evt: 'closing', id: summary.id || null});
 					details.classList.remove('custom-expanded');
 					const startHeight = content.scrollHeight;
 					content.style.height = startHeight + 'px';
@@ -327,6 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
 					}, 400);
 				} else {
 					// Opening animation
+					sendClientLog({evt: 'opening', id: summary.id || null});
 					details.classList.add('custom-expanded');
 					content.style.height = '0px';
 					content.style.opacity = '0';
@@ -359,6 +433,56 @@ document.addEventListener('DOMContentLoaded', () => {
 						});
 					}, 400);
 				}
+			}
+
+			// Expose programmatic toggle to avoid synthetic click events
+			try { summary._toggle = () => toggleDetails(null); } catch (err) { /* ignore */ }
+
+			// Touch: only toggle on true tap (not swipe/drag). Mark summary as touch-handled to suppress following click.
+			let touchStartY = null, touchStartX = null, touchStartTime = null;
+			summary._isTouch = false;
+			summary.addEventListener('touchstart', function(e) {
+				summary._isTouch = true;
+				if (e.touches && e.touches.length === 1) {
+					const t = e.touches[0];
+					touchStartY = t.clientY;
+					touchStartX = t.clientX;
+					touchStartTime = Date.now();
+				}
+			}, {passive: true});
+			summary.addEventListener('touchend', function(e) {
+				let isTap = true;
+				let validBox = true;
+				const maxMove = 8;
+				const maxTime = 400;
+				if (touchStartY !== null && touchStartX !== null && e.changedTouches && e.changedTouches.length === 1) {
+					const t = e.changedTouches[0];
+					const dy = Math.abs(t.clientY - touchStartY);
+					const dx = Math.abs(t.clientX - touchStartX);
+					if (dx > maxMove || dy > maxMove) isTap = false;
+					if (touchStartTime !== null && (Date.now() - touchStartTime) > maxTime) isTap = false;
+					// Check both start and end are inside summary hit box
+					const rect = summary.getBoundingClientRect();
+					if (!(touchStartX >= rect.left && touchStartX <= rect.right && touchStartY >= rect.top && touchStartY <= rect.bottom)) validBox = false;
+					if (!(t.clientX >= rect.left && t.clientX <= rect.right && t.clientY >= rect.top && t.clientY <= rect.bottom)) validBox = false;
+				} else {
+					isTap = false;
+					validBox = false;
+				}
+				touchStartY = null; touchStartX = null; touchStartTime = null;
+				if (isTap && validBox) toggleDetails(e);
+				// Suppress click synthesized from this touch for a short duration
+				setTimeout(() => { summary._isTouch = false; }, 500);
+			}, {passive: false});
+
+			// Click/tap: always use our toggle handler (fixes desktop mouse). Ignore clicks that follow touch interactions.
+			summary.addEventListener('click', function(e) {
+				if (summary._isTouch) {
+					// This click likely came from a recent touch — ignore it because touchend handled toggling
+					e.stopPropagation();
+					return;
+				}
+				toggleDetails(e);
 			});
 		});
 	}
@@ -532,9 +656,18 @@ document.addEventListener('DOMContentLoaded', () => {
 		const progressPct = parseFloat(stats.progress) || 0;
 		
 		progressBars.forEach(bar => {
-			// Animate progress bar width change
-			bar.style.transition = 'width 0.6s ease';
+			// Animate progress bar width change. Keep glow class stable to avoid animation reset.
+			bar.style.transition = 'width 0.6s ease, opacity 0.35s ease';
 			bar.style.width = `${progressPct}%`;
+			// If at extremes, gently reduce shimmer opacity to avoid harsh reset visuals.
+			if (progressPct === 0 || progressPct === 100) {
+				bar.classList.add('progress-glow');
+				bar.style.opacity = '0.95';
+				setTimeout(() => { bar.style.opacity = ''; }, 400);
+			} else {
+				// Ensure glow is present for mid-range values
+				bar.classList.add('progress-glow');
+			}
 		});
 	}
 	
