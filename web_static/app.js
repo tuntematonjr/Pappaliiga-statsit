@@ -596,7 +596,9 @@ document.addEventListener('DOMContentLoaded', () => {
 			progress: seasonContent.dataset.progress || '0',
 			regularProgress: seasonContent.dataset.regularProgress || '0',
 			playoffsProgress: seasonContent.dataset.playoffsProgress || '0',
-			playoffDivisions: seasonContent.dataset.playoffDivisions || '0'
+			playoffDivisions: seasonContent.dataset.playoffDivisions || '0',
+			playoffsMatchesPlayed: seasonContent.dataset.playoffsMatchesPlayed || '0',
+			playoffsMatchesTotal: seasonContent.dataset.playoffsMatchesTotal || '0'
 		};
 	}
 	
@@ -652,23 +654,31 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 	
 	function updateProgressBars(stats) {
-		const progressBars = document.querySelectorAll('.progress-fill');
-		const progressPct = parseFloat(stats.progress) || 0;
-		
-		progressBars.forEach(bar => {
-			// Animate progress bar width change. Keep glow class stable to avoid animation reset.
-			bar.style.transition = 'width 0.6s ease, opacity 0.35s ease';
-			bar.style.width = `${progressPct}%`;
-			// If at extremes, gently reduce shimmer opacity to avoid harsh reset visuals.
-			if (progressPct === 0 || progressPct === 100) {
-				bar.classList.add('progress-glow');
-				bar.style.opacity = '0.95';
-				setTimeout(() => { bar.style.opacity = ''; }, 400);
-			} else {
-				// Ensure glow is present for mid-range values
-				bar.classList.add('progress-glow');
-			}
-		});
+		// Update regular season progress bar and text
+		const regularBar = document.getElementById('overview-regular-bar');
+		const regularText = document.getElementById('overview-regular-text');
+		const regularPct = parseFloat(stats.regularProgress) || 0;
+		if (regularBar) {
+			regularBar.style.transition = 'width 0.6s ease, opacity 0.35s ease';
+			regularBar.style.width = `${regularPct}%`;
+			regularBar.classList.add('progress-glow');
+		}
+		if (regularText) {
+			regularText.textContent = `${stats.matchesPlayed} / ${stats.matchesTotal} ottelua`;
+		}
+
+		// Update playoffs progress bar and text
+		const playoffsBar = document.getElementById('overview-playoffs-bar');
+		const playoffsText = document.getElementById('overview-playoffs-text');
+		const playoffsPct = parseFloat(stats.playoffsProgress) || 0;
+		if (playoffsBar) {
+			playoffsBar.style.transition = 'width 0.6s ease, opacity 0.35s ease';
+			playoffsBar.style.width = `${playoffsPct}%`;
+			playoffsBar.classList.add('progress-glow');
+		}
+		if (playoffsText) {
+			playoffsText.textContent = `${stats.playoffsMatchesPlayed || 0} / ${stats.playoffsMatchesTotal || 0} ottelua`;
+		}
 	}
 	
 	// Initialize on DOM ready
