@@ -1,9 +1,9 @@
-<!-- GENVER:9 GENERATED_AT:1759799871 -->
+<!-- GENVER:9 LAST_MATCH:0 -->
 <!doctype html>
 <html lang="fi">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=1200, initial-scale=1, maximum-scale=1, user-scalable=yes"/>
+<meta name="viewport" content="width=1200, initial-scale=0, maximum-scale=1, user-scalable=yes"/>
 <title>AFI - Pappaliiga — Index</title>
 <!-- Externalized CSS/JS for maintainability and performance -->
 <link rel="stylesheet" href="styles.css">
@@ -45,7 +45,7 @@
             <div class="hero-card afi-card">
                 <h1>Armafinland</h1>
                 <p>
-                    Arma Finland on suomenkielisille pelaajille ja peliporukoille tarkoitettu avoin peliyhteisö. Yhteisö tarjoaa Arman pelaamista taktisessa ympäristössä mahdollisimman monen suomalaisen pelaajan kanssa. Pelitapahtumissa keskitytään realismiin, toimintaan joukkueissa ja yhteistyöhön.
+                    Yhteisö on avoin kaikille pelaajille ja ryhmille, jotka haluavat kokeilla taktista pelaamista myös Arma-sarjan peleissä. Pelaamme Arma 3 ja Arma Reforger, sekä järjestämme kansainvälisiä TvT-tehtäviä, joissa painotetaan realismia, joukkuepeliä ja yhteistoimintaa. Pelien ulkopuolella meno on rentoa ja mutkatonta, mutta pelissä otetaan tehtävät tosissaan.
                 </p>
                 <div class="hero-cta">
                     <a class="btn btn-primary" href="https://armafinland.fi/discord" title="Liity Armafinland Discordiin">Liity AFI Discord</a>
@@ -128,72 +128,68 @@
                 </div>
 
             </div>
-            
-            <!-- Dynamic Season Overview (updates based on selection) -->
+
+            <!-- Dynamic Season Overview (JS will fill stats from data attributes) -->
             <div id="dynamic-season-overview" class="stats-overview" style="margin-top: 32px;">
                 <h2 class="section-title" id="season-overview-title">Season 11 Yleiskatsaus</h2>
                 <div class="season-stats" id="season-overview-stats">
                     <div class="stat-card">
                         <div class="stat-icon">🎲</div>
-                        <div class="stat-value" id="overview-divisions">26</div>
+                        <div class="stat-value" id="overview-divisions"></div>
                         <div class="stat-label">Divisioonaa</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">👥</div>
-                        <div class="stat-value" id="overview-teams">314</div>
+                        <div class="stat-value" id="overview-teams"></div>
                         <div class="stat-label">Joukkuetta</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">👤</div>
-                        <div class="stat-value" id="overview-players">0</div>
+                        <div class="stat-value" id="overview-players"></div>
                         <div class="stat-label">Pelaajaa</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">⚔️</div>
-                        <div class="stat-value" id="overview-matches">1064</div>
+                        <div class="stat-value" id="overview-matches"></div>
                         <div class="stat-label">Ottelua Pelattu</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">🗺️</div>
-                        <div class="stat-value" id="overview-maps">0</div>
+                        <div class="stat-value" id="overview-maps"></div>
                         <div class="stat-label">Karttaa Pelattu</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">🔄</div>
-                        <div class="stat-value" id="overview-rounds">0</div>
+                        <div class="stat-value" id="overview-rounds"></div>
                         <div class="stat-label">Kierrosta Pelattu</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">💀</div>
-                        <div class="stat-value" id="overview-kills">0</div>
+                        <div class="stat-value" id="overview-kills"></div>
                         <div class="stat-label">Tappoja</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">☠️</div>
-                        <div class="stat-value" id="overview-deaths">0</div>
+                        <div class="stat-value" id="overview-deaths"></div>
                         <div class="stat-label">Kuolemia</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">📊</div>
-                        <div class="stat-value" id="overview-progress">61%</div>
+                        <div class="stat-value" id="overview-progress"></div>
                         <div class="season-progress">
                             <div class="season-progress-section">
                                 <div class="season-progress-label">Runkosarja</div>
                                 <div class="season-progress-bar">
-                                    <div class="season-progress-fill" style="width: 61%"></div>
+                                    <div class="season-progress-fill" id="overview-regular-bar"></div>
                                 </div>
-                                <div class="season-progress-text">
-                                    1064 / 1741 ottelua
-                                </div>
+                                <div class="season-progress-text" id="overview-regular-text"></div>
                             </div>
                             <div class="season-progress-section">
                                 <div class="season-progress-label">Playoffs</div>
                                 <div class="season-progress-bar">
-                                    <div class="season-progress-fill" style="width: 0%"></div>
+                                    <div class="season-progress-fill" id="overview-playoffs-bar"></div>
                                 </div>
-                                <div class="season-progress-text">
-                                    0 / 0 ottelua
-                                </div>
+                                <div class="season-progress-text" id="overview-playoffs-text"></div>
                             </div>
                         </div>
                     </div>
@@ -202,40 +198,44 @@
             
             <!-- Season Content Sections -->
 
-            <div class="season-content active" data-season-content="11" 
-                 data-divisions="26"
-                 data-teams="314"
-                 data-players="2205"
-                 data-matches-played="1182"
-                 data-matches-total="1741"
-                 data-maps-played="2300"
-                     data-rounds-played="49033"
-                     data-kills="341378"
-                     data-deaths="343036"
-                     data-playoff-divisions="0"
-                 data-progress="67.9"
-                 data-regular-progress="67.9"
-                 data-playoffs-progress="0.0">
+          <div class="season-content active" data-season-content="11" 
+              data-divisions="26"
+              data-teams="314"
+              data-players="2205"
+              data-matches-played="1182"
+              data-matches-total="1741"
+              data-maps-played="2300"
+              data-rounds-played="49033"
+              data-kills="341378"
+              data-deaths="343036"
+              data-playoff-divisions="0"
+              data-playoffs-matches-played="0"
+              data-playoffs-matches-total="182"
+              data-progress="61.5"
+              data-regular-progress="67.9"
+              data-playoffs-progress="0.0">
                 
                 <div class="season-stats">
                     <!-- Removed duplicate per-season stat cards -->
                 </div>
             </div>
 
-            <div class="season-content" data-season-content="10" 
-                 data-divisions="26"
-                 data-teams="311"
-                 data-players="2178"
-                 data-matches-played="1887"
-                 data-matches-total="1887"
-                 data-maps-played="3799"
-                     data-rounds-played="79716"
-                     data-kills="554189"
-                     data-deaths="556335"
-                     data-playoff-divisions="26"
-                 data-progress="100.0"
-                 data-regular-progress="100.0"
-                 data-playoffs-progress="100.0">
+          <div class="season-content" data-season-content="10" 
+              data-divisions="26"
+              data-teams="311"
+              data-players="2178"
+              data-matches-played="1887"
+              data-matches-total="1887"
+              data-maps-played="3799"
+              data-rounds-played="79716"
+              data-kills="554189"
+              data-deaths="556335"
+              data-playoff-divisions="26"
+              data-playoffs-matches-played="182"
+              data-playoffs-matches-total="182"
+              data-progress="100.0"
+              data-regular-progress="100.0"
+              data-playoffs-progress="100.0">
                 
                 <div class="season-stats">
                     <!-- Removed duplicate per-season stat cards -->
@@ -245,15 +245,13 @@
         </section>
 
         <div class="season-divisions active" data-season-divisions="11">
-            <h2 class="divisions-title">Season 11 Divisioonat <span class="season-meta">(26 divisioonaa, 68% pelattu)</span></h2>
+            <h2 class="divisions-title">Season 11 Divisioonat <span class="season-meta">(26 divisioonaa, 61% pelattu)</span></h2>
             <div class="divisions-grid">
 
-            <a class="division-card tier-master" href="div0-s11.html" title="Mestaruussarja S11">
+            <a class="division-card tier-master" href="div0-s11.html" title="Mestaruussarja">
                 <div class="card-header">
-                    
                     <div class="tier-badge">👑</div>
-                    <h3>Mestaruussarja S11</h3>
-                    <div class="tier-label">Master Tier</div>
+                    <h3>Mestaruussarja</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -268,17 +266,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:29</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:29</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-div1" href="div1-s11.html" title="1 Divisioona S11">
+            <a class="division-card tier-div1" href="div1-s11.html" title="1 Divisioona">
                 <div class="card-header">
-                    
                     <div class="tier-badge">🥇</div>
-                    <h3>1 Divisioona S11</h3>
-                    <div class="tier-label">Division 1</div>
+                    <h3>1 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -293,17 +290,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:38</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:38</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-div2" href="div2-s11.html" title="2 Divisioona S11">
+            <a class="division-card tier-div2" href="div2-s11.html" title="2 Divisioona">
                 <div class="card-header">
-                    
                     <div class="tier-badge">🥈</div>
-                    <h3>2 Divisioona S11</h3>
-                    <div class="tier-label">Division 2</div>
+                    <h3>2 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -318,17 +314,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:13</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:13</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-div3" href="div3-s11.html" title="3 Divisioona S11">
+            <a class="division-card tier-div3" href="div3-s11.html" title="3 Divisioona">
                 <div class="card-header">
-                    
                     <div class="tier-badge">🥉</div>
-                    <h3>3 Divisioona S11</h3>
-                    <div class="tier-label">Division 3</div>
+                    <h3>3 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -343,17 +338,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:29</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:29</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div4-s11.html" title="4 Divisioona S11">
+            <a class="division-card tier-regular" href="div4-s11.html" title="4 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>4 Divisioona S11</h3>
-                    <div class="tier-label">Division 4</div>
+                    <h3>4 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -368,17 +362,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:29</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:29</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div5-s11.html" title="5 Divisioona S11">
+            <a class="division-card tier-regular" href="div5-s11.html" title="5 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>5 Divisioona S11</h3>
-                    <div class="tier-label">Division 5</div>
+                    <h3>5 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -393,17 +386,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:13</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:13</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div6-s11.html" title="6 Divisioona S11">
+            <a class="division-card tier-regular" href="div6-s11.html" title="6 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>6 Divisioona S11</h3>
-                    <div class="tier-label">Division 6</div>
+                    <h3>6 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -418,17 +410,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:13</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:13</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div7-s11.html" title="7 Divisioona S11">
+            <a class="division-card tier-regular" href="div7-s11.html" title="7 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>7 Divisioona S11</h3>
-                    <div class="tier-label">Division 7</div>
+                    <h3>7 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -443,17 +434,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:29</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:29</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div8-s11.html" title="8 Divisioona S11">
+            <a class="division-card tier-regular" href="div8-s11.html" title="8 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>8 Divisioona S11</h3>
-                    <div class="tier-label">Division 8</div>
+                    <h3>8 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -468,17 +458,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:29</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:29</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div9-s11.html" title="9 Divisioona S11">
+            <a class="division-card tier-regular" href="div9-s11.html" title="9 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>9 Divisioona S11</h3>
-                    <div class="tier-label">Division 9</div>
+                    <h3>9 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -493,17 +482,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:13</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:13</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div10-s11.html" title="10 Divisioona S11">
+            <a class="division-card tier-regular" href="div10-s11.html" title="10 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>10 Divisioona S11</h3>
-                    <div class="tier-label">Division 10</div>
+                    <h3>10 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -518,17 +506,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:13</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:13</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div11-s11.html" title="11 Divisioona S11">
+            <a class="division-card tier-regular" href="div11-s11.html" title="11 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>11 Divisioona S11</h3>
-                    <div class="tier-label">Division 11</div>
+                    <h3>11 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -543,17 +530,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:30</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:30</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div12-s11.html" title="12 Divisioona S11">
+            <a class="division-card tier-regular" href="div12-s11.html" title="12 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>12 Divisioona S11</h3>
-                    <div class="tier-label">Division 12</div>
+                    <h3>12 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -568,17 +554,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:30</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:30</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div13-s11.html" title="13 Divisioona S11">
+            <a class="division-card tier-regular" href="div13-s11.html" title="13 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>13 Divisioona S11</h3>
-                    <div class="tier-label">Division 13</div>
+                    <h3>13 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -593,17 +578,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:30</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:30</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div14-s11.html" title="14 Divisioona S11">
+            <a class="division-card tier-regular" href="div14-s11.html" title="14 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>14 Divisioona S11</h3>
-                    <div class="tier-label">Division 14</div>
+                    <h3>14 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -618,17 +602,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:14</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:14</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div15-s11.html" title="15 Divisioona S11">
+            <a class="division-card tier-regular" href="div15-s11.html" title="15 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>15 Divisioona S11</h3>
-                    <div class="tier-label">Division 15</div>
+                    <h3>15 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -643,17 +626,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:30</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:30</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div16-s11.html" title="16 Divisioona S11">
+            <a class="division-card tier-regular" href="div16-s11.html" title="16 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>16 Divisioona S11</h3>
-                    <div class="tier-label">Division 16</div>
+                    <h3>16 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -668,17 +650,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:14</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:14</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div17-s11.html" title="17 Divisioona S11">
+            <a class="division-card tier-regular" href="div17-s11.html" title="17 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>17 Divisioona S11</h3>
-                    <div class="tier-label">Division 17</div>
+                    <h3>17 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -693,17 +674,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:14</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:14</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div18-s11.html" title="18 Divisioona S11">
+            <a class="division-card tier-regular" href="div18-s11.html" title="18 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>18 Divisioona S11</h3>
-                    <div class="tier-label">Division 18</div>
+                    <h3>18 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -718,17 +698,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:14</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:14</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div19-s11.html" title="19 Divisioona S11">
+            <a class="division-card tier-regular" href="div19-s11.html" title="19 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>19 Divisioona S11</h3>
-                    <div class="tier-label">Division 19</div>
+                    <h3>19 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -743,17 +722,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:14</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:14</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div20-s11.html" title="20 Divisioona S11">
+            <a class="division-card tier-regular" href="div20-s11.html" title="20 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>20 Divisioona S11</h3>
-                    <div class="tier-label">Division 20</div>
+                    <h3>20 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -768,17 +746,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:30</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:30</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div21-s11.html" title="21 Divisioona S11">
+            <a class="division-card tier-regular" href="div21-s11.html" title="21 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>21 Divisioona S11</h3>
-                    <div class="tier-label">Division 21</div>
+                    <h3>21 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -793,17 +770,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:14</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:14</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div22-s11.html" title="22 Divisioona S11">
+            <a class="division-card tier-regular" href="div22-s11.html" title="22 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>22 Divisioona S11</h3>
-                    <div class="tier-label">Division 22</div>
+                    <h3>22 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -818,17 +794,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:31</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:31</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div23-s11.html" title="23 Divisioona S11">
+            <a class="division-card tier-regular" href="div23-s11.html" title="23 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>23 Divisioona S11</h3>
-                    <div class="tier-label">Division 23</div>
+                    <h3>23 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -843,17 +818,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:31</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:31</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div24-s11.html" title="24 Divisioona S11">
+            <a class="division-card tier-regular" href="div24-s11.html" title="24 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>24 Divisioona S11</h3>
-                    <div class="tier-label">Division 24</div>
+                    <h3>24 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -868,17 +842,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 05.10.2025 23:31</div>
+                    <div class="update-time">Data päivitetty 05.10.2025 23:31</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div25-s11.html" title="25 Divisioona S11">
+            <a class="division-card tier-regular" href="div25-s11.html" title="25 Divisioona">
                 <div class="card-header">
                     
-                    
-                    <h3>25 Divisioona S11</h3>
-                    <div class="tier-label">Division 25</div>
+                    <h3>25 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -893,7 +866,8 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 07.10.2025 00:14</div>
+                    <div class="update-time">Data päivitetty 07.10.2025 00:14</div>
+                    
                 </div>
             </a>
             
@@ -904,12 +878,10 @@
             <h2 class="divisions-title">Season 10 Divisioonat <span class="season-meta">(26 divisioonaa, 100% pelattu)</span></h2>
             <div class="divisions-grid">
 
-            <a class="division-card tier-master" href="div0-s10.html" title="Mestaruussarja S10">
+            <a class="division-card tier-master" href="div0-s10.html" title="Mestaruussarja">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     <div class="tier-badge">👑</div>
-                    <h3>Mestaruussarja S10</h3>
-                    <div class="tier-label">Master Tier</div>
+                    <h3>Mestaruussarja</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -924,17 +896,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:30</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div0-s10-po.html" title="Mestaruussarja Playoffs S10">
+            <a class="division-card tier-playoffs" href="div0-s10-po.html" title="Mestaruussarja Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     <div class="tier-badge">👑</div>
-                    <h3>Mestaruussarja Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>Mestaruussarja Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -949,17 +920,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:30</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-div1" href="div1-s10.html" title="1 Divisioona S10">
+            <a class="division-card tier-div1" href="div1-s10.html" title="1 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     <div class="tier-badge">🥇</div>
-                    <h3>1 Divisioona S10</h3>
-                    <div class="tier-label">Division 1</div>
+                    <h3>1 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -974,17 +944,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:31</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div1-s10-po.html" title="1 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div1-s10-po.html" title="1 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     <div class="tier-badge">🥇</div>
-                    <h3>1 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>1 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -999,17 +968,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:31</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-div2" href="div2-s10.html" title="2 Divisioona S10">
+            <a class="division-card tier-div2" href="div2-s10.html" title="2 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     <div class="tier-badge">🥈</div>
-                    <h3>2 Divisioona S10</h3>
-                    <div class="tier-label">Division 2</div>
+                    <h3>2 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1024,17 +992,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:32</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div2-s10-po.html" title="2 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div2-s10-po.html" title="2 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     <div class="tier-badge">🥈</div>
-                    <h3>2 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>2 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1049,17 +1016,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:32</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-div3" href="div3-s10.html" title="3 Divisioona S10">
+            <a class="division-card tier-div3" href="div3-s10.html" title="3 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     <div class="tier-badge">🥉</div>
-                    <h3>3 Divisioona S10</h3>
-                    <div class="tier-label">Division 3</div>
+                    <h3>3 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1074,17 +1040,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:33</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div3-s10-po.html" title="3 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div3-s10-po.html" title="3 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     <div class="tier-badge">🥉</div>
-                    <h3>3 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>3 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1099,17 +1064,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:33</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div4-s10.html" title="4 Divisioona S10">
+            <a class="division-card tier-regular" href="div4-s10.html" title="4 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>4 Divisioona S10</h3>
-                    <div class="tier-label">Division 4</div>
+                    <h3>4 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1124,17 +1088,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:35</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div4-s10-po.html" title="4 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div4-s10-po.html" title="4 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>4 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>4 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1149,17 +1112,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:35</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div5-s10.html" title="5 Divisioona S10">
+            <a class="division-card tier-regular" href="div5-s10.html" title="5 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>5 Divisioona S10</h3>
-                    <div class="tier-label">Division 5</div>
+                    <h3>5 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1174,17 +1136,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:36</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div5-s10-po.html" title="5 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div5-s10-po.html" title="5 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>5 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>5 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1199,17 +1160,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:36</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div6-s10.html" title="6 Divisioona S10">
+            <a class="division-card tier-regular" href="div6-s10.html" title="6 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>6 Divisioona S10</h3>
-                    <div class="tier-label">Division 6</div>
+                    <h3>6 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1224,17 +1184,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:37</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div6-s10-po.html" title="6 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div6-s10-po.html" title="6 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>6 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>6 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1249,17 +1208,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:37</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div7-s10.html" title="7 Divisioona S10">
+            <a class="division-card tier-regular" href="div7-s10.html" title="7 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>7 Divisioona S10</h3>
-                    <div class="tier-label">Division 7</div>
+                    <h3>7 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1274,17 +1232,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:38</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div7-s10-po.html" title="7 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div7-s10-po.html" title="7 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>7 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>7 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1299,17 +1256,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:39</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div8-s10.html" title="8 Divisioona S10">
+            <a class="division-card tier-regular" href="div8-s10.html" title="8 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>8 Divisioona S10</h3>
-                    <div class="tier-label">Division 8</div>
+                    <h3>8 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1324,17 +1280,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:40</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div8-s10-po.html" title="8 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div8-s10-po.html" title="8 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>8 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>8 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1349,17 +1304,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:40</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div9-s10.html" title="9 Divisioona S10">
+            <a class="division-card tier-regular" href="div9-s10.html" title="9 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>9 Divisioona S10</h3>
-                    <div class="tier-label">Division 9</div>
+                    <h3>9 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1374,17 +1328,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:41</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div9-s10-po.html" title="9 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div9-s10-po.html" title="9 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>9 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>9 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1399,17 +1352,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:41</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div10-s10.html" title="10 Divisioona S10">
+            <a class="division-card tier-regular" href="div10-s10.html" title="10 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>10 Divisioona S10</h3>
-                    <div class="tier-label">Division 10</div>
+                    <h3>10 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1424,17 +1376,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:42</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div10-s10-po.html" title="10 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div10-s10-po.html" title="10 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>10 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>10 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1449,17 +1400,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:42</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div11-s10.html" title="11 Divisioona S10">
+            <a class="division-card tier-regular" href="div11-s10.html" title="11 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>11 Divisioona S10</h3>
-                    <div class="tier-label">Division 11</div>
+                    <h3>11 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1474,17 +1424,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:43</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div11-s10-po.html" title="11 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div11-s10-po.html" title="11 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>11 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>11 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1499,17 +1448,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:43</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div12-s10.html" title="12 Divisioona S10">
+            <a class="division-card tier-regular" href="div12-s10.html" title="12 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>12 Divisioona S10</h3>
-                    <div class="tier-label">Division 12</div>
+                    <h3>12 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1524,17 +1472,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:45</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div12-s10-po.html" title="12 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div12-s10-po.html" title="12 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>12 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>12 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1549,17 +1496,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:45</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div13-s10.html" title="13 Divisioona S10">
+            <a class="division-card tier-regular" href="div13-s10.html" title="13 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>13 Divisioona S10</h3>
-                    <div class="tier-label">Division 13</div>
+                    <h3>13 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1574,17 +1520,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:46</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div13-s10-po.html" title="13 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div13-s10-po.html" title="13 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>13 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>13 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1599,17 +1544,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:46</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div14-s10.html" title="14 Divisioona S10">
+            <a class="division-card tier-regular" href="div14-s10.html" title="14 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>14 Divisioona S10</h3>
-                    <div class="tier-label">Division 14</div>
+                    <h3>14 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1624,17 +1568,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:47</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div14-s10-po.html" title="14 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div14-s10-po.html" title="14 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>14 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>14 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1649,17 +1592,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:47</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div15-s10.html" title="15 Divisioona S10">
+            <a class="division-card tier-regular" href="div15-s10.html" title="15 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>15 Divisioona S10</h3>
-                    <div class="tier-label">Division 15</div>
+                    <h3>15 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1674,17 +1616,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:48</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div15-s10-po.html" title="15 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div15-s10-po.html" title="15 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>15 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>15 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1699,17 +1640,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:49</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div16-s10.html" title="16 Divisioona S10">
+            <a class="division-card tier-regular" href="div16-s10.html" title="16 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>16 Divisioona S10</h3>
-                    <div class="tier-label">Division 16</div>
+                    <h3>16 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1724,17 +1664,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:50</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div16-s10-po.html" title="16 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div16-s10-po.html" title="16 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>16 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>16 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1749,17 +1688,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:50</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div17-s10.html" title="17 Divisioona S10">
+            <a class="division-card tier-regular" href="div17-s10.html" title="17 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>17 Divisioona S10</h3>
-                    <div class="tier-label">Division 17</div>
+                    <h3>17 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1774,17 +1712,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:51</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div17-s10-po.html" title="17 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div17-s10-po.html" title="17 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>17 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>17 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1799,17 +1736,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:51</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div18-s10.html" title="18 Divisioona S10">
+            <a class="division-card tier-regular" href="div18-s10.html" title="18 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>18 Divisioona S10</h3>
-                    <div class="tier-label">Division 18</div>
+                    <h3>18 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1824,17 +1760,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:52</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div18-s10-po.html" title="18 Divisioona Playoffs S10">
+            <a class="division-card tier-playoffs" href="div18-s10-po.html" title="18 Divisioona Playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>18 Divisioona Playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>18 Divisioona Playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1849,17 +1784,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:52</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div19-s10.html" title="19 Divisioona S10">
+            <a class="division-card tier-regular" href="div19-s10.html" title="19 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>19 Divisioona S10</h3>
-                    <div class="tier-label">Division 19</div>
+                    <h3>19 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1874,17 +1808,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:53</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div19-s10-po.html" title="19 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div19-s10-po.html" title="19 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>19 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>19 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1899,17 +1832,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:53</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div20-s10.html" title="20 Divisioona S10">
+            <a class="division-card tier-regular" href="div20-s10.html" title="20 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>20 Divisioona S10</h3>
-                    <div class="tier-label">Division 20</div>
+                    <h3>20 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1924,17 +1856,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:55</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div20-s10-po.html" title="20 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div20-s10-po.html" title="20 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>20 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>20 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1949,17 +1880,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:55</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div21-s10.html" title="21 Divisioona S10">
+            <a class="division-card tier-regular" href="div21-s10.html" title="21 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>21 Divisioona S10</h3>
-                    <div class="tier-label">Division 21</div>
+                    <h3>21 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1974,17 +1904,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:56</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div21-s10-po.html" title="21 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div21-s10-po.html" title="21 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>21 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>21 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -1999,17 +1928,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:56</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div22-s10.html" title="22 Divisioona S10">
+            <a class="division-card tier-regular" href="div22-s10.html" title="22 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>22 Divisioona S10</h3>
-                    <div class="tier-label">Division 22</div>
+                    <h3>22 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -2024,17 +1952,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:57</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div22-s10-po.html" title="22 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div22-s10-po.html" title="22 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>22 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>22 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -2049,17 +1976,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:57</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div23-s10.html" title="23 Divisioona S10">
+            <a class="division-card tier-regular" href="div23-s10.html" title="23 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>23 Divisioona S10</h3>
-                    <div class="tier-label">Division 23</div>
+                    <h3>23 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -2074,17 +2000,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:58</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div23-s10-po.html" title="23 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div23-s10-po.html" title="23 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>23 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>23 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -2099,17 +2024,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 00:58</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div24-s10.html" title="24 Divisioona S10">
+            <a class="division-card tier-regular" href="div24-s10.html" title="24 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>24 Divisioona S10</h3>
-                    <div class="tier-label">Division 24</div>
+                    <h3>24 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -2124,17 +2048,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 01:00</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div24-s10-po.html" title="24 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div24-s10-po.html" title="24 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>24 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>24 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -2149,17 +2072,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 01:00</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-regular" href="div25-s10.html" title="25 Divisioona S10">
+            <a class="division-card tier-regular" href="div25-s10.html" title="25 Divisioona">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>25 Divisioona S10</h3>
-                    <div class="tier-label">Division 25</div>
+                    <h3>25 Divisioona</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -2174,17 +2096,16 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 01:01</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             
 
-            <a class="division-card tier-playoffs" href="div25-s10-po.html" title="25 divisioona playoffs S10">
+            <a class="division-card tier-playoffs" href="div25-s10-po.html" title="25 divisioona playoffs">
                 <div class="card-header">
-                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
                     
-                    <h3>25 divisioona playoffs S10</h3>
-                    <div class="tier-label">Playoffs</div>
+                    <h3>25 divisioona playoffs</h3>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -2199,7 +2120,8 @@
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty 22.09.2025 01:01</div>
+                    <div class="season-indicator completed">✓ Taputeltu loppuun</div>
+                    
                 </div>
             </a>
             

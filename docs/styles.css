@@ -819,6 +819,7 @@ a{ color:var(--accent); text-decoration:none; }
 .division-card.tier-div2::before { background: linear-gradient(90deg, #cd7f32, #daa520); }
 .division-card.tier-div3::before { background: linear-gradient(90deg, #8b4513, #cd853f); }
 .division-card.tier-regular::before { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.division-card.tier-playoffs::before { background: linear-gradient(90deg, #8a2be2, #da70d6); }
 
 .division-card:hover {
 	transform: translateY(-6px);
@@ -835,6 +836,24 @@ a{ color:var(--accent); text-decoration:none; }
 	padding: 20px 24px 16px 24px;
 	text-align: center;
 	position: relative;
+}
+
+/* Make sure season indicators size down on small screens and sit correctly */
+.season-indicator {
+	font-size: 0.75rem; /* default */
+	padding: 4px 8px;
+}
+
+@media (max-width: 640px) {
+	.season-indicator {
+		font-size: 0.65rem;
+		padding: 2px 6px;
+		top: 8px;
+		right: 8px;
+	}
+	.division-card {
+		min-height: 160px;
+	}
 }
 
 .tier-badge {
@@ -865,6 +884,7 @@ a{ color:var(--accent); text-decoration:none; }
 	display: flex;
 	flex-direction: column;
 	gap: 12px;
+	align-items: center;
 }
 
 .stat-row {
@@ -881,6 +901,9 @@ a{ color:var(--accent); text-decoration:none; }
 
 .progress-section {
 	margin-top: auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
 }
 
 .progress-bar {
@@ -936,9 +959,10 @@ a{ color:var(--accent); text-decoration:none; }
 }
 
 .card-footer {
-	padding: 16px 24px 20px 24px;
+	padding: 16px 24px 16px 24px;
 	border-top: 1px solid rgba(255,255,255,0.05);
 	background: rgba(0,0,0,0.2);
+	align-items: center;
 }
 
 .update-time {
@@ -946,6 +970,55 @@ a{ color:var(--accent); text-decoration:none; }
 	color: var(--muted);
 	text-align: center;
 	opacity: 0.8;
+}
+
+.gen-note {
+	font-size: 0.7rem;
+	color: rgba(255,255,255,0.55);
+	text-align: center;
+	margin-top: 4px;
+}
+
+/* Season indicator badges for division cards */
+.season-indicator {
+	display: block;
+	margin: 0 auto 8px auto;
+	padding: 4px 10px;
+	border-radius: 14px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: none;
+	letter-spacing: 0.2px;
+	backdrop-filter: blur(6px);
+	border: 1px solid rgba(255,255,255,0.06);
+	white-space: nowrap;
+	text-align: center;
+	max-width: 90%;
+	align-self: center;
+}
+
+.season-indicator.completed {
+	background: rgba(57, 217, 138, 0.15);
+	color: var(--ok);
+	border-color: rgba(57, 217, 138, 0.3);
+}
+
+.season-indicator.archived {
+	background: rgba(157, 177, 209, 0.15);
+	color: var(--muted);
+	border-color: rgba(157, 177, 209, 0.3);
+}
+
+@media (max-width: 640px) {
+	.season-indicator {
+		bottom: 44px;
+		padding: 3px 8px;
+		font-size: 0.65rem;
+	}
+	/* ensure update-time has extra bottom padding to avoid overlap on very small cards */
+	.card-footer .update-time {
+		margin-bottom: 6px;
+	}
 }
 
 /* Enhanced animations and interactions */
