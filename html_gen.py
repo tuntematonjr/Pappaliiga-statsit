@@ -50,7 +50,15 @@ args = parse_args()
 FORCE_REGEN = args.force
 
 HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
-_GENVER_RE = re.compile(r"<!--\s*GENVER:(\d+)\s*(?:\S+)?\s*-->", re.IGNORECASE)
+_GENVER_RE = re.compile(r"<!--\s*GENVER:(\d+) LAST_MATCH:(\d+)\s*-->", re.IGNORECASE)
+_GENMETA_RE = re.compile(
+    r"<!--\s*GENVER:(?P<ver>\d+) LAST_MATCH:(?P<last>\d+)\s*-->",
+    re.IGNORECASE,
+)
+
+# runtime values set when page_start() is called
+CURRENT_GEN_TS: int = 0
+CURRENT_LAST_MATCH: int = 0
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
 
@@ -58,7 +66,7 @@ UNIFIED_HEAD = """<!doctype html>
 <html lang=\"fi\">
 <head>
 <meta charset=\"utf-8\">
-<meta name=\"viewport\" content=\"width=1200, initial-scale=1, maximum-scale=1, user-scalable=yes\"/>
+<meta name=\"viewport\" content=\"width=1200, initial-scale=0, maximum-scale=1, user-scalable=yes\"/>
 <title>{title}</title>
 <!-- Externalized CSS/JS for maintainability and performance -->
 <link rel=\"stylesheet\" href=\"styles.css\">
@@ -72,10 +80,14 @@ HTML_FOOT = """
 </html>
 """
 
-def page_start(title: str, page_class: str = "") -> str:
-    gen_ts = int(time.time())
-    token = f"<!-- GENVER:{HTML_TEMPLATE_VERSION} GENERATED_AT:{gen_ts} -->"
-    # Put GENVER first, then the big HEAD block
+def page_start(title: str, page_class: str = "", last_match_ts: Optional[int] = None) -> str:
+    """Return the page head with an embedded GENVER token.
+    Optionally include LAST_MATCH epoch (used for skip-checking and displaying update time).
+    """
+    global CURRENT_GEN_TS, CURRENT_LAST_MATCH
+    lm = int(last_match_ts) if last_match_ts else 0
+    token = f"<!-- GENVER:{HTML_TEMPLATE_VERSION} LAST_MATCH:{lm} -->"
+    CURRENT_LAST_MATCH = lm
     return token + "\n" + UNIFIED_HEAD.replace("{title}", title).replace("{page_class}", page_class)
 
 def topbar(show_back_to_index: bool):
@@ -206,9 +218,26 @@ def _read_embedded_version(path: str) -> int:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             data = f.read()
         m = _GENVER_RE.search(data)
-        return int(m.group(1)) if m else 0
+        if not m:
+            return 0
+        return int(m.group(1))
     except FileNotFoundError:
         return 0
+
+
+def _read_embedded_meta(path: str) -> tuple[int, int, int]:
+    """Return (ver, generated_at, last_match) from embedded GENVER token in file."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            data = f.read()
+        m = _GENMETA_RE.search(data)
+        if not m:
+            return (0, 0, 0)
+        ver = int(m.group('ver') or 0)
+        last = int(m.group('last') or 0)
+        return (ver, 0, last)
+    except FileNotFoundError:
+        return (0, 0, 0)
 
 def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, min_flashes: int = 10):
     """
@@ -454,15 +483,18 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
     
     # Calculate stats for each season
     for season, season_divs in by_season.items():
+        num_regular_divs = len([d for d in season_divs if not d.get("is_playoffs", 0)])
+        num_playoff_divs = len([d for d in season_divs if d.get("is_playoffs", 0)])
         season_stats = {
-            "divisions": len([d for d in season_divs if not d.get("is_playoffs", 0)]),
-            "playoff_divisions": len([d for d in season_divs if d.get("is_playoffs", 0)]),
+            "divisions": num_regular_divs,
+            "playoff_divisions": num_playoff_divs,
             "teams": 0,  # Unique teams in regular season only
             "players": 0,  # Unique players in regular season only
             "matches_played": 0,
             "matches_total": 0,
             "playoffs_matches_played": 0,
-            "playoffs_matches_total": 0,
+            # Always expect 7 playoff matches per regular division, even if none exist yet
+            "playoffs_matches_total": max(num_playoff_divs, num_regular_divs) * 7,
             "regular_matches_played": 0,
             "regular_matches_total": 0,
             "maps_played": 0,
@@ -546,23 +578,26 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
             season_stats["kills"] += kills
             season_stats["deaths"] += deaths
             
+            # Always estimate playoff matches as 7 per division (8 teams, single-elimination)
             if div.get("is_playoffs", 0):
                 season_stats["playoffs_matches_played"] += played
-                season_stats["playoffs_matches_total"] += total
             else:
                 season_stats["regular_matches_played"] += played
                 season_stats["regular_matches_total"] += total
-            
+
             season_stats["matches_played"] += played
             season_stats["matches_total"] += total
         
         # Calculate completion rates
-        if season_stats["matches_total"] > 0:
-            season_stats["completion_rate"] = (season_stats["matches_played"] / season_stats["matches_total"]) * 100
-        
+        # Use estimated playoff matches for completion rate
+        total_matches_estimated = season_stats["regular_matches_total"] + season_stats["playoffs_matches_total"]
+        total_played = season_stats["regular_matches_played"] + season_stats["playoffs_matches_played"]
+        if total_matches_estimated > 0:
+            season_stats["completion_rate"] = (total_played / total_matches_estimated) * 100
+
         if season_stats["regular_matches_total"] > 0:
             season_stats["regular_completion_rate"] = (season_stats["regular_matches_played"] / season_stats["regular_matches_total"]) * 100
-            
+
         if season_stats["playoffs_matches_total"] > 0:
             season_stats["playoffs_completion_rate"] = (season_stats["playoffs_matches_played"] / season_stats["playoffs_matches_total"]) * 100
         
@@ -648,7 +683,7 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
             <div class="hero-card afi-card">
                 <h1>Armafinland</h1>
                 <p>
-                    Arma Finland on suomenkielisille pelaajille ja peliporukoille tarkoitettu avoin peliyhteisö. Yhteisö tarjoaa Arman pelaamista taktisessa ympäristössä mahdollisimman monen suomalaisen pelaajan kanssa. Pelitapahtumissa keskitytään realismiin, toimintaan joukkueissa ja yhteistyöhön.
+                    Yhteisö on avoin kaikille pelaajille ja ryhmille, jotka haluavat kokeilla taktista pelaamista myös Arma-sarjan peleissä. Pelaamme Arma 3 ja Arma Reforger, sekä järjestämme kansainvälisiä TvT-tehtäviä, joissa painotetaan realismia, joukkuepeliä ja yhteistoimintaa. Pelien ulkopuolella meno on rentoa ja mutkatonta, mutta pelissä otetaan tehtävät tosissaan.
                 </p>
                 <div class="hero-cta">
                     <a class="btn btn-primary" href="https://armafinland.fi/discord" title="Liity Armafinland Discordiin">Liity AFI Discord</a>
@@ -738,74 +773,79 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
                     {' (Käynnissä)' if is_current else ' (Loppunut)' if is_completed else ''}
                 </div>""")
     
-    html.append("""
+    # Get current season data for the dynamic season overview
+    current_season_data = stats["seasons_data"].get(stats["current_season"], {})
+    current_season = stats["current_season"]
+    
+    # Calculate percentages for progress bars
+    regular_progress = current_season_data.get("regular_completion_rate", 0)
+    playoffs_progress = current_season_data.get("playoffs_completion_rate", 0)
+    overall_progress = current_season_data.get("completion_rate", 0)
+    
+    html.append(f"""
             </div>
-            
-            <!-- Dynamic Season Overview (updates based on selection) -->
+
+            <!-- Dynamic Season Overview (JS will fill stats from data attributes) -->
             <div id="dynamic-season-overview" class="stats-overview" style="margin-top: 32px;">
-                <h2 class="section-title" id="season-overview-title">Season 11 Yleiskatsaus</h2>
+                <h2 class="section-title" id="season-overview-title">Season {current_season} Yleiskatsaus</h2>
                 <div class="season-stats" id="season-overview-stats">
                     <div class="stat-card">
                         <div class="stat-icon">🎲</div>
-                        <div class="stat-value" id="overview-divisions">26</div>
+                        <div class="stat-value" id="overview-divisions"></div>
                         <div class="stat-label">Divisioonaa</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">👥</div>
-                        <div class="stat-value" id="overview-teams">314</div>
+                        <div class="stat-value" id="overview-teams"></div>
                         <div class="stat-label">Joukkuetta</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">👤</div>
-                        <div class="stat-value" id="overview-players">0</div>
+                        <div class="stat-value" id="overview-players"></div>
                         <div class="stat-label">Pelaajaa</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">⚔️</div>
-                        <div class="stat-value" id="overview-matches">1064</div>
+                        <div class="stat-value" id="overview-matches"></div>
                         <div class="stat-label">Ottelua Pelattu</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">🗺️</div>
-                        <div class="stat-value" id="overview-maps">0</div>
+                        <div class="stat-value" id="overview-maps"></div>
                         <div class="stat-label">Karttaa Pelattu</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">🔄</div>
-                        <div class="stat-value" id="overview-rounds">0</div>
+                        <div class="stat-value" id="overview-rounds"></div>
                         <div class="stat-label">Kierrosta Pelattu</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">💀</div>
-                        <div class="stat-value" id="overview-kills">0</div>
+                        <div class="stat-value" id="overview-kills"></div>
                         <div class="stat-label">Tappoja</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">☠️</div>
-                        <div class="stat-value" id="overview-deaths">0</div>
+                        <div class="stat-value" id="overview-deaths"></div>
                         <div class="stat-label">Kuolemia</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">📊</div>
-                        <div class="stat-value" id="overview-progress">61%</div>
+                        <div class="stat-value" id="overview-progress"></div>
                         <div class="season-progress">
                             <div class="season-progress-section">
                                 <div class="season-progress-label">Runkosarja</div>
                                 <div class="season-progress-bar">
-                                    <div class="season-progress-fill" style="width: 61%"></div>
+                                    <div class="season-progress-fill" id="overview-regular-bar"></div>
                                 </div>
-                                <div class="season-progress-text">
-                                    1064 / 1741 ottelua
-                                </div>
+                                <div class="season-progress-text" id="overview-regular-text"></div>
                             </div>
                             <div class="season-progress-section">
                                 <div class="season-progress-label">Playoffs</div>
                                 <div class="season-progress-bar">
-                                    <div class="season-progress-fill" style="width: 0%"></div>
+                                    <div class="season-progress-fill" id="overview-playoffs-bar"></div>
                                 </div>
-                                <div class="season-progress-text">
-                                    0 / 0 ottelua
-                                </div>
+                                <div class="season-progress-text" id="overview-playoffs-text"></div>
                             </div>
                         </div>
                     </div>
@@ -827,20 +867,22 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
         playoffs_progress = season_data.get("playoffs_completion_rate", 0)
         
         html.append(f"""
-            <div class="{' '.join(content_classes)}" data-season-content="{season}" 
-                 data-divisions="{season_data.get('divisions', 0)}"
-                 data-teams="{season_data.get('teams', 0)}"
-                 data-players="{season_data.get('players', 0)}"
-                 data-matches-played="{season_data.get('matches_played', 0)}"
-                 data-matches-total="{season_data.get('matches_total', 0)}"
-                 data-maps-played="{season_data.get('maps_played', 0)}"
-                     data-rounds-played="{season_data.get('rounds_played', 0)}"
-                     data-kills="{season_data.get('kills', 0)}"
-                     data-deaths="{season_data.get('deaths', 0)}"
-                     data-playoff-divisions="{season_data.get('playoff_divisions', 0)}"
-                 data-progress="{progress_pct:.1f}"
-                 data-regular-progress="{regular_progress:.1f}"
-                 data-playoffs-progress="{playoffs_progress:.1f}">
+          <div class="{' '.join(content_classes)}" data-season-content="{season}" 
+              data-divisions="{season_data.get('divisions', 0)}"
+              data-teams="{season_data.get('teams', 0)}"
+              data-players="{season_data.get('players', 0)}"
+              data-matches-played="{season_data.get('matches_played', 0)}"
+              data-matches-total="{season_data.get('matches_total', 0)}"
+              data-maps-played="{season_data.get('maps_played', 0)}"
+              data-rounds-played="{season_data.get('rounds_played', 0)}"
+              data-kills="{season_data.get('kills', 0)}"
+              data-deaths="{season_data.get('deaths', 0)}"
+              data-playoff-divisions="{season_data.get('playoff_divisions', 0)}"
+              data-playoffs-matches-played="{season_data.get('playoffs_matches_played', 0)}"
+              data-playoffs-matches-total="{season_data.get('playoffs_matches_total', 0)}"
+              data-progress="{progress_pct:.1f}"
+              data-regular-progress="{regular_progress:.1f}"
+              data-playoffs-progress="{playoffs_progress:.1f}">
                 
                 <div class="season-stats">
                     <!-- Removed duplicate per-season stat cards -->
@@ -871,61 +913,69 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
             <div class="divisions-grid">""")
         
         for i, div in enumerate(divs):
-            title = esc_title(div.get("name", "Division"))
+            # Trim division name to remove season info
+            raw_name = div.get("name", "Division")
+            trimmed_name = re.sub(r"\s*S\d+$", "", raw_name).strip()
+            title = esc_title(trimmed_name)
             slug = (div.get("slug") or "").strip()
             href = f"{slug}.html" if slug else "index.html"
 
             # --- async database calls ---
             ts_epoch = await get_division_generated_ts_async(pool, div["championship_id"])
             updated_str = format_ts(ts_epoch)  # palauttaa '—' jos None
+            gen_tooltip = ''
+            gen_note = ''
+            try:
+                if CURRENT_GEN_TS:
+                    gen_tooltip = f' title="Generoitu: {format_ts(CURRENT_GEN_TS)}"'
+                    gen_note = f'<div class="gen-note">(generoitu {format_ts(CURRENT_GEN_TS)})</div>'
+            except NameError:
+                gen_tooltip = ''
+                gen_note = ''
 
             # peruskortin statsit
             teams, played, total = await _index_card_stats_async(pool, div["championship_id"])
-            
+
             # Calculate progress percentage
             progress_pct = int((played / total * 100)) if total > 0 else 0
-            
+
             # Determine tier and icon based on division number
             div_num = int(div.get("division_num") or 0)
             is_playoffs = div.get("is_playoffs", 0)
-            
+
             # First determine the base tier info for this division number
             if "master" in title.lower() or "mestaruus" in title.lower() or div_num == 0:
                 base_tier_class = "tier-master"
                 base_tier_icon = "👑"
-                base_tier_label = "Master Tier"
             elif div_num == 1:
                 base_tier_class = "tier-div1"
                 base_tier_icon = "🥇"
-                base_tier_label = "Division 1"
             elif div_num == 2:
                 base_tier_class = "tier-div2"
                 base_tier_icon = "🥈"
-                base_tier_label = "Division 2"
             elif div_num == 3:
                 base_tier_class = "tier-div3"
                 base_tier_icon = "🥉"
-                base_tier_label = "Division 3"
             else:
                 base_tier_class = "tier-regular"
                 base_tier_icon = ""  # Regular tier has no icon
-                base_tier_label = f"Division {div_num}"
-            
+
             # Apply playoff modifications if needed
             if is_playoffs:
                 tier_class = "tier-playoffs"
                 tier_icon = base_tier_icon  # Use same icon as the division
-                tier_label = "Playoffs"
             else:
                 tier_class = base_tier_class
                 tier_icon = base_tier_icon
-                tier_label = base_tier_label
-            
+
             # Add season indicator for older seasons
             season_indicator = ""
+            is_finished = False
             if season != stats["current_season"]:
                 if season_completion >= 95:
-                    season_indicator = '<div class="season-indicator completed">✓ Taputeltu loppuun</div>'
+                    # Add generation time tooltip to finished badge
+                    season_indicator = f'<div class="season-indicator completed"{gen_tooltip}>✓ Taputeltu loppuun</div>'
+                    is_finished = True
                 else:
                     season_indicator = f'<div class="season-indicator archived">📁 Arkistoitu</div>'
 
@@ -935,10 +985,8 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
             html.append(f"""
             <a class="division-card {tier_class}" href="{href}" title="{title}">
                 <div class="card-header">
-                    {season_indicator}
                     {tier_badge}
                     <h3>{title}</h3>
-                    <div class="tier-label">{tier_label}</div>
                 </div>
                 <div class="card-stats">
                     <div class="stat-row">
@@ -953,7 +1001,8 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
                     </div>
                 </div>
                 <div class="card-footer">
-                    <div class="update-time">Päivitetty {updated_str}</div>
+                    {season_indicator if is_finished else f'<div class="update-time"{gen_tooltip}>Data päivitetty {updated_str}</div>'}
+                    {'' if is_finished else gen_note}
                 </div>
             </a>
             """)
@@ -1116,7 +1165,7 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     # Start building HTML
     html = []
     title = f"{esc_title(div['name'])} (Season {div['season']}) — Pappaliiga Stats"
-    html.append(page_start(title, "is-division"))
+    html.append(page_start(title, "is-division", last_match_ts=ts_epoch))
     html.append(topbar(show_back_to_index=True))
 
     html.append('<div class="container">')
@@ -1525,11 +1574,17 @@ async def should_render_division_async(pool: AsyncConnectionPool, div: dict, out
         return True, f"db last_seen {int(db_ts)} > html mtime {int(mtime)}"
 
     # 2) Template version guard
-    embedded = _read_embedded_version(out_path)
-    if embedded < HTML_TEMPLATE_VERSION:
-        return True, f"template version bump {HTML_TEMPLATE_VERSION} (was {embedded})"
+    embedded_ver = _read_embedded_version(out_path)
+    if embedded_ver < HTML_TEMPLATE_VERSION:
+        return True, f"template version bump {HTML_TEMPLATE_VERSION} (was {embedded_ver})"
 
-    return False, f"(html mtime {int(mtime)} >= last_seen {int(db_ts)} and ver={embedded})"
+    # 3) LAST_MATCH guard from embedded meta (if present)
+    embedded_meta = _read_embedded_meta(out_path)
+    embedded_last = embedded_meta[2] if embedded_meta else 0
+    if embedded_last and embedded_last > mtime:
+        return True, f"embedded last_match {int(embedded_last)} > html mtime {int(mtime)}"
+
+    return False, f"(html mtime {int(mtime)} >= last_seen {int(db_ts)} and ver={embedded_ver} last_match={embedded_last})"
 
 async def render_team_summary_async(pool: AsyncConnectionPool, team: dict, div: dict, div_avgs: dict, thresholds: dict) -> list[str]:
     """Async version that renders a team summary section"""
