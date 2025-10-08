@@ -1343,7 +1343,7 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
 
     # Get rounds played per map for this championship
     rounds_rows = await query_async(pool, """
-        SELECT mp.map_name, COUNT(*) as rounds_played
+        SELECT mp.map_name, SUM(mp.score_team1 + mp.score_team2) as rounds_played
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
         WHERE m.championship_id = ?
