@@ -1947,7 +1947,7 @@ async def _render_team_maps_section_async(pool: AsyncConnectionPool, div: dict, 
     ''')
     
     # Maps table
-    html.append(f'<table id="{tid2}" data-sort-col="1" data-sort-dir="desc">')
+    html.append(f'<table id="{tid2}" data-sort-col="0" data-sort-dir="asc">')
     html.append(f'''
     <thead><tr>
     <th data-sortable title="Map name" onclick="sortTable('{tid2}',0,false)">Map</th>

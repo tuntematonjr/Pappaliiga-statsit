@@ -1420,12 +1420,12 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
         img_html = f'<img class="map-img-sm" src="{img_url}" alt="{pretty}" loading="lazy">' if img_url else ''
         combined_data.append((map_id, pretty, img_html, played, banned, rounds))
 
-    # Sort by total activity (played + banned), then by name
-    combined_data.sort(key=lambda x: (-(x[3] + x[4]), x[1]))
+    # Sort by played count descending, then by name ascending
+    combined_data.sort(key=lambda x: (-x[3], x[1]))
 
     # Render map stats as a sortable table with image, name, played, banned, rounds columns
     html.append('<section class="stats-overview map-stats-section">')
-    html.append('<h2 class="section-title">Kartta Tilastot</h2>')
+    html.append('<h2 class="section-title">Divisioonan Kartta Tilastot</h2>')
     html.append('<div class="map-stats-grid">')
     html.append('<div class="map-table-container">')
     html.append('<table id="maps-table" class="map-table sortable" data-sort-col="1" data-sort-dir="desc">')

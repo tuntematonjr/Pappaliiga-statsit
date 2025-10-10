@@ -163,7 +163,8 @@ function processColorization(tableId, colorOptions) {
 }
 
 function processDefaultSort(tableId, sortOptions) {
-	sortTable(tableId, sortOptions.col, sortOptions.dir === 'asc');
+	const numeric = sortOptions.col === 0 ? false : true;  // Column 0 is names, string sort
+	sortTable(tableId, sortOptions.col, numeric);
 }
 
 function postProcessTable(tableId, opts) {
@@ -180,10 +181,14 @@ function initTabsAutoSort(rootId) {
 	const table = activePanel.querySelector('table');
 	if (!table) return;
 	
-	// Set default sort and apply it once
+	// The table is already sorted ascending by postProcessTable
+	// Set attributes to indicate current ascending sort
 	table.setAttribute('data-sort-col', '0');
-	table.setAttribute('data-sort-dir', 'desc');
-	applyDefaultSort(table.id);
+	table.setAttribute('data-sort-dir', 'asc');
+	const headers = table.querySelectorAll('th[data-sortable]');
+	if (headers[0]) {
+		headers[0].setAttribute('data-sort-dir', 'asc');
+	}
 }
 function renderWRCell(td) {
 	const w = parseInt(td.dataset.w || '0', 10);
@@ -666,3 +671,25 @@ function initSeasonSelector() {
 	if (savedSeason && document.querySelector(`[data-season="${savedSeason}"]`)) {
 		switchToSeason(savedSeason);
 	}
+
+function switchTab(containerId, tabName) {
+	const container = document.getElementById(containerId);
+	if (!container) return;
+	
+	// Remove active class from all buttons in this container's nav
+	const buttons = container.querySelectorAll('.tab-btn');
+	buttons.forEach(btn => btn.classList.remove('active'));
+	
+	// Add active to the target button
+	const targetBtn = container.querySelector(`.tab-btn[data-target="${tabName}"]`);
+	if (targetBtn) targetBtn.classList.add('active');
+	
+	// Remove active from all panels in this container
+	const panels = container.querySelectorAll('.tab-panel');
+	panels.forEach(panel => panel.classList.remove('active'));
+	
+	// Add active to the target panel
+	const targetPanel = container.querySelector(`.tab-panel[data-tab="${tabName}"]`);
+	if (targetPanel) targetPanel.classList.add('active');
+
+}
