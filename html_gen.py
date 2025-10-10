@@ -16,6 +16,9 @@ import time
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+from stats_utils import weighted_percentile, weighted_median
+from division_overrides import load_division_overrides, banned_teams_for_division
+
 from db import (
     get_map_art, normalize_map_id,
     get_division_generated_ts,
@@ -40,13 +43,21 @@ from async_db import (
 HTML_TEMPLATE_VERSION = 9
 
 # Parse command line arguments
-def parse_args():
+def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Generate HTML statistics for Pappaliiga divisions')
     parser.add_argument('--force', '-f', action='store_true', help='Force regeneration of all files')
     parser.add_argument('--div', type=int, help='Generate only specific division number (1-based)')
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
-args = parse_args()
+
+def _set_runtime_args(parsed: argparse.Namespace) -> None:
+    global args, FORCE_REGEN
+    args = parsed
+    FORCE_REGEN = parsed.force
+
+
+# Default arguments used when the module is imported (e.g., for testing)
+args = argparse.Namespace(force=False, div=None)
 FORCE_REGEN = args.force
 
 HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
@@ -61,6 +72,7 @@ CURRENT_GEN_TS: int = 0
 CURRENT_LAST_MATCH: int = 0
 DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
+_DIVISION_OVERRIDES = load_division_overrides()
 
 UNIFIED_HEAD = """<!doctype html>
 <html lang=\"fi\">
@@ -149,39 +161,19 @@ def format_ts(ts: int | None) -> str:
     dt = datetime.fromtimestamp(int(ts), tz=timezone.utc).astimezone(HELSINKI_TZ)
     return dt.strftime("%d.%m.%Y %H:%M")
 
+
+def _format_banned_team_summary(team: dict) -> str:
+    """Return escaped team name for banners/navigation."""
+    return escape(team.get("team_name") or team.get("team_id") or "-")
+
 def _fs_mtime(path: Path) -> int:
     try:
         return int(path.stat().st_mtime)
     except FileNotFoundError:
         return 0
 
-def weighted_percentile(values, weights, p):
-    """
-    Painotettu prosenttipiste p (0..100) ilman numpyä.
-    values: lista arvoja
-    weights: vastaavat painot (>=0)
-    """
-    if not values:
-        return 0.0
-    pairs = sorted(zip(values, weights), key=lambda x: x[0])
-    total = sum(w for _, w in pairs)
-    if total <= 0:
-        # fallback: tavallinen mediaani
-        k = len(pairs) // 2
-        return pairs[k][0]
-    threshold = total * (p / 100.0)
-    acc = 0.0
-    for v, w in pairs:
-        acc += w
-        if acc >= threshold:
-            return v
-    return pairs[-1][0]
-
-def weighted_median(values, weights):
-    return weighted_percentile(values, weights, 50)
-
 def esc_title(s: str) -> str:
-    # Poistaa yksittäiset heittomerkit ja korvaa rivinvaihdot HTML:lle sopiviksi
+    # Strip single quotes and replace line breaks with HTML-safe markers
     return (s or "").replace("'", "").replace("\n", "&#10;")
 
 def _render_card_header(section_type: str, title: str, hint: str = "Click to expand", open_attr: str = " open") -> list[str]:
@@ -241,11 +233,11 @@ def _read_embedded_meta(path: str) -> tuple[int, int, int]:
 
 def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, min_flashes: int = 10):
     """
-    Division summary + Leaders (optimoitu DB-kierrosten määrä):
-      - yhdistetään teams/maps/rounds yhteen CTE-kyselyyn
-      - muu laskenta ennallaan
+    Division summary + leaders (optimized to reduce DB roundtrips):
+      - join teams/maps/rounds in a single CTE query
+      - keep the rest of the calculations unchanged
     """
-    # Pääjoukko pelaajakohtaisiin, kuten ennen
+    # Main player-centric dataset, same as before
     rows = query(con, """
       SELECT
         ps.player_id,
@@ -280,7 +272,7 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
       GROUP BY ps.player_id
     """, (division_id,))
 
-    # --- Yhdistetyt aggregaatit yhdellä kyselyllä ---
+    # --- Combined aggregates via a single query ---
     agg = query(con, """
       WITH
       team_ids AS (
@@ -307,7 +299,7 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
     maps_cnt    = int((agg[0]["maps"]  or 0)) if agg else 0
     total_rounds= int((agg[0]["rounds"] or 0)) if agg else 0
 
-    # --- jakaumat ja leaderit kuten ennen ---
+    # --- Distributions and leaders as before ---
     kd_vals, kd_w = [], []
     adr_vals, adr_w = [], []
     kr_vals,  kr_w  = [], []
@@ -425,10 +417,10 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
 async def _index_card_stats_async(pool: AsyncConnectionPool, championship_id: str) -> tuple[int, int, int]:
     """
     Async version of _index_card_stats.
-    Palauttaa (teams, played, total) index-kortille.
-    - teams: uniikkien joukkueiden määrä (team1_id ∪ team2_id)
-    - played: pelatut matsit (finished_at IS NOT NULL TAI status='finished')
-    - total: kaikki matsit kannassa
+    Returns (teams, played, total) for the index card.
+    - teams: unique teams (team1_id ∪ team2_id)
+    - played: matches finished (finished_at IS NOT NULL OR status='finished')
+    - total: all matches in the database
     """
     r = await query_async(pool, """
       SELECT
@@ -894,7 +886,7 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
 
     # Render divisions per season (updated structure with season containers)
     for season in sorted(by_season.keys(), reverse=True):
-        # lajittelu numerojärjestykseen division_id:n mukaan
+        # Sort divisions by division number in ascending order
         divs = sorted(by_season[season], key=lambda d: int(d.get("division_num") or 0))
         
         # Get season statistics
@@ -922,7 +914,7 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
 
             # --- async database calls ---
             ts_epoch = await get_division_generated_ts_async(pool, div["championship_id"])
-            updated_str = format_ts(ts_epoch)  # palauttaa '—' jos None
+            updated_str = format_ts(ts_epoch)  # returns '—' when None
             gen_tooltip = ''
             gen_note = ''
             try:
@@ -933,7 +925,7 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
                 gen_tooltip = ''
                 gen_note = ''
 
-            # peruskortin statsit
+            # Baseline stats for the summary card
             teams, played, total = await _index_card_stats_async(pool, div["championship_id"])
 
             # Calculate progress percentage
@@ -1145,20 +1137,74 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     Core async division rendering logic using team helpers for concurrency.
     """
     # Import async team rendering functions
-    from async_db import render_team_card_async, map_pretty_name_async
+    from async_db import render_team_card_async
     
+    overrides = _DIVISION_OVERRIDES
+    banned_entries = banned_teams_for_division(div["championship_id"], overrides)
+    banned_ids = {entry.get("team_id") for entry in banned_entries if entry.get("team_id")}
+
     # Get teams and thresholds concurrently
     teams_task = get_teams_in_championship_async(pool, div["championship_id"])
-    thresholds_task = compute_champ_thresholds_data_async(pool, div["championship_id"])
-    map_avgs_task = compute_champ_map_avgs_data_async(pool, div["championship_id"])
-    div_summary_task = compute_champ_player_summary_async(pool, div["championship_id"], min_rounds=20)
-    map_summary_task = compute_champ_map_summary_data_async(pool, div["championship_id"])
+    thresholds_task = compute_champ_thresholds_data_async(pool, div["championship_id"], banned_ids)
+    map_avgs_task = compute_champ_map_avgs_data_async(pool, div["championship_id"], banned_ids)
+    div_summary_task = compute_champ_player_summary_async(
+        pool, div["championship_id"], min_rounds=20, excluded_team_ids=banned_ids
+    )
+    map_summary_task = compute_champ_map_summary_data_async(pool, div["championship_id"], banned_ids)
     timestamp_task = get_division_generated_ts_async(pool, div["championship_id"])
-    
+
     teams, thresholds, div_avgs, div_summary, map_summary, ts_epoch = await asyncio.gather(
         teams_task, thresholds_task, map_avgs_task, div_summary_task, map_summary_task, timestamp_task
     )
-    
+
+    banned_lookup = {item["team_id"]: item for item in banned_entries}
+
+    augmented: list[dict] = []
+    existing_ids: set[str] = set()
+    for team in teams:
+        team_id = team.get("team_id")
+        if team_id:
+            existing_ids.add(team_id)
+        info = banned_lookup.get(team_id)
+        if info:
+            team = dict(team)
+            team["is_banned"] = True
+            team["ban_reason"] = info.get("reason")
+            team["banned_at"] = info.get("banned_at")
+            team["ban_note"] = info.get("note")
+            if info.get("team_name") and not (team.get("team_name")):
+                team["team_name"] = info["team_name"]
+            if info.get("avatar") and not team.get("avatar"):
+                team["avatar"] = info["avatar"]
+        augmented.append(team)
+
+    for info in banned_entries:
+        tid = info.get("team_id")
+        if tid and tid not in existing_ids:
+            augmented.append({
+                "team_id": tid,
+                "team_name": info.get("team_name") or tid,
+                "avatar": info.get("avatar") or "",
+                "is_banned": True,
+                "ban_reason": info.get("reason"),
+                "banned_at": info.get("banned_at"),
+                "ban_note": info.get("note"),
+            })
+
+    teams = sorted(
+        augmented,
+        key=lambda t: (t.get("team_name") or t.get("team_id") or "").lower()
+    )
+
+    for team in teams:
+        base_name = team.get("team_name") or team.get("team_id") or "-"
+        if team.get("is_banned"):
+            team["display_name"] = f"{base_name} (BANNED)"
+        else:
+            team["display_name"] = base_name
+
+    div_summary["teams"] = len({t.get("team_id") for t in teams if t.get("team_id")})
+
     # Format timestamp
     ts_str = format_ts(ts_epoch) if ts_epoch else "—"
     
@@ -1193,10 +1239,17 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     html.append('<h2 class="section-title">Joukkueet</h2>')
     html.append('<div class="nav">')
     for t in teams:
-        name = t["team_name"] or t["team_id"]
+        name = t.get("display_name") or t.get("team_name") or t.get("team_id") or "-"
         avatar = t.get("avatar")
         logo = f'<img class="logo nav-logo" src="{avatar}" alt="{escape(name)}" loading="lazy">' if avatar else ''
-        html.append(f'<a href="#team-{t["team_id"]}">{logo}<span>{escape(name)}</span></a>')
+        css_classes = []
+        if t.get("is_banned"):
+            css_classes.append("is-banned")
+        class_attr = f' class="{" ".join(css_classes)}"' if css_classes else ""
+        html.append(
+            f'<a href="#team-{t["team_id"]}"{class_attr}>{logo}'
+            f'<span class="nav-name">{escape(name)}</span></a>'
+        )
     html.append("</div>")
 
     # Division summary section
@@ -1214,7 +1267,7 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     # Render all team cards concurrently - this is where we get the performance boost!
     team_tasks = []
     for i, team in enumerate(teams, start=1):
-        task = render_team_card_async(pool, div, team, i, teams, thresholds, div_avgs)
+        task = render_team_card_async(pool, div, team, i, teams, thresholds, div_avgs, banned_ids)
         team_tasks.append(task)
     
     # Wait for all team cards and add to HTML
@@ -1282,6 +1335,13 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
     html.append(f'<div class="stat-value">{div_summary["rounds"]}</div>')
     html.append('<div class="stat-label">Erää Pelattu</div>')
     html.append('</div>')
+
+    if banned_count:
+        html.append('<div class="stat-card stat-card--warning">')
+        html.append('<div class="stat-icon">🚫</div>')
+        html.append(f'<div class="stat-value">{banned_count}</div>')
+        html.append('<div class="stat-label">Banned Teams</div>')
+        html.append('</div>')
 
     # Performance stats with tooltips
     # html.append(f'<div class="stat-card performance" title="{TOOLTIP_WMED}">')
@@ -1691,52 +1751,52 @@ async def render_index_async(pool: AsyncConnectionPool, divisions: list[dict]) -
 
 # --- Content-aware write helpers -------------------------------------------
 
-# Nappaa sekä suomen- että englanninkielisiä aikaleimatekstejä (varmuuden vuoksi).
+# Capture Finnish and English timestamp phrases for comparison safety.
 _TS_PATTERNS = [
-    r"Generoitu\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?",   # "Generoitu 2025-09-06 15:27" (tai sekunneilla)
-    r"\(Generoitu\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?\)", # "(Generoitu ...)"
-    r"Generated\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?",   # jos joskus käytössä
+    r"Generoitu\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?",   # "Generated 2025-09-06 15:27" (with optional seconds)
+    r"\(Generoitu\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?\)", # "(Generated ...)"
+    r"Generated\s+\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?",   # future-proof if the English token appears
 ]
 
-# Mahdollisia build/nonssi-merkintöjä, joita ei haluta vaikuttamaan vertailuun:
-# esim. <link href="app.css?b=abcdef1"> tai data-build="abcdef1"
+# Build/noise markers to exclude from comparisons,
+# e.g. <link href="app.css?b=abcdef1"> or data-build="abcdef1"
 _BUILD_PATTERNS = [
     r"\?b=[a-f0-9]{7,}",                   # query-param build hash
     r"data-build=[\"'][a-f0-9]{7,}[\"']",  # data-build attribuutti
 ]
 
-# Yleinen ISO-ajan poistaja varmistukseksi (jos viet jonkin ajan meta- tai kommenttikenttään)
+# Generic ISO timestamp remover as a safeguard (e.g., metadata or comments)
 _ISO_TS_ANYWHERE = r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?"
 
 def _to_unix_newlines(s: str) -> str:
-    # Normalisoi rivinvaihdot: CRLF/LF -> LF (tämä oli syypää jatkuviin kirjoituksiin Windowsissa)
+    # Normalize line endings: CRLF/LF -> LF (preventing repeated writes on Windows)
     return s.replace("\r\n", "\n").replace("\r", "\n")
 
 def _normalize_for_compare_bytes(b: bytes) -> bytes:
-    # Dekoodaa, normalisoi rivinvaihdot ja poista dynaamiset osat vertailusta
+    # Decode, normalize newlines, and strip dynamic fragments before comparing
     s = b.decode("utf-8", errors="ignore")
     s = _to_unix_newlines(s)
 
-    # Poista aikaleimatekstit
+    # Remove timestamp strings
     for pat in _TS_PATTERNS:
         s = re.sub(pat, "GENERATED_TS", s, flags=re.IGNORECASE)
 
-    # Poista yksittäiset ISO-ajat varmuuden vuoksi (jos esiintyvät esim. kommenteissa)
+    # Remove stray ISO timestamps just in case (e.g., in comments)
     s = re.sub(_ISO_TS_ANYWHERE, "GENERATED_TS", s)
 
-    # Poista build/nonssi-merkkaukset
+    # Remove build/noise markers
     for pat in _BUILD_PATTERNS:
         s = re.sub(pat, "", s, flags=re.IGNORECASE)
 
-    # (Valinnainen) Siivoa trailing whitespace rivuilta, jotta editori-muutokset eivät vaikuta
+    # (Optional) Trim trailing whitespace so editor changes do not affect comparisons
     s = "\n".join(line.rstrip() for line in s.split("\n"))
 
     return s.encode("utf-8", errors="ignore")
 
 def write_if_changed(path: "Path", content: str) -> bool:
     """
-    Kirjoita 'path' vain jos normalisoitu sisältö poikkeaa vanhasta.
-    Palauttaa True jos kirjoitettiin, False jos ohitettiin.
+    Write to 'path' only when the normalized content differs from the existing file.
+    Returns True if the file was written, False if it was skipped.
     """
     # If forced regeneration is requested, always write regardless of content
     if FORCE_REGEN:
@@ -1752,12 +1812,12 @@ def write_if_changed(path: "Path", content: str) -> bool:
         old_raw = path.read_bytes()
         old_bytes = _normalize_for_compare_bytes(old_raw)
         if hashlib.sha256(old_bytes).digest() == hashlib.sha256(new_bytes).digest():
-            return False  # Ei muutosta
+            return False  # No changes detected
     except FileNotFoundError:
         pass
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    # Atomic write Windows-yhteensopivasti: kirjoita temp-tiedostoon ja vaihda paikalleen
+    # Atomic write with Windows compatibility: write to a temp file and swap it in
     with tempfile.NamedTemporaryFile("wb", delete=False, dir=str(path.parent)) as tf:
         tf.write(content.encode("utf-8"))
         tmp_name = tf.name
@@ -1767,8 +1827,8 @@ def write_if_changed(path: "Path", content: str) -> bool:
 async def write_if_changed_async(path: "Path", content: str) -> bool:
     """
     Async version of write_if_changed using aiofiles.
-    Kirjoita 'path' vain jos normalisoitu sisältö poikkeaa vanhasta.
-    Palauttaa True jos kirjoitettiin, False jos ohitettiin.
+    Write to 'path' only when the normalized content differs.
+    Returns True if the file was written, False if skipped.
     """
     # If forced regeneration is requested, always write regardless of content
     if FORCE_REGEN:
@@ -1873,14 +1933,20 @@ async def _copy_file_async(src: Path, dst: Path):
     except Exception as e:
         print(f"[static] Error copying {src} -> {dst}: {e}")
 
-def main():
-    """Main entry point - async only"""
+def main(argv: Optional[list[str]] = None) -> None:
+    """Main entry point - parse CLI args and run the async generator"""
+    parsed = parse_args(argv)
+    _set_runtime_args(parsed)
     print("Running in async mode...")
     asyncio.run(main_async())
 
-async def main_async():
-    """Asynchronous main function (only path)"""
+
+async def main_async(parsed: Optional[argparse.Namespace] = None) -> None:
+    """Asynchronous main function; optionally accept pre-parsed args"""
+    if parsed is not None:
+        _set_runtime_args(parsed)
     await generate_all_async(force_regenerate=FORCE_REGEN, division_filter=args.div)
+
 
 if __name__ == "__main__":
     main()

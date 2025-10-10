@@ -51,7 +51,7 @@ def safe_int(v: Any, default: Optional[int] = None) -> Optional[int]:
 
 def safe_float(v: Any, default: Optional[float] = None) -> Optional[float]:
     try:
-        # Faceit saattaa välillä antaa "1,23" → normalisoidaan pisteeseen
+        # Faceit may occasionally return "1,23"; normalize it to use a dot
         s = str(v).replace(",", ".")
         return float(s)
     except Exception:
@@ -215,7 +215,7 @@ def _extract_map_rows_from_stats(match_id: str, rounds: List[Dict[str, Any]]) ->
             "map_name": name,
             "score_team1": s1,
             "score_team2": s2,
-            "winner_team_id": rs.get("Winner") or rs.get("winner"),  # normalisoidaan myöhemmin
+            "winner_team_id": rs.get("Winner") or rs.get("winner"),  # normalized later
         })
     return rows
 
@@ -285,10 +285,10 @@ def _extract_rounds_from_stats(stats_json: Dict[str, Any]) -> List[Dict[str, Any
 
 def _derive_team_ids(details: Dict[str, Any], rounds: List[Dict[str, Any]]) -> tuple[Optional[str], Optional[str]]:
     """
-    Palauta (team1_id, team2_id) käyttäen:
-      1) rounds[*].teams[*].team_id (jos statsit on)
-      2) nimi-matchi rounds-datan tiiminimistä
-      3) FALLBACK: details.teams.faction*.faction_id (toimii ilman statseja)
+    Return (team1_id, team2_id) by checking, in order:
+      1) rounds[*].teams[*].team_id when stats are present
+      2) a name match against the team names in the rounds payload
+      3) FALLBACK: details.teams.faction*.faction_id to work without stats
     """
     f1_name = ((details.get("teams") or {}).get("faction1") or {}).get("name")
     f2_name = ((details.get("teams") or {}).get("faction2") or {}).get("name")
@@ -308,14 +308,14 @@ def _derive_team_ids(details: Dict[str, Any], rounds: List[Dict[str, Any]]) -> t
             if f2_name and tname and tname == f2_name and not t2_id:
                 t2_id = tid
 
-    # Jos nimi-match ei onnistunut, mutta roundsissa on 2 tiimiä
+    # If the name match failed but there are two teams in the rounds payload
     if (t1_id is None or t2_id is None) and len(seen_ids) >= 2:
         if t1_id is None:
             t1_id = seen_ids[0]
         if t2_id is None:
             t2_id = next((x for x in seen_ids if x != t1_id), seen_ids[1])
 
-    # UUSI: varmistus ilman statseja — poimi suoraan details.teams.faction*.faction_id
+    # Final fallback: pull details.teams.faction*.faction_id directly when stats are missing
     if t1_id is None or t2_id is None:
         t1_fid = (((details.get("teams") or {}).get("faction1") or {}).get("faction_id")) or None
         t2_fid = (((details.get("teams") or {}).get("faction2") or {}).get("faction_id")) or None
@@ -328,8 +328,8 @@ def _derive_team_ids(details: Dict[str, Any], rounds: List[Dict[str, Any]]) -> t
 
 def _normalize_team_ref(ref: Any, team1_id: Optional[str], team2_id: Optional[str]) -> Optional[str]:
     """
-    Muunna 'faction1'/'faction2'/'1'/'2'/'team1'/'team2' → oikea team_id.
-    Jos ref on jo ID, palautetaan sellaisenaan.
+    Convert 'faction1'/'faction2'/'1'/'2'/'team1'/'team2' into the real team_id.
+    If ref is already an ID, return it unchanged.
     """
     if ref is None:
         return None
@@ -340,7 +340,7 @@ def _normalize_team_ref(ref: Any, team1_id: Optional[str], team2_id: Optional[st
         return team2_id
     return str(ref)
 
-# Skipataanko kannassa jo valmiiksi finished-matsit (säästää API:a)?
+# Skip matches already finished in the database (saves API quota)?
 SKIP_FINISHED_IN_DB = True  
 
 def _db_match_snapshot(con: sqlite3.Connection, match_id: str) -> dict:
@@ -385,9 +385,9 @@ def _db_match_snapshot(con: sqlite3.Connection, match_id: str) -> dict:
 
 def _target_kind_from_status(item: dict) -> str:
     """
-    Map Faceit status → käsittelyluokka.
-      - 'finished' / 'closed' / 'played' → 'past' (haetaan statsit)
-      - muut ('ongoing', 'live', 'upcoming', 'scheduled', tms.) → 'upcoming'
+    Map Faceit status values into handling buckets.
+      - 'finished' / 'closed' / 'played' → 'past' (fetch stats)
+      - everything else ('ongoing', 'live', 'upcoming', 'scheduled', etc.) → 'upcoming'
     """
     st = str(item.get("status") or "").lower()
     past_statuses = {"finished", "closed", "played"}
@@ -395,7 +395,7 @@ def _target_kind_from_status(item: dict) -> str:
 
 def _list_matches_all(championship_id: str) -> list[dict]:
     """
-    Hae kaikki matsit kerralla (type=all), leimaa _target_kind ja nosta ydinkentät mukaan.
+    Fetch every match in one call (type=all), set _target_kind, and pull the core fields.
     """
     items = list_championship_matches(championship_id, match_type="all") or []
     out: list[dict] = []
@@ -404,7 +404,7 @@ def _list_matches_all(championship_id: str) -> list[dict]:
         f1 = teams.get("faction1") or {}
         f2 = teams.get("faction2") or {}
         out.append({
-            "_raw": it,  # talteen jos tarvitsee myöhemmin
+            "_raw": it,  # keep the raw payload in case we need it later
             "_target_kind": _target_kind_from_status(it),
             "match_id": it.get("match_id") or it.get("id"),
             "status": (it.get("status") or "").lower(),
@@ -755,7 +755,7 @@ def main(db_path: str, division_num: int = None) -> None:
             })
             champs.append(row)
 
-        # Käy kaikki divisioonat läpi yhdellä passilla / divisioona
+        # Walk through every division in a single pass per division
         for c in champs:
             _sync_division_one_pass(con, c)
 

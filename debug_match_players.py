@@ -2,7 +2,7 @@
 import os, sys, json, sqlite3
 from typing import Any, Dict
 
-# Käytetään olemassa olevaa clienttia (lukee FACEIT_API_KEY:n)
+# Reuse the existing client module (reads FACEIT_API_KEY for us)
 try:
     from faceit_client import get_match_details, get_match_stats
 except Exception as e:
@@ -29,7 +29,7 @@ def api_inspect(match_id: str, dump_json: bool=False) -> None:
         print("\n=== RAW stats ===")
         print(json.dumps(stats, indent=2, ensure_ascii=False))
 
-    # Yritetään Faceit stats -rakenne: rounds -> teams -> players
+    # Try to unpack the Faceit stats structure: rounds -> teams -> players
     rounds = stats.get("rounds") or []
     print(f"\n[API] rounds: {len(rounds)}")
     for ri, rnd in enumerate(rounds, start=1):
@@ -42,7 +42,7 @@ def api_inspect(match_id: str, dump_json: bool=False) -> None:
             for p in players:
                 nick = p.get("nickname") or p.get("player_nickname") or p.get("player_id")
                 pid  = p.get("player_id")
-                # Tulosta saatavilla olevat avaimet yhdellä rivillä
+                # Print the available keys on a single line
                 print(f"    - {nick} ({pid}) :: keys = [{flat_keys(p)}]")
 
 def db_inspect(match_id: str) -> None:

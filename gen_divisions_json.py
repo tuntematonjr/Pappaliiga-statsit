@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from faceit_client import list_championships_for_organizer
-from faceit_config import PAPPALIGA_ORG_ID
+from faceit_config import PAPPALIIGA_ORG_ID
 
 DIV_RX     = re.compile(r"(divisioona|division|mestaruussarja)", re.IGNORECASE)
 LEAD_NUM   = re.compile(r"^\s*(\d{1,3})\s*[\.\-]?\s*")
@@ -30,7 +30,7 @@ def parse_leading_divnum(name: str) -> Optional[int]:
     m = LEAD_NUM.match(name or "")
     if m:
         return int(m.group(1))
-    # Mestaruussarja: ei numeroa → käytetään aina 0, jotta pysyy listan kärjessä
+    # Mestaruussarja has no number → always use 0 so it stays at the top of lists
     if MESTAR_RX.search(name or ""):
         return 0
     return None
@@ -89,7 +89,7 @@ def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[s
         season = parse_season(name)
         po     = is_playoffs(name)
 
-        # NEW: Mestaruussarja fallback (jos parse ei jo palauttanut 0)
+        # NEW: Mestaruussarja fallback (if parsing did not already return 0)
         if dnum is None and MESTAR_RX.search(name):
             dnum = 0
 
@@ -197,7 +197,7 @@ def non_destructive_merge(existing: List[Dict[str, Any]],
 def main(out_path: str, dry_run: bool, min_season: int) -> None:
     out = Path(out_path)
     existing = load_existing(out)
-    discovered = discover_cs_divisions(PAPPALIGA_ORG_ID, min_season=min_season)
+    discovered = discover_cs_divisions(PAPPALIIGA_ORG_ID, min_season=min_season)
     final = non_destructive_merge(existing, discovered)
 
     if dry_run:
