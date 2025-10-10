@@ -118,9 +118,9 @@ def upsert_championship(con: sqlite3.Connection, row: Dict[str, Any]) -> Dict[st
 def upsert_team(con: sqlite3.Connection, team: Dict[str, Any]) -> None:
     """
     team = { team_id, name, avatar, updated_at? }
-    Takuut:
-      - tallennetaan aina jokin avatar (oletus jos puuttuu)
-      - ei ylikirjoiteta olemassa olevaa ei-tyhjää arvoa
+    Guarantees:
+      - always persist some avatar (default if missing)
+      - never overwrite an existing non-empty value
     """
     if "updated_at" not in team:
         team["updated_at"] = None
@@ -190,7 +190,7 @@ def get_teams_in_championship(con: sqlite3.Connection, division_id: int) -> list
     return [r for r in rows if r["team_id"]]
 
 def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id: str) -> dict:
-    # Haetaan VAIN pelatut kartat (join maps) → näistä johdetaan kaikki
+    # Fetch only played maps (join maps); everything else derives from these
     rows = query(con, """
         SELECT m.match_id, m.team1_id, m.team2_id,
                p.round_index, p.map_name, p.score_team1, p.score_team2, p.winner_team_id
@@ -200,12 +200,12 @@ def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id
         AND p.map_name <> 'forfeit'
     """, (division_id, team_id, team_id))
 
-    # Pelatut ottelut = distinct match_id karttariveistä
+    # Matches played = distinct match_id values in the map rows
     matches_played = len({r["match_id"] for r in rows})
     maps_played = len(rows)
     maps_w = sum(1 for r in rows if r.get("winner_team_id") == team_id)
 
-    # Round-difference joukkueen näkökulmasta
+    # Round difference from the team's perspective
     rd = 0
     for r in rows:
         s1 = r.get("score_team1") or 0
@@ -215,8 +215,8 @@ def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id
         elif r["team2_id"] == team_id:
             rd += (s2 - s1)
 
-    # Aggregaatit suoraan player_statsista (ei team_stats-taulua)
-    agg = query(con, """
+    # Aggregates directly from player_stats (no team_stats table)
+    agg_rows = query(con, """
         SELECT
           SUM(ps.kills)           AS kills,
           SUM(ps.deaths)          AS deaths,
@@ -226,10 +226,15 @@ def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id
         FROM player_stats ps
         JOIN matches m ON m.match_id = ps.match_id
         WHERE ps.team_id=? AND m.championship_id=?
-    """, (team_id, division_id))[0]
+    """, (team_id, division_id))
 
-    kills = agg["kills"] or 0
-    deaths = agg["deaths"] or 0
+    if agg_rows:
+        agg = agg_rows[0] or {}
+    else:
+        agg = {"kills": 0, "deaths": 0, "kr": 0.0, "adr": 0.0, "util": 0}
+
+    kills = agg.get("kills") or 0
+    deaths = agg.get("deaths") or 0
     kd = (kills / deaths) if deaths else float(kills)
 
     return {
@@ -239,9 +244,9 @@ def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id
         "l": maps_played - maps_w,
         "rd": rd,
         "kd": kd,
-        "kr": agg["kr"] or 0.0,
-        "adr": agg["adr"] or 0.0,
-        "util": agg["util"] or 0,
+        "kr": agg.get("kr") or 0.0,
+        "adr": agg.get("adr") or 0.0,
+        "util": agg.get("util") or 0,
     }
 
 
@@ -360,10 +365,10 @@ def compute_player_table_data(con: sqlite3.Connection, division_id: int, team_id
 
 def compute_champ_map_avgs_data(con: sqlite3.Connection, division_id: int) -> dict[str, tuple[float, float]]:
     """
-    Palauttaa {map_name: (kd, adr)} koko divisioonalle.
-    Lasketaan player_statsista:
-      - kd = SUM(kills) / SUM(deaths) kartalla
-      - adr = kierros-painotettu ADR kartalla (paino = kartan pelatut kierrokset = score1+score2)
+    Return {map_name: (kd, adr)} for the entire division.
+    Derived from player_stats:
+      - kd = SUM(kills) / SUM(deaths) on the map
+      - adr = round-weighted ADR on the map (weight = rounds played = score1+score2)
     """
     rows = query(con, """
         SELECT
@@ -391,11 +396,11 @@ def compute_champ_map_avgs_data(con: sqlite3.Connection, division_id: int) -> di
 
 def compute_map_stats_table_data(con, championship_id: int, team_id: str):
     """
-    Palauttaa listan rivejä [{map, played, picks, opp_picks, wins, games, wr,
-                               wins_own, games_own, wr_own,
-                               wins_opp, games_opp, wr_opp,
-                               kd, adr, rd, ban1, ban2, opp_ban, total_own_ban,
-                               decov}]
+    Return a list of rows [{map, played, picks, opp_picks, wins, games, wr,
+                             wins_own, games_own, wr_own,
+                             wins_opp, games_opp, wr_opp,
+                             kd, adr, rd, ban1, ban2, opp_ban, total_own_ban,
+                             decov}]
     """
     # Map pool for the season; fallbacks if not present
     pool = get_season_map_pool(con, championship_id)
@@ -428,7 +433,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
               AND (:team = m.team1_id OR :team = m.team2_id)
         ),
         team_maps AS (
-            -- Pelatut kartat + W/L sekä pick-alkuperä
+            -- Played maps + W/L and pick provenance
             SELECT
                 mp.map_name AS map,
                 CASE WHEN m.team1_id = :team THEN mp.score_team1 ELSE mp.score_team2 END AS rounds_for,
@@ -459,7 +464,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
               ON mp.match_id = m.match_id
              AND mp.round_index IS NOT NULL
         ),
-        -- Omat dropit indeksoituna (1./2. ban)
+        -- Team drops indexed (1st/2nd ban)
         team_drops AS (
             SELECT
                 v.match_id,
@@ -475,7 +480,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
             WHERE LOWER(v.status) = 'drop'
               AND v.selected_by_team_id = :team
         ),
-        -- Vastustajan dropit niissä matseissa joissa :team pelasi
+        -- Opponent drops in matches where :team played
         opp_drops AS (
             SELECT v.match_id, v.map_name
             FROM map_votes v
@@ -495,7 +500,7 @@ def compute_map_stats_table_data(con, championship_id: int, team_id: str):
                 COALESCE((SELECT COUNT(*) FROM team_drops td WHERE td.map_name = am.map AND td.drop_idx IN (1,2)), 0) AS total_own_ban
             FROM allmaps am
         ),
-        -- Joukkueen KD/ADR karttatasolla
+        -- Team KD/ADR per map
         perf AS (
             SELECT
                 mp.map_name AS map,
@@ -732,8 +737,8 @@ def compute_champ_thresholds_data(con: sqlite3.Connection, division_id: int) -> 
 
 def upsert_match(con: sqlite3.Connection, row: dict) -> None:
     """
-    Upsert 'matches' header. last_seen_at päivittyy aina.
-    Ei tallenna joukkueiden nimiä; nimet haetaan teams-taulusta.
+    Upsert the 'matches' header. last_seen_at is always refreshed.
+    Team names are not stored; they are sourced from the teams table.
     """
     sql = """
     INSERT INTO matches(
@@ -1170,7 +1175,7 @@ def compute_team_summary_with_delta(con: sqlite3.Connection, division_id: int, t
     prev = _summary_until(prev_cutoff)
     curr = _summary_until(curr_ts)
 
-    # Jos ennen viimeisintä ei ollut dataa → delta None
+    # If nothing existed before the most recent match, keep delta as None
     if (prev["matches_played"]==0 and prev["maps_played"]==0 and prev["w"]==0 and prev["l"]==0 and
         prev["rd"]==0 and prev["kd"]==0.0 and prev["kr"]==0.0 and prev["adr"]==0.0 and prev["util"]==0):
         return {"curr": curr, "prev": None, "delta": None}
@@ -1268,7 +1273,7 @@ def _player_agg_until(con: sqlite3.Connection, division_id: int, team_id: str, p
 def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: str) -> dict[str, dict]:
     """
     Delta = (agg <= curr_ts) - (agg <= curr_ts-1)
-    eli viimeisimmän matsin nettovaikutus kumulatiivisiin arvoihin.
+    i.e., the net impact of the latest match on cumulative metrics.
     """
     curr_ts, _ = _get_team_last_prev_ts(con, division_id, team_id)
     if curr_ts is None:
@@ -1276,7 +1281,7 @@ def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: st
 
     prev_cutoff = max(0, int(curr_ts) - 1)
 
-    # Kauden pelaajat (joilta on havaittu statsia)
+    # Players in the season (anyone with observed stats)
     pids = [r["player_id"] for r in query(con, """
       SELECT DISTINCT ps.player_id
       FROM player_stats ps
@@ -1289,7 +1294,7 @@ def compute_player_deltas(con: sqlite3.Connection, division_id: int, team_id: st
         prev = _player_agg_until(con, division_id, team_id, pid, prev_cutoff)
         curr = _player_agg_until(con, division_id, team_id, pid, curr_ts)
 
-        # Jos ennen viimeisintä ei ollut mitään, näytä prev=None, delta=None (UI näyttää "(no prev)")
+        # If there was nothing before the latest match, expose prev=None and delta=None (UI shows "(no prev)")
         if prev["maps_played"] == 0 and prev["rounds"] == 0 and prev["kills"] == 0 and prev["deaths"] == 0 and prev["assists"] == 0:
             out[pid] = {"curr": curr, "prev": None, "delta": None}
         else:
