@@ -1333,23 +1333,15 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
     html.append('<div class="stat-card">')
     html.append('<div class="stat-icon">🎯</div>')
     html.append(f'<div class="stat-value">{div_summary["rounds"]}</div>')
+    html.append('<div class="stat-label">Karttaa Pelattu</div>')
+    html.append('</div>')
+
+    html.append('<div class="stat-card">')
+    html.append('<div class="stat-icon">🎯</div>')
+    html.append(f'<div class="stat-value">{div_summary["rounds"]}</div>')
     html.append('<div class="stat-label">Erää Pelattu</div>')
     html.append('</div>')
 
-    if banned_count:
-        html.append('<div class="stat-card stat-card--warning">')
-        html.append('<div class="stat-icon">🚫</div>')
-        html.append(f'<div class="stat-value">{banned_count}</div>')
-        html.append('<div class="stat-label">Banned Teams</div>')
-        html.append('</div>')
-
-    # Performance stats with tooltips
-    # html.append(f'<div class="stat-card performance" title="{TOOLTIP_WMED}">')
-    # html.append('<div class="stat-icon">💀</div>')
-    # html.append(f'<div class="stat-value">{div_summary["kd_p50"]:.2f}</div>')
-    # html.append('<div class="stat-label">Median K/D</div>')
-    # html.append(f'<div class="stat-range">{div_summary["kd_p25"]:.2f}-{div_summary["kd_p75"]:.2f}</div>')
-    # html.append('</div>')
 
     html.append(f'<div class="stat-card performance" title="{TOOLTIP_WMED}">')
     html.append('<div class="stat-icon">💥</div>')
