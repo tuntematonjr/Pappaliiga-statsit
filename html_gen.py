@@ -8,8 +8,8 @@ import aiofiles
 import aiofiles.os
 import argparse
 from collections import defaultdict
-from typing import Optional
-from faceit_config import DIVISIONS, TOOL_VERSION
+from typing import Any, Optional
+from faceit_config import DIVISIONS, TOOL_VERSION, CURRENT_SEASON
 from html import escape
 import hashlib, tempfile, re
 import time
@@ -17,25 +17,22 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from stats_utils import weighted_percentile, weighted_median
-from division_overrides import load_division_overrides, banned_teams_for_division
+from division_overrides import combined_status_teams, load_division_overrides
 
-from db import (
-    get_map_art, normalize_map_id,
-    get_division_generated_ts,
-    query,
-)
 from async_db import (
-    AsyncConnectionPool,
-    query_async,
-    get_teams_in_championship_async,
-    compute_team_summary_data_async,
     compute_champ_map_avgs_data_async,
-    compute_champ_thresholds_data_async,
-    get_division_generated_ts_async,
-    compute_player_table_data_async,
-    compute_player_deltas_async,
-    compute_champ_player_summary_async,
     compute_champ_map_summary_data_async,
+    compute_champ_player_summary_async,
+    compute_champ_thresholds_data_async,
+    compute_player_deltas_async,
+    compute_player_table_data_async,
+    compute_team_summary_data_async,
+    DEFAULT_TEAM_AVATAR,
+    get_division_generated_ts_async,
+    get_map_art_async,
+    get_teams_in_championship_async,
+    normalize_map_id,
+    query_async,
 )
 
 
@@ -70,7 +67,6 @@ _GENMETA_RE = re.compile(
 # runtime values set when page_start() is called
 CURRENT_GEN_TS: int = 0
 CURRENT_LAST_MATCH: int = 0
-DB_PATH = str(Path(__file__).with_name("pappaliiga.db"))
 OUT_DIR = Path(__file__).with_name("docs")
 _DIVISION_OVERRIDES = load_division_overrides()
 
@@ -162,9 +158,43 @@ def format_ts(ts: int | None) -> str:
     return dt.strftime("%d.%m.%Y %H:%M")
 
 
+def _build_championship_cte(cte_name: str, ids: list[Any]) -> tuple[str, dict[str, Any]]:
+    """Return a UNION ALL CTE enumerating ``ids`` as championship identifiers."""
+
+    selects: list[str] = []
+    params: dict[str, Any] = {}
+    for idx, cid in enumerate(ids):
+        alias = " AS championship_id" if idx == 0 else ""
+        selects.append(f"SELECT :{cte_name}{idx}{alias}")
+        params[f"{cte_name}{idx}"] = cid
+    body = "\n        UNION ALL\n        ".join(selects)
+    return (f"{cte_name} AS (\n        {body}\n    )", params)
+
+
 def _format_banned_team_summary(team: dict) -> str:
     """Return escaped team name for banners/navigation."""
     return escape(team.get("team_name") or team.get("team_id") or "-")
+
+def _get_excluded_team_ids_for_championships(championship_ids: list[str]) -> set[str]:
+    """
+    Get banned/quit team IDs for specific championships only.
+    Bans and quits are season-specific and should not affect other seasons.
+    """
+    excluded = set()
+    overrides = _DIVISION_OVERRIDES
+    
+    for champ_id in championship_ids:
+        # Check banned_teams for this championship
+        if champ_id in overrides:
+            for entry in overrides[champ_id].get("banned_teams", []):
+                if entry.get("team_id"):
+                    excluded.add(entry["team_id"])
+            # Check quit_teams for this championship
+            for entry in overrides[champ_id].get("quit_teams", []):
+                if entry.get("team_id"):
+                    excluded.add(entry["team_id"])
+    
+    return excluded
 
 def _fs_mtime(path: Path) -> int:
     try:
@@ -414,15 +444,15 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
         "leaders": leaders,
     }
 
-async def _index_card_stats_async(pool: AsyncConnectionPool, championship_id: str) -> tuple[int, int, int]:
+async def _index_card_stats_async(championship_id: str, excluded_team_ids: set[str] | None = None) -> tuple[int, int, int]:
     """
     Async version of _index_card_stats.
     Returns (teams, played, total) for the index card.
-    - teams: unique teams (team1_id ∪ team2_id)
+    - teams: unique teams (team1_id ∪ team2_id), excluding banned/quit teams
     - played: matches finished (finished_at IS NOT NULL OR status='finished')
     - total: all matches in the database
     """
-    r = await query_async(pool, """
+    r = await query_async("""
       SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN finished_at IS NOT NULL OR LOWER(COALESCE(status,''))='finished'
@@ -433,25 +463,50 @@ async def _index_card_stats_async(pool: AsyncConnectionPool, championship_id: st
     total = int((r[0]["total"] or 0)) if r else 0
     played = int((r[0]["played"] or 0)) if r else 0
 
-    teams = await query_async(pool, """
-      SELECT COUNT(*) AS c FROM (
-        SELECT team1_id AS tid FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
-        UNION
-        SELECT team2_id AS tid FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
-      )
-    """, (championship_id, championship_id))
+    # Build exclusion clause for banned/quit teams
+    params = {"champ_id1": championship_id, "champ_id2": championship_id}
+    exclusion_clause_team1 = ""
+    exclusion_clause_team2 = ""
+    if excluded_team_ids:
+        excluded_list = list(excluded_team_ids)
+        for idx, team_id in enumerate(excluded_list):
+            params[f"excl_{idx}"] = team_id
+        placeholders = ", ".join([f":excl_{idx}" for idx in range(len(excluded_list))])
+        exclusion_clause_team1 = f"AND team1_id NOT IN ({placeholders})"
+        exclusion_clause_team2 = f"AND team2_id NOT IN ({placeholders})"
+
+    teams = await query_async(f"""
+            SELECT COUNT(*) AS c FROM (
+                SELECT team1_id AS tid FROM matches WHERE championship_id=:champ_id1 AND team1_id IS NOT NULL {exclusion_clause_team1}
+                UNION
+                SELECT team2_id AS tid FROM matches WHERE championship_id=:champ_id2 AND team2_id IS NOT NULL {exclusion_clause_team2}
+            ) AS teams_union
+        """, params)
     team_cnt = int((teams[0]["c"] or 0)) if teams else 0
 
     return (team_cnt, played, total)
 
-async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisions: list[dict]) -> dict:
+async def _calculate_comprehensive_stats_async(divisions: list[dict]) -> dict:
     """
     Calculate comprehensive statistics across all seasons and divisions.
     Returns detailed stats for display on the index page.
+    Note: Bans/quits are season-specific and only affect their respective championships.
     """
+    seasons_present = sorted({int(div.get("season") or 0) for div in divisions if div.get("season") is not None})
+    configured_current_season = int(CURRENT_SEASON)
+    current_season = configured_current_season
+    if seasons_present:
+        if current_season not in seasons_present:
+            current_season = seasons_present[-1]
+    previous_candidates = [season for season in seasons_present if season < current_season]
+    if previous_candidates:
+        previous_season = previous_candidates[-1]
+    else:
+        previous_season = current_season - 1 if current_season > 0 else 0
+
     stats = {
-        "current_season": 11,
-        "previous_season": 10,
+        "current_season": current_season,
+        "previous_season": previous_season,
         "total_divisions": 0,
         "total_regular_teams": 0,  # Only regular season teams
         "total_regular_players": 0,  # Only regular season players
@@ -473,6 +528,7 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
         season = int(div.get("season", 0))
         by_season.setdefault(season, []).append(div)
     
+
     # Calculate stats for each season
     for season, season_divs in by_season.items():
         num_regular_divs = len([d for d in season_divs if not d.get("is_playoffs", 0)])
@@ -480,8 +536,8 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
         season_stats = {
             "divisions": num_regular_divs,
             "playoff_divisions": num_playoff_divs,
-            "teams": 0,  # Unique teams in regular season only
-            "players": 0,  # Unique players in regular season only
+            "teams": 0,  # Unique teams in regular season only (excludes banned/quit)
+            "players": 0,  # Unique players in regular season only (excludes banned/quit teams)
             "matches_played": 0,
             "matches_total": 0,
             "playoffs_matches_played": 0,
@@ -497,39 +553,79 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
             "playoffs_completion_rate": 0.0,
             "regular_completion_rate": 0.0
         }
-        
-        # Calculate unique teams and players for regular season only in this season
+
+        # --- Season-specific exclusion logic for banned/quit teams ---
         regular_season_divs = [d for d in season_divs if not d.get("is_playoffs", 0)]
         if regular_season_divs:
-            # Get unique teams from regular season divisions
             regular_championship_ids = [d["championship_id"] for d in regular_season_divs]
-            placeholders = ','.join(['?' for _ in regular_championship_ids])
-            
-            teams_result = await query_async(pool, f"""
-                SELECT COUNT(DISTINCT team_id) as team_count
+            season_excluded_teams = _get_excluded_team_ids_for_championships(regular_championship_ids)
+
+            # Build CTE and exclusion clause for teams
+            champ_cte_sql, champ_params = _build_championship_cte("champ_ids", regular_championship_ids)
+            excluded_list = list(season_excluded_teams) if season_excluded_teams else []
+            if excluded_list:
+                for idx, team_id in enumerate(excluded_list):
+                    champ_params[f"excl_team_{idx}"] = team_id
+                placeholders = ", ".join([f":excl_team_{idx}" for idx in range(len(excluded_list))])
+                exclusion_clause_team1 = f"AND m.team1_id NOT IN ({placeholders})"
+                exclusion_clause_team2 = f"AND m.team2_id NOT IN ({placeholders})"
+            else:
+                exclusion_clause_team1 = ""
+                exclusion_clause_team2 = ""
+
+            # Unique teams (regular season, excluding banned/quit)
+            teams_result = await query_async(
+                f"""
+                WITH {champ_cte_sql}
+                SELECT COUNT(DISTINCT team_id) AS team_count
                 FROM (
-                    SELECT team1_id as team_id FROM matches WHERE championship_id IN ({placeholders}) AND team1_id IS NOT NULL
+                    SELECT m.team1_id AS team_id
+                    FROM matches m
+                    JOIN champ_ids c ON c.championship_id = m.championship_id
+                    WHERE m.team1_id IS NOT NULL {exclusion_clause_team1}
                     UNION
-                    SELECT team2_id as team_id FROM matches WHERE championship_id IN ({placeholders}) AND team2_id IS NOT NULL
-                )
-            """, regular_championship_ids + regular_championship_ids)
+                    SELECT m.team2_id AS team_id
+                    FROM matches m
+                    JOIN champ_ids c ON c.championship_id = m.championship_id
+                    WHERE m.team2_id IS NOT NULL {exclusion_clause_team2}
+                ) AS combined
+                """,
+                champ_params,
+            )
             season_stats["teams"] = int((teams_result[0]["team_count"] or 0)) if teams_result else 0
-            
-            # Get unique players from regular season divisions
-            players_result = await query_async(pool, f"""
-                SELECT COUNT(DISTINCT ps.player_id) as player_count
+
+            # Build exclusion clause for players in banned/quit teams
+            champ_cte_sql, champ_params = _build_championship_cte("champ_ids", regular_championship_ids)
+            if excluded_list:
+                for idx, team_id in enumerate(excluded_list):
+                    champ_params[f"excl_team_p_{idx}"] = team_id
+                placeholders = ", ".join([f":excl_team_p_{idx}" for idx in range(len(excluded_list))])
+                player_exclusion_clause = f"AND ps.team_id NOT IN ({placeholders})"
+            else:
+                player_exclusion_clause = ""
+
+            # Unique players (regular season, excluding banned/quit teams)
+            players_result = await query_async(
+                f"""
+                WITH {champ_cte_sql}
+                SELECT COUNT(DISTINCT ps.player_id) AS player_count
                 FROM player_stats ps
                 JOIN matches m ON ps.match_id = m.match_id
-                WHERE m.championship_id IN ({placeholders}) AND ps.player_id IS NOT NULL
-            """, regular_championship_ids)
+                JOIN champ_ids c ON c.championship_id = m.championship_id
+                WHERE ps.player_id IS NOT NULL {player_exclusion_clause}
+                """,
+                champ_params,
+            )
             season_stats["players"] = int((players_result[0]["player_count"] or 0)) if players_result else 0
         
         # Calculate aggregated stats for this season
         for div in season_divs:
-            teams, played, total = await _index_card_stats_async(pool, div["championship_id"])
+            # Get excluded teams for this specific division
+            div_excluded_teams = _get_excluded_team_ids_for_championships([div["championship_id"]])
+            teams, played, total = await _index_card_stats_async(div["championship_id"], div_excluded_teams)
             
             # Get map count for this division (exclude forfeits)
-            maps_result = await query_async(pool, """
+            maps_result = await query_async("""
                 SELECT COUNT(*) as map_count
                 FROM maps mp
                 JOIN matches m ON mp.match_id = m.match_id
@@ -541,7 +637,7 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
             map_count = int((maps_result[0]["map_count"] or 0)) if maps_result else 0
             
             # Get kills, deaths, and rounds for this division
-            stats_result = await query_async(pool, """
+            stats_result = await query_async("""
                 SELECT 
                     SUM(ps.kills) as total_kills,
                     SUM(ps.deaths) as total_deaths
@@ -553,7 +649,7 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
             deaths = int((stats_result[0]["total_deaths"] or 0)) if stats_result else 0
 
             # Only count rounds for real played maps (exclude forfeits, include walkovers)
-            rounds_result = await query_async(pool, """
+            rounds_result = await query_async("""
                 SELECT SUM(mp.score_team1 + mp.score_team2) as real_rounds
                 FROM maps mp
                 JOIN matches m ON mp.match_id = m.match_id
@@ -622,25 +718,64 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
         all_regular_championships.extend([d["championship_id"] for d in regular_divs])
     
     if all_regular_championships:
-        # Get unique teams across ALL regular season divisions
-        placeholders = ','.join(['?' for _ in all_regular_championships])
-        global_teams_result = await query_async(pool, f"""
-            SELECT COUNT(DISTINCT team_id) as team_count
+        # Get excluded teams for all regular championships (season-specific)
+        global_excluded_teams = _get_excluded_team_ids_for_championships(all_regular_championships)
+        
+        # Get unique teams across ALL regular season divisions (exclude banned/quit)
+        champ_cte_sql, champ_params = _build_championship_cte("global_champ_ids", all_regular_championships)
+        
+        # Build exclusion clause for banned/quit teams
+        global_exclusion_clause = ""
+        if global_excluded_teams:
+            excluded_list = list(global_excluded_teams)
+            for idx, team_id in enumerate(excluded_list):
+                champ_params[f"global_excl_{idx}"] = team_id
+            placeholders = ", ".join([f":global_excl_{idx}" for idx in range(len(excluded_list))])
+            global_exclusion_clause = f"AND team_id NOT IN ({placeholders})"
+        
+        global_teams_result = await query_async(
+            f"""
+            WITH {champ_cte_sql}
+            SELECT COUNT(DISTINCT team_id) AS team_count
             FROM (
-                SELECT team1_id as team_id FROM matches WHERE championship_id IN ({placeholders}) AND team1_id IS NOT NULL
+                SELECT m.team1_id AS team_id
+                FROM matches m
+                JOIN global_champ_ids c ON c.championship_id = m.championship_id
+                WHERE m.team1_id IS NOT NULL {global_exclusion_clause.replace('team_id', 'm.team1_id')}
                 UNION
-                SELECT team2_id as team_id FROM matches WHERE championship_id IN ({placeholders}) AND team2_id IS NOT NULL
-            )
-        """, all_regular_championships + all_regular_championships)
+                SELECT m.team2_id AS team_id
+                FROM matches m
+                JOIN global_champ_ids c ON c.championship_id = m.championship_id
+                WHERE m.team2_id IS NOT NULL {global_exclusion_clause.replace('team_id', 'm.team2_id')}
+            ) AS combined
+            """,
+            champ_params,
+        )
         stats["total_regular_teams"] = int((global_teams_result[0]["team_count"] or 0)) if global_teams_result else 0
         
-        # Get unique players across ALL regular season divisions
-        global_players_result = await query_async(pool, f"""
-            SELECT COUNT(DISTINCT ps.player_id) as player_count
+        # Get unique players across ALL regular season divisions (exclude players from banned/quit teams)
+        champ_cte_sql, champ_params = _build_championship_cte("global_champ_ids", all_regular_championships)
+        
+        # Build exclusion clause for players in banned/quit teams (use global_excluded_teams)
+        global_player_exclusion_clause = ""
+        if global_excluded_teams:
+            excluded_list = list(global_excluded_teams)
+            for idx, team_id in enumerate(excluded_list):
+                champ_params[f"global_excl_p_{idx}"] = team_id
+            placeholders = ", ".join([f":global_excl_p_{idx}" for idx in range(len(excluded_list))])
+            global_player_exclusion_clause = f"AND ps.team_id NOT IN ({placeholders})"
+        
+        global_players_result = await query_async(
+            f"""
+            WITH {champ_cte_sql}
+            SELECT COUNT(DISTINCT ps.player_id) AS player_count
             FROM player_stats ps
             JOIN matches m ON ps.match_id = m.match_id
-            WHERE m.championship_id IN ({placeholders}) AND ps.player_id IS NOT NULL
-        """, all_regular_championships)
+            JOIN global_champ_ids c ON c.championship_id = m.championship_id
+            WHERE ps.player_id IS NOT NULL {global_player_exclusion_clause}
+            """,
+            champ_params,
+        )
         stats["total_regular_players"] = int((global_players_result[0]["player_count"] or 0)) if global_players_result else 0
     else:
         stats["total_regular_teams"] = 0
@@ -650,12 +785,12 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
 
 ## (legacy helper removed) maybe_render_index
 
-async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dict]) -> str:
+async def render_index_pure_async(divisions: list[dict]) -> str:
     """
     Async version of render_index - pure async implementation.
     """
     # Calculate comprehensive statistics
-    stats = await _calculate_comprehensive_stats_async(pool, divisions)
+    stats = await _calculate_comprehensive_stats_async(divisions)
     
     # Group divisions by season
     by_season: dict[int, list[dict]] = {}
@@ -913,7 +1048,7 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
             href = f"{slug}.html" if slug else "index.html"
 
             # --- async database calls ---
-            ts_epoch = await get_division_generated_ts_async(pool, div["championship_id"])
+            ts_epoch = await get_division_generated_ts_async(div["championship_id"])
             updated_str = format_ts(ts_epoch)  # returns '—' when None
             gen_tooltip = ''
             gen_note = ''
@@ -925,8 +1060,9 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
                 gen_tooltip = ''
                 gen_note = ''
 
-            # Baseline stats for the summary card
-            teams, played, total = await _index_card_stats_async(pool, div["championship_id"])
+            # Baseline stats for the summary card (exclude banned/quit teams for this championship)
+            div_excluded_teams = _get_excluded_team_ids_for_championships([div["championship_id"]])
+            teams, played, total = await _index_card_stats_async(div["championship_id"], div_excluded_teams)
 
             # Calculate progress percentage
             progress_pct = int((played / total * 100)) if total > 0 else 0
@@ -1103,7 +1239,7 @@ async def render_index_pure_async(pool: AsyncConnectionPool, divisions: list[dic
 # ------------------------------
 # Async Rendering Functions
 # ------------------------------
-async def render_division_async(pool: AsyncConnectionPool, div: dict) -> None:
+async def render_division_async(div: dict) -> None:
     """Pure async division renderer that generates division HTML files concurrently.
 
     Uses async team rendering helpers for true concurrency and performance.
@@ -1114,7 +1250,7 @@ async def render_division_async(pool: AsyncConnectionPool, div: dict) -> None:
     out_path = OUT_DIR / f"{div['slug']}.html"
 
     # Smarter skip: DB last_seen / GENVER
-    do_render, reason = await should_render_division_async(pool, div, str(out_path))
+    do_render, reason = await should_render_division_async(div, str(out_path))
     if not FORCE_REGEN:
         if do_render:
             print(f"[render] {out_path} ({reason})")
@@ -1128,11 +1264,11 @@ async def render_division_async(pool: AsyncConnectionPool, div: dict) -> None:
     else:
         print(f"[timer] START division {div['slug']} at {start:.2f}s")
     # Pure async rendering using new team helpers
-    await _render_division_pure_async(pool, div)
+    await _render_division_pure_async(div)
     end = time.perf_counter()
     print(f"[timer] END division {div['slug']} at {end:.2f}s (duration: {end-start:.2f}s)")
 
-async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> Path:
+async def _render_division_pure_async(div: dict) -> Path:
     """
     Core async division rendering logic using team helpers for concurrency.
     """
@@ -1140,24 +1276,24 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     from async_db import render_team_card_async
     
     overrides = _DIVISION_OVERRIDES
-    banned_entries = banned_teams_for_division(div["championship_id"], overrides)
-    banned_ids = {entry.get("team_id") for entry in banned_entries if entry.get("team_id")}
+    status_entries = combined_status_teams(div["championship_id"], overrides)
+    banned_ids = {entry.get("team_id") for entry in status_entries if entry.get("team_id")}
 
     # Get teams and thresholds concurrently
-    teams_task = get_teams_in_championship_async(pool, div["championship_id"])
-    thresholds_task = compute_champ_thresholds_data_async(pool, div["championship_id"], banned_ids)
-    map_avgs_task = compute_champ_map_avgs_data_async(pool, div["championship_id"], banned_ids)
+    teams_task = get_teams_in_championship_async( div["championship_id"])
+    thresholds_task = compute_champ_thresholds_data_async( div["championship_id"], banned_ids)
+    map_avgs_task = compute_champ_map_avgs_data_async( div["championship_id"], banned_ids)
     div_summary_task = compute_champ_player_summary_async(
-        pool, div["championship_id"], min_rounds=20, excluded_team_ids=banned_ids
+        div["championship_id"], min_rounds=20, excluded_team_ids=banned_ids
     )
-    map_summary_task = compute_champ_map_summary_data_async(pool, div["championship_id"], banned_ids)
-    timestamp_task = get_division_generated_ts_async(pool, div["championship_id"])
+    map_summary_task = compute_champ_map_summary_data_async( div["championship_id"], banned_ids)
+    timestamp_task = get_division_generated_ts_async( div["championship_id"])
 
     teams, thresholds, div_avgs, div_summary, map_summary, ts_epoch = await asyncio.gather(
         teams_task, thresholds_task, map_avgs_task, div_summary_task, map_summary_task, timestamp_task
     )
 
-    banned_lookup = {item["team_id"]: item for item in banned_entries}
+    banned_lookup = {item["team_id"]: item for item in status_entries}
 
     augmented: list[dict] = []
     existing_ids: set[str] = set()
@@ -1170,15 +1306,16 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
             team = dict(team)
             team["is_banned"] = True
             team["ban_reason"] = info.get("reason")
-            team["banned_at"] = info.get("banned_at")
+            team["banned_at"] = info.get("banned_at") or info.get("quit_at")
             team["ban_note"] = info.get("note")
+            team["status"] = info.get("status", "banned")
             if info.get("team_name") and not (team.get("team_name")):
                 team["team_name"] = info["team_name"]
             if info.get("avatar") and not team.get("avatar"):
                 team["avatar"] = info["avatar"]
         augmented.append(team)
 
-    for info in banned_entries:
+    for info in status_entries:
         tid = info.get("team_id")
         if tid and tid not in existing_ids:
             augmented.append({
@@ -1187,8 +1324,9 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
                 "avatar": info.get("avatar") or "",
                 "is_banned": True,
                 "ban_reason": info.get("reason"),
-                "banned_at": info.get("banned_at"),
+                "banned_at": info.get("banned_at") or info.get("quit_at"),
                 "ban_note": info.get("note"),
+                "status": info.get("status", "banned"),
             })
 
     teams = sorted(
@@ -1199,11 +1337,20 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     for team in teams:
         base_name = team.get("team_name") or team.get("team_id") or "-"
         if team.get("is_banned"):
-            team["display_name"] = f"{base_name} (BANNED)"
+            # Check status metadata to determine display text
+            status = team.get("status") or "banned"
+            if status == "quit":
+                team["display_name"] = f"{base_name} (Keskeyttänyt)"
+                team["css_class"] = "team-quit"
+            else:
+                team["display_name"] = f"{base_name} (BANNED)"
+                team["css_class"] = "team-banned"
         else:
             team["display_name"] = base_name
+            team["css_class"] = ""
 
-    div_summary["teams"] = len({t.get("team_id") for t in teams if t.get("team_id")})
+    # Count only active teams (exclude banned/quit teams from totals)
+    div_summary["teams"] = len({t.get("team_id") for t in teams if t.get("team_id") and not t.get("is_banned")})
 
     # Format timestamp
     ts_str = format_ts(ts_epoch) if ts_epoch else "—"
@@ -1245,6 +1392,9 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
         css_classes = []
         if t.get("is_banned"):
             css_classes.append("is-banned")
+        # Add status-based CSS class
+        if t.get("css_class"):
+            css_classes.append(t.get("css_class"))
         class_attr = f' class="{" ".join(css_classes)}"' if css_classes else ""
         html.append(
             f'<a href="#team-{t["team_id"]}"{class_attr}>{logo}'
@@ -1254,7 +1404,7 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
 
     # Division summary section
     try:
-        summary_html = await _render_division_summary_async(pool, div, div_summary, map_summary, teams)
+        summary_html = await _render_division_summary_async(div, div_summary, map_summary, teams)
         html.extend(summary_html)
     except Exception as e:
         print(f"ERROR in _render_division_summary_async: {e}")
@@ -1267,7 +1417,7 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     # Render all team cards concurrently - this is where we get the performance boost!
     team_tasks = []
     for i, team in enumerate(teams, start=1):
-        task = render_team_card_async(pool, div, team, i, teams, thresholds, div_avgs, banned_ids)
+        task = render_team_card_async( div, team, i, teams, thresholds, div_avgs, banned_ids)
         team_tasks.append(task)
     
     # Wait for all team cards and add to HTML
@@ -1289,11 +1439,10 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     
     return out_path
 
-async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, div_summary: dict, map_summary: dict, teams: list[dict]) -> list[str]:
+async def _render_division_summary_async(div: dict, div_summary: dict, map_summary: dict, teams: list[dict]) -> list[str]:
     """
     Render the division summary section with stats and leaders.
     """
-    from async_db import map_pretty_name_async, get_map_art_async
     
     html = []
     
@@ -1333,12 +1482,6 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
     html.append('<div class="stat-card">')
     html.append('<div class="stat-icon">🎯</div>')
     html.append(f'<div class="stat-value">{div_summary["rounds"]}</div>')
-    html.append('<div class="stat-label">Karttaa Pelattu</div>')
-    html.append('</div>')
-
-    html.append('<div class="stat-card">')
-    html.append('<div class="stat-icon">🎯</div>')
-    html.append(f'<div class="stat-value">{div_summary["rounds"]}</div>')
     html.append('<div class="stat-label">Erää Pelattu</div>')
     html.append('</div>')
 
@@ -1364,19 +1507,12 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
     html.append('<div class="stat-label">Median Survival</div>')
     html.append(f'<div class="stat-range">{div_summary["surv_p25"]:.0f}%-{div_summary["surv_p75"]:.0f}%</div>')
     html.append('</div>')
-
-    # html.append(f'<div class="stat-card performance" title="{esc_title(TOOLTIP_RATING1)}">')
-    # html.append('<div class="stat-icon">⭐</div>')
-    # html.append(f'<div class="stat-value">{div_summary["r1_p50"]:.2f}</div>')
-    # html.append('<div class="stat-label">Median Rating1</div>')
-    # html.append(f'<div class="stat-range">{div_summary["r1_p25"]:.2f}-{div_summary["r1_p75"]:.2f}</div>')
-    # html.append('</div>')
     
     html.append('</div>')  # /stats-grid
     html.append('</section>')  # /stats-overview
 
     # Query the actual map pool for this championship/season
-    pool_rows = await query_async(pool, """
+    pool_rows = await query_async("""
         SELECT DISTINCT mp.map_name AS map_id
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
@@ -1394,7 +1530,7 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
     banned_counts = {map_name: count for map_name, count in map_summary["top_banned"]}
 
     # Get rounds played per map for this championship
-    rounds_rows = await query_async(pool, """
+    rounds_rows = await query_async("""
         SELECT mp.map_name, SUM(mp.score_team1 + mp.score_team2) as rounds_played
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
@@ -1411,7 +1547,7 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
         played = played_counts.get(map_id, 0)
         banned = banned_counts.get(map_id, 0)
         rounds = map_rounds.get(map_id, 0)
-        map_art = await get_map_art_async(pool, map_id)
+        map_art = await get_map_art_async(map_id)
         pretty = map_id
         img_url = ''
         if map_art:
@@ -1534,8 +1670,8 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
                 if leaders[stat_key][0] != "-":
                     for team in teams:
                         if team.get("team_name") == leaders[stat_key][1] or team.get("team_id") == leaders[stat_key][1]:
-                            if team.get("avatar"):
-                                team_logo = f'<img class="logo leader-team-logo" src="{team["avatar"]}" alt="{team_name}" loading="lazy">'
+                            team_avatar = team.get("avatar") or DEFAULT_TEAM_AVATAR
+                            team_logo = f'<img class="logo leader-team-logo" src="{team_avatar}" alt="{team_name}" loading="lazy">'
                             break
                 
                 # Create detailed tooltip with breakdown
@@ -1607,7 +1743,7 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
     
     return html
 
-async def should_render_division_async(pool: AsyncConnectionPool, div: dict, out_path: str) -> tuple[bool, str]:
+async def should_render_division_async(div: dict, out_path: str) -> tuple[bool, str]:
     """Async decision for division regeneration, including GENVER check."""
     p = Path(out_path)
     if not p.exists():
@@ -1618,11 +1754,17 @@ async def should_render_division_async(pool: AsyncConnectionPool, div: dict, out
     except OSError:
         return True, "stat error"
 
+    # Allow small clock drift/rounding differences between DB and filesystem
+    STALE_EPSILON = 2
+
     # 1) DB timestamp guard
-    db_ts = await get_division_generated_ts_async(pool, div["championship_id"])
+    db_ts = await get_division_generated_ts_async(div["championship_id"])
     if db_ts is None:
-        return True, "no DB timestamp"
-    if db_ts > mtime:
+        # No matches exist for this championship yet
+        # If HTML already exists, don't regenerate (empty championship placeholder)
+        # If HTML missing, we'll render it once (handled by the exists() check above)
+        return False, "no matches in DB, keeping existing HTML"
+    if (db_ts - mtime) > STALE_EPSILON:
         return True, f"db last_seen {int(db_ts)} > html mtime {int(mtime)}"
 
     # 2) Template version guard
@@ -1633,19 +1775,19 @@ async def should_render_division_async(pool: AsyncConnectionPool, div: dict, out
     # 3) LAST_MATCH guard from embedded meta (if present)
     embedded_meta = _read_embedded_meta(out_path)
     embedded_last = embedded_meta[2] if embedded_meta else 0
-    if embedded_last and embedded_last > mtime:
+    if embedded_last and (embedded_last - mtime) > STALE_EPSILON:
         return True, f"embedded last_match {int(embedded_last)} > html mtime {int(mtime)}"
 
     return False, f"(html mtime {int(mtime)} >= last_seen {int(db_ts)} and ver={embedded_ver} last_match={embedded_last})"
 
-async def render_team_summary_async(pool: AsyncConnectionPool, team: dict, div: dict, div_avgs: dict, thresholds: dict) -> list[str]:
+async def render_team_summary_async(team: dict, div: dict, div_avgs: dict, thresholds: dict) -> list[str]:
     """Async version that renders a team summary section"""
     team_id = team["team_id"]
     
     # Get team data asynchronously
-    team_data = await compute_team_summary_data_async(pool, team_id, div["championship_id"])
-    players = await compute_player_table_data_async(pool, div["championship_id"], team_id)
-    player_deltas = await compute_player_deltas_async(pool, div["championship_id"], team_id)
+    team_data = await compute_team_summary_data_async(team_id, div["championship_id"])
+    players = await compute_player_table_data_async(div["championship_id"], team_id)
+    player_deltas = await compute_player_deltas_async(div["championship_id"], team_id)
     
     # For now, render the team using a simplified version of sync logic
     # This is a placeholder - in practice, we'd extract the complex team rendering
@@ -1655,8 +1797,8 @@ async def render_team_summary_async(pool: AsyncConnectionPool, team: dict, div: 
     
     # Team header
     name = team["team_name"] or team["team_id"]
-    avatar = team.get("avatar")
-    logo = f'<img class="logo team-logo" src="{avatar}" alt="">' if avatar else ''
+    avatar = team.get("avatar") or DEFAULT_TEAM_AVATAR
+    logo = f'<img class="logo team-logo" src="{avatar}" alt="">'
     html.append(f'<h2 class="team-name">{logo}{escape(name)}</h2>')
     
     # Team stats summary
@@ -1674,14 +1816,12 @@ async def render_team_summary_async(pool: AsyncConnectionPool, team: dict, div: 
     return html
 
 async def generate_all_async(force_regenerate: bool = False, division_filter: Optional[int] = None) -> None:
-    """Async version of main HTML generation function (only mode)."""
+    """Main async HTML generation function."""
     import time
+    from db_async import close_pool
+    
     print("Starting async HTML generation...")
     total_start = time.perf_counter()
-
-    # Initialize async database pool
-    pool = AsyncConnectionPool(DB_PATH)
-    await pool.initialize()
 
     try:
         # Use the DIVISIONS constant from faceit_config (already imported at top)
@@ -1702,9 +1842,12 @@ async def generate_all_async(force_regenerate: bool = False, division_filter: Op
         # Generate division pages concurrently for performance
         async def _safe_render(div: dict) -> tuple[str, Exception | None]:
             try:
-                await render_division_async(pool, div)
+                await render_division_async(div)
                 return div.get('slug', 'unknown'), None
             except Exception as e:
+                import traceback
+                print(f"[error] Exception while rendering {div.get('slug', 'unknown')}: {e}")
+                traceback.print_exc()
                 return div.get('slug', 'unknown'), e
 
         tasks = [ _safe_render(div) for div in divisions ]
@@ -1718,19 +1861,19 @@ async def generate_all_async(force_regenerate: bool = False, division_filter: Op
                 print(f"  - {slug}: {type(err).__name__}: {err}")
 
         # Generate index page
-        await render_index_async(pool, divisions)
+        await render_index_async(divisions)
 
     finally:
         total_end = time.perf_counter()
         print(f"[timer] TOTAL generation time: {total_end-total_start:.2f}s")
         print("Async HTML generation completed!")
-        await pool.close_all()
+        await close_pool()
 
-async def render_index_async(pool: AsyncConnectionPool, divisions: list[dict]) -> None:
+async def render_index_async(divisions: list[dict]) -> None:
     """Fully async index rendering"""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     
-    html = await render_index_pure_async(pool, divisions)
+    html = await render_index_pure_async(divisions)
     
     idx_path = OUT_DIR / "index.html"
     did_write = await write_if_changed_async(idx_path, html)

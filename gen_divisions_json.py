@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from faceit_client import list_championships_for_organizer
+from faceit_client_async import list_championships_for_organizer_async
 from faceit_config import PAPPALIIGA_ORG_ID
 
 DIV_RX     = re.compile(r"(divisioona|division|mestaruussarja)", re.IGNORECASE)
@@ -68,8 +68,8 @@ def make_unique_slug(proposed: str, cid: str, already: set[str]) -> str:
         s = f"{s}-{short}"
     return s
 
-def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[str, Any]]:
-    champs = list_championships_for_organizer(organizer_id)
+async def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[str, Any]]:
+    champs = await list_championships_for_organizer_async(organizer_id)
     out: List[Dict[str, Any]] = []
     seen_cids: set[str] = set()
 
@@ -194,10 +194,13 @@ def non_destructive_merge(existing: List[Dict[str, Any]],
     return merged
 
 
-def main(out_path: str, dry_run: bool, min_season: int) -> None:
+
+import asyncio
+
+async def main_async(out_path: str, dry_run: bool, min_season: int) -> None:
     out = Path(out_path)
     existing = load_existing(out)
-    discovered = discover_cs_divisions(PAPPALIIGA_ORG_ID, min_season=min_season)
+    discovered = await discover_cs_divisions(PAPPALIIGA_ORG_ID, min_season=min_season)
     final = non_destructive_merge(existing, discovered)
 
     if dry_run:
@@ -218,5 +221,5 @@ if __name__ == "__main__":
                     help="Skip adding divisions older than this season (default: 11 = include all)")
                     #    python gen_divisions_json.py --min-season 10
     args = p.parse_args()
-    main(out_path=args.out, dry_run=args.dry_run, min_season=args.min_season)
+    asyncio.run(main_async(out_path=args.out, dry_run=args.dry_run, min_season=args.min_season))
 

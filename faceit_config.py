@@ -5,22 +5,13 @@
 
 import os, json
 from pathlib import Path
+from env_loader import load_env
 
+load_env(Path(__file__).parent)
 API_KEY = os.environ.get("FACEIT_API_KEY", "").strip()
 
 CURRENT_SEASON = 11
-TOOL_VERSION = 0.5
-
-# Load .env only if the environment variable is missing
-if not API_KEY:
-    try:
-        from dotenv import load_dotenv
-        dotenv_path = Path(__file__).with_name(".env")
-        if dotenv_path.exists():
-            load_dotenv(dotenv_path)
-            API_KEY = os.environ.get("FACEIT_API_KEY", "").strip()
-    except ImportError:
-        pass
+TOOL_VERSION = 0.6
 
 # Base URLs (public Open Data v4 + Democracy history for vetoes).
 OPEN_BASE = "https://open.faceit.com/data/v4"
@@ -28,12 +19,6 @@ DEMOCRACY_BASE = "https://www.faceit.com/api/democracy/v1"
 
 # Organizer ID for Pappaliiga (fixed, no need to search every time)
 PAPPALIIGA_ORG_ID = "1bfc69fa-5a21-4ed9-9ef3-37edbd7210d8"
-
-BASE_SLEEP = 0.10
-MAX_SLEEP = 1.50
-BACKOFF_FACTOR = 1.75
-RECOVER_FACTOR = 0.85
-RECOVER_STEPS = 3
 
 DIVISIONS_JSON = Path(__file__).with_name("divisions.json")
 DIVISIONS = []

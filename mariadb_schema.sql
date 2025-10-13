@@ -1,0 +1,248 @@
+-- MariaDB schema for Pappaliiga stats (async pipeline)
+-- All tables use utf8mb4 and cascade deletes to keep referential integrity tight.
+-- IMPORTANT: This schema is intended for MariaDB 10.6+ or MySQL 8+.
+
+CREATE TABLE IF NOT EXISTS championships (
+    championship_id       VARCHAR(64) NOT NULL,
+    season                SMALLINT UNSIGNED NOT NULL,
+    division_num          SMALLINT UNSIGNED NOT NULL,
+    name                  VARCHAR(255) NOT NULL,
+    is_playoffs           TINYINT(1) NOT NULL DEFAULT 0,
+    slug                  VARCHAR(120) NOT NULL,
+    created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (championship_id),
+    UNIQUE KEY uq_champ_slug (slug),
+    UNIQUE KEY uq_champ_season_division (season, division_num, is_playoffs)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS teams (
+    team_id          VARCHAR(64) NOT NULL,
+    name             VARCHAR(255) NULL,
+    avatar           VARCHAR(512) NULL,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (team_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS players (
+    player_id        VARCHAR(64) NOT NULL,
+    nickname         VARCHAR(255) NOT NULL,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (player_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS matches (
+    match_id         VARCHAR(64) NOT NULL,
+    championship_id  VARCHAR(64) NOT NULL,
+    season           SMALLINT UNSIGNED NOT NULL,
+    division_num     SMALLINT UNSIGNED NOT NULL,
+    best_of          TINYINT UNSIGNED NULL,
+    configured_at    BIGINT NULL,
+    started_at       BIGINT NULL,
+    finished_at      BIGINT NULL,
+    scheduled_at     BIGINT NULL,
+    status           VARCHAR(32) NULL,
+    last_seen_at     BIGINT NULL,
+    team1_id         VARCHAR(64) NULL,
+    team2_id         VARCHAR(64) NULL,
+    winner_team_id   VARCHAR(64) NULL,
+    is_forfeit       TINYINT(1) NOT NULL DEFAULT 0,
+    ignored_due_ban  TINYINT(1) NOT NULL DEFAULT 0,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (match_id),
+    CONSTRAINT fk_matches_championship FOREIGN KEY (championship_id) REFERENCES championships(championship_id) ON DELETE CASCADE,
+    CONSTRAINT fk_matches_team1 FOREIGN KEY (team1_id) REFERENCES teams(team_id) ON DELETE SET NULL,
+    CONSTRAINT fk_matches_team2 FOREIGN KEY (team2_id) REFERENCES teams(team_id) ON DELETE SET NULL,
+    CONSTRAINT fk_matches_winner FOREIGN KEY (winner_team_id) REFERENCES teams(team_id) ON DELETE SET NULL,
+    KEY idx_matches_championship (championship_id),
+    KEY idx_matches_season_division_finished (season, division_num, finished_at),
+    KEY idx_matches_team1 (team1_id),
+    KEY idx_matches_team2 (team2_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS maps (
+    map_id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    match_id         VARCHAR(64) NOT NULL,
+    season           SMALLINT UNSIGNED NOT NULL,
+    division_num     SMALLINT UNSIGNED NOT NULL,
+    round_index      SMALLINT UNSIGNED NOT NULL,
+    map_name         VARCHAR(80) NULL,
+    score_team1      SMALLINT NULL,
+    score_team2      SMALLINT NULL,
+    winner_team_id   VARCHAR(64) NULL,
+    is_forfeit       TINYINT(1) NOT NULL DEFAULT 0,
+    created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (map_id),
+    CONSTRAINT fk_maps_match FOREIGN KEY (match_id) REFERENCES matches(match_id) ON DELETE CASCADE,
+    CONSTRAINT fk_maps_winner FOREIGN KEY (winner_team_id) REFERENCES teams(team_id) ON DELETE SET NULL,
+    UNIQUE KEY uq_maps_match_round (match_id, round_index),
+    KEY idx_maps_match (match_id),
+    KEY idx_maps_season_division (season, division_num)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS map_votes (
+    vote_id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    match_id             VARCHAR(64) NOT NULL,
+    season               SMALLINT UNSIGNED NOT NULL,
+    division_num         SMALLINT UNSIGNED NOT NULL,
+    map_name             VARCHAR(80) NULL,
+    status               VARCHAR(32) NULL,
+    selected_by_faction  VARCHAR(32) NULL,
+    round_num            SMALLINT NULL,
+    selected_by_team_id  VARCHAR(64) NULL,
+    created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (vote_id),
+    CONSTRAINT fk_votes_match FOREIGN KEY (match_id) REFERENCES matches(match_id) ON DELETE CASCADE,
+    CONSTRAINT fk_votes_team FOREIGN KEY (selected_by_team_id) REFERENCES teams(team_id) ON DELETE SET NULL,
+    KEY idx_votes_match (match_id),
+    KEY idx_votes_season_division (season, division_num)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS player_stats (
+    player_stat_id     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    season             SMALLINT UNSIGNED NOT NULL,
+    division_num       SMALLINT UNSIGNED NOT NULL,
+    match_id           VARCHAR(64) NOT NULL,
+    round_index        SMALLINT UNSIGNED NOT NULL,
+    map_id             BIGINT UNSIGNED NULL,
+    player_id          VARCHAR(64) NULL,
+    team_id            VARCHAR(64) NULL,
+    opponent_team_id   VARCHAR(64) NULL,
+    is_forfeit_map     TINYINT(1) NOT NULL DEFAULT 0,
+    kills              SMALLINT NULL,
+    deaths             SMALLINT NULL,
+    assists            SMALLINT NULL,
+    kd                 FLOAT NULL,
+    kr                 FLOAT NULL,
+    adr                FLOAT NULL,
+    hs_pct             DECIMAL(6,3) NULL,
+    mvps               SMALLINT NULL,
+    sniper_kills       SMALLINT NULL,
+    utility_damage     INTEGER NULL,
+    enemies_flashed    SMALLINT NULL,
+    flash_count        SMALLINT NULL,
+    flash_successes    SMALLINT NULL,
+    mk_2k              SMALLINT NULL,
+    mk_3k              SMALLINT NULL,
+    mk_4k              SMALLINT NULL,
+    mk_5k              SMALLINT NULL,
+    clutch_kills       SMALLINT NULL,
+    cl_1v1_attempts    SMALLINT NULL,
+    cl_1v1_wins        SMALLINT NULL,
+    cl_1v2_attempts    SMALLINT NULL,
+    cl_1v2_wins        SMALLINT NULL,
+    entry_count        SMALLINT NULL,
+    entry_wins         SMALLINT NULL,
+    pistol_kills       SMALLINT NULL,
+    damage             INTEGER NULL,
+    created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (player_stat_id),
+    CONSTRAINT fk_ps_match FOREIGN KEY (match_id) REFERENCES matches(match_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ps_map FOREIGN KEY (map_id) REFERENCES maps(map_id) ON DELETE SET NULL,
+    CONSTRAINT fk_ps_player FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE SET NULL,
+    CONSTRAINT fk_ps_team FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE SET NULL,
+    CONSTRAINT fk_ps_opponent FOREIGN KEY (opponent_team_id) REFERENCES teams(team_id) ON DELETE SET NULL,
+    UNIQUE KEY uq_ps_match_round_player (match_id, round_index, player_id),
+    KEY idx_ps_match (match_id),
+    KEY idx_ps_player (player_id),
+    KEY idx_ps_team (team_id),
+    KEY idx_ps_season_player (season, division_num, player_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS team_stats (
+    team_stat_id       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    season             SMALLINT UNSIGNED NOT NULL,
+    division_num       SMALLINT UNSIGNED NOT NULL,
+    match_id           VARCHAR(64) NOT NULL,
+    round_index        SMALLINT UNSIGNED NOT NULL,
+    team_id            VARCHAR(64) NOT NULL,
+    opponent_team_id   VARCHAR(64) NULL,
+    map_id             BIGINT UNSIGNED NULL,
+    is_forfeit_map     TINYINT(1) NOT NULL DEFAULT 0,
+    final_score        SMALLINT NULL,
+    first_half_score   SMALLINT NULL,
+    second_half_score  SMALLINT NULL,
+    overtime_score     SMALLINT NULL,
+    headshot_pct       DECIMAL(6,3) NULL,
+    win                TINYINT(1) NULL,
+    created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (team_stat_id),
+    CONSTRAINT fk_ts_match FOREIGN KEY (match_id) REFERENCES matches(match_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ts_map FOREIGN KEY (map_id) REFERENCES maps(map_id) ON DELETE SET NULL,
+    CONSTRAINT fk_ts_team FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ts_opponent FOREIGN KEY (opponent_team_id) REFERENCES teams(team_id) ON DELETE SET NULL,
+    UNIQUE KEY uq_ts_match_round_team (match_id, round_index, team_id),
+    KEY idx_ts_team (team_id),
+    KEY idx_ts_season_team (season, division_num, team_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS player_season_totals (
+    season             SMALLINT UNSIGNED NOT NULL,
+    division_num       SMALLINT UNSIGNED NOT NULL,
+    player_id          VARCHAR(64) NOT NULL,
+    team_id            VARCHAR(64) NULL,
+    maps_played        INT UNSIGNED NOT NULL DEFAULT 0,
+    rounds_played      INT UNSIGNED NOT NULL DEFAULT 0,
+    kills              INT UNSIGNED NOT NULL DEFAULT 0,
+    deaths             INT UNSIGNED NOT NULL DEFAULT 0,
+    assists            INT UNSIGNED NOT NULL DEFAULT 0,
+    adr                FLOAT NOT NULL DEFAULT 0,
+    kr                 FLOAT NOT NULL DEFAULT 0,
+    kd                 FLOAT NOT NULL DEFAULT 0,
+    rating             FLOAT NOT NULL DEFAULT 0,
+    hs_pct             FLOAT NOT NULL DEFAULT 0,
+    mvps               INT UNSIGNED NOT NULL DEFAULT 0,
+    sniper_kills       INT UNSIGNED NOT NULL DEFAULT 0,
+    utility_damage     INT UNSIGNED NOT NULL DEFAULT 0,
+    enemies_flashed    INT UNSIGNED NOT NULL DEFAULT 0,
+    flash_count        INT UNSIGNED NOT NULL DEFAULT 0,
+    flash_successes    INT UNSIGNED NOT NULL DEFAULT 0,
+    mk_2k              INT UNSIGNED NOT NULL DEFAULT 0,
+    mk_3k              INT UNSIGNED NOT NULL DEFAULT 0,
+    mk_4k              INT UNSIGNED NOT NULL DEFAULT 0,
+    mk_5k              INT UNSIGNED NOT NULL DEFAULT 0,
+    clutch_kills       INT UNSIGNED NOT NULL DEFAULT 0,
+    cl_1v1_attempts    INT UNSIGNED NOT NULL DEFAULT 0,
+    cl_1v1_wins        INT UNSIGNED NOT NULL DEFAULT 0,
+    cl_1v2_attempts    INT UNSIGNED NOT NULL DEFAULT 0,
+    cl_1v2_wins        INT UNSIGNED NOT NULL DEFAULT 0,
+    entry_count        INT UNSIGNED NOT NULL DEFAULT 0,
+    entry_wins         INT UNSIGNED NOT NULL DEFAULT 0,
+    pistol_kills       INT UNSIGNED NOT NULL DEFAULT 0,
+    damage             BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (season, division_num, player_id),
+    CONSTRAINT fk_totals_player FOREIGN KEY (player_id) REFERENCES players(player_id) ON DELETE CASCADE,
+    CONSTRAINT fk_totals_team FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS team_season_totals (
+    season             SMALLINT UNSIGNED NOT NULL,
+    division_num       SMALLINT UNSIGNED NOT NULL,
+    team_id            VARCHAR(64) NOT NULL,
+    matches_played     INT UNSIGNED NOT NULL DEFAULT 0,
+    matches_won        INT UNSIGNED NOT NULL DEFAULT 0,
+    maps_played        INT UNSIGNED NOT NULL DEFAULT 0,
+    maps_won           INT UNSIGNED NOT NULL DEFAULT 0,
+    rounds_won         INT UNSIGNED NOT NULL DEFAULT 0,
+    rounds_lost        INT UNSIGNED NOT NULL DEFAULT 0,
+    updated_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (season, division_num, team_id),
+    CONSTRAINT fk_team_totals_team FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Map catalog for displaying map images and pretty names
+CREATE TABLE IF NOT EXISTS maps_catalog (
+    map_id       VARCHAR(64) PRIMARY KEY,
+    pretty_name  VARCHAR(128) NOT NULL,
+    image_sm     VARCHAR(512),
+    image_lg     VARCHAR(512),
+    created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,125 +1,78 @@
 # async_db.py
-# Async SQLite helpers for Pappaliiga CS (championship-centric).
-# Async versions of all db.py functions using aiosqlite
+# Async helpers for Pappaliiga CS HTML generation backed by MariaDB.
 
 from __future__ import annotations
-import aiosqlite
+
 import asyncio
-import json
-from pathlib import Path
+import re
 from collections.abc import Collection
-from typing import Any, Dict, Iterable, List, Optional, AsyncContextManager
-from contextlib import asynccontextmanager
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from stats_utils import weighted_percentile
 
-# Import original schema and constants from db.py
-from db import SCHEMA_PATH, DEFAULT_TEAM_AVATAR, has_column
+from db_async import (
+    close_pool,
+    create_schema_async,
+    execute,
+    fetch_all,
+    get_pool,
+)
 
-# Global connection pool
-_connection_pool: Optional[AsyncConnectionPool] = None
+# Default avatar for teams without a logo
+DEFAULT_TEAM_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
 
-class AsyncConnectionPool:
-    # Async SQLite connection pool with resource management
+_maps_catalog_available: Optional[bool] = None
+
+_NAMED_PARAM_RE = re.compile(r":([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def _translate_sql(sql: str, params: Any) -> tuple[str, Any]:
+    """Convert named parameters to MariaDB placeholders."""
+    if isinstance(params, dict):
+        def repl(match: re.Match[str]) -> str:
+            key = match.group(1)
+            if key not in params:
+                raise KeyError(f"SQL parameter '{key}' missing from params")
+            return f"%({key})s"
+        return _NAMED_PARAM_RE.sub(repl, sql), params
     
-    def __init__(self, db_path: str, max_connections: int = 5):
-        self.db_path = db_path
-        self.max_connections = max_connections
-        self._semaphore = asyncio.Semaphore(max_connections)
-        self._connections: List[aiosqlite.Connection] = []
-        self._available = asyncio.Queue()
-        self._initialized = False
-
-    async def initialize(self):
-        # Initialize the connection pool
-        if self._initialized:
-            return
-            
-        for _ in range(self.max_connections):
-            conn = await self._create_connection()
-            self._connections.append(conn)
-            await self._available.put(conn)
-        
-        self._initialized = True
-
-    async def _create_connection(self) -> aiosqlite.Connection:
-        # Create a properly configured async SQLite connection
-        conn = await aiosqlite.connect(self.db_path)
-        conn.row_factory = aiosqlite.Row
-        
-        # Apply same performance pragmas as sync version
-        await conn.execute("PRAGMA foreign_keys = ON;")
-        
-        try:
-            await conn.execute("PRAGMA journal_mode=WAL;")
-            await conn.execute("PRAGMA synchronous=NORMAL;")
-            await conn.execute("PRAGMA temp_store=MEMORY;")
-            await conn.execute("PRAGMA mmap_size=1073741824;")  # 1 GiB
-        except Exception:
-            pass  # Ignore pragma errors, use defaults
-        
-        return conn
-
-    @asynccontextmanager
-    async def get_connection(self) -> AsyncContextManager[aiosqlite.Connection]:
-        # Get a connection from the pool with proper resource management
-        async with self._semaphore:
-            if not self._initialized:
-                await self.initialize()
-            
-            conn = await self._available.get()
-            try:
-                yield conn
-            finally:
-                await self._available.put(conn)
-
-    async def close_all(self):
-        # Close all connections in the pool
-        if not self._initialized:
-            return
-            
-        for conn in self._connections:
-            await conn.close()
-        
-        self._connections.clear()
-        self._initialized = False
-
-# Global pool management functions
-async def get_async_pool(db_path: str = None) -> AsyncConnectionPool:
-    # Get or create the global async connection pool
-    global _connection_pool
+    if isinstance(params, (list, tuple)):
+        return sql.replace("?", "%s"), params
     
-    if _connection_pool is None:
-        if db_path is None:
-            raise ValueError("db_path required for first pool initialization")
-        _connection_pool = AsyncConnectionPool(db_path)
-        await _connection_pool.initialize()
-    
-    return _connection_pool
+    return sql, params
 
-async def close_async_pool():
-    # Close the global connection pool
-    global _connection_pool
-    if _connection_pool:
-        await _connection_pool.close_all()
-        _connection_pool = None
+
+async def _table_has_columns_async(table: str, *columns: str) -> dict[str, bool]:
+    """Return a mapping describing which columns exist on table."""
+    if not columns:
+        return {}
+
+    placeholders = ", ".join(f":col{idx}" for idx in range(len(columns)))
+    params = {"table": table}
+    for idx, col in enumerate(columns):
+        params[f"col{idx}"] = col
+
+    rows = await query_async(
+        f"""
+        SELECT COLUMN_NAME
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = :table
+          AND COLUMN_NAME IN ({placeholders})
+        """,
+        params,
+    )
+
+    present = {str(row["COLUMN_NAME"]).lower() for row in rows}
+    return {col: col.lower() in present for col in columns}
+
 
 # Async query functions
-async def query_async(pool: AsyncConnectionPool, sql: str, params: tuple = ()) -> list[dict]:
-    # Async version of query() function
-    async with pool.get_connection() as conn:
-        cursor = await conn.execute(sql, params)
-        rows = await cursor.fetchall()
-        out = []
-        # rows should be aiosqlite.Row, not sqlite3.Row
-        for row in rows:
-            if hasattr(row, 'keys'):
-                out.append({k: row[k] for k in row.keys()})
-            elif isinstance(row, dict):
-                out.append(row)
-            else:
-                out.append(dict(enumerate(row)))
-        return out
+async def query_async(sql: str, params: Any = None) -> list[dict]:
+    """Execute a read-only query and return dictionaries."""
+    sql_conv, params_conv = _translate_sql(sql, params)
+    rows = await fetch_all(sql_conv, params_conv)
+    return [dict(row) for row in rows]
 
 
 def _prepare_excluded(
@@ -161,18 +114,26 @@ def _build_exclusion_clause(
     params = {f"{param_prefix}{idx}": tid for idx, tid in enumerate(ids)}
     return clause, params
 
-async def execute_async(pool: AsyncConnectionPool, sql: str, params: dict = None) -> None:
-    # Execute a single SQL statement asynchronously
-    async with pool.get_connection() as conn:
-        if params:
-            await conn.execute(sql, params)
-        else:
-            await conn.execute(sql)
-        await conn.commit()
 
-# Async versions of main query functions from db.py
-async def get_teams_in_championship_async(pool: AsyncConnectionPool, division_id: int) -> list[dict]:
-    # Async version of get_teams_in_championship
+def _build_allmaps_cte(all_maps: Sequence[str]) -> tuple[str, dict[str, str]]:
+    """Return SQL and parameters for a CTE enumerating map identifiers."""
+
+    selects: list[str] = []
+    params: dict[str, str] = {}
+    for idx, map_name in enumerate(all_maps):
+        alias = " AS map" if idx == 0 else ""
+        selects.append(f"SELECT :map{idx}{alias}")
+        params[f"map{idx}"] = map_name
+    return " UNION ALL ".join(selects), params
+
+async def execute_async(sql: str, params: Dict[str, Any] | Sequence[Any] | None = None) -> None:
+    """Execute a statement and commit."""
+    sql_conv, params_conv = _translate_sql(sql, params)
+    await execute(sql_conv, params_conv)
+
+# Main async query functions
+async def get_teams_in_championship_async(division_id: int) -> list[dict]:
+    """Return all teams participating in a championship."""
     sql = """
     WITH team_ids AS (
       SELECT DISTINCT team1_id AS team_id FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
@@ -184,13 +145,12 @@ async def get_teams_in_championship_async(pool: AsyncConnectionPool, division_id
            t.avatar
     FROM team_ids x
     LEFT JOIN teams t ON t.team_id = x.team_id
-    ORDER BY team_name COLLATE NOCASE
+    ORDER BY team_name COLLATE utf8mb4_unicode_ci
     """
-    rows = await query_async(pool, sql, (division_id, division_id))
+    rows = await query_async(sql, (division_id, division_id))
     return [r for r in rows if r["team_id"]]
 
 async def compute_team_summary_data_async(
-    pool: AsyncConnectionPool,
     team_id: str,
     division_id: int,
     excluded_team_ids: Collection[str] | None = None,
@@ -201,7 +161,6 @@ async def compute_team_summary_data_async(
 
     # Fetch only played maps (join maps); all summaries derive from these
     rows = await query_async(
-        pool,
         f"""
         SELECT m.match_id, m.team1_id, m.team2_id,
                p.round_index, p.map_name, p.score_team1, p.score_team2, p.winner_team_id
@@ -230,7 +189,6 @@ async def compute_team_summary_data_async(
 
     # Aggregates directly from player_stats (no team_stats table)
     agg = await query_async(
-        pool,
         f"""
         SELECT
           SUM(ps.kills)           AS kills,
@@ -263,93 +221,77 @@ async def compute_team_summary_data_async(
     }
 
 async def compute_player_table_data_async(
-    pool: AsyncConnectionPool,
     division_id: int,
     team_id: str,
     excluded_team_ids: Collection[str] | None = None,
 ) -> list[dict]:
-    # Async version of compute_player_table_data (mirrors db.py implementation).
-    async with pool.get_connection() as conn:
-        # Column feature flags
-        async def has_col(table: str, col: str) -> bool:
-            cur = await conn.execute(f"PRAGMA table_info({table})")
-            rows = await cur.fetchall()
-            return any((r[1] if isinstance(r, tuple) else r["name"]) == col for r in rows)
+    """Return player stats for a team in a championship using player_season_totals."""
+    # Get season and division_num from championship
+    champ_info = await query_async(
+        "SELECT season, division_num FROM championships WHERE championship_id = ?",
+        (division_id,)
+    )
+    if not champ_info:
+        return []
+    season = champ_info[0]["season"]
+    division_num = champ_info[0]["division_num"]
+    
+    HAS_PISTOL = True
+    HAS_FLASH = True
+    HAS_FLASH_SUCC = True
+    HAS_MVPS = True
 
-        HAS_PISTOL = await has_col("player_stats", "pistol_kills")
-        HAS_FLASH = (await has_col("player_stats", "enemies_flashed")) and (await has_col("player_stats", "flash_count"))
-        HAS_FLASH_SUCC = await has_col("player_stats", "flash_successes")
-        HAS_MVPS = await has_col("player_stats", "mvps")
-
-    select_cols = [
-        "ps.player_id AS player_id",
-        "COALESCE(MAX(pl.nickname),'') AS nickname_display",
-        "COUNT(*) AS maps_played",
-        "SUM(COALESCE(ps.kills,0)) AS kills",
-        "SUM(COALESCE(ps.deaths,0)) AS deaths",
-        "SUM(COALESCE(ps.assists,0)) AS assists",
-        "AVG(COALESCE(ps.adr,0)) AS adr",
-        "AVG(COALESCE(ps.kr,0)) AS kr",
-        "AVG(COALESCE(ps.hs_pct,0)) AS hs_pct",
-        "SUM(COALESCE(ps.sniper_kills,0)) AS awp_kills",
-        "SUM(COALESCE(ps.mk_2k,0)) AS k2",
-        "SUM(COALESCE(ps.mk_3k,0)) AS k3",
-        "SUM(COALESCE(ps.mk_4k,0)) AS k4",
-        "SUM(COALESCE(ps.mk_5k,0)) AS k5",
-        "SUM(COALESCE(ps.utility_damage,0)) AS util",
-        "SUM(COALESCE(ps.damage,0)) AS damage",
-    ]
-    if HAS_MVPS:
-        select_cols.append("SUM(COALESCE(ps.mvps,0)) AS mvps")
-    if HAS_FLASH:
-        select_cols += [
-            "SUM(COALESCE(ps.enemies_flashed,0)) AS flashed",
-            "SUM(COALESCE(ps.flash_count,0)) AS flash_count",
-        ]
-    if HAS_FLASH_SUCC:
-        select_cols.append("SUM(COALESCE(ps.flash_successes,0)) AS flash_successes")
-
-    select_cols += [
-        "SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)) AS rounds",
-        "SUM(COALESCE(ps.clutch_kills,0))    AS clutch_kills",
-        "SUM(COALESCE(ps.cl_1v1_attempts,0)) AS c11_att",
-        "SUM(COALESCE(ps.cl_1v1_wins,0))     AS c11_win",
-        "SUM(COALESCE(ps.cl_1v2_attempts,0)) AS c12_att",
-        "SUM(COALESCE(ps.cl_1v2_wins,0))     AS c12_win",
-        "SUM(COALESCE(ps.entry_count,0))     AS entry_count",
-        "SUM(COALESCE(ps.entry_wins,0))      AS entry_win",
-    ]
-    if HAS_PISTOL:
-        select_cols.append("SUM(COALESCE(ps.pistol_kills,0)) AS pistol_kills")
-
-    excluded = _prepare_excluded(excluded_team_ids, ignore=[team_id])
-    excl_clause, excl_params = _build_exclusion_clause(excluded)
-
-    sql = f"""
+    # Query pre-aggregated data from player_season_totals
+    sql = """
       SELECT
-        {", ".join(select_cols)}
-      FROM player_stats ps
-      JOIN matches m
-        ON m.match_id = ps.match_id AND m.is_forfeit = 0
-      JOIN maps mp
-        ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-      LEFT JOIN players pl
-        ON pl.player_id = ps.player_id
-      WHERE m.championship_id = :champ AND ps.team_id = :team{excl_clause}
-      GROUP BY ps.player_id
-      ORDER BY kills DESC
+        pst.player_id,
+        COALESCE(pl.nickname, '') AS nickname_display,
+        pst.maps_played,
+        pst.rounds_played AS rounds,
+        pst.kills,
+        pst.deaths,
+        pst.assists,
+        pst.adr,
+        pst.kr,
+        pst.kd,
+        pst.hs_pct,
+        pst.sniper_kills AS awp_kills,
+        pst.mk_2k AS k2,
+        pst.mk_3k AS k3,
+        pst.mk_4k AS k4,
+        pst.mk_5k AS k5,
+        pst.utility_damage AS util,
+        pst.damage,
+        pst.mvps,
+        pst.enemies_flashed AS flashed,
+        pst.flash_count,
+        pst.flash_successes,
+        pst.clutch_kills,
+        pst.cl_1v1_attempts AS c11_att,
+        pst.cl_1v1_wins AS c11_win,
+        pst.cl_1v2_attempts AS c12_att,
+        pst.cl_1v2_wins AS c12_win,
+        pst.entry_count,
+        pst.entry_wins AS entry_win,
+        pst.pistol_kills
+      FROM player_season_totals pst
+      LEFT JOIN players pl ON pl.player_id = pst.player_id
+      WHERE pst.season = :season 
+        AND pst.division_num = :division_num
+        AND pst.team_id = :team
+      ORDER BY pst.kills DESC
     """
-    rows = await query_async(pool, sql, {"champ": division_id, "team": team_id, **excl_params})
+    rows = await query_async(sql, {"season": season, "division_num": division_num, "team": team_id})
 
     out = []
     for r in rows:
-        kills = r.get("kills", 0) or 0
-        deaths = r.get("deaths", 0) or 0
-        assists = r.get("assists", 0) or 0
-        kd = (kills / deaths) if deaths else float(kills)
-        rounds = r.get("rounds", 0) or 0
-        maps_played = r.get("maps_played", 0) or 0
-        rpm = (rounds / maps_played) if maps_played else 0.0
+        kills = float(r.get("kills", 0) or 0)
+        deaths = float(r.get("deaths", 0) or 0)
+        assists = float(r.get("assists", 0) or 0)
+        rounds_float = float(r.get("rounds", 0) or 0)
+        rounds = int(round(rounds_float))
+        maps_played = int(r.get("maps_played", 0) or 0)
+        rpm = (rounds_float / maps_played) if maps_played else 0.0
 
         row = {
             "player_id": r.get("player_id"),
@@ -357,36 +299,33 @@ async def compute_player_table_data_async(
             "maps_played": maps_played,
             "rounds": rounds,
             "rpm": rpm,
-            "kd": kd,
-            "adr": r.get("adr", 0.0) or 0.0,
-            "kr": r.get("kr", 0.0) or 0.0,
-            "kill": kills,
-            "death": deaths,
-            "assist": assists,
-            "mvps": r.get("mvps", 0) or 0,
-            "hs_pct": r.get("hs_pct", 0.0) or 0.0,
-            "awp_kills": r.get("awp_kills", 0) or 0,
-            "k2": r.get("k2", 0) or 0,
-            "k3": r.get("k3", 0) or 0,
-            "k4": r.get("k4", 0) or 0,
-            "k5": r.get("k5", 0) or 0,
-            "util": r.get("util", 0) or 0,
-            "clutch_kills": r.get("clutch_kills", 0) or 0,
-            "c11_att": r.get("c11_att", 0) or 0,
-            "c11_win": r.get("c11_win", 0) or 0,
-            "c12_att": r.get("c12_att", 0) or 0,
-            "c12_win": r.get("c12_win", 0) or 0,
-            "entry_count": r.get("entry_count", 0) or 0,
-            "entry_win": r.get("entry_win", 0) or 0,
-            "damage": r.get("damage", 0) or 0,
+            "kd": float(r.get("kd", 0.0) or 0.0),
+            "adr": float(r.get("adr", 0.0) or 0.0),
+            "kr": float(r.get("kr", 0.0) or 0.0),
+            "kill": int(kills),
+            "death": int(deaths),
+            "assist": int(assists),
+            "mvps": int(r.get("mvps", 0) or 0),
+            "hs_pct": float(r.get("hs_pct", 0.0) or 0.0),
+            "awp_kills": int(r.get("awp_kills", 0) or 0),
+            "k2": int(r.get("k2", 0) or 0),
+            "k3": int(r.get("k3", 0) or 0),
+            "k4": int(r.get("k4", 0) or 0),
+            "k5": int(r.get("k5", 0) or 0),
+            "util": int(r.get("util", 0) or 0),
+            "clutch_kills": int(r.get("clutch_kills", 0) or 0),
+            "c11_att": int(r.get("c11_att", 0) or 0),
+            "c11_win": int(r.get("c11_win", 0) or 0),
+            "c12_att": int(r.get("c12_att", 0) or 0),
+            "c12_win": int(r.get("c12_win", 0) or 0),
+            "entry_count": int(r.get("entry_count", 0) or 0),
+            "entry_win": int(r.get("entry_win", 0) or 0),
+            "damage": int(r.get("damage", 0) or 0),
+            "pistol_kills": int(r.get("pistol_kills", 0) or 0),
+            "flashed": int(r.get("flashed", 0) or 0),
+            "flash_count": int(r.get("flash_count", 0) or 0),
+            "flash_successes": int(r.get("flash_successes", 0) or 0),
         }
-        if HAS_PISTOL:
-            row["pistol_kills"] = r.get("pistol_kills", 0) or 0
-        if HAS_FLASH:
-            row["flashed"] = r.get("flashed", 0) or 0
-            row["flash_count"] = r.get("flash_count", 0) or 0
-        if HAS_FLASH_SUCC:
-            row["flash_successes"] = r.get("flash_successes", 0) or 0
 
         out.append(row)
 
@@ -395,22 +334,17 @@ async def compute_player_table_data_async(
 # Initialize additional async functions as needed
 # This is a foundation - more functions will be added as we convert the rendering pipeline
 
-async def init_async_db(pool: AsyncConnectionPool, schema_path: Path = SCHEMA_PATH) -> None:
-    # Async version of init_db
-    if not schema_path.exists():
-        raise FileNotFoundError(f"Schema file not found: {schema_path}")
-    
-    schema_sql = schema_path.read_text(encoding="utf-8")
-    async with pool.get_connection() as conn:
-        await conn.executescript(schema_sql)
-        await conn.commit()
+async def init_async_db(_deprecated_pool: Any | None = None, _schema_path: Any = None) -> None:
+    """Ensure the MariaDB schema exists (compatibility wrapper)."""
+
+    del _deprecated_pool, _schema_path  # legacy arguments
+    await create_schema_async(force=False)
 
 async def compute_champ_map_avgs_data_async(
-    pool: AsyncConnectionPool,
     division_id: int,
     excluded_team_ids: Collection[str] | None = None,
 ) -> dict[str, tuple[float, float]]:
-    # Async version of compute_champ_map_avgs_data
+    """Return average KD and ADR per map for a championship."""
     excl_clause, excl_params = _build_exclusion_clause(excluded_team_ids)
 
     sql = f"""
@@ -427,26 +361,27 @@ async def compute_champ_map_avgs_data_async(
         AND m.is_forfeit = 0
         GROUP BY mp.map_name
     """
-    rows = await query_async(pool, sql, {"champ": division_id, **excl_params})
+    rows = await query_async(sql, {"champ": division_id, **excl_params})
     
     out: dict[str, tuple[float, float]] = {}
     for r in rows:
-        kills = r["kills"] or 0
-        deaths = r["deaths"] or 0
+        kills = float(r["kills"] or 0)
+        deaths = float(r["deaths"] or 0)
         kd = (kills / deaths) if deaths else float(kills)
-        adr = (r["adr_w"] / r["rw"]) if (r["rw"] or 0) > 0 else 0.0
-        out[r["map"]] = (kd, adr)
+        adr_weighted = float(r["adr_w"] or 0)
+        rounds_weight = float(r["rw"] or 0)
+        adr = (adr_weighted / rounds_weight) if rounds_weight > 0 else 0.0
+        out[r["map"]] = (float(kd), float(adr))
     return out
 
 async def compute_champ_thresholds_data_async(
-    pool: AsyncConnectionPool,
     division_id: int,
     excluded_team_ids: Collection[str] | None = None,
 ) -> dict:
-    # Async version of compute_champ_thresholds_data
+    """Return statistical thresholds (percentiles) for player metrics."""
     excl_clause, excl_params = _build_exclusion_clause(excluded_team_ids)
 
-    rows = await query_async(pool, f"""
+    rows = await query_async(f"""
       SELECT
         ps.player_id,
         SUM(ps.kills)                     AS kills,
@@ -500,16 +435,16 @@ async def compute_champ_thresholds_data_async(
     flash_succ_vals = []
 
     for r in rows:
-        kills  = r["kills"] or 0
-        deaths = r["deaths"] or 0
+        kills  = float(r["kills"] or 0)
+        deaths = float(r["deaths"] or 0)
         kd = (kills / deaths) if deaths else float(kills)
 
-        adr = r["adr"] or 0.0
-        kr  = r["kr"] or 0.0
-        hs_pct = r["hs_pct"] or 0.0
+        adr = float(r["adr"] or 0.0)
+        kr  = float(r["kr"] or 0.0)
+        hs_pct = float(r["hs_pct"] or 0.0)
 
-        rounds = r["rounds"] or 0
-        util   = r["util"] or 0
+        rounds = float(r["rounds"] or 0)
+        util   = float(r["util"] or 0)
         udpr   = (util / rounds) if rounds else 0.0
 
         deaths_per_round = (deaths / rounds) if rounds else 0.0
@@ -517,23 +452,23 @@ async def compute_champ_thresholds_data_async(
         survival_ratio = survival / 100.0
         rating1 = ((kr / 0.679) + (survival_ratio / 0.317) + (adr / 79.9)) / 3.0
 
-        ewin = r["entry_wins"]  or 0
-        eatt = r["entry_count"] or 0
+        ewin = float(r["entry_wins"]  or 0)
+        eatt = float(r["entry_count"] or 0)
         entry_wr = (100.0 * ewin / eatt) if eatt else None
 
-        c11_att = r.get("cl_1v1_attempts", 0) or 0
-        c11_win = r.get("cl_1v1_wins", 0) or 0
+        c11_att = float(r.get("cl_1v1_attempts", 0) or 0)
+        c11_win = float(r.get("cl_1v1_wins", 0) or 0)
         c11_wr = (c11_win / c11_att * 100.0) if c11_att else 0.0
 
-        c12_att = r.get("cl_1v2_attempts", 0) or 0
-        c12_win = r.get("cl_1v2_wins", 0) or 0
+        c12_att = float(r.get("cl_1v2_attempts", 0) or 0)
+        c12_win = float(r.get("cl_1v2_wins", 0) or 0)
         c12_wr = (c12_win / c12_att * 100.0) if c12_att else 0.0
 
-        efl = r["enemies_flashed"] or 0
-        fct = r["flash_count"]     or 0
+        efl = float(r["enemies_flashed"] or 0)
+        fct = float(r["flash_count"]     or 0)
         enem_per_flash = (efl / fct) if fct else None
 
-        fsu = r["flash_successes"] or 0
+        fsu = float(r["flash_successes"] or 0)
         flash_succ = (100.0 * fsu / fct) if fct else None  # percent 0..100
 
         kd_vals.append(kd)
@@ -566,21 +501,46 @@ async def compute_champ_thresholds_data_async(
         "rating1":  pack(rating1_vals,  fallback=(0.85, 1.00, 1.15)),
     }
 
-async def get_division_generated_ts_async(pool: AsyncConnectionPool, division_id: int) -> int | None:
-    # Async version of get_division_generated_ts
-    sql = "SELECT MAX(last_seen_at) AS ts FROM matches WHERE championship_id = ?"
-    rows = await query_async(pool, sql, (division_id,))
-    return rows[0]["ts"] if rows and rows[0]["ts"] else None
+async def get_division_generated_ts_async(division_id: int) -> int | None:
+    """Return the latest meaningful activity timestamp for a championship.
+
+    Historical rows might have ``last_seen_at`` set to NULL and upcoming
+    matches can carry ``scheduled_at`` values in the future.  We combine all
+    available temporal markers, clamp them to ``UNIX_TIMESTAMP()`` (now), and
+    fall back to ``updated_at`` so the HTML generator can reliably decide
+    whether regeneration is required.
+    """
+
+    sql = """
+        SELECT MAX(
+            GREATEST(
+                COALESCE(m.last_seen_at, 0),
+                COALESCE(m.finished_at, 0),
+                COALESCE(m.started_at, 0),
+                COALESCE(UNIX_TIMESTAMP(m.updated_at), 0),
+                COALESCE(UNIX_TIMESTAMP(m.created_at), 0)
+            )
+        ) AS ts
+        FROM matches m
+        WHERE m.championship_id = ?
+    """
+
+    rows = await query_async(sql, (division_id,))
+    if not rows:
+        return None
+
+    raw = rows[0].get("ts")
+    if raw in (None, "", 0):
+        return None
+
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
 
 # (duplicate removed) compute_player_table_data_async is implemented above using pure async SQL
 
-async def compute_player_deltas_async(pool: AsyncConnectionPool, championship_id: int, team_id: str) -> dict:
-    # NOT IMPLEMENTED: This function must be rewritten to use aiosqlite only.
-    raise NotImplementedError("compute_player_deltas_async must be implemented with aiosqlite only.")
-
-async def compute_champ_player_summary_async(
-    pool: AsyncConnectionPool,
-    championship_id: int,
+async def compute_champ_player_summary_async(championship_id: int,
     min_rounds: int = 20,
     min_flashes: int = 10,
     excluded_team_ids: Collection[str] | None = None,
@@ -589,7 +549,7 @@ async def compute_champ_player_summary_async(
     # Main player data query
     excl_clause, excl_params = _build_exclusion_clause(excluded_team_ids)
 
-    rows = await query_async(pool, f"""
+    rows = await query_async(f"""
       SELECT
         ps.player_id,
         COALESCE(MAX(pl.nickname), '') AS nick,
@@ -630,7 +590,7 @@ async def compute_champ_player_summary_async(
     """, {"champ": championship_id, **excl_params})
 
     # Aggregates query
-    agg = await query_async(pool, f"""
+    agg = await query_async(f"""
       WITH
       team_ids AS (
         SELECT m.team1_id AS tid FROM matches m WHERE m.championship_id=:champ AND m.team1_id IS NOT NULL{excl_clause}
@@ -671,13 +631,18 @@ async def compute_champ_player_summary_async(
     for r in rows:
         nick = r["nick"] or r["player_id"]
         team = r.get("team_name") or "-"
-        rounds = r["rounds"] or 0
+        rounds_raw = r["rounds"] or 0
+        rounds = float(rounds_raw)
+        rounds_int = int(rounds)
 
-        kills = r["kills"] or 0
-        deaths = r["deaths"] or 0
-        assists = r["assists"] or 0
+        kills = float(r["kills"] or 0)
+        deaths = float(r["deaths"] or 0)
+        assists = float(r["assists"] or 0)
+        kills_int = int(kills)
+        deaths_int = int(deaths)
+        assists_int = int(assists)
 
-        adr = (r["adr_weighted"] / rounds) if rounds else 0.0
+        adr = (float(r["adr_weighted"] or 0.0) / rounds) if rounds else 0.0
         kr = (kills / rounds) if rounds else 0.0
         kd = (kills / deaths) if deaths else float(kills)
 
@@ -693,30 +658,30 @@ async def compute_champ_player_summary_async(
             surv_vals.append(survival_pct); surv_w.append(rounds)
             r1_vals.append(rating1); r1_w.append(rounds)
 
-        totals_kills.append((nick, team, kills))
-        totals_deaths.append((nick, team, deaths))
+        totals_kills.append((nick, team, kills_int))
+        totals_deaths.append((nick, team, deaths_int))
 
         if rounds >= min_rounds:
-            udpr = (r["util_total"] or 0) / rounds
-            flashed_pr = (r["flashed_total"] or 0) / rounds
+            udpr = (float(r["util_total"] or 0) / rounds)
+            flashed_pr = (float(r["flashed_total"] or 0) / rounds)
             assist_pr = assists / rounds
 
-            ewin = r["entry_wins"] or 0
-            eatt = r["entry_count"] or 0
+            ewin = float(r["entry_wins"] or 0)
+            eatt = float(r["entry_count"] or 0)
             entry_wr = (100.0 * ewin / eatt) if eatt >= 10 else -1.0
 
-            c11w = r["c11_wins"] or 0; c11a = r["c11_atts"] or 0
-            c12w = r["c12_wins"] or 0; c12a = r["c12_atts"] or 0
+            c11w = float(r["c11_wins"] or 0); c11a = float(r["c11_atts"] or 0)
+            c12w = float(r["c12_wins"] or 0); c12a = float(r["c12_atts"] or 0)
             c_wins = c11w + c12w
             c_atts = c11a + c12a
             clutch_wr = (100.0 * c_wins / c_atts) if c_atts >= 10 else -1.0
 
-            flashed_total = r["flashed_total"] or 0
-            flash_cnt_total = r["flash_cnt_total"] or 0
+            flashed_total = float(r["flashed_total"] or 0)
+            flash_cnt_total = float(r["flash_cnt_total"] or 0)
             enemies_per_flash = (flashed_total / flash_cnt_total) if (flash_cnt_total >= min_flashes and rounds >= min_rounds) else -1.0
 
             leaders_pool.append({
-                "nick": nick, "team": team, "rounds": rounds,
+                "nick": nick, "team": team, "rounds": rounds_int,
                 "kd": kd, "adr": adr, "kr": kr,
                 "udpr": udpr,
                 "enemies_per_flash": enemies_per_flash,
@@ -725,15 +690,15 @@ async def compute_champ_player_summary_async(
                 "clutch_wr": clutch_wr,
                 "survival_rate": survival_pct,
                 "rating1": rating1,
-                "assists_total": assists,
-                "flashes_total": r["flash_cnt_total"] or 0,
-                "total_damage": r["total_damage"] or 0,
-                "hs_pct": r["hs_pct"] or 0.0,
-                "mvps_total": r["mvps_total"] or 0,
-                "pistol_kills_total": r["pistol_kills_total"] or 0,
-                "sniper_kills_total": r["sniper_kills_total"] or 0,
-                "enemies_flashed_total": r["flashed_total"] or 0,
-                "clutch_kills_total": r["clutch_kills_total"] or 0,
+                "assists_total": assists_int,
+                "flashes_total": int(float(r["flash_cnt_total"] or 0)),
+                "total_damage": int(float(r["total_damage"] or 0)),
+                "hs_pct": float(r["hs_pct"] or 0.0),
+                "mvps_total": int(float(r["mvps_total"] or 0)),
+                "pistol_kills_total": int(float(r["pistol_kills_total"] or 0)),
+                "sniper_kills_total": int(float(r["sniper_kills_total"] or 0)),
+                "enemies_flashed_total": int(float(r["flashed_total"] or 0)),
+                "clutch_kills_total": int(float(r["clutch_kills_total"] or 0)),
             })
 
     def _wperc(vals, w, p):
@@ -806,9 +771,7 @@ async def compute_champ_player_summary_async(
         "leaders": leaders,
     }
 
-async def compute_champ_map_summary_data_async(
-    pool: AsyncConnectionPool,
-    championship_id: int,
+async def compute_champ_map_summary_data_async(championship_id: int,
     excluded_team_ids: Collection[str] | None = None,
 ) -> dict:
     # Get map summary stats for division: all played and banned maps.
@@ -824,7 +787,7 @@ async def compute_champ_map_summary_data_async(
     GROUP BY map_name
     ORDER BY count DESC, mp.map_name ASC
     """
-    played_rows = await query_async(pool, played_sql, {"champ": championship_id, **excl_params})
+    played_rows = await query_async(played_sql, {"champ": championship_id, **excl_params})
     top_played = [(row["map_name"], row["count"]) for row in played_rows]
 
     # All banned maps (using map_votes table)
@@ -838,7 +801,7 @@ async def compute_champ_map_summary_data_async(
     GROUP BY v.map_name
     ORDER BY count DESC, v.map_name ASC
     """
-    banned_rows = await query_async(pool, banned_sql, {"champ": championship_id, **excl_params})
+    banned_rows = await query_async(banned_sql, {"champ": championship_id, **excl_params})
     top_banned = [(row["map_name"], row["count"]) for row in banned_rows]
     
     return {
@@ -855,18 +818,37 @@ def normalize_map_id(name: str) -> str:
         s = "de_" + s
     return s
 
-async def get_map_art_async(pool: AsyncConnectionPool, map_name_or_id: str) -> dict | None:
-    # Return {'map_id','pretty_name','image_sm','image_lg'} for given map name/id, or None.
+async def get_map_art_async(map_name_or_id: str) -> dict | None:
+    """Return map metadata from catalog or None."""
+    global _maps_catalog_available
+
+    if _maps_catalog_available is False:
+        return None
+
+    if _maps_catalog_available is None:
+        exists = await query_async(
+            """
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = DATABASE()
+              AND table_name = 'maps_catalog'
+            LIMIT 1
+            """,
+        )
+        _maps_catalog_available = bool(exists)
+        if not _maps_catalog_available:
+            return None
+
     mid = normalize_map_id(map_name_or_id)
-    rows = await query_async(pool, "SELECT map_id, pretty_name, image_sm, image_lg FROM maps_catalog WHERE map_id=?", (mid,))
+    rows = await query_async("SELECT map_id, pretty_name, image_sm, image_lg FROM maps_catalog WHERE map_id=?", (mid,))
     if not rows:
         return None
     row = rows[0]
     return {"map_id": row["map_id"], "pretty_name": row["pretty_name"], "image_sm": row["image_sm"], "image_lg": row["image_lg"]}
 
-async def map_pretty_name_async(pool: AsyncConnectionPool, raw: str) -> str:
-    # Return the prettified name from maps_catalog or a solid fallback.
-    art = await get_map_art_async(pool, raw)
+async def map_pretty_name_async(raw: str) -> str:
+    """Return the prettified name from maps_catalog or a fallback."""
+    art = await get_map_art_async(raw)
     if art and (art.get("pretty_name")):
         return art["pretty_name"]
     if not raw:
@@ -874,15 +856,13 @@ async def map_pretty_name_async(pool: AsyncConnectionPool, raw: str) -> str:
     slug = normalize_map_id(raw).replace("de_", "").replace("_", " ")
     return slug.title()
 
-async def compute_map_stats_table_data_async(
-    pool: AsyncConnectionPool,
-    championship_id: int,
+async def compute_map_stats_table_data_async(championship_id: int,
     team_id: str,
     excluded_team_ids: Collection[str] | None = None,
 ) -> list[dict]:
     # Async version of compute_map_stats_table_data
     # Get season map pool
-    pool_rows = await query_async(pool, """
+    pool_rows = await query_async("""
         SELECT DISTINCT mp.map_name AS map_id
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
@@ -896,14 +876,14 @@ async def compute_map_stats_table_data_async(
     else:
         all_maps = ["de_nuke","de_inferno","de_mirage","de_overpass","de_dust2","de_ancient","de_train","de_anubis"]
 
-    values_sql = ", ".join([f"('{m}')" for m in all_maps])
+    cte_sql, map_params = _build_allmaps_cte(all_maps)
 
     excluded = _prepare_excluded(excluded_team_ids, ignore=[team_id])
     excl_clause, excl_params = _build_exclusion_clause(excluded)
 
     sql = f"""
-        WITH allmaps(map) AS (
-            VALUES {values_sql}
+        WITH allmaps AS (
+            {cte_sql}
         ),
         my_matches AS (
             SELECT m.*
@@ -1042,22 +1022,53 @@ async def compute_map_stats_table_data_async(
         ORDER BY am.map
     """
 
-    rows = await query_async(pool, sql, {"champ": championship_id, "team": team_id, **excl_params})
+    rows = await query_async(
+        sql,
+        {"champ": championship_id, "team": team_id, **excl_params, **map_params},
+    )
 
     # Add pretty names - simplified version for now
-    out = []
+    out: list[dict] = []
     for r in rows:
         mid = r.get("map")
-        r["map_pretty"] = (mid or "").replace("de_", "").title() if mid else ""
-        out.append(r)
+        map_pretty = (mid or "").replace("de_", "").title() if mid else ""
+
+        def _ival(key: str) -> int:
+            return int(float(r.get(key, 0) or 0))
+
+        def _fval(key: str) -> float:
+            return float(r.get(key, 0.0) or 0.0)
+
+        out.append({
+            "map": mid,
+            "map_pretty": map_pretty,
+            "played": _ival("played"),
+            "picks": _ival("picks"),
+            "opp_picks": _ival("opp_picks"),
+            "wins": _ival("wins"),
+            "games": _ival("games"),
+            "wr": _fval("wr"),
+            "wins_own": _ival("wins_own"),
+            "games_own": _ival("games_own"),
+            "wr_own": _fval("wr_own"),
+            "wins_opp": _ival("wins_opp"),
+            "games_opp": _ival("games_opp"),
+            "wr_opp": _fval("wr_opp"),
+            "rd": _ival("rd"),
+            "ban1": _ival("ban1"),
+            "ban2": _ival("ban2"),
+            "opp_ban": _ival("opp_ban"),
+            "total_own_ban": _ival("total_own_ban"),
+            "kd": _fval("kd"),
+            "adr": _fval("adr"),
+            "decov": _ival("decov"),
+        })
     return out
 
 # Helper constants and functions for async database operations
 _TS_EXPR = "COALESCE(m.finished_at, m.started_at, m.scheduled_at, m.configured_at, m.last_seen_at, 0)"
 
-async def _get_team_last_prev_ts_async(
-    pool: AsyncConnectionPool,
-    division_id: int,
+async def _get_team_last_prev_ts_async(division_id: int,
     team_id: str,
     excluded_team_ids: Collection[str] | None = None,
 ) -> tuple[int | None, int | None]:
@@ -1066,7 +1077,6 @@ async def _get_team_last_prev_ts_async(
     excl_clause, excl_params = _build_exclusion_clause(excluded)
 
     rows = await query_async(
-        pool,
         f"""
         SELECT DISTINCT { _TS_EXPR } AS ts
         FROM matches m
@@ -1082,16 +1092,14 @@ async def _get_team_last_prev_ts_async(
     prev_ts = rows[-2]["ts"] if len(rows) >= 2 else None
     return (curr_ts, prev_ts)
 
-async def compute_map_stats_table_data_until_async(
-    pool: AsyncConnectionPool,
-    championship_id: int,
+async def compute_map_stats_table_data_until_async(championship_id: int,
     team_id: str,
     cutoff_ts: int,
     excluded_team_ids: Collection[str] | None = None,
 ) -> list[dict]:
     # Async version of compute_map_stats_table_data_until
     # Get season map pool
-    pool_rows = await query_async(pool, """
+    pool_rows = await query_async("""
         SELECT DISTINCT mp.map_name AS map_id
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
@@ -1105,14 +1113,14 @@ async def compute_map_stats_table_data_until_async(
     else:
         all_maps = ["de_nuke","de_inferno","de_mirage","de_overpass","de_dust2","de_ancient","de_train","de_anubis"]
 
-    values_sql = ", ".join([f"('{m}')" for m in all_maps])
+    cte_sql, map_params = _build_allmaps_cte(all_maps)
 
     excluded = _prepare_excluded(excluded_team_ids, ignore=[team_id])
     excl_clause, excl_params = _build_exclusion_clause(excluded)
 
     sql = f"""
-        WITH allmaps(map) AS (
-            VALUES {values_sql}
+        WITH allmaps AS (
+            {cte_sql}
         ),
         my_matches AS (
             SELECT m.*
@@ -1249,33 +1257,65 @@ async def compute_map_stats_table_data_until_async(
     """
 
     rows = await query_async(
-        pool,
         sql,
-        {"champ": championship_id, "team": team_id, "cutoff": cutoff_ts, **excl_params},
+        {"champ": championship_id, "team": team_id, "cutoff": cutoff_ts, **excl_params, **map_params},
     )
-    out = [dict(r) for r in rows]
+
+    out: list[dict] = []
+    for r in rows:
+        mid = r.get("map")
+        map_pretty = (mid or "").replace("de_", "").title() if mid else ""
+
+        def _ival(key: str) -> int:
+            return int(float(r.get(key, 0) or 0))
+
+        def _fval(key: str) -> float:
+            return float(r.get(key, 0.0) or 0.0)
+
+        out.append({
+            "map": mid,
+            "map_pretty": map_pretty,
+            "played": _ival("played"),
+            "picks": _ival("picks"),
+            "opp_picks": _ival("opp_picks"),
+            "wins": _ival("wins"),
+            "games": _ival("games"),
+            "wr": _fval("wr"),
+            "wins_own": _ival("wins_own"),
+            "games_own": _ival("games_own"),
+            "wr_own": _fval("wr_own"),
+            "wins_opp": _ival("wins_opp"),
+            "games_opp": _ival("games_opp"),
+            "wr_opp": _fval("wr_opp"),
+            "rd": _ival("rd"),
+            "ban1": _ival("ban1"),
+            "ban2": _ival("ban2"),
+            "opp_ban": _ival("opp_ban"),
+            "total_own_ban": _ival("total_own_ban"),
+            "kd": _fval("kd"),
+            "adr": _fval("adr"),
+            "decov": _ival("decov"),
+        })
     return out
 
-async def compute_map_stats_with_delta_async(
-    pool: AsyncConnectionPool,
-    championship_id: int,
+async def compute_map_stats_with_delta_async(championship_id: int,
     team_id: str,
     excluded_team_ids: Collection[str] | None = None,
 ) -> dict[str, dict]:
     # Async version of compute_map_stats_with_delta
     # Map-delta = (agg <= curr_ts) - (agg <= curr_ts-1)
     excluded = _prepare_excluded(excluded_team_ids, ignore=[team_id])
-    curr_ts, _ = await _get_team_last_prev_ts_async(pool, championship_id, team_id, excluded)
+    curr_ts, _ = await _get_team_last_prev_ts_async(championship_id, team_id, excluded)
     if curr_ts is None:
         return {}
 
     prev_cutoff = max(0, int(curr_ts) - 1)
 
     curr = await compute_map_stats_table_data_until_async(
-        pool, championship_id, team_id, curr_ts, excluded
+        championship_id, team_id, curr_ts, excluded
     )
     prev = await compute_map_stats_table_data_until_async(
-        pool, championship_id, team_id, prev_cutoff, excluded
+        championship_id, team_id, prev_cutoff, excluded
     )
 
     curr_by = {r["map"]: r for r in curr}
@@ -1294,9 +1334,7 @@ async def compute_map_stats_with_delta_async(
             out[m] = {"curr": c, "prev": p, "delta": d}
     return out
 
-async def _player_agg_until_async(
-    pool: AsyncConnectionPool,
-    division_id: int,
+async def _player_agg_until_async(division_id: int,
     team_id: str,
     player_id: str,
     cutoff: int | None,
@@ -1319,7 +1357,7 @@ async def _player_agg_until_async(
     excluded = _prepare_excluded(excluded_team_ids, ignore=[team_id])
     excl_clause, excl_params = _build_exclusion_clause(excluded)
 
-    rows = await query_async(pool, f"""
+    rows = await query_async(f"""
         SELECT
           COUNT(*) AS maps_played,
           SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds,
@@ -1356,7 +1394,7 @@ async def _player_agg_until_async(
     )
     
     if not rows:
-        return await _player_agg_until_async(pool, division_id, team_id, player_id, None, excluded_team_ids)
+        return await _player_agg_until_async(division_id, team_id, player_id, None, excluded_team_ids)
     
     row = rows[0]
     rounds = int(row["rounds"] or 0)
@@ -1388,16 +1426,14 @@ async def _player_agg_until_async(
         "pistol_kills": int(row["pistol_kills"] or 0),
     }
 
-async def compute_player_deltas_async(
-    pool: AsyncConnectionPool,
-    division_id: int,
+async def compute_player_deltas_async(division_id: int,
     team_id: str,
     excluded_team_ids: Collection[str] | None = None,
 ) -> dict[str, dict]:
     # Async version of compute_player_deltas
     # Delta = (agg <= curr_ts) - (agg <= curr_ts-1)
     excluded = _prepare_excluded(excluded_team_ids, ignore=[team_id])
-    curr_ts, _ = await _get_team_last_prev_ts_async(pool, division_id, team_id, excluded)
+    curr_ts, _ = await _get_team_last_prev_ts_async(division_id, team_id, excluded)
     if curr_ts is None:
         return {}
 
@@ -1406,7 +1442,7 @@ async def compute_player_deltas_async(
     # Kauden pelaajat (joilta on havaittu statsia)
     excl_clause, excl_params = _build_exclusion_clause(excluded)
 
-    pid_rows = await query_async(pool, f"""
+    pid_rows = await query_async(f"""
       SELECT DISTINCT ps.player_id
       FROM player_stats ps
       JOIN matches m ON m.match_id = ps.match_id
@@ -1418,8 +1454,8 @@ async def compute_player_deltas_async(
 
     out: dict[str, dict] = {}
     for pid in pids:
-        prev = await _player_agg_until_async(pool, division_id, team_id, pid, prev_cutoff, excluded)
-        curr = await _player_agg_until_async(pool, division_id, team_id, pid, curr_ts, excluded)
+        prev = await _player_agg_until_async(division_id, team_id, pid, prev_cutoff, excluded)
+        curr = await _player_agg_until_async(division_id, team_id, pid, curr_ts, excluded)
 
         # If nothing existed before the latest match, expose prev=None and delta=None (UI shows "(no prev)")
         if prev["maps_played"] == 0 and prev["rounds"] == 0 and prev["kills"] == 0 and prev["deaths"] == 0 and prev["assists"] == 0:
@@ -1435,9 +1471,7 @@ async def compute_player_deltas_async(
 # Async Team Rendering Helpers
 # =============================================
 
-async def render_team_card_async(
-    pool: AsyncConnectionPool,
-    div: dict,
+async def render_team_card_async(div: dict,
     team: dict,
     team_index: int,
     teams: list,
@@ -1451,8 +1485,8 @@ async def render_team_card_async(
     team_name = team.get("display_name") or team.get("team_name") or team["team_id"]
     
     # Team avatar and logo
-    team_avatar = next((t.get("avatar") for t in teams if t["team_id"] == team_id), None)
-    logo = f'<img class="logo team-logo" src="{team_avatar}" alt="">' if team_avatar else ''
+    team_avatar = next((t.get("avatar") for t in teams if t["team_id"] == team_id), None) or DEFAULT_TEAM_AVATAR
+    logo = f'<img class="logo team-logo" src="{team_avatar}" alt="">'
     
     html = []
     
@@ -1460,19 +1494,19 @@ async def render_team_card_async(
     excluded = [] if team.get("is_banned") else _prepare_excluded(banned_team_ids, ignore=[team_id])
 
     players_task = compute_player_table_data_async(
-        pool, div["championship_id"], team_id, excluded
+        div["championship_id"], team_id, excluded
     )
     player_deltas_task = compute_player_deltas_async(
-        pool, div["championship_id"], team_id, excluded
+        div["championship_id"], team_id, excluded
     )
     team_summary_task = compute_team_summary_data_async(
-        pool, team_id, div["championship_id"], excluded
+        team_id, div["championship_id"], excluded
     )
     maps_task = compute_map_stats_table_data_async(
-        pool, div["championship_id"], team_id, excluded
+        div["championship_id"], team_id, excluded
     )
     map_deltas_task = compute_map_stats_with_delta_async(
-        pool, div["championship_id"], team_id, excluded
+        div["championship_id"], team_id, excluded
     )
     
     players, player_deltas, team_summary, maps, map_deltas = await asyncio.gather(
@@ -1530,27 +1564,30 @@ async def render_team_card_async(
             team_summary[k] = fallback_stats[k]
     
     # Generate team card HTML
-    html.extend(await _render_team_card_header_async(team_id, team_name, logo, team.get("is_banned")))
+    html.extend(await _render_team_card_header_async(team_id, team_name, logo, team.get("is_banned"), team.get("css_class")))
     html.extend(await _render_team_players_section_async(
-        pool, div, team, players, player_deltas, team_summary,
+        div, team, players, player_deltas, team_summary,
         team_index, thresholds, _pd, _dval, _signed, _arrow, has_flash, has_pistol
     ))
     html.extend(await _render_team_maps_section_async(
-        pool, div, team, maps, map_deltas, div_avgs, team_index, 
+        div, team, maps, map_deltas, div_avgs, team_index, 
         _signed, _arrow
     ))
     # Render team matches section
-    html.extend(await _render_team_matches_section_async(pool, div, team, excluded))
+    html.extend(await _render_team_matches_section_async(div, team, excluded))
     html.extend(_render_team_card_footer())
     
     return html
 
-async def _render_team_card_header_async(team_id: str, team_name: str, logo: str, is_banned: bool = False) -> list[str]:
+async def _render_team_card_header_async(team_id: str, team_name: str, logo: str, is_banned: bool = False, css_class: str = "") -> list[str]:
     # Render team card header with collapsible details.
     from html import escape
     classes = ["card", "team-section"]
     if is_banned:
         classes.append("is-banned")
+    # Add status-based CSS class
+    if css_class:
+        classes.append(css_class)
     class_attr = " ".join(classes)
     return [
         f'''<details class="{class_attr}" id="team-{team_id}" open>''',
@@ -1572,7 +1609,7 @@ def _render_team_card_footer() -> list[str]:
     ]
 
 
-async def _render_team_players_section_async(pool: AsyncConnectionPool, div: dict, team: dict,
+async def _render_team_players_section_async(div: dict, team: dict,
                                            players: list, player_deltas: dict, team_summary: dict,
                                            team_index: int, thresholds: dict,
                                            _pd, _dval, _signed, _arrow, has_flash: bool, has_pistol: bool) -> list[str]:
@@ -1906,7 +1943,7 @@ async def _render_players_advanced_table_async(players, team_index, thresholds, 
     html.append("</div>")  # /tab-panel advanced
     return html
 
-async def _render_team_maps_section_async(pool: AsyncConnectionPool, div: dict, team: dict,
+async def _render_team_maps_section_async(div: dict, team: dict,
                                         maps: list, map_deltas: dict, div_avgs: dict,
                                         team_index: int, _signed, _arrow) -> list[str]:
     # Render team maps section with map statistics table.
@@ -1926,16 +1963,16 @@ async def _render_team_maps_section_async(pool: AsyncConnectionPool, div: dict, 
     # Maps chips
     html.append('<div class="chips">')
     if most_ban and most_ban["total_own_ban"]>0:
-        map_name = await map_pretty_name_async(pool, most_ban["map"])
+        map_name = await map_pretty_name_async(most_ban["map"])
         html.append(f'<span class="chip">Most banned: {map_name} ({most_ban["total_own_ban"]}×)</span>')
     if most_pick and most_pick["picks"]>0:
-        map_name = await map_pretty_name_async(pool, most_pick["map"])
+        map_name = await map_pretty_name_async(most_pick["map"])
         html.append(f'<span class="chip">Most picked: {map_name} ({most_pick["picks"]}×)</span>')
     if best_wr and best_wr["wr"]>0:
-        map_name = await map_pretty_name_async(pool, best_wr["map"])
+        map_name = await map_pretty_name_async(best_wr["map"])
         html.append(f'<span class="chip">Best WR: {map_name} ({best_wr["wr"]:.0f}%)</span>')
     if avoid:
-        map_name = await map_pretty_name_async(pool, avoid["map"])
+        map_name = await map_pretty_name_async(avoid["map"])
         html.append(f'<span class="chip">Map to avoid: {map_name} ({avoid["wr"]:.0f}%)</span>')
     html.append('</div>')
 
@@ -2002,7 +2039,7 @@ async def _render_team_maps_section_async(pool: AsyncConnectionPool, div: dict, 
         prev_wr_opp = (100.0 * (prev["wins_opp"] or 0) / (prev["games_opp"] or 0)) if (prev and prev["games_opp"]) else 0.0
         wr_opp_delta = r["wr_opp"] - prev_wr_opp
 
-        map_name = await map_pretty_name_async(pool, r["map"])
+        map_name = await map_pretty_name_async(r["map"])
         html.append(f'''<tr>
         <td>{map_name}</td>
         <td title="{_pp('played',0)}">{r["played"]}{_arrow(dlt.get('played') if dlt else None)}</td>
@@ -2046,9 +2083,7 @@ bindPlayedOnly('{tid2}', '{tid2}-played-only');
 # Async Team Matches Functions
 # =============================================
 
-async def get_team_matches_mirror_async(
-    pool: AsyncConnectionPool,
-    championship_id: int,
+async def get_team_matches_mirror_async(championship_id: int,
     team_id: str,
     excluded_team_ids: Collection[str] | None = None,
 ) -> list[dict]:
@@ -2119,7 +2154,7 @@ async def get_team_matches_mirror_async(
     ORDER BY (mp.ts IS NULL) ASC, mp.ts ASC, mp.match_id ASC, mp.round_index ASC
     """
     
-    rows = await query_async(pool, sql, {"champ": championship_id, "team": team_id, **excl_params})
+    rows = await query_async(sql, {"champ": championship_id, "team": team_id, **excl_params})
 
     out: dict[str, dict] = {}
     for r in rows:
@@ -2152,15 +2187,15 @@ async def get_team_matches_mirror_async(
         rf = (r["score_team1"] if me_is_t1 else r["score_team2"])
         ra = (r["score_team2"] if me_is_t1 else r["score_team1"])
 
-        me_kills  = (r["t1_kills"]  if me_is_t1 else r["t2_kills"])  or 0
-        me_deaths = (r["t1_deaths"] if me_is_t1 else r["t2_deaths"]) or 0
-        me_adr    = (r["t1_adr"]    if me_is_t1 else r["t2_adr"])    or 0.0
-        me_damage = (r["t1_dmg"]    if me_is_t1 else r["t2_dmg"])    or 0
+        me_kills  = int(float((r["t1_kills"]  if me_is_t1 else r["t2_kills"])  or 0))
+        me_deaths = int(float((r["t1_deaths"] if me_is_t1 else r["t2_deaths"]) or 0))
+        me_adr    = float((r["t1_adr"]    if me_is_t1 else r["t2_adr"])    or 0.0)
+        me_damage = int(float((r["t1_dmg"]    if me_is_t1 else r["t2_dmg"])    or 0))
 
-        opp_kills  = (r["t2_kills"]  if me_is_t1 else r["t1_kills"])  or 0
-        opp_deaths = (r["t2_deaths"] if me_is_t1 else r["t1_deaths"]) or 0
-        opp_adr    = (r["t2_adr"]    if me_is_t1 else r["t1_adr"])    or 0.0
-        opp_damage = (r["t2_dmg"]    if me_is_t1 else r["t1_dmg"])    or 0
+        opp_kills  = int(float((r["t2_kills"]  if me_is_t1 else r["t1_kills"])  or 0))
+        opp_deaths = int(float((r["t2_deaths"] if me_is_t1 else r["t1_deaths"]) or 0))
+        opp_adr    = float((r["t2_adr"]    if me_is_t1 else r["t1_adr"])    or 0.0)
+        opp_damage = int(float((r["t2_dmg"]    if me_is_t1 else r["t1_dmg"])    or 0))
 
         me_kd  = (float(me_kills) / me_deaths) if me_deaths else float(me_kills)
         opp_kd = (float(opp_kills) / opp_deaths) if opp_deaths else float(opp_kills)
@@ -2172,15 +2207,13 @@ async def get_team_matches_mirror_async(
             "ra": ra if ra is not None else 0,
             "is_forfeit": bool(r["map_is_forfeit"]),
             "pick_team_id": r["pick_team_id"],
-            "left":  {"adr": float(me_adr or 0.0),  "kd": float(me_kd),  "dmg": int(me_damage),  "kills": int(me_kills),  "deaths": int(me_deaths)},
-            "right": {"adr": float(opp_adr or 0.0), "kd": float(opp_kd), "dmg": int(opp_damage), "kills": int(opp_kills), "deaths": int(opp_deaths)}
+            "left":  {"adr": me_adr,  "kd": float(me_kd),  "dmg": me_damage,  "kills": me_kills,  "deaths": me_deaths},
+            "right": {"adr": opp_adr, "kd": float(opp_kd), "dmg": opp_damage, "kills": opp_kills, "deaths": opp_deaths}
         })
 
     return [out[mid] for mid in sorted(out, key=lambda k: (out[k]["ts"] is None, out[k]["ts"] or 0, k))]
 
-async def _render_team_matches_section_async(
-    pool: AsyncConnectionPool,
-    div: dict,
+async def _render_team_matches_section_async(div: dict,
     team: dict,
     excluded_team_ids: Collection[str] | None = None,
 ) -> list[str]:
@@ -2193,7 +2226,7 @@ async def _render_team_matches_section_async(
     # Get team matches data
     excluded = _prepare_excluded(excluded_team_ids, ignore=[team_id])
     matches = await get_team_matches_mirror_async(
-        pool, div["championship_id"], team_id, excluded
+        div["championship_id"], team_id, excluded
     )
 
     # Calculate summary chips (Ottelut, Kartat, W-L, ±RD)
@@ -2245,7 +2278,7 @@ async def _render_team_matches_section_async(
     html.append(f'    </div>')
     html.append(f'    <div class="matches-list" id="matches-{team_id}">')
     for match in matches:
-        await _render_single_match_async(pool, html, match, team_id)
+        await _render_single_match_async(html, match, team_id)
     html.append('    </div>')
     # Inline script to bind "Show played only" behavior for this matches list (legacy-compatible)
     html.append(f'''    <script>
@@ -2269,7 +2302,7 @@ window.addEventListener('DOMContentLoaded', function(){{
     html.append('</details>')
     return html
 
-async def _render_single_match_async(pool: AsyncConnectionPool, html: list[str], match: dict, team_id: str) -> None:
+async def _render_single_match_async(html: list[str], match: dict, team_id: str) -> None:
     """Render a single match in the matches section"""
     from html import escape
     import datetime
@@ -2336,7 +2369,7 @@ async def _render_single_match_async(pool: AsyncConnectionPool, html: list[str],
     total_kills = 0
     total_deaths = 0
     for map_data in maps:
-        await _render_single_map_async(pool, html, map_data, team_id)
+        await _render_single_map_async(html, map_data, team_id)
         rf, ra = map_data.get("rf", 0), map_data.get("ra", 0)
         if rf > ra:
             total_w += 1
@@ -2359,13 +2392,13 @@ async def _render_single_match_async(pool: AsyncConnectionPool, html: list[str],
     html.append(f'    </div>')
     html.append(f'  </details>')
 
-async def _render_single_map_async(pool: AsyncConnectionPool, html: list[str], map_data: dict, team_id: str) -> None:
+async def _render_single_map_async(html: list[str], map_data: dict, team_id: str) -> None:
     """Render a single map within a match"""
     from html import escape
     
     map_name = map_data["map"]
-    pretty_name = await map_pretty_name_async(pool, map_name)
-    art = await get_map_art_async(pool, map_name)
+    pretty_name = await map_pretty_name_async(map_name)
+    art = await get_map_art_async(map_name)
     img_src = (art.get("image_lg") if art else None) or ""
     
     # Score and stats

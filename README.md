@@ -9,6 +9,8 @@ All source changes to CSS/JS must be made in `web_static/` and copied to `docs/`
 
 Async HTML generation is the only mode now. CI/GitHub Actions don’t need changes.
 
+> **Database**: The pipeline uses MariaDB via `asyncmy` for all data storage and retrieval.
+
 ## Usage
 
 - Commands:
@@ -24,11 +26,12 @@ Async HTML generation is the only mode now. CI/GitHub Actions don’t need chang
 
 - Outputs are written under docs/ for GitHub Pages.
 - The generator compares content to avoid unnecessary writes; pass --force to always write.
+- Skips rely on MariaDB timestamps (clamped to "now") so reruns are fast when nothing changed.
 
 ## Division overrides
 
-- To flag teams that were banned from a division, create an optional `division_overrides.json`
-  file alongside the scripts. Example structure:
+- To flag teams that were banned or quit mid-season, create/update the optional
+  `division_overrides.json` file (or run `python manage_team_status.py`). Example structure:
 
   ```json
   {
@@ -40,11 +43,19 @@ Async HTML generation is the only mode now. CI/GitHub Actions don’t need chang
           "reason": "Admin decision",
           "banned_at": "2024-03-15"
         }
+      ],
+      "quit_teams": [
+        {
+          "team_id": "zyx987",
+          "team_name": "Roster Collapse",
+          "reason": "Line-up unable to continue",
+          "quit_at": "2025-02-01"
+        }
       ]
     }
   }
   ```
 
-- When present, the overrides are surfaced in the generated HTML: banned teams are annotated
-  with a red “(BANNED)” suffix and their matches are excluded from division-wide aggregates for
-  other teams while still showing the banned team’s own data.
+- When present, both banned and quit teams are surfaced in the generated HTML. Their matches are
+  ignored for division-wide aggregates so remaining teams retain fair standings, while still
+  showing the affected team’s own data for auditing purposes.
