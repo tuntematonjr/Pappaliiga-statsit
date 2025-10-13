@@ -724,6 +724,17 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
 
     # PLAYER STATS
     player_rows = _extract_player_rows(match_id, rounds)
+    # Upsert any players referenced by the stats to avoid FK failures
+    if player_rows:
+        players_from_stats = []
+        for r in player_rows:
+            pid = r.get("player_id")
+            if pid:
+                players_from_stats.append({"player_id": pid, "nickname": r.get("nickname") or "", "updated_at": None})
+        if players_from_stats:
+            # Bulk upsert is idempotent and uses ON CONFLICT to avoid duplicates
+            upsert_players_bulk(con, players_from_stats)
+
     for r in player_rows:
         r.pop("nickname", None)  # varmistus
         r["team_id"] = _normalize_team_ref(r.get("team_id"), team1_id, team2_id)
