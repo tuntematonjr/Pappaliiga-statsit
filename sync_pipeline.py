@@ -29,7 +29,7 @@ from faceit_client_async import (
 
 from faceit_config import DIVISIONS
 
-from db_async import connection, fetch_all
+from db_async import connection, readonly_connection, fetch_all
 from db_ops_async import (
     DEFAULT_TEAM_AVATAR,
     clear_obsolete_maps_async,
@@ -600,7 +600,47 @@ async def sync_match_async(
         votes = {}
     normalised = _build_normalised_match(ctx, details, stats, votes)
 
+    # FK safety check: Verify championship exists
+    # If missing, try to find an existing championship with matching (season, div, playoffs) and use that ID
+    match_championship_id = normalised.match_row.get("championship_id")
+    
+    # Use a single transaction for everything
     async with connection() as conn:
+        # Check if championship exists
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "SELECT championship_id FROM championships WHERE championship_id = %s",
+                (match_championship_id,)
+            )
+            champ_exists = await cur.fetchone()
+        
+        if not champ_exists:
+            # Championship missing! Try to find an existing championship with same (season, div, playoffs)
+            LOGGER.warning(
+                "Championship %s MISSING for match %s! Looking for alternative championship with S%d D%d playoffs=%d",
+                match_championship_id,
+                match_id,
+                ctx.season,
+                ctx.division_num,
+                1 if ctx.is_playoffs else 0,
+            )
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT championship_id FROM championships WHERE season = %s AND division_num = %s AND is_playoffs = %s LIMIT 1",
+                    (ctx.season, ctx.division_num, 1 if ctx.is_playoffs else 0)
+                )
+                alternative = await cur.fetchone()
+            
+            if alternative:
+                alternative_id = alternative[0]
+                LOGGER.info("Found alternative championship %s - remapping match %s", alternative_id, match_id)
+                # Update the match row to use the alternative championship ID
+                normalised.match_row["championship_id"] = alternative_id
+            else:
+                LOGGER.error("No alternative championship found for S%d D%d playoffs=%d - match %s will fail FK constraint!",
+                           ctx.season, ctx.division_num, 1 if ctx.is_playoffs else 0, match_id)
+                # Let it fail with FK error so we can debug
+        
         # Ensure teams and players exist first to satisfy FK constraints from matches/maps/stats
         for team_row in normalised.team_rows:
             await upsert_team_async(conn, team_row)

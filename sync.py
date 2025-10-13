@@ -9,11 +9,12 @@ import sys
 import time
 from typing import Sequence
 
-from db_async import create_schema_async, fetch_val, reset_db_async
+from db_async import create_schema_async, fetch_val, reset_db_async, connection
 from division_overrides import load_division_overrides
 from faceit_client_async import get_rate_limit_stats, reset_rate_limit_stats, shutdown_clients
 from faceit_config import DIVISIONS, CURRENT_SEASON
 from sync_pipeline import ChampionshipSyncResult, sync_championship_async, update_single_match_async
+from db_ops_async import upsert_championship_async
 
 LOGGER = logging.getLogger("pappaliiga.sync")
 
@@ -164,6 +165,31 @@ async def main_async(args: argparse.Namespace) -> int:
         
         LOGGER.info("Starting sync for %d championship(s) across %d season(s)", 
                    len(targets), len(championships_by_season))
+
+        # Ensure all championships exist in DB before syncing matches. This avoids
+        # foreign-key failures when match rows reference championships that haven't
+        # been upserted yet. We use a single DB connection and upsert sequentially.
+        try:
+            LOGGER.info("Upserting %d championship rows into DB", len(targets))
+            async with connection() as conn:
+                for season_key in sorted(championships_by_season.keys()):
+                    for championship_id, division in championships_by_season[season_key]:
+                        row = {
+                            "championship_id": championship_id,
+                            "season": division.get("season"),
+                            "division_num": division.get("division_num"),
+                            "name": division.get("name") or division.get("slug") or f"div{division.get('division_num')}-s{division.get('season')}",
+                            "is_playoffs": 1 if division.get("is_playoffs") else 0,
+                            "slug": division.get("slug") or f"div{division.get('division_num')}-s{division.get('season')}",
+                        }
+                        try:
+                            await upsert_championship_async(conn, row)
+                        except Exception:
+                            # If upsert fails for a single championship, log and continue so other
+                            # divisions can still be processed. The failure will be obvious in logs.
+                            LOGGER.exception("Failed to upsert championship %s before sync", championship_id)
+        except Exception:
+            LOGGER.exception("Unexpected error while upserting championships - continuing with sync")
         
         # Process each season
         for season in sorted(championships_by_season.keys()):

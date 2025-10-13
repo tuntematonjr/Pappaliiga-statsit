@@ -14,7 +14,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from faceit_client_async import list_championships_for_organizer_async
+from faceit_client_async import list_championships_for_organizer_async, get_championship_matches_async
 from faceit_config import PAPPALIIGA_ORG_ID
 
 DIV_RX     = re.compile(r"(divisioona|division|mestaruussarja)", re.IGNORECASE)
@@ -68,12 +68,15 @@ def make_unique_slug(proposed: str, cid: str, already: set[str]) -> str:
         s = f"{s}-{short}"
     return s
 
-async def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[str, Any]]:
+async def discover_cs_divisions(organizer_id: str, min_season: int = 0,
+                                require_matches: bool = False, min_matches: int = 0) -> tuple[List[Dict[str, Any]], Dict[str, int]]:
     champs = await list_championships_for_organizer_async(organizer_id)
     out: List[Dict[str, Any]] = []
     seen_cids: set[str] = set()
+    stats: Dict[str, int] = {"api_count": 0, "skipped_status": 0, "skipped_matches": 0}
 
     for c in champs:
+        stats["api_count"] += 1
         cid  = c.get("championship_id") or c.get("id")
         name = (c.get("name") or "").strip()
         if not cid or not name:
@@ -96,6 +99,14 @@ async def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[
         if season < min_season:
             continue
 
+        # Skip championships that are marked cancelled/closed/inactive if possible
+        # Some Faceit responses include a 'status' or 'state' field; treat values like 'cancelled', 'closed', 'inactive' as excluded.
+        status = (c.get("status") or c.get("state") or "").strip().lower()
+        if status in ("cancelled", "canceled", "closed", "inactive"):
+            # skip cancelled championships
+            stats["skipped_status"] += 1
+            continue
+
         game   = (c.get("game") or c.get("game_id") or "cs2").strip().lower() or "cs2"
 
         item = {
@@ -107,20 +118,55 @@ async def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[
             "game": game if game in CS_TAGS else "cs2",
             "is_playoffs": 1 if po else 0,
         }
+        # If caller requested requiring matches, fetch details to check match_count
+        if require_matches and min_matches > 0:
+            try:
+                # Fetch up to a reasonable limit and count matches. This may be somewhat heavy
+                # depending on championship size; use max(min_matches, 100) as a sensible cap.
+                fetch_limit = max(min_matches, 100)
+                matches = await get_championship_matches_async(cid, limit=fetch_limit)
+                mcount = len(matches or [])
+                if mcount < min_matches:
+                    # skip championships with too few matches
+                    stats["skipped_matches"] += 1
+                    continue
+            except Exception:
+                # if fetch fails, be conservative and include the championship
+                pass
+
         out.append(item)
         seen_cids.add(cid)
 
     out.sort(key=lambda d: (-int(d.get("season", 0)), int(d.get("division_num", 0))))
-    return out
+    return out, stats
 
 def load_existing(path: Path) -> List[Dict[str, Any]]:
     if not path.exists():
         return []
     with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+        try:
+            data = json.load(f)
+        except Exception:
+            # Try a tolerant parse: strip C-style block comments and ellipsis placeholder lines
+            f.seek(0)
+            raw = f.read()
+            # remove /* ... */ blocks
+            import re
+
+            raw_clean = re.sub(r"/\*.*?\*/", "", raw, flags=re.DOTALL)
+            # remove lines that are just '...' or contain 'Lines' placeholders
+            lines = [ln for ln in raw_clean.splitlines() if not ln.strip().startswith("...") and "Lines" not in ln]
+            raw_clean = "\n".join(lines)
+            try:
+                data = json.loads(raw_clean)
+            except Exception as exc:
+                print(f"Warning: divisions.json exists but could not be parsed after tolerant cleanup: {exc}. Proceeding with empty existing list.")
+                return []
+
         if isinstance(data, list):
             return data
-        raise ValueError("divisions.json must be a JSON array")
+        print("Warning: divisions.json parsed but top-level is not a JSON array. Proceeding with empty existing list.")
+        return []
 
 
 def next_unique_division_id(existing: List[Dict[str, Any]]) -> int:
@@ -197,10 +243,14 @@ def non_destructive_merge(existing: List[Dict[str, Any]],
 
 import asyncio
 
-async def main_async(out_path: str, dry_run: bool, min_season: int) -> None:
+async def main_async(out_path: str, dry_run: bool, min_season: int,
+                     require_matches: bool = False, min_matches: int = 0) -> None:
     out = Path(out_path)
     existing = load_existing(out)
-    discovered = await discover_cs_divisions(PAPPALIIGA_ORG_ID, min_season=min_season)
+    discovered, stats = await discover_cs_divisions(PAPPALIIGA_ORG_ID, min_season=min_season,
+                                                    require_matches=require_matches, min_matches=min_matches)
+    if stats:
+        print(f"Discovery: api_count={stats.get('api_count',0)}, skipped_status={stats.get('skipped_status',0)}, skipped_matches={stats.get('skipped_matches',0)}")
     final = non_destructive_merge(existing, discovered)
 
     if dry_run:
@@ -219,7 +269,12 @@ if __name__ == "__main__":
     p.add_argument("--dry-run", action="store_true", help="Print result without writing the file")
     p.add_argument("--min-season", type=int, default=11,
                     help="Skip adding divisions older than this season (default: 11 = include all)")
+    p.add_argument("--require-matches", action="store_true",
+                   help="Require checking championship details for a minimum number of matches (costly API calls)")
+    p.add_argument("--min-matches", type=int, default=0,
+                   help="Minimum number of matches a championship must have when --require-matches is set")
                     #    python gen_divisions_json.py --min-season 10
     args = p.parse_args()
-    asyncio.run(main_async(out_path=args.out, dry_run=args.dry_run, min_season=args.min_season))
+    asyncio.run(main_async(out_path=args.out, dry_run=args.dry_run, min_season=args.min_season,
+                           require_matches=args.require_matches, min_matches=args.min_matches))
 

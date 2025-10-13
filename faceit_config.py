@@ -23,5 +23,11 @@ PAPPALIIGA_ORG_ID = "1bfc69fa-5a21-4ed9-9ef3-37edbd7210d8"
 DIVISIONS_JSON = Path(__file__).with_name("divisions.json")
 DIVISIONS = []
 if DIVISIONS_JSON.exists():
-    with open(DIVISIONS_JSON, "r", encoding="utf-8") as f:
-        DIVISIONS = json.load(f)
+    try:
+        with open(DIVISIONS_JSON, "r", encoding="utf-8") as f:
+            DIVISIONS = json.load(f)
+    except Exception as exc:
+        # Be tolerant: if divisions.json is temporarily malformed (comments/omitted sections),
+        # warn and continue with an empty list so tools (generator) can run.
+        print(f"Warning: failed to parse {DIVISIONS_JSON}: {exc}. Continuing with empty DIVISIONS.")
+        DIVISIONS = []
