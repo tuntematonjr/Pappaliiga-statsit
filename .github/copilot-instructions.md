@@ -159,7 +159,7 @@ python html_gen.py --div 1           # single division
   - Use precise touch detection (max movement: 8px, max time: 400ms)
   - Suppress synthetic click events after touch with `_isTouch` flag
   - Single event handler per summary with `dataset.hasSummaryListener` guard
-- **Team navigation**: Auto-expand target sections when clicking team links (`#team-{id}`)
+- **Team navigation**: Auto-expand target sections when clicking team links (# team-{id}
 - **State preservation**: Collapsible state managed through CSS classes, not `open` attribute
 - **Debug logging**: `sendClientLog()` posts events to local collector (LAN IP configurable)
 
