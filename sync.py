@@ -44,6 +44,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--match-id", default=None, help="Resync a single match")
     parser.add_argument("--full", action="store_true", help="Force full resync for the selected championship")
     parser.add_argument("--all-seasons", action="store_true", help="Sync all seasons (default: current season only)")
+    parser.add_argument("--season", type=int, default=None, help="Sync only the provided season number (overrides --all-seasons)")
     parser.add_argument("--verify", action="store_true", help="Run post-sync verification queries")
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
     parser.add_argument(
@@ -91,21 +92,27 @@ async def _verify_counts() -> None:
         LOGGER.info("%s matches flagged ignored_due_ban", ignored_matches)
 
 
-def _resolve_targets(championship_id: str | None, all_seasons: bool = False) -> Sequence[str]:
+def _resolve_targets(championship_id: str | None, all_seasons: bool = False, season: int | None = None) -> Sequence[str]:
     if championship_id:
         return [championship_id]
-    
+
+    # If explicit season provided, use that (overrides all_seasons)
+    if season is not None:
+        season_divisions = [item["championship_id"] for item in DIVISIONS if item.get("season") == season]
+        LOGGER.info("Syncing Season %s divisions (%d total)", season, len(season_divisions))
+        return season_divisions
+
     if all_seasons:
         # Return all championships from all seasons
         LOGGER.info("All seasons requested - syncing all divisions from all seasons (%d total)", len(DIVISIONS))
         return [item["championship_id"] for item in DIVISIONS]
-    
+
     # Default to current season only
     current_season_divisions = [
         item["championship_id"] for item in DIVISIONS 
         if item.get("season") == CURRENT_SEASON
     ]
-    
+
     LOGGER.info("No specific championship provided - syncing all Season %d divisions (%d total)", 
                 CURRENT_SEASON, len(current_season_divisions))
     return current_season_divisions
@@ -148,7 +155,7 @@ async def main_async(args: argparse.Namespace) -> int:
             LOGGER.exception("Failed to refresh match %s: %s", args.match_id, exc)
             return 1
     else:
-        targets = _resolve_targets(args.championship_id, args.all_seasons)
+        targets = _resolve_targets(args.championship_id, args.all_seasons, season=args.season)
         total_start_time = time.time()
         total_synced_matches = 0
         total_skipped_matches = 0
