@@ -1334,6 +1334,108 @@ async def compute_map_stats_with_delta_async(championship_id: int,
             out[m] = {"curr": c, "prev": p, "delta": d}
     return out
 
+
+async def compute_team_map_deltas_async(
+    championship_id: int | str,
+    team_id: str,
+    excluded_team_ids: Collection[str] | None = None,
+) -> dict[str, dict]:
+    """Backwards-compatible alias retained for older API callers."""
+    return await compute_map_stats_with_delta_async(
+        championship_id,
+        team_id,
+        excluded_team_ids,
+    )
+
+async def compute_player_map_deltas_async(championship_id: str,
+    player_id: str) -> dict[str, dict]:
+    """
+    Aggregate per-map stats for a player within a championship.
+    Returns curr stats plus placeholders for prev/delta (not yet tracked).
+    """
+    rows = await query_async(
+        """
+        SELECT
+            COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_label,
+            COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
+            COUNT(DISTINCT ps.match_id) AS maps_played,
+            COUNT(*) AS rounds_played,
+            SUM(COALESCE(ps.kills, 0)) AS kills,
+            SUM(COALESCE(ps.deaths, 0)) AS deaths,
+            SUM(COALESCE(ps.assists, 0)) AS assists,
+            AVG(COALESCE(ps.kd, 0)) AS kd_avg,
+            AVG(COALESCE(ps.kr, 0)) AS kr_avg,
+            AVG(COALESCE(ps.adr, 0)) AS adr_avg,
+            AVG(COALESCE(ps.hs_pct, 0)) AS hs_avg,
+            SUM(COALESCE(ps.mvps, 0)) AS mvps,
+            SUM(COALESCE(ps.sniper_kills, 0)) AS sniper_kills,
+            SUM(COALESCE(ps.utility_damage, 0)) AS utility_damage,
+            SUM(COALESCE(ps.enemies_flashed, 0)) AS enemies_flashed,
+            SUM(COALESCE(ps.flash_count, 0)) AS flash_count,
+            SUM(COALESCE(ps.flash_successes, 0)) AS flash_successes,
+            SUM(COALESCE(ps.mk_2k, 0)) AS mk2,
+            SUM(COALESCE(ps.mk_3k, 0)) AS mk3,
+            SUM(COALESCE(ps.mk_4k, 0)) AS mk4,
+            SUM(COALESCE(ps.mk_5k, 0)) AS mk5,
+            SUM(COALESCE(ps.clutch_kills, 0)) AS clutch_kills,
+            SUM(COALESCE(ps.cl_1v1_attempts, 0)) AS c11_att,
+            SUM(COALESCE(ps.cl_1v1_wins, 0)) AS c11_win,
+            SUM(COALESCE(ps.cl_1v2_attempts, 0)) AS c12_att,
+            SUM(COALESCE(ps.cl_1v2_wins, 0)) AS c12_win,
+            SUM(COALESCE(ps.entry_count, 0)) AS entry_count,
+            SUM(COALESCE(ps.entry_wins, 0)) AS entry_wins,
+            SUM(COALESCE(ps.pistol_kills, 0)) AS pistol_kills
+        FROM player_stats ps
+        JOIN matches m ON m.match_id = ps.match_id
+        LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+        WHERE m.championship_id = :champ AND ps.player_id = :player AND COALESCE(ps.is_forfeit_map, 0) = 0
+        GROUP BY map_label
+        ORDER BY map_label
+        """,
+        {"champ": championship_id, "player": player_id}
+    )
+
+    out: dict[str, dict] = {}
+    for row in rows:
+        map_name = row.get("map_name") or "Unknown"
+        kills = int(row.get("kills") or 0)
+        deaths = int(row.get("deaths") or 0)
+        rounds = int(row.get("rounds_played") or 0)
+        damage = None  # total damage not tracked directly; keep placeholder for future
+
+        curr = {
+            "maps_played": int(row.get("maps_played") or 0),
+            "rounds": rounds,
+            "kills": kills,
+            "deaths": deaths,
+            "assists": int(row.get("assists") or 0),
+            "kd": (kills / deaths) if deaths else float(kills),
+            "kr": float(row.get("kr_avg") or 0.0),
+            "adr": float(row.get("adr_avg") or 0.0),
+            "hs_pct": float(row.get("hs_avg") or 0.0),
+            "mvps": int(row.get("mvps") or 0),
+            "sniper_kills": int(row.get("sniper_kills") or 0),
+            "utility_damage": int(row.get("utility_damage") or 0),
+            "enemies_flashed": int(row.get("enemies_flashed") or 0),
+            "flash_count": int(row.get("flash_count") or 0),
+            "flash_successes": int(row.get("flash_successes") or 0),
+            "clutch_kills": int(row.get("clutch_kills") or 0),
+            "c11_att": int(row.get("c11_att") or 0),
+            "c11_win": int(row.get("c11_win") or 0),
+            "c12_att": int(row.get("c12_att") or 0),
+            "c12_win": int(row.get("c12_win") or 0),
+            "entry_count": int(row.get("entry_count") or 0),
+            "entry_wins": int(row.get("entry_wins") or 0),
+            "mk2": int(row.get("mk2") or 0),
+            "mk3": int(row.get("mk3") or 0),
+            "mk4": int(row.get("mk4") or 0),
+            "mk5": int(row.get("mk5") or 0),
+            "pistol_kills": int(row.get("pistol_kills") or 0),
+            "damage": damage,
+        }
+        out[map_name] = {"curr": curr, "prev": None, "delta": None}
+    return out
+
 async def _player_agg_until_async(division_id: int,
     team_id: str,
     player_id: str,

@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""FastAPI application for Pappaliiga Stats API.
+
+Serves dynamic data for teams, players, divisions, and matches.
+Replaces static HTML generation with REST API endpoints.
+"""
+from __future__ import annotations
+
+import os
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from db_async import close_pool, get_pool
+
+from .routers import championships, divisions, matches, players, stats, teams
+from .routers import maps_catalog, image_proxy
+
+# Load environment variables from .env file if present
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+        print(f"[info] Loaded environment from {env_path}")
+except ImportError:
+    # python-dotenv not installed, environment must be set externally
+    pass
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize and cleanup database pool."""
+    # Startup: ensure pool is ready
+    await get_pool()
+    print("[info] Database pool initialized")
+    
+    yield
+    
+    # Shutdown: close pool
+    await close_pool()
+    print("[info] Database pool closed")
+
+
+app = FastAPI(
+    title="Pappaliiga Stats API",
+    description="REST API for CS2 tournament statistics",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# CORS configuration for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure for production
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["*"],
+)
+
+
+# Mount static files
+frontend_dir = Path(__file__).parent.parent / "frontend"
+if (frontend_dir / "static").exists():
+    app.mount("/static", StaticFiles(directory=str(frontend_dir / "static")), name="static")
+    print(f"[info] Mounted static files from {frontend_dir / 'static'}")
+
+# Include routers
+app.include_router(divisions.router, prefix="/api/divisions", tags=["divisions"])
+app.include_router(championships.router, prefix="/api/championships", tags=["championships"])
+app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
+app.include_router(players.router, prefix="/api/players", tags=["players"])
+app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
+app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
+app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
+app.include_router(image_proxy.router, prefix="/api", tags=["images"])
+
+
+# Expose a compatibility endpoint for /api/seasons/{season}/stats (frontend expects this path)
+@app.get('/api/seasons/{season}/stats')
+async def seasons_stats_compat(season: int):
+    return await stats.get_season_stats(season)
+
+
+
+
+@app.get("/")
+async def root():
+    """Serve the frontend index.html."""
+    frontend_dir = Path(__file__).parent.parent / "frontend"
+    index_path = frontend_dir / "index.html"
+    
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    else:
+        return {
+            "message": "Pappaliiga Stats API",
+            "version": "1.0.0",
+            "docs": "/docs",
+            "frontend": "not found - expected at frontend/index.html"
+        }
+
+
+@app.get("/api")
+async def api_root():
+    """API root endpoint."""
+    return {
+        "message": "Pappaliiga Stats API",
+        "version": "1.0.0",
+        "docs": "/docs",
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring."""
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("SELECT 1")
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Database unhealthy: {e}")
+
+
+# SPA fallback - must be last route!
+# This catches all routes not matched by API or static files
+# and returns index.html for Vue Router to handle
+@app.get("/{full_path:path}")
+async def spa_fallback(full_path: str):
+    """Serve index.html for all routes (SPA fallback for Vue Router)."""
+    # Don't intercept API routes or static files
+    if full_path.startswith("api/") or full_path.startswith("static/"):
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    frontend_dir = Path(__file__).parent.parent / "frontend"
+    index_path = frontend_dir / "index.html"
+    
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    else:
+        raise HTTPException(status_code=404, detail="Frontend not found")
+
+
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Catch-all exception handler."""
+    print(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "error": str(exc)},
+    )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "api.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info",
+    )

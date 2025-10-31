@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pappaliiga Stats</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <!-- Favicon: inline SVG (data URI) used to avoid extra requests; also provide a static fallback at /favicon.svg -->
+    <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%232b6cb0'/><text x='8' y='11' font-size='9' text-anchor='middle' fill='white' font-family='Arial, Helvetica, sans-serif'>PL</text></svg>">
+    <!-- Vue 3 production builds -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
+    <!-- Pinia with vue-demi polyfill for browser -->
+    <script src="https://unpkg.com/vue-demi@0.14.6/lib/index.iife.js"></script>
+    <script src="https://unpkg.com/pinia@2.1.7/dist/pinia.iife.js"></script>
+</head>
+<body>
+    <div id="app">
+        <nav class="main-nav">
+            <div class="nav-container">
+                <div class="nav-brand">
+                    <div class="brand-logos">
+                        <img src="https://armafinland.fi/logot/images/armafin-logo-200px.png" alt="AFI" class="nav-logo">
+                        <img src="https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png" alt="Pappaliiga" class="nav-logo">
+                    </div>
+                    <div>
+                        <span class="nav-title">AFI - Unofficial Pappaliiga CS Stats</span>
+                    </div>
+                </div>
+                <div class="nav-links">
+                    <router-link to="/" class="nav-link">Home</router-link>
+                    <router-link to="/seasons" class="nav-link">Seasons</router-link>
+                </div>
+            </div>
+        </nav>
+        
+        <main class="main-content">
+            <router-view v-slot="{ Component }">
+                <transition name="fade" mode="out-in">
+                    <component :is="Component"></component>
+                </transition>
+            </router-view>
+        </main>
+
+        <footer class="main-footer">
+            <p>&copy; 2025 Pappaliiga Stats | Data from Faceit API</p>
+        </footer>
+    </div>
+
+    <!-- API Client -->
+    <script src="/static/api-client.js"></script>
+    
+    <!-- Composables (must load before components that use them) -->
+    <script src="/static/composables/useTableSort.js"></script>
+    <script src="/static/composables/useProgressBars.js"></script>
+    <script src="/static/composables/useCellColorization.js"></script>
+    
+    <!-- Vue Components -->
+    <script src="/static/components/LoadingSpinner.js"></script>
+    <script src="/static/components/ErrorMessage.js"></script>
+    <script src="/static/components/DeltaIndicator.js"></script>
+    <script src="/static/components/MapStatsTable.js"></script>
+    <script src="/static/components/ProgressBar.js"></script>
+    <script src="/static/components/SplitBar.js"></script>
+    <script src="/static/components/SortableTable.js"></script>
+    <script src="/static/components/CopyLink.js"></script>
+    <script src="/static/components/HeroCards.js"></script>
+    <script src="/static/components/SeasonsNav.js"></script>
+    <script src="/static/components/StatsGrid.js"></script>
+    <script src="/static/components/LeadersNew.js"></script>
+    <script src="/static/components/Masthead.js"></script>
+    <script src="/static/components/TeamNav.js"></script>
+    <script src="/static/components/StandingsTable.js"></script>
+    <script src="/static/components/AllTeamsComparison.js"></script>
+    <script src="/static/components/TeamDetail.js"></script>
+    
+    <!-- Views -->
+    <script src="/static/views/HomeView.js"></script>
+    <script src="/static/views/SeasonsView.js"></script>
+    <script src="/static/views/DivisionView.js"></script>
+    <script src="/static/views/TeamDetailView.js"></script>
+    <script src="/static/views/PlayerView.js"></script>
+    
+    <!-- Main App -->
+    <script src="/static/app-main.js"></script>
+</body>
+</html>

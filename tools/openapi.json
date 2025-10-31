@@ -1,0 +1,814 @@
+﻿{
+    "openapi":  "3.1.0",
+    "info":  {
+                 "title":  "Pappaliiga Stats API",
+                 "description":  "REST API for CS2 tournament statistics",
+                 "version":  "1.0.0"
+             },
+    "paths":  {
+                  "/api/index/aggregate-stats":  {
+                                                     "get":  {
+                                                                 "summary":  "Get Index Aggregate Stats",
+                                                                 "description":  "Get aggregate statistics across all seasons.\n\nReturns total counts of divisions, teams, players, matches, maps, rounds, kills, and deaths.\nExcludes banned/quit teams based on division_overrides.json per championship.\n\nReturns:\n    dict: Aggregate statistics wrapped in \"all_seasons\" key",
+                                                                 "operationId":  "get_index_aggregate_stats_api_index_aggregate_stats_get",
+                                                                 "responses":  {
+                                                                                   "200":  "@{description=Successful Response; content=}"
+                                                                               }
+                                                             }
+                                                 },
+                  "/api/index":  {
+                                     "get":  {
+                                                 "tags":  [
+                                                              "index"
+                                                          ],
+                                                 "summary":  "Get Seasons Async",
+                                                 "description":  "Get metadata for all seasons with aggregate statistics.\n\nReturns list of seasons with division counts, team/player counts (excluding banned/quit),\nmatch progress, and stats for maps/rounds/kills/deaths.\n\nReturns:\n    list[dict]: List of season objects sorted by season number descending",
+                                                 "operationId":  "get_seasons_async_api_index_get",
+                                                 "responses":  {
+                                                                   "200":  "@{description=Successful Response; content=}"
+                                                               }
+                                             }
+                                 },
+                  "/api/index/{season}/divisions":  {
+                                                        "get":  {
+                                                                    "tags":  [
+                                                                                 "index"
+                                                                             ],
+                                                                    "summary":  "Get Season Divisions Async",
+                                                                    "description":  "Get division cards for a specific season.\n\nArgs:\n    season: Season number\n\nReturns:\n    list[dict]: List of division objects with slug, tier, counts, and progress",
+                                                                    "operationId":  "get_season_divisions_async_api_index__season__divisions_get",
+                                                                    "parameters":  [
+                                                                                       "@{name=season; in=path; required=True; schema=}"
+                                                                                   ],
+                                                                    "responses":  {
+                                                                                      "200":  "@{description=Successful Response; content=}",
+                                                                                      "422":  "@{description=Validation Error; content=}"
+                                                                                  }
+                                                                }
+                                                    },
+                  "/api/divisions/seasons":  {
+                                                 "get":  {
+                                                             "tags":  [
+                                                                          "divisions"
+                                                                      ],
+                                                             "summary":  "Get Seasons",
+                                                             "description":  "Get all seasons with their divisions.",
+                                                             "operationId":  "get_seasons_api_divisions_seasons_get",
+                                                             "responses":  {
+                                                                               "200":  "@{description=Successful Response; content=}"
+                                                                           }
+                                                         }
+                                             },
+                  "/api/divisions":  {
+                                         "get":  {
+                                                     "tags":  [
+                                                                  "divisions"
+                                                              ],
+                                                     "summary":  "Get All Divisions",
+                                                     "description":  "Get all divisions across all seasons.",
+                                                     "operationId":  "get_all_divisions_api_divisions_get",
+                                                     "responses":  {
+                                                                       "200":  "@{description=Successful Response; content=}"
+                                                                   }
+                                                 }
+                                     },
+                  "/api/divisions/{season}":  {
+                                                  "get":  {
+                                                              "tags":  [
+                                                                           "divisions"
+                                                                       ],
+                                                              "summary":  "Get Divisions By Season",
+                                                              "description":  "Get all divisions for a specific season.",
+                                                              "operationId":  "get_divisions_by_season_api_divisions__season__get",
+                                                              "parameters":  [
+                                                                                 "@{name=season; in=path; required=True; schema=}"
+                                                                             ],
+                                                              "responses":  {
+                                                                                "200":  "@{description=Successful Response; content=}",
+                                                                                "422":  "@{description=Validation Error; content=}"
+                                                                            }
+                                                          }
+                                              },
+                  "/api/divisions/by-slug/{slug}":  {
+                                                        "get":  {
+                                                                    "tags":  [
+                                                                                 "divisions"
+                                                                             ],
+                                                                    "summary":  "Get Division By Slug",
+                                                                    "description":  "Get full division details by slug (e.g., \u0027div1-s11\u0027).",
+                                                                    "operationId":  "get_division_by_slug_api_divisions_by_slug__slug__get",
+                                                                    "parameters":  [
+                                                                                       "@{name=slug; in=path; required=True; schema=}"
+                                                                                   ],
+                                                                    "responses":  {
+                                                                                      "200":  "@{description=Successful Response; content=}",
+                                                                                      "422":  "@{description=Validation Error; content=}"
+                                                                                  }
+                                                                }
+                                                    },
+                  "/api/teams/{team_id}":  {
+                                               "get":  {
+                                                           "tags":  [
+                                                                        "teams"
+                                                                    ],
+                                                           "summary":  "Get Team Info",
+                                                           "description":  "Get basic team information.",
+                                                           "operationId":  "get_team_info_api_teams__team_id__get",
+                                                           "parameters":  [
+                                                                              "@{name=team_id; in=path; required=True; schema=}"
+                                                                          ],
+                                                           "responses":  {
+                                                                             "200":  "@{description=Successful Response; content=}",
+                                                                             "422":  "@{description=Validation Error; content=}"
+                                                                         }
+                                                       }
+                                           },
+                  "/api/teams/{team_id}/seasons":  {
+                                                       "get":  {
+                                                                   "tags":  [
+                                                                                "teams"
+                                                                            ],
+                                                                   "summary":  "Get Team Season Stats",
+                                                                   "description":  "Get team stats across all seasons/divisions.",
+                                                                   "operationId":  "get_team_season_stats_api_teams__team_id__seasons_get",
+                                                                   "parameters":  [
+                                                                                      "@{name=team_id; in=path; required=True; schema=}"
+                                                                                  ],
+                                                                   "responses":  {
+                                                                                     "200":  "@{description=Successful Response; content=}",
+                                                                                     "422":  "@{description=Validation Error; content=}"
+                                                                                 }
+                                                               }
+                                                   },
+                  "/api/teams/{team_id}/map-stats/{championship_id}":  {
+                                                                           "get":  {
+                                                                                       "tags":  [
+                                                                                                    "teams"
+                                                                                                ],
+                                                                                       "summary":  "Get Team Map Stats",
+                                                                                       "description":  "Get detailed per-map stats with deltas for a team in a specific championship.",
+                                                                                       "operationId":  "get_team_map_stats_api_teams__team_id__map_stats__championship_id__get",
+                                                                                       "parameters":  [
+                                                                                                          "@{name=team_id; in=path; required=True; schema=}",
+                                                                                                          "@{name=championship_id; in=path; required=True; schema=}"
+                                                                                                      ],
+                                                                                       "responses":  {
+                                                                                                         "200":  "@{description=Successful Response; content=}",
+                                                                                                         "422":  "@{description=Validation Error; content=}"
+                                                                                                     }
+                                                                                   }
+                                                                       },
+                  "/api/teams/":  {
+                                      "get":  {
+                                                  "tags":  [
+                                                               "teams"
+                                                           ],
+                                                  "summary":  "List Teams",
+                                                  "description":  "List all teams, optionally filtered by season/division.",
+                                                  "operationId":  "list_teams_api_teams__get",
+                                                  "parameters":  [
+                                                                     "@{name=season; in=query; required=False; schema=; description=Filter by season}",
+                                                                     "@{name=division; in=query; required=False; schema=; description=Filter by division}",
+                                                                     "@{name=limit; in=query; required=False; schema=}"
+                                                                 ],
+                                                  "responses":  {
+                                                                    "200":  "@{description=Successful Response; content=}",
+                                                                    "422":  "@{description=Validation Error; content=}"
+                                                                }
+                                              }
+                                  },
+                  "/api/players/{player_id}":  {
+                                                   "get":  {
+                                                               "tags":  [
+                                                                            "players"
+                                                                        ],
+                                                               "summary":  "Get Player Info",
+                                                               "description":  "Get basic player information.",
+                                                               "operationId":  "get_player_info_api_players__player_id__get",
+                                                               "parameters":  [
+                                                                                  "@{name=player_id; in=path; required=True; schema=}"
+                                                                              ],
+                                                               "responses":  {
+                                                                                 "200":  "@{description=Successful Response; content=}",
+                                                                                 "422":  "@{description=Validation Error; content=}"
+                                                                             }
+                                                           }
+                                               },
+                  "/api/players/{player_id}/seasons":  {
+                                                           "get":  {
+                                                                       "tags":  [
+                                                                                    "players"
+                                                                                ],
+                                                                       "summary":  "Get Player Season Stats",
+                                                                       "description":  "Get player stats across all seasons/divisions.",
+                                                                       "operationId":  "get_player_season_stats_api_players__player_id__seasons_get",
+                                                                       "parameters":  [
+                                                                                          "@{name=player_id; in=path; required=True; schema=}"
+                                                                                      ],
+                                                                       "responses":  {
+                                                                                         "200":  "@{description=Successful Response; content=}",
+                                                                                         "422":  "@{description=Validation Error; content=}"
+                                                                                     }
+                                                                   }
+                                                       },
+                  "/api/players/{player_id}/map-stats/{championship_id}":  {
+                                                                               "get":  {
+                                                                                           "tags":  [
+                                                                                                        "players"
+                                                                                                    ],
+                                                                                           "summary":  "Get Player Map Stats",
+                                                                                           "description":  "Get detailed per-map stats with deltas for a player in a specific championship.",
+                                                                                           "operationId":  "get_player_map_stats_api_players__player_id__map_stats__championship_id__get",
+                                                                                           "parameters":  [
+                                                                                                              "@{name=player_id; in=path; required=True; schema=}",
+                                                                                                              "@{name=championship_id; in=path; required=True; schema=}"
+                                                                                                          ],
+                                                                                           "responses":  {
+                                                                                                             "200":  "@{description=Successful Response; content=}",
+                                                                                                             "422":  "@{description=Validation Error; content=}"
+                                                                                                         }
+                                                                                       }
+                                                                           },
+                  "/api/players/":  {
+                                        "get":  {
+                                                    "tags":  [
+                                                                 "players"
+                                                             ],
+                                                    "summary":  "List Players",
+                                                    "description":  "List all players, optionally filtered by season/division/team.",
+                                                    "operationId":  "list_players_api_players__get",
+                                                    "parameters":  [
+                                                                       "@{name=season; in=query; required=False; schema=; description=Filter by season}",
+                                                                       "@{name=division; in=query; required=False; schema=; description=Filter by division}",
+                                                                       "@{name=team_id; in=query; required=False; schema=; description=Filter by team}",
+                                                                       "@{name=limit; in=query; required=False; schema=}"
+                                                                   ],
+                                                    "responses":  {
+                                                                      "200":  "@{description=Successful Response; content=}",
+                                                                      "422":  "@{description=Validation Error; content=}"
+                                                                  }
+                                                }
+                                    },
+                  "/api/matches/division/{championship_id}":  {
+                                                                  "get":  {
+                                                                              "tags":  [
+                                                                                           "matches"
+                                                                                       ],
+                                                                              "summary":  "Get Division Matches",
+                                                                              "description":  "Get all matches for a division.",
+                                                                              "operationId":  "get_division_matches_api_matches_division__championship_id__get",
+                                                                              "parameters":  [
+                                                                                                 "@{name=championship_id; in=path; required=True; schema=}"
+                                                                                             ],
+                                                                              "responses":  {
+                                                                                                "200":  "@{description=Successful Response; content=}",
+                                                                                                "422":  "@{description=Validation Error; content=}"
+                                                                                            }
+                                                                          }
+                                                              },
+                  "/api/matches/{match_id}":  {
+                                                  "get":  {
+                                                              "tags":  [
+                                                                           "matches"
+                                                                       ],
+                                                              "summary":  "Get Match Details",
+                                                              "description":  "Get full match details including map results.",
+                                                              "operationId":  "get_match_details_api_matches__match_id__get",
+                                                              "parameters":  [
+                                                                                 "@{name=match_id; in=path; required=True; schema=}"
+                                                                             ],
+                                                              "responses":  {
+                                                                                "200":  "@{description=Successful Response; content=}",
+                                                                                "422":  "@{description=Validation Error; content=}"
+                                                                            }
+                                                          }
+                                              },
+                  "/api/stats/overview":  {
+                                              "get":  {
+                                                          "tags":  [
+                                                                       "stats"
+                                                                   ],
+                                                          "summary":  "Get Stats Overview",
+                                                          "description":  "Get high-level overview stats for index page.",
+                                                          "operationId":  "get_stats_overview_api_stats_overview_get",
+                                                          "responses":  {
+                                                                            "200":  "@{description=Successful Response; content=}"
+                                                                        }
+                                                      }
+                                          },
+                  "/api/stats/top-players/{stat}":  {
+                                                        "get":  {
+                                                                    "tags":  [
+                                                                                 "stats"
+                                                                             ],
+                                                                    "summary":  "Get Top Players",
+                                                                    "description":  "Get top players by a specific stat (kd, adr, rating, hs_pct, etc.).",
+                                                                    "operationId":  "get_top_players_api_stats_top_players__stat__get",
+                                                                    "parameters":  [
+                                                                                       "@{name=stat; in=path; required=True; schema=}",
+                                                                                       "@{name=season; in=query; required=False; schema=; description=Filter by season}",
+                                                                                       "@{name=division; in=query; required=False; schema=; description=Filter by division}",
+                                                                                       "@{name=limit; in=query; required=False; schema=}",
+                                                                                       "@{name=min_maps; in=query; required=False; schema=; description=Minimum maps played}"
+                                                                                   ],
+                                                                    "responses":  {
+                                                                                      "200":  "@{description=Successful Response; content=}",
+                                                                                      "422":  "@{description=Validation Error; content=}"
+                                                                                  }
+                                                                }
+                                                    },
+                  "/api/stats/division/{championship_id}/averages":  {
+                                                                         "get":  {
+                                                                                     "tags":  [
+                                                                                                  "stats"
+                                                                                              ],
+                                                                                     "summary":  "Get Division Averages",
+                                                                                     "description":  "Get division-wide average stats.",
+                                                                                     "operationId":  "get_division_averages_api_stats_division__championship_id__averages_get",
+                                                                                     "parameters":  [
+                                                                                                        "@{name=championship_id; in=path; required=True; schema=}"
+                                                                                                    ],
+                                                                                     "responses":  {
+                                                                                                       "200":  "@{description=Successful Response; content=}",
+                                                                                                       "422":  "@{description=Validation Error; content=}"
+                                                                                                   }
+                                                                                 }
+                                                                     },
+                  "/api/seasons/aggregate-stats":  {
+                                                       "get":  {
+                                                                   "tags":  [
+                                                                                "seasons"
+                                                                            ],
+                                                                   "summary":  "Get Index Aggregate Stats Async",
+                                                                   "description":  "Get aggregate statistics across all seasons.\n\nReturns total counts of divisions, teams, players, matches, maps, rounds, kills, and deaths.\nExcludes banned/quit teams based on division_overrides.json per championship.\n\nReturns:\n    dict: Aggregate statistics wrapped in \"all_seasons\" key",
+                                                                   "operationId":  "get_index_aggregate_stats_async_api_seasons_aggregate_stats_get",
+                                                                   "responses":  {
+                                                                                     "200":  "@{description=Successful Response; content=}"
+                                                                                 }
+                                                               }
+                                                   },
+                  "/api/seasons":  {
+                                       "get":  {
+                                                   "summary":  "Get Seasons",
+                                                   "description":  "Get metadata for all seasons with aggregate statistics.\n\nReturns list of seasons with division counts, team/player counts (excluding banned/quit),\nmatch progress, and stats for maps/rounds/kills/deaths.\n\nReturns:\n    list[dict]: List of season objects sorted by season number descending",
+                                                   "operationId":  "get_seasons_api_seasons_get",
+                                                   "responses":  {
+                                                                     "200":  "@{description=Successful Response; content=}"
+                                                                 }
+                                               }
+                                   },
+                  "/api/seasons/{season}/divisions":  {
+                                                          "get":  {
+                                                                      "summary":  "Get Season Divisions",
+                                                                      "description":  "Get division cards for a specific season.\n\nArgs:\n    season: Season number\n\nReturns:\n    list[dict]: List of division objects with slug, tier, counts, and progress",
+                                                                      "operationId":  "get_season_divisions_api_seasons__season__divisions_get",
+                                                                      "parameters":  [
+                                                                                         "@{name=season; in=path; required=True; schema=}"
+                                                                                     ],
+                                                                      "responses":  {
+                                                                                        "200":  "@{description=Successful Response; content=}",
+                                                                                        "422":  "@{description=Validation Error; content=}"
+                                                                                    }
+                                                                  }
+                                                      },
+                  "/api/proxy-image":  {
+                                           "get":  {
+                                                       "tags":  [
+                                                                    "proxy"
+                                                                ],
+                                                       "summary":  "Proxy Image",
+                                                       "description":  "Fetch an image from a whitelisted host and return it.\n\nExample: /api/proxy-image?url=https://distribution.faceit-cdn.net/images/...",
+                                                       "operationId":  "proxy_image_api_proxy_image_get",
+                                                       "parameters":  [
+                                                                          "@{name=url; in=query; required=True; schema=; description=Remote image URL to proxy}"
+                                                                      ],
+                                                       "responses":  {
+                                                                         "200":  "@{description=Successful Response; content=}",
+                                                                         "422":  "@{description=Validation Error; content=}"
+                                                                     }
+                                                   }
+                                       },
+                  "/":  {
+                            "get":  {
+                                        "summary":  "Root",
+                                        "description":  "Serve the frontend index.html.",
+                                        "operationId":  "root__get",
+                                        "responses":  {
+                                                          "200":  "@{description=Successful Response; content=}"
+                                                      }
+                                    }
+                        },
+                  "/api":  {
+                               "get":  {
+                                           "summary":  "Api Root",
+                                           "description":  "API root endpoint.",
+                                           "operationId":  "api_root_api_get",
+                                           "responses":  {
+                                                             "200":  "@{description=Successful Response; content=}"
+                                                         }
+                                       }
+                           },
+                  "/health":  {
+                                  "get":  {
+                                              "summary":  "Health Check",
+                                              "description":  "Health check endpoint for monitoring.",
+                                              "operationId":  "health_check_health_get",
+                                              "responses":  {
+                                                                "200":  "@{description=Successful Response; content=}"
+                                                            }
+                                          }
+                              },
+                  "/{full_path}":  {
+                                       "get":  {
+                                                   "summary":  "Spa Fallback",
+                                                   "description":  "Serve index.html for all routes (SPA fallback for Vue Router).",
+                                                   "operationId":  "spa_fallback__full_path__get",
+                                                   "parameters":  [
+                                                                      "@{name=full_path; in=path; required=True; schema=}"
+                                                                  ],
+                                                   "responses":  {
+                                                                     "200":  "@{description=Successful Response; content=}",
+                                                                     "422":  "@{description=Validation Error; content=}"
+                                                                 }
+                                               }
+                                   }
+              },
+    "components":  {
+                       "schemas":  {
+                                       "DivisionDetails":  {
+                                                               "properties":  {
+                                                                                  "championship_id":  "@{type=string; title=Championship Id}",
+                                                                                  "slug":  "@{type=string; title=Slug}",
+                                                                                  "name":  "@{type=string; title=Name}",
+                                                                                  "season":  "@{type=integer; title=Season}",
+                                                                                  "division_num":  "@{type=integer; title=Division Num}",
+                                                                                  "is_playoff":  "@{type=boolean; title=Is Playoff}",
+                                                                                  "teams":  "@{items=; type=array; title=Teams}",
+                                                                                  "excluded_team_ids":  "@{items=; type=array; title=Excluded Team Ids}"
+                                                                              },
+                                                               "type":  "object",
+                                                               "required":  [
+                                                                                "championship_id",
+                                                                                "slug",
+                                                                                "name",
+                                                                                "season",
+                                                                                "division_num",
+                                                                                "is_playoff",
+                                                                                "teams",
+                                                                                "excluded_team_ids"
+                                                                            ],
+                                                               "title":  "DivisionDetails",
+                                                               "description":  "Full division details."
+                                                           },
+                                       "DivisionSummary":  {
+                                                               "properties":  {
+                                                                                  "championship_id":  "@{type=string; title=Championship Id}",
+                                                                                  "slug":  "@{type=string; title=Slug}",
+                                                                                  "name":  "@{type=string; title=Name}",
+                                                                                  "season":  "@{type=integer; title=Season}",
+                                                                                  "division_num":  "@{type=integer; title=Division Num}",
+                                                                                  "is_playoff":  "@{type=boolean; title=Is Playoff}"
+                                                                              },
+                                                               "type":  "object",
+                                                               "required":  [
+                                                                                "championship_id",
+                                                                                "slug",
+                                                                                "name",
+                                                                                "season",
+                                                                                "division_num",
+                                                                                "is_playoff"
+                                                                            ],
+                                                               "title":  "DivisionSummary",
+                                                               "description":  "Division summary info."
+                                                           },
+                                       "HTTPValidationError":  {
+                                                                   "properties":  {
+                                                                                      "detail":  "@{items=; type=array; title=Detail}"
+                                                                                  },
+                                                                   "type":  "object",
+                                                                   "title":  "HTTPValidationError"
+                                                               },
+                                       "MapResult":  {
+                                                         "properties":  {
+                                                                            "map_name":  "@{type=string; title=Map Name}",
+                                                                            "score1":  "@{type=integer; title=Score1}",
+                                                                            "score2":  "@{type=integer; title=Score2}",
+                                                                            "winner":  "@{anyOf=System.Object[]; title=Winner}"
+                                                                        },
+                                                         "type":  "object",
+                                                         "required":  [
+                                                                          "map_name",
+                                                                          "score1",
+                                                                          "score2",
+                                                                          "winner"
+                                                                      ],
+                                                         "title":  "MapResult",
+                                                         "description":  "Map-level result."
+                                                     },
+                                       "MapStatsWithDelta":  {
+                                                                 "properties":  {
+                                                                                    "map_name":  "@{type=string; title=Map Name}",
+                                                                                    "curr":  "@{additionalProperties=True; type=object; title=Curr}",
+                                                                                    "prev":  "@{anyOf=System.Object[]; title=Prev}",
+                                                                                    "delta":  "@{anyOf=System.Object[]; title=Delta}",
+                                                                                    "snapshot_ts":  "@{anyOf=System.Object[]; title=Snapshot Ts}"
+                                                                                },
+                                                                 "type":  "object",
+                                                                 "required":  [
+                                                                                  "map_name",
+                                                                                  "curr",
+                                                                                  "prev",
+                                                                                  "delta",
+                                                                                  "snapshot_ts"
+                                                                              ],
+                                                                 "title":  "MapStatsWithDelta",
+                                                                 "description":  "Map-specific stats with curr/prev/delta."
+                                                             },
+                                       "MatchDetails":  {
+                                                            "properties":  {
+                                                                               "match_id":  "@{type=string; title=Match Id}",
+                                                                               "championship_id":  "@{type=integer; title=Championship Id}",
+                                                                               "match_date":  "@{anyOf=System.Object[]; title=Match Date}",
+                                                                               "team1_id":  "@{type=string; title=Team1 Id}",
+                                                                               "team2_id":  "@{type=string; title=Team2 Id}",
+                                                                               "team1_name":  "@{anyOf=System.Object[]; title=Team1 Name}",
+                                                                               "team2_name":  "@{anyOf=System.Object[]; title=Team2 Name}",
+                                                                               "team1_avatar":  "@{anyOf=System.Object[]; title=Team1 Avatar}",
+                                                                               "team2_avatar":  "@{anyOf=System.Object[]; title=Team2 Avatar}",
+                                                                               "score1":  "@{anyOf=System.Object[]; title=Score1}",
+                                                                               "score2":  "@{anyOf=System.Object[]; title=Score2}",
+                                                                               "is_forfeit":  "@{type=boolean; title=Is Forfeit}",
+                                                                               "ignored_due_ban":  "@{type=boolean; title=Ignored Due Ban}",
+                                                                               "maps":  "@{items=; type=array; title=Maps}"
+                                                                           },
+                                                            "type":  "object",
+                                                            "required":  [
+                                                                             "match_id",
+                                                                             "championship_id",
+                                                                             "match_date",
+                                                                             "team1_id",
+                                                                             "team2_id",
+                                                                             "team1_name",
+                                                                             "team2_name",
+                                                                             "team1_avatar",
+                                                                             "team2_avatar",
+                                                                             "score1",
+                                                                             "score2",
+                                                                             "is_forfeit",
+                                                                             "ignored_due_ban",
+                                                                             "maps"
+                                                                         ],
+                                                            "title":  "MatchDetails",
+                                                            "description":  "Full match details with map results."
+                                                        },
+                                       "MatchSummary":  {
+                                                            "properties":  {
+                                                                               "match_id":  "@{type=string; title=Match Id}",
+                                                                               "championship_id":  "@{type=integer; title=Championship Id}",
+                                                                               "match_date":  "@{anyOf=System.Object[]; title=Match Date}",
+                                                                               "team1_id":  "@{type=string; title=Team1 Id}",
+                                                                               "team2_id":  "@{type=string; title=Team2 Id}",
+                                                                               "team1_name":  "@{anyOf=System.Object[]; title=Team1 Name}",
+                                                                               "team2_name":  "@{anyOf=System.Object[]; title=Team2 Name}",
+                                                                               "score1":  "@{anyOf=System.Object[]; title=Score1}",
+                                                                               "score2":  "@{anyOf=System.Object[]; title=Score2}",
+                                                                               "is_forfeit":  "@{type=boolean; title=Is Forfeit}",
+                                                                               "ignored_due_ban":  "@{type=boolean; title=Ignored Due Ban}"
+                                                                           },
+                                                            "type":  "object",
+                                                            "required":  [
+                                                                             "match_id",
+                                                                             "championship_id",
+                                                                             "match_date",
+                                                                             "team1_id",
+                                                                             "team2_id",
+                                                                             "team1_name",
+                                                                             "team2_name",
+                                                                             "score1",
+                                                                             "score2",
+                                                                             "is_forfeit",
+                                                                             "ignored_due_ban"
+                                                                         ],
+                                                            "title":  "MatchSummary",
+                                                            "description":  "Match summary information."
+                                                        },
+                                       "PlayerInfo":  {
+                                                          "properties":  {
+                                                                             "player_id":  "@{type=string; title=Player Id}",
+                                                                             "nickname":  "@{type=string; title=Nickname}",
+                                                                             "country":  "@{anyOf=System.Object[]; title=Country}",
+                                                                             "avatar":  "@{anyOf=System.Object[]; title=Avatar}",
+                                                                             "faceit_url":  "@{anyOf=System.Object[]; title=Faceit Url}"
+                                                                         },
+                                                          "type":  "object",
+                                                          "required":  [
+                                                                           "player_id",
+                                                                           "nickname",
+                                                                           "country",
+                                                                           "avatar",
+                                                                           "faceit_url"
+                                                                       ],
+                                                          "title":  "PlayerInfo",
+                                                          "description":  "Player basic information."
+                                                      },
+                                       "PlayerMapStatsWithDelta":  {
+                                                                       "properties":  {
+                                                                                          "map_name":  "@{type=string; title=Map Name}",
+                                                                                          "curr":  "@{additionalProperties=True; type=object; title=Curr}",
+                                                                                          "prev":  "@{anyOf=System.Object[]; title=Prev}",
+                                                                                          "delta":  "@{anyOf=System.Object[]; title=Delta}",
+                                                                                          "snapshot_ts":  "@{anyOf=System.Object[]; title=Snapshot Ts}"
+                                                                                      },
+                                                                       "type":  "object",
+                                                                       "required":  [
+                                                                                        "map_name",
+                                                                                        "curr",
+                                                                                        "prev",
+                                                                                        "delta",
+                                                                                        "snapshot_ts"
+                                                                                    ],
+                                                                       "title":  "PlayerMapStatsWithDelta",
+                                                                       "description":  "Player map-specific stats with curr/prev/delta."
+                                                                   },
+                                       "PlayerSeasonStats":  {
+                                                                 "properties":  {
+                                                                                    "season":  "@{type=integer; title=Season}",
+                                                                                    "division_num":  "@{type=integer; title=Division Num}",
+                                                                                    "championship_id":  "@{type=string; title=Championship Id}",
+                                                                                    "team_id":  "@{type=string; title=Team Id}",
+                                                                                    "team_name":  "@{anyOf=System.Object[]; title=Team Name}",
+                                                                                    "maps_played":  "@{type=integer; title=Maps Played}",
+                                                                                    "rounds_played":  "@{type=integer; title=Rounds Played}",
+                                                                                    "kills":  "@{type=integer; title=Kills}",
+                                                                                    "deaths":  "@{type=integer; title=Deaths}",
+                                                                                    "assists":  "@{type=integer; title=Assists}",
+                                                                                    "kd":  "@{type=number; title=Kd}",
+                                                                                    "adr":  "@{type=number; title=Adr}",
+                                                                                    "rating":  "@{type=number; title=Rating}",
+                                                                                    "hs_pct":  "@{type=number; title=Hs Pct}",
+                                                                                    "mvps":  "@{type=integer; title=Mvps}"
+                                                                                },
+                                                                 "type":  "object",
+                                                                 "required":  [
+                                                                                  "season",
+                                                                                  "division_num",
+                                                                                  "championship_id",
+                                                                                  "team_id",
+                                                                                  "team_name",
+                                                                                  "maps_played",
+                                                                                  "rounds_played",
+                                                                                  "kills",
+                                                                                  "deaths",
+                                                                                  "assists",
+                                                                                  "kd",
+                                                                                  "adr",
+                                                                                  "rating",
+                                                                                  "hs_pct",
+                                                                                  "mvps"
+                                                                              ],
+                                                                 "title":  "PlayerSeasonStats",
+                                                                 "description":  "Player stats for a specific season/division."
+                                                             },
+                                       "SeasonInfo":  {
+                                                          "properties":  {
+                                                                             "season":  "@{type=integer; title=Season}",
+                                                                             "divisions":  "@{items=; type=array; title=Divisions}",
+                                                                             "championship_ids":  "@{items=; type=array; title=Championship Ids}"
+                                                                         },
+                                                          "type":  "object",
+                                                          "required":  [
+                                                                           "season",
+                                                                           "divisions",
+                                                                           "championship_ids"
+                                                                       ],
+                                                          "title":  "SeasonInfo",
+                                                          "description":  "Season metadata."
+                                                      },
+                                       "StatsOverview":  {
+                                                             "properties":  {
+                                                                                "total_seasons":  "@{type=integer; title=Total Seasons}",
+                                                                                "total_divisions":  "@{type=integer; title=Total Divisions}",
+                                                                                "total_teams":  "@{type=integer; title=Total Teams}",
+                                                                                "total_players":  "@{type=integer; title=Total Players}",
+                                                                                "total_matches":  "@{type=integer; title=Total Matches}",
+                                                                                "total_maps_played":  "@{type=integer; title=Total Maps Played}"
+                                                                            },
+                                                             "type":  "object",
+                                                             "required":  [
+                                                                              "total_seasons",
+                                                                              "total_divisions",
+                                                                              "total_teams",
+                                                                              "total_players",
+                                                                              "total_matches",
+                                                                              "total_maps_played"
+                                                                          ],
+                                                             "title":  "StatsOverview",
+                                                             "description":  "Overview stats for index page."
+                                                         },
+                                       "TeamBasic":  {
+                                                         "properties":  {
+                                                                            "team_id":  "@{type=string; title=Team Id}",
+                                                                            "team_name":  "@{type=string; title=Team Name}",
+                                                                            "display_name":  "@{anyOf=System.Object[]; title=Display Name}",
+                                                                            "avatar":  "@{anyOf=System.Object[]; title=Avatar}"
+                                                                        },
+                                                         "type":  "object",
+                                                         "required":  [
+                                                                          "team_id",
+                                                                          "team_name",
+                                                                          "display_name",
+                                                                          "avatar"
+                                                                      ],
+                                                         "title":  "TeamBasic",
+                                                         "description":  "Basic team info for lists."
+                                                     },
+                                       "TeamInfo":  {
+                                                        "properties":  {
+                                                                           "team_id":  "@{type=string; title=Team Id}",
+                                                                           "team_name":  "@{type=string; title=Team Name}",
+                                                                           "display_name":  "@{anyOf=System.Object[]; title=Display Name}",
+                                                                           "avatar":  "@{anyOf=System.Object[]; title=Avatar}",
+                                                                           "faceit_url":  "@{anyOf=System.Object[]; title=Faceit Url}"
+                                                                       },
+                                                        "type":  "object",
+                                                        "required":  [
+                                                                         "team_id",
+                                                                         "team_name",
+                                                                         "display_name",
+                                                                         "avatar",
+                                                                         "faceit_url"
+                                                                     ],
+                                                        "title":  "TeamInfo",
+                                                        "description":  "Team basic information."
+                                                    },
+                                       "TeamSeasonStats":  {
+                                                               "properties":  {
+                                                                                  "season":  "@{type=integer; title=Season}",
+                                                                                  "division_num":  "@{type=integer; title=Division Num}",
+                                                                                  "championship_id":  "@{type=string; title=Championship Id}",
+                                                                                  "maps_played":  "@{type=integer; title=Maps Played}",
+                                                                                  "matches_played":  "@{type=integer; title=Matches Played}",
+                                                                                  "wins":  "@{type=integer; title=Wins}",
+                                                                                  "losses":  "@{type=integer; title=Losses}",
+                                                                                  "win_rate":  "@{type=number; title=Win Rate}",
+                                                                                  "rounds_won":  "@{type=integer; title=Rounds Won}",
+                                                                                  "rounds_lost":  "@{type=integer; title=Rounds Lost}",
+                                                                                  "maps_won":  "@{type=integer; title=Maps Won}"
+                                                                              },
+                                                               "type":  "object",
+                                                               "required":  [
+                                                                                "season",
+                                                                                "division_num",
+                                                                                "championship_id",
+                                                                                "maps_played",
+                                                                                "matches_played",
+                                                                                "wins",
+                                                                                "losses",
+                                                                                "win_rate",
+                                                                                "rounds_won",
+                                                                                "rounds_lost",
+                                                                                "maps_won"
+                                                                            ],
+                                                               "title":  "TeamSeasonStats",
+                                                               "description":  "Team stats for a specific season/division."
+                                                           },
+                                       "TopPlayer":  {
+                                                         "properties":  {
+                                                                            "player_id":  "@{type=string; title=Player Id}",
+                                                                            "nickname":  "@{type=string; title=Nickname}",
+                                                                            "team_name":  "@{anyOf=System.Object[]; title=Team Name}",
+                                                                            "stat_value":  "@{type=number; title=Stat Value}",
+                                                                            "maps_played":  "@{type=integer; title=Maps Played}",
+                                                                            "season":  "@{type=integer; title=Season}",
+                                                                            "division_num":  "@{type=integer; title=Division Num}"
+                                                                        },
+                                                         "type":  "object",
+                                                         "required":  [
+                                                                          "player_id",
+                                                                          "nickname",
+                                                                          "team_name",
+                                                                          "stat_value",
+                                                                          "maps_played",
+                                                                          "season",
+                                                                          "division_num"
+                                                                      ],
+                                                         "title":  "TopPlayer",
+                                                         "description":  "Top player stats."
+                                                     },
+                                       "ValidationError":  {
+                                                               "properties":  {
+                                                                                  "loc":  "@{items=; type=array; title=Location}",
+                                                                                  "msg":  "@{type=string; title=Message}",
+                                                                                  "type":  "@{type=string; title=Error Type}"
+                                                                              },
+                                                               "type":  "object",
+                                                               "required":  [
+                                                                                "loc",
+                                                                                "msg",
+                                                                                "type"
+                                                                            ],
+                                                               "title":  "ValidationError"
+                                                           }
+                                   }
+                   }
+}
