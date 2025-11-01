@@ -4,7 +4,6 @@ from . import (
     championships,
     divisions,
     image_proxy,
-    index,
     maps_catalog,
     matches,
     players,
@@ -21,5 +20,4 @@ __all__ = [
     "teams",
     "maps_catalog",
     "image_proxy",
-    "index",
 ]

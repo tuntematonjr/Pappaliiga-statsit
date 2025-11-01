@@ -5,25 +5,40 @@ window.TeamDetailView = {
         get TeamDetail() { return window.TeamDetail; }
     },
     computed: {
-        championshipId() { return this.$route.params.championshipId || this.$route.query.champ || null; },
-        teamId() { return this.$route.params.teamId; },
-        season() { return this.$route.query.season || 'current'; }
+        championshipId() {
+            return this.$route.params.championshipId || this.$route.query.championship || this.$route.query.champ || null;
+        },
+        teamId() {
+            return this.$route.params.teamId || this.$route.query.teamId || null;
+        },
+        divisionBackLink() {
+            const divisionChamp = this.$route.query.championship || this.$route.params.championshipId;
+            if (divisionChamp) {
+                return { name: 'division', params: { championshipId: divisionChamp } };
+            }
+            return null;
+        }
     },
     mounted() {
-        // Small debug log to help trace why the team page might not open
         try {
-            console.log('TeamDetailView mounted', { teamId: this.teamId, championshipId: this.championshipId, route: this.$route && this.$route.fullPath });
-        } catch (e) {}
+            console.log('TeamDetailView mounted', {
+                teamId: this.teamId,
+                championshipId: this.championshipId,
+                route: this.$route && this.$route.fullPath
+            });
+        } catch (err) {
+            console.warn('TeamDetailView mount log failed', err);
+        }
     },
     template: `
         <div class="team-detail-page">
             <div class="page-header">
-                <router-link :to="{ name: 'division', params: { slug: $route.query.divisionSlug || '' } }" class="chip">Takaisin divisioonaan</router-link>
-                <h1 style="display:inline-block;margin-left:12px;">Joukkueen tiedot</h1>
+                <router-link v-if="divisionBackLink" :to="divisionBackLink" class="chip">
+                    ← Takaisin divisioonaan
+                </router-link>
+                <h1>Joukkueen tiedot</h1>
             </div>
             <team-detail :championship-id="championshipId" :team-id="teamId"></team-detail>
         </div>
     `
 };
-
-
