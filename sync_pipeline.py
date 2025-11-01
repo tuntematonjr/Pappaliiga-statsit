@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from collections import defaultdict
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set
 
 
@@ -41,10 +42,12 @@ from db_ops_async import (
     upsert_match_async,
     upsert_player_async,
     upsert_player_season_totals_async,
+    upsert_player_map_season_totals_async,
     upsert_player_stat_async,
     upsert_players_bulk_async,
     upsert_team_async,
     upsert_team_season_totals_async,
+    upsert_team_map_season_totals_async,
     upsert_team_stat_async,
     upsert_map_catalog_async,
 )
@@ -661,7 +664,25 @@ async def sync_match_async(
 
         map_lookup = await get_map_id_lookup_async(conn, match_id)
         await replace_map_votes_async(conn, match_id, ctx.season, ctx.division_num, normalised.map_votes)
-        await delete_stats_for_match_async(conn, match_id)
+
+        snapshot_rows = await fetch_all(
+            """
+            SELECT COALESCE(
+                MAX(
+                    COALESCE(m.finished_at, m.started_at, m.scheduled_at, m.configured_at, m.last_seen_at, 0)
+                ), 0
+            ) AS snapshot_ts
+            FROM matches m
+            WHERE m.season = %s
+              AND m.division_num = %s
+            """,
+            (ctx.season, ctx.division_num),
+        )
+        snapshot_ts = int((snapshot_rows[0].get("snapshot_ts") if snapshot_rows else 0) or 0)
+        if snapshot_ts <= 0:
+            snapshot_ts = int(time.time())
+
+        await delete_stats_for_match_async(conn, match_id, snapshot_ts=snapshot_ts)
 
         for pstat in normalised.player_stats:
             round_index = pstat["round_index"]
@@ -697,13 +718,58 @@ async def sync_match_async(
             [row["round_index"] for row in normalised.map_rows],
         )
 
+        affected_team_ids: Set[str] = {
+            row.get("team_id")
+            for row in normalised.team_rows
+            if row.get("team_id")
+        }
+        team_map_updates: dict[str, set[str]] = defaultdict(set)
+        if affected_team_ids:
+            for map_row in normalised.map_rows:
+                raw_map = (map_row.get("map_name") or "").strip()
+                if raw_map:
+                    map_key = raw_map
+                else:
+                    round_index = map_row.get("round_index")
+                    map_key = f"map_{round_index}" if round_index is not None else "unknown"
+                for tid in affected_team_ids:
+                    team_map_updates[tid].add(map_key)
+
         for team_row in normalised.team_rows:
             team_id = team_row.get("team_id")
             if team_id:
-                await upsert_team_season_totals_async(conn, ctx.season, ctx.division_num, team_id)
+                await upsert_team_season_totals_async(
+                    conn,
+                    ctx.season,
+                    ctx.division_num,
+                    team_id,
+                    snapshot_ts=snapshot_ts,
+                )
+                for map_key in team_map_updates.get(team_id, ()):
+                    await upsert_team_map_season_totals_async(
+                        conn,
+                        ctx.season,
+                        ctx.division_num,
+                        team_id,
+                        map_name=map_key,
+                        snapshot_ts=snapshot_ts,
+                    )
 
         for player_id in normalised.affected_players:
-            await upsert_player_season_totals_async(conn, ctx.season, ctx.division_num, player_id)
+            await upsert_player_season_totals_async(
+                conn,
+                ctx.season,
+                ctx.division_num,
+                player_id,
+                snapshot_ts=snapshot_ts,
+            )
+            await upsert_player_map_season_totals_async(
+                conn,
+                ctx.season,
+                ctx.division_num,
+                player_id,
+                snapshot_ts=snapshot_ts,
+            )
 
         # Upsert map images provided by Faceit into maps_catalog so html_gen can use Faceit assets
         try:
