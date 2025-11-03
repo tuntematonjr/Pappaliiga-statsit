@@ -1,14 +1,14 @@
 # Pappaliiga Stats - Vue.js Frontend
 
-Modern single-page application for CS2 tournament statistics with detailed per-map analytics.
+Modern single-page application for CS2 tournament statistics with glassmorphism UI, responsive charts, and rich team/player dashboards.
 
 ## Features
 
-- **Dynamic Data Loading**: Fetches data from REST API
-- **Per-Map Statistics**: Team and player breakdowns with curr/prev/delta indicators
-- **Responsive Design**: Works on desktop and mobile
-- **Vue Router**: Client-side routing for seamless navigation
-- **Real-time Updates**: No page reloads required
+- **Dynamic Data Loading**: Pinia-backed stores cache heavy API responses
+- **Division & Team Dashboards**: Sticky headers, comparison charts, and map breakdowns
+- **Player Analytics**: KPI grids, sparkline trends, radar charts, and compare modal
+- **Responsive Layout**: Fluid typography and breakpoints down to 480px
+- **Vue Router SPA**: Client-side routing without reloads
 
 ## Architecture
 
@@ -25,60 +25,39 @@ Modern single-page application for CS2 tournament statistics with detailed per-m
 frontend/
 ├── index.html                   # Main HTML entry point
 └── static/
-    ├── api-client.js            # API wrapper
+    ├── api-client.js            # API wrapper (supports runtime base override)
     ├── app-main.js              # Vue app initialization
-    ├── styles.css               # Global styles
+    ├── styles.css               # Global styles & design tokens
     ├── components/
-    │   ├── LoadingSpinner.js    # Loading state component
-    │   ├── ErrorMessage.js      # Error display component
-    │   ├── DeltaIndicator.js    # Curr/prev/delta display
-    │   └── MapStatsTable.js     # Per-map stats table
+    │   ├── HeroBanner.js        # Glass hero layout
+    │   ├── SeasonToggle.js      # Season pills + segmented control
+    │   ├── StatPanel.js         # Compact metric grid
+    │   ├── TeamComparisonChart.js
+    │   ├── SparklineChart.js / RadarChart.js
+    │   └── MapsStats.js         # Map stat wrapper
+    ├── stores/
+    │   ├── useHomeStore.js
+    │   ├── useDivisionStore.js
+    │   ├── useTeamStore.js
+    │   └── usePlayerStore.js
     └── views/
         ├── HomeView.js          # Landing page with stats overview
         ├── SeasonsView.js       # Seasons/divisions list
         ├── DivisionView.js      # Division details
-        ├── TeamView.js          # Team stats with map breakdown
-        └── PlayerView.js        # Player stats with map breakdown
+        ├── TeamDetailView.js    # Wrapper for team dashboard
+        └── PlayerView.js        # Player analytics dashboard
 ```
 
 ## Components
 
-### Delta Indicator
+### Key Components
 
-Shows current value with optional delta arrow and tooltip:
-
-```javascript
-<delta-indicator 
-    :value="curr.kd" 
-    :delta="delta.kd"
-    :prev="prev.kd"
-    format="decimal"
-    :show-delta="true"
-/>
-```
-
-- **Green ↑**: Positive improvement
-- **Red ↓**: Negative change
-- Tooltip shows previous value and change amount
-
-### Map Stats Table
-
-Displays per-map performance with sortable columns:
-
-```javascript
-<map-stats-table 
-    :map-stats="mapStats"
-    title="Per-Map Performance"
-    :show-wins="true"
-    :show-rating="true"
-    :show-mvps="true"
-/>
-```
-
-Features:
-- Click column headers to sort
-- Automatic delta calculations
-- Responsive table layout
+- **HeroBanner** — full-width hero with responsive overlay, used on home & detail pages.
+- **SeasonToggle** — segmented control + pill selector for switching seasons/phase.
+- **StatPanel** — compact KPI grid used across home, division, team, and player dashboards.
+- **SparklineChart / RadarChart** — lightweight SVG charts (no external libs) for trends & attribute profiles.
+- **PlayerCompareModal** — side-by-side player metric comparison fetched on demand.
+- **MapsStats** — wrapper around `MapStatsTable` with loading/error states.
 
 ## Development
 
@@ -93,9 +72,22 @@ Features:
    Navigate to `http://localhost:8000`
 
 3. **Development Mode**:
-   - Uses CDN-hosted Vue/Vue Router (no build step)
-   - Edit `.js` files and refresh browser
-   - Hot reload on file changes (via Uvicorn)
+   - Uses CDN-hosted Vue/Vue Router/Pinia (no bundler required)
+   - Edit `.js` files under `frontend/static/` and refresh
+   - Hot reload on file changes via Uvicorn
+
+### Overriding the API Base
+
+By default the API client points to `window.location.origin + '/api'`. To target another backend (e.g. staging), set `window.__API_BASE__` **before** `api-client.js` loads in `index.html`:
+
+```html
+<script>
+  window.__API_BASE__ = 'https://stats.example.com/api';
+</script>
+<script src="/static/api-client.js"></script>
+```
+
+All subsequent requests use the overridden base URL.
 
 ### Adding New Views
 
@@ -121,7 +113,7 @@ routes: [
 
 ## API Integration
 
-All API calls use the global `apiClient` instance:
+All API calls use the global `apiClient` instance. Common helpers:
 
 ```javascript
 // Get team info
@@ -131,15 +123,7 @@ const team = await window.apiClient.getTeamInfo(teamId);
 const mapStats = await window.apiClient.getTeamMapStats(teamId, championshipId);
 ```
 
-Response format for map stats:
-```json
-{
-    "map_name": "de_dust2",
-    "curr": { "maps_played": 15, "kd": 1.25, ... },
-    "prev": { "maps_played": 12, "kd": 1.18, ... },
-    "delta": { "maps_played": 3, "kd": 0.07, ... }
-}
-```
+**Tip:** Team and player detail views rely on Pinia stores (`useTeamStore`, `usePlayerStore`) to memoize profile, season, and map stats per ID.
 
 ## Styling
 
@@ -157,7 +141,7 @@ All colors defined in `:root`:
 
 ### Theme Customization
 
-Edit `frontend/static/styles.css` to change colors, spacing, etc.
+Edit `frontend/static/styles.css` to adjust colors, spacing, or glass effects. Design tokens live under the `:root` block for quick theming.
 
 ## Production Build
 

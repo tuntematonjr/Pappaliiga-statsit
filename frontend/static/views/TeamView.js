@@ -1,182 +1,284 @@
-// Team View - Detailed team stats with map breakdown
 window.TeamView = {
     name: 'TeamView',
     components: {
         get LoadingSpinner() { return window.LoadingSpinner; },
         get ErrorMessage() { return window.ErrorMessage; },
-        get MapStatsTable() { return window.MapStatsTable; },
-        get ProgressBar() { return window.ProgressBar; },
-        get SplitBar() { return window.SplitBar; },
+        get StatPanel() { return window.StatPanel; },
         get SortableTable() { return window.SortableTable; },
-        get Masthead() { return window.Masthead; },
-        get CopyLink() { return window.CopyLink; }
+        get PlayerRow() { return window.PlayerRow; },
+        get CopyLink() { return window.CopyLink; },
+        get SparklineChart() { return window.SparklineChart; }
     },
-    template: `
-        <div class="team-view">
-            <masthead></masthead>
-            <loading-spinner v-if="loading" message="Loading team..."></loading-spinner>
-            <error-message v-else-if="error" :message="error" @retry="loadTeam"></error-message>
-            
-            <div v-else class="home-section">
-                <div class="team-header">
-                    <img :src="avatarUrl(teamInfo.avatar) || defaultAvatar" :alt="teamInfo.display_name || teamInfo.team_name" class="team-avatar">
-                    <div class="team-header-info">
-                        <h1>{{ teamInfo.display_name || teamInfo.team_name }}</h1>
-                        <p v-if="teamInfo.faceit_url">
-                            <a :href="teamInfo.faceit_url" target="_blank" class="faceit-link">View on Faceit →</a>
-                        </p>
-                        <copy-link label="Copy Team Link" compact></copy-link>
-                    </div>
-                </div>
-
-                <div class="season-selector home-section">
-                    <label>Season/Division:</label>
-                    <select v-model="selectedChampionship" @change="loadMapStats">
-                        <option v-for="season in seasonStats" :key="season.championship_id" :value="season.championship_id">
-                            Season {{ season.season }} - Div {{ season.division_num }}
-                        </option>
-                    </select>
-                </div>
-
-                <div v-if="selectedSeason" class="team-season-stats home-section">
-                    <h2 class="section-title">Season {{ selectedSeason.season }} - Division {{ selectedSeason.division_num }}</h2>
-                    
-                    <!-- Win/Loss Split Bar -->
-                    <div class="stat-card" style="margin-bottom: 24px;">
-                        <h3>Win / Loss Record</h3>
-                        <split-bar :wins="selectedSeason.wins" :losses="selectedSeason.losses" :left-text="(selectedSeason.wins+'W')" :right-text="(selectedSeason.losses+'L')" :show-percent="true"></split-bar>
-                        <div style="text-align: center; margin-top: 8px; color: var(--muted); font-size: 0.9rem;">
-                            Win Rate: {{ (selectedSeason.win_rate * 100).toFixed(1) }}%
-                        </div>
-                    </div>
-                    
-                    <!-- Stat Cards Grid -->
-                    <div class="stat-cards home-section">
-                        <div class="stat-card">
-                            <h3>Maps Played</h3>
-                            <div class="stat-value">{{ selectedSeason.maps_played }}</div>
-                        </div>
-                        <div class="stat-card">
-                            <h3>K/D Ratio</h3>
-                            <div class="stat-value">{{ selectedSeason.kd.toFixed(2) }}</div>
-                            <progress-bar 
-                                :value="selectedSeason.kd" 
-                                :max="2.0" 
-                                :color="selectedSeason.kd >= 1.0 ? 'ok' : 'warn'"
-                                height="8px"
-                                :showShimmer="false"
-                            ></progress-bar>
-                        </div>
-                        <div class="stat-card">
-                            <h3>ADR</h3>
-                            <div class="stat-value">{{ selectedSeason.adr.toFixed(1) }}</div>
-                            <progress-bar 
-                                :value="selectedSeason.adr" 
-                                :max="100" 
-                                color="accent"
-                                height="8px"
-                                :showShimmer="false"
-                            ></progress-bar>
-                        </div>
-                        <div class="stat-card">
-                            <h3>Round Diff</h3>
-                            <div class="stat-value" :class="selectedSeason.round_diff >= 0 ? 'positive' : 'negative'">
-                                {{ selectedSeason.round_diff >= 0 ? '+' : '' }}{{ selectedSeason.round_diff }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <map-stats-table 
-                    v-if="selectedChampionship"
-                    :map-stats="mapStats"
-                    :loading="mapStatsLoading"
-                    :error="mapStatsError"
-                    title="Per-Map Performance"
-                    :show-wins="true"
-                    :show-rating="true"
-                    :show-mvps="true"
-                />
-            </div>
-        </div>
-    `,
-    data() {
-        return {
-            loading: true,
-            error: null,
-            teamInfo: null,
-            seasonStats: [],
-            selectedChampionship: null,
-            mapStats: [],
-            mapStatsLoading: false,
-            mapStatsError: null,
-            defaultAvatar: '/static/pappaliiga-logo-white-bg.png'
-        };
+    props: {
+        profile: { type: Object, default: null },
+        breadcrumbs: { type: Array, default: () => [] },
+        seasonOptions: { type: Array, default: () => [] },
+        selectedSeason: { type: String, default: null },
+        seasonLoading: { type: Boolean, default: false },
+        seasonError: { type: String, default: null },
+        activeTab: { type: String, default: 'overview' },
+        metrics: { type: Array, default: () => [] },
+        sparkline: { type: Array, default: () => [] },
+        mapHighlights: { type: Array, default: () => [] },
+        mapStats: { type: Array, default: () => [] },
+        mapStatsLoading: { type: Boolean, default: false },
+        mapStatsError: { type: String, default: null },
+        matches: { type: Array, default: () => [] },
+        matchesLoading: { type: Boolean, default: false },
+        matchesError: { type: String, default: null },
+        matchesPage: { type: Number, default: 1 },
+        matchesTotalPages: { type: Number, default: 0 },
+        matchesPageSize: { type: Number, default: 8 },
+        players: { type: Array, default: () => [] },
+        playerColumns: { type: Array, default: () => [] },
+        playersLoading: { type: Boolean, default: false },
+        playersError: { type: String, default: null }
     },
+    emits: ['select-season', 'select-tab', 'refresh', 'change-page'],
     computed: {
-        teamId() {
-            return this.$route.params.teamId;
+        teamName() {
+            return this.profile?.display_name || this.profile?.team_name || this.profile?.name || 'Joukkue';
         },
-        selectedSeason() {
-            if (!this.selectedChampionship) return null;
-            return this.seasonStats.find(s => s.championship_id === this.selectedChampionship);
-        }
-    },
-    watch: {
-        teamId: {
-            immediate: true,
-            handler() {
-                this.loadTeam();
+        crestUrl() {
+            const src = this.profile?.avatar || this.profile?.logo || this.profile?.team_logo;
+            if (!src) return null;
+            try {
+                return window.apiClient.proxyAvatar(src);
+            } catch (error) {
+                return src;
             }
+        },
+        faceitLink() {
+            return this.profile?.faceit_url || this.profile?.faceit || null;
+        },
+        tabOptions() {
+            return [
+                { key: 'overview', label: 'Yleiskuva' },
+                { key: 'matches', label: 'Ottelut' },
+                { key: 'players', label: 'Pelaajat' }
+            ];
+        },
+        hasSeasonPills() {
+            return Array.isArray(this.seasonOptions) && this.seasonOptions.length > 1;
+        },
+        matchesEmpty() {
+            return !this.matchesLoading && (!Array.isArray(this.matches) || !this.matches.length);
+        },
+        playersEmpty() {
+            return !this.playersLoading && (!Array.isArray(this.players) || !this.players.length);
         }
     },
     methods: {
-        avatarUrl(src) {
-            try { return window.apiClient.proxyAvatar(src); } catch (e) { return src; }
+        emitSeason(seasonId) {
+            this.$emit('select-season', seasonId);
         },
-        async loadTeam() {
-            this.loading = true;
-            this.error = null;
-            
+        emitTab(tab) {
+            this.$emit('select-tab', tab);
+        },
+        emitRefresh() {
+            this.$emit('refresh');
+        },
+        emitPage(page) {
+            this.$emit('change-page', page);
+        },
+        isActiveTab(tab) {
+            return this.activeTab === tab;
+        },
+        breadcrumbTo(crumb) {
+            return crumb?.to || null;
+        },
+        formatMatchDate(match) {
+            const raw = match?.played_at || match?.date || match?.scheduled_at;
+            if (!raw) return '';
             try {
-                const [teamInfo, seasonStats] = await Promise.all([
-                    window.apiClient.getTeamInfo(this.teamId),
-                    window.apiClient.getTeamSeasonStats(this.teamId)
-                ]);
-                
-                this.teamInfo = teamInfo;
-                this.seasonStats = seasonStats;
-                
-                // Auto-select championship from query param or most recent
-                const championshipParam = this.$route.query.championship;
-                if (championshipParam) {
-                    this.selectedChampionship = parseInt(championshipParam);
-                } else if (seasonStats.length > 0) {
-                    this.selectedChampionship = seasonStats[0].championship_id;
-                }
-                
-                if (this.selectedChampionship) {
-                    await this.loadMapStats();
-                }
-            } catch (err) {
-                this.error = err.message || 'Failed to load team';
-            } finally {
-                this.loading = false;
+                const date = new Date(raw);
+                return date.toLocaleDateString('fi-FI', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            } catch (error) {
+                return raw;
             }
         },
-        async loadMapStats() {
-            if (!this.selectedChampionship) return;
-            
-            this.mapStatsLoading = true;
-            this.mapStatsError = null;
-            
-            try {
-                this.mapStats = await window.apiClient.getTeamMapStats(this.teamId, this.selectedChampionship);
-            } catch (err) {
-                this.mapStatsError = err.message || 'Failed to load map stats';
-            } finally {
-                this.mapStatsLoading = false;
+        matchOpponent(match) {
+            return match?.opponent?.name || match?.opponent_name || match?.enemy || match?.opponent || 'Vastustaja';
+        },
+        matchScoreline(match) {
+            const forScore = match?.team_score ?? match?.score_for ?? match?.for ?? match?.score?.for;
+            const againstScore = match?.opponent_score ?? match?.score_against ?? match?.against ?? match?.score?.against;
+            if (forScore == null || againstScore == null) {
+                return match?.scoreline || match?.result || '';
             }
+            const formatted = `${forScore} - ${againstScore}`;
+            if (match?.result) {
+                return `${formatted} · ${match.result}`;
+            }
+            return formatted;
         }
-    }
+        return '';
+        },
+        matchOutcomeClass(match) {
+            const result = (match?.result || '').toLowerCase();
+            if (result.includes('win') || result.includes('voitto')) return 'match-card__score--win';
+            if (result.includes('loss') || result.includes('tappio')) return 'match-card__score--loss';
+            if (result.includes('draw') || result.includes('tasapeli')) return 'match-card__score--draw';
+            const scoreFor = match?.team_score ?? match?.score_for;
+            const scoreAgainst = match?.opponent_score ?? match?.score_against;
+            if (scoreFor > scoreAgainst) return 'match-card__score--win';
+            if (scoreFor < scoreAgainst) return 'match-card__score--loss';
+            return '';
+        }
+    },
+    template: `
+        <div class="team-view">
+            <header class="team-header glass-card">
+                <nav class="team-breadcrumbs" aria-label="Murupolku">
+                    <template v-for="(crumb, index) in breadcrumbs" :key="index">
+                        <router-link
+                            v-if="crumb.to"
+                            class="team-breadcrumbs__link"
+                            :to="breadcrumbTo(crumb)"
+                        >
+                            {{ crumb.label }}
+                        </router-link>
+                        <span v-else class="team-breadcrumbs__current">{{ crumb.label }}</span>
+                    </template>
+                </nav>
+                <div class="team-header__content">
+                    <div class="team-header__identity">
+                        <div class="team-header__crest" aria-hidden="crestUrl ? 'false' : 'true'">
+                            <img v-if="crestUrl" :src="crestUrl" :alt="teamName" loading="lazy" />
+                            <span v-else>{{ teamName.charAt(0).toUpperCase() }}</span>
+                        </div>
+                        <div class="team-header__meta">
+                            <h1>{{ teamName }}</h1>
+                            <div class="team-header__actions">
+                                <a v-if="faceitLink" :href="faceitLink" target="_blank" rel="noopener" class="btn-primary">Faceit</a>
+                                <button type="button" class="btn-link" @click="emitRefresh">Päivitä</button>
+                                <copy-link label="Jaa joukkue"></copy-link>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="seasonOptions.length" class="team-season-pills">
+                        <button
+                            v-for="season in seasonOptions"
+                            :key="season.value"
+                            type="button"
+                            class="team-season-pill"
+                            :class="{ 'team-season-pill--active': selectedSeason === season.value }"
+                            @click="emitSeason(season.value)"
+                        >
+                            {{ season.label }}<span v-if="season.isCurrent" class="team-season-pill__tag">NYT</span>
+                        </button>
+                    </div>
+                    <error-message
+                        v-if="seasonError"
+                        :message="seasonError"
+                        @retry="emitRefresh"
+                    ></error-message>
+                </div>
+                <div class="team-tabs" role="tablist">
+                    <button
+                        v-for="tab in tabOptions"
+                        :key="tab.key"
+                        type="button"
+                        class="team-tab"
+                        :class="{ 'team-tab--active': isActiveTab(tab.key) }"
+                        role="tab"
+                        @click="emitTab(tab.key)"
+                    >
+                        {{ tab.label }}
+                    </button>
+                </div>
+            </header>
+
+            <section v-if="isActiveTab('overview')" class="team-section">
+                <div class="team-overview">
+                    <stat-panel :items="metrics" :columns="3"></stat-panel>
+                    <div class="team-overview__sparkline glass-card">
+                        <h3>Viime ottelut</h3>
+                        <sparkline-chart
+                            v-if="Array.isArray(sparkline) && sparkline.length"
+                            :points="sparkline"
+                            :width="160"
+                            :height="60"
+                        ></sparkline-chart>
+                        <p v-else class="team-overview__empty">Otteluhistoria ei ole saatavilla.</p>
+                    </div>
+                    <div class="team-overview__maps">
+                        <loading-spinner
+                            v-if="mapStatsLoading && !mapHighlights.length"
+                            message="Karttatilastoja ladataan..."
+                        ></loading-spinner>
+                        <error-message
+                            v-else-if="mapStatsError && !mapHighlights.length"
+                            :message="mapStatsError"
+                            @retry="emitRefresh"
+                        ></error-message>
+                        <article v-else v-for="map in mapHighlights" :key="map.id" class="team-map-card glass-card">
+                            <h4>{{ map.name }}</h4>
+                            <p class="team-map-card__stat">{{ map.played }} karttaa</p>
+                            <p class="team-map-card__metric">{{ map.winRate.toFixed(1) }} %</p>
+                            <p class="team-map-card__meta">ADR {{ map.adr.toFixed(1) }} · Rating {{ map.rating.toFixed(2) }}</p>
+                        </article>
+                        <p v-if="!mapHighlights.length" class="team-overview__empty">Karttatilastoja ei löytynyt.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section v-else-if="isActiveTab('matches')" class="team-section">
+                <loading-spinner v-if="matchesLoading" message="Otteluita ladataan..."></loading-spinner>
+                <error-message v-else-if="matchesError" :message="matchesError" @retry="emitRefresh"></error-message>
+                <div v-else class="team-matches">
+                    <p v-if="matchesEmpty" class="team-overview__empty">Ei otteluita tälle kaudelle.</p>
+                    <article v-for="(match, index) in matches" :key="match.id || index" class="match-card glass-card">
+                        <header class="match-card__header">
+                            <span class="match-card__opponent">{{ matchOpponent(match) }}</span>
+                            <span class="match-card__date">{{ formatMatchDate(match) }}</span>
+                        </header>
+                        <div class="match-card__score" :class="matchOutcomeClass(match)">
+                            {{ matchScoreline(match) }}
+                        </div>
+                        <p v-if="match.notes" class="match-card__notes">{{ match.notes }}</p>
+                    </article>
+                    <div v-if="matchesTotalPages > 1" class="pagination">
+                        <button type="button" class="pagination__btn" :disabled="matchesPage <= 1" @click="emitPage(matchesPage - 1)">Edellinen</button>
+                        <span class="pagination__info">Sivu {{ matchesPage }} / {{ matchesTotalPages }}</span>
+                        <button type="button" class="pagination__btn" :disabled="matchesPage >= matchesTotalPages" @click="emitPage(matchesPage + 1)">Seuraava</button>
+                    </div>
+                </div>
+            </section>
+
+            <section v-else class="team-section">
+                <loading-spinner v-if="playersLoading" message="Pelaajia ladataan..."></loading-spinner>
+                <error-message v-else-if="playersError" :message="playersError" @retry="emitRefresh"></error-message>
+                <div v-else>
+                    <sortable-table
+                        v-if="!playersEmpty"
+                        :columns="playerColumns"
+                        :data="players"
+                        :default-sort="{ column: 'rating', order: 'desc', numeric: true }"
+                        :compact="false"
+                    >
+                        <template #cell-player="{ row }">
+                            <player-row :player="row.player"></player-row>
+                        </template>
+                        <template #cell-rating="{ row }">
+                            <span>{{ row.rating.toFixed(2) }}</span>
+                        </template>
+                        <template #cell-kd="{ row }">
+                            <span>{{ row.kd.toFixed(2) }}</span>
+                        </template>
+                        <template #cell-adr="{ row }">
+                            <span>{{ row.adr.toFixed(1) }}</span>
+                        </template>
+                        <template #cell-kr="{ row }">
+                            <span>{{ row.kr.toFixed(2) }}</span>
+                        </template>
+                        <template #cell-hs="{ row }">
+                            <span>{{ row.hs.toFixed(1) }} %</span>
+                        </template>
+                    </sortable-table>
+                    <p v-else class="team-overview__empty">Ei pelaajatietoja saatavilla.</p>
+                </div>
+            </section>
+        </div>
+    `
 };

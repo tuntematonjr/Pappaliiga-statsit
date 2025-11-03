@@ -3,15 +3,16 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
 
-from . import divisions
+from api.exceptions import NotFoundError
+from api.models import CamelModel
+from api.services import divisions_service
 
 router = APIRouter()
 
 
-class ChampionshipTeam(BaseModel):
+class ChampionshipTeam(CamelModel):
     """Normalized team stats for championship overviews."""
 
     team_id: str
@@ -34,7 +35,12 @@ class ChampionshipTeam(BaseModel):
 @router.get("/{championship_id}/teams", response_model=List[ChampionshipTeam])
 async def list_championship_teams(championship_id: str):
     """Return normalized team data for a specific championship."""
-    division = await divisions.get_division_by_id(championship_id)
+    try:
+        champ_row = await divisions_service.fetch_division_by_id(championship_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    division = await divisions_service.get_division_details(champ_row)
     teams = division.get("teams") or []
 
     normalized: list[dict] = []

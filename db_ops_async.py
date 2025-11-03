@@ -15,6 +15,116 @@ _TS_EXPR = (
     "COALESCE(m.finished_at, m.started_at, m.scheduled_at, m.configured_at, m.last_seen_at, 0)"
 )
 
+_CHAMPIONSHIP_UPSERT_SQL = """
+    INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug)
+    VALUES (%(championship_id)s, %(season)s, %(division_num)s, %(name)s, %(is_playoffs)s, %(slug)s)
+    ON DUPLICATE KEY UPDATE
+      season = VALUES(season),
+      division_num = VALUES(division_num),
+      name = CASE WHEN championships.name = '' THEN VALUES(name) ELSE championships.name END,
+      is_playoffs = VALUES(is_playoffs),
+      slug = CASE WHEN championships.slug = '' THEN VALUES(slug) ELSE championships.slug END
+"""
+
+_TEAM_UPSERT_SQL = """
+    INSERT INTO teams (team_id, name, avatar)
+    VALUES (%(team_id)s, %(name)s, %(avatar)s)
+    ON DUPLICATE KEY UPDATE
+      name = CASE WHEN VALUES(name) <> '' THEN VALUES(name) ELSE teams.name END,
+      avatar = CASE WHEN VALUES(avatar) <> '' THEN VALUES(avatar) ELSE teams.avatar END
+"""
+
+_MAP_UPSERT_SQL = """
+    INSERT INTO maps (
+      match_id, season, division_num, round_index, map_name,
+      score_team1, score_team2, winner_team_id, is_forfeit
+    )
+    VALUES (
+      %(match_id)s, %(season)s, %(division_num)s, %(round_index)s, %(map_name)s,
+      %(score_team1)s, %(score_team2)s, %(winner_team_id)s, %(is_forfeit)s
+    )
+    ON DUPLICATE KEY UPDATE
+      map_name = VALUES(map_name),
+      score_team1 = VALUES(score_team1),
+      score_team2 = VALUES(score_team2),
+      winner_team_id = VALUES(winner_team_id),
+      is_forfeit = VALUES(is_forfeit)
+"""
+
+_PLAYER_STAT_UPSERT_SQL = """
+    INSERT INTO player_stats (
+      season, division_num, match_id, round_index, map_id, player_id, team_id, opponent_team_id,
+      is_forfeit_map, kills, deaths, assists, kd, kr, adr, hs_pct, mvps, sniper_kills,
+      utility_damage, enemies_flashed, flash_count, flash_successes,
+      mk_2k, mk_3k, mk_4k, mk_5k,
+      clutch_kills, cl_1v1_attempts, cl_1v1_wins,
+      cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
+      pistol_kills, damage
+    )
+    VALUES (
+      %(season)s, %(division_num)s, %(match_id)s, %(round_index)s, %(map_id)s, %(player_id)s, %(team_id)s, %(opponent_team_id)s,
+      %(is_forfeit_map)s, %(kills)s, %(deaths)s, %(assists)s, %(kd)s, %(kr)s, %(adr)s, %(hs_pct)s, %(mvps)s, %(sniper_kills)s,
+      %(utility_damage)s, %(enemies_flashed)s, %(flash_count)s, %(flash_successes)s,
+      %(mk_2k)s, %(mk_3k)s, %(mk_4k)s, %(mk_5k)s,
+      %(clutch_kills)s, %(cl_1v1_attempts)s, %(cl_1v1_wins)s,
+      %(cl_1v2_attempts)s, %(cl_1v2_wins)s, %(entry_count)s, %(entry_wins)s,
+      %(pistol_kills)s, %(damage)s
+    )
+    ON DUPLICATE KEY UPDATE
+      team_id = VALUES(team_id),
+      opponent_team_id = VALUES(opponent_team_id),
+      is_forfeit_map = VALUES(is_forfeit_map),
+      kills = VALUES(kills),
+      deaths = VALUES(deaths),
+      assists = VALUES(assists),
+      kd = VALUES(kd),
+      kr = VALUES(kr),
+      adr = VALUES(adr),
+      hs_pct = VALUES(hs_pct),
+      mvps = VALUES(mvps),
+      sniper_kills = VALUES(sniper_kills),
+      utility_damage = VALUES(utility_damage),
+      enemies_flashed = VALUES(enemies_flashed),
+      flash_count = VALUES(flash_count),
+      flash_successes = VALUES(flash_successes),
+      mk_2k = VALUES(mk_2k),
+      mk_3k = VALUES(mk_3k),
+      mk_4k = VALUES(mk_4k),
+      mk_5k = VALUES(mk_5k),
+      clutch_kills = VALUES(clutch_kills),
+      cl_1v1_attempts = VALUES(cl_1v1_attempts),
+      cl_1v1_wins = VALUES(cl_1v1_wins),
+      cl_1v2_attempts = VALUES(cl_1v2_attempts),
+      cl_1v2_wins = VALUES(cl_1v2_wins),
+      entry_count = VALUES(entry_count),
+      entry_wins = VALUES(entry_wins),
+      pistol_kills = VALUES(pistol_kills),
+      damage = VALUES(damage)
+"""
+
+_TEAM_STAT_UPSERT_SQL = """
+    INSERT INTO team_stats (
+      season, division_num, match_id, round_index, team_id, opponent_team_id,
+      map_id, is_forfeit_map, final_score, first_half_score, second_half_score,
+      overtime_score, headshot_pct, win
+    )
+    VALUES (
+      %(season)s, %(division_num)s, %(match_id)s, %(round_index)s, %(team_id)s, %(opponent_team_id)s,
+      %(map_id)s, %(is_forfeit_map)s, %(final_score)s, %(first_half_score)s, %(second_half_score)s,
+      %(overtime_score)s, %(headshot_pct)s, %(win)s
+    )
+    ON DUPLICATE KEY UPDATE
+      opponent_team_id = VALUES(opponent_team_id),
+      map_id = VALUES(map_id),
+      is_forfeit_map = VALUES(is_forfeit_map),
+      final_score = VALUES(final_score),
+      first_half_score = VALUES(first_half_score),
+      second_half_score = VALUES(second_half_score),
+      overtime_score = VALUES(overtime_score),
+      headshot_pct = VALUES(headshot_pct),
+      win = VALUES(win)
+"""
+
 
 def _normalize_avatar(url: Optional[str]) -> str:
     raw = (url or "").strip()
@@ -48,49 +158,68 @@ async def _calc_snapshot_ts_async(conn: asyncmy.Connection, season: int, divisio
     return snapshot_ts
 
 
-async def upsert_championship_async(conn: asyncmy.Connection, row: Row) -> str:
-    payload = {
-        "championship_id": row.get("championship_id"),
+async def get_division_snapshot_ts_async(conn: asyncmy.Connection, season: int, division_num: int) -> int:
+    """Public helper for retrieving the division snapshot timestamp."""
+    return await _calc_snapshot_ts_async(conn, season, division_num)
+
+
+def _prepare_championship_payload(row: Row) -> Optional[Dict[str, Any]]:
+    cid = row.get("championship_id")
+    if not cid:
+        return None
+    return {
+        "championship_id": cid,
         "season": row.get("season"),
         "division_num": row.get("division_num"),
         "name": row.get("name"),
         "is_playoffs": 1 if row.get("is_playoffs") else 0,
         "slug": row.get("slug"),
     }
+
+
+async def upsert_championships_async(conn: asyncmy.Connection, rows: Iterable[Row]) -> list[str]:
+    payloads = []
+    for row in rows:
+        payload = _prepare_championship_payload(row)
+        if payload:
+            payloads.append(payload)
+    if not payloads:
+        return []
     async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug)
-            VALUES (%(championship_id)s, %(season)s, %(division_num)s, %(name)s, %(is_playoffs)s, %(slug)s)
-            ON DUPLICATE KEY UPDATE
-              season = VALUES(season),
-              division_num = VALUES(division_num),
-              name = CASE WHEN championships.name = '' THEN VALUES(name) ELSE championships.name END,
-              is_playoffs = VALUES(is_playoffs),
-              slug = CASE WHEN championships.slug = '' THEN VALUES(slug) ELSE championships.slug END
-            """,
-            payload,
-        )
-    return str(payload["championship_id"])
+        await cur.executemany(_CHAMPIONSHIP_UPSERT_SQL, payloads)
+    return [str(item["championship_id"]) for item in payloads]
 
 
-async def upsert_team_async(conn: asyncmy.Connection, team: Row) -> None:
-    payload = {
-        "team_id": team.get("team_id"),
+async def upsert_championship_async(conn: asyncmy.Connection, row: Row) -> str:
+    ids = await upsert_championships_async(conn, [row])
+    return ids[0] if ids else ""
+
+
+def _prepare_team_payload(team: Row) -> Optional[Dict[str, Any]]:
+    tid = team.get("team_id")
+    if not tid:
+        return None
+    return {
+        "team_id": tid,
         "name": team.get("name"),
         "avatar": _normalize_avatar(team.get("avatar")),
     }
+
+
+async def upsert_teams_bulk_async(conn: asyncmy.Connection, teams: Iterable[Row]) -> None:
+    payloads = []
+    for team in teams:
+        payload = _prepare_team_payload(team)
+        if payload:
+            payloads.append(payload)
+    if not payloads:
+        return
     async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO teams (team_id, name, avatar)
-            VALUES (%(team_id)s, %(name)s, %(avatar)s)
-            ON DUPLICATE KEY UPDATE
-              name = CASE WHEN VALUES(name) <> '' THEN VALUES(name) ELSE teams.name END,
-              avatar = CASE WHEN VALUES(avatar) <> '' THEN VALUES(avatar) ELSE teams.avatar END
-            """,
-            payload,
-        )
+        await cur.executemany(_TEAM_UPSERT_SQL, payloads)
+
+
+async def upsert_team_async(conn: asyncmy.Connection, team: Row) -> None:
+    await upsert_teams_bulk_async(conn, [team])
 
 
 async def upsert_player_async(conn: asyncmy.Connection, player: Row) -> None:
@@ -133,6 +262,16 @@ async def upsert_players_bulk_async(conn: asyncmy.Connection, players: Iterable[
 
 
 async def upsert_match_async(conn: asyncmy.Connection, row: Row) -> None:
+    times = [
+        row.get("finished_at"),
+        row.get("started_at"),
+        row.get("scheduled_at"),
+        row.get("last_seen_at"),
+        row.get("configured_at"),
+    ]
+    activity_ts = row.get("activity_ts")
+    if activity_ts is None:
+        activity_ts = max((int(v) for v in times if v), default=0)
     payload = {
         "match_id": row["match_id"],
         "championship_id": row["championship_id"],
@@ -145,6 +284,7 @@ async def upsert_match_async(conn: asyncmy.Connection, row: Row) -> None:
         "scheduled_at": row.get("scheduled_at"),
         "status": row.get("status"),
         "last_seen_at": row.get("last_seen_at"),
+        "activity_ts": activity_ts,
         "team1_id": row.get("team1_id"),
         "team2_id": row.get("team2_id"),
         "winner_team_id": row.get("winner_team_id"),
@@ -157,13 +297,13 @@ async def upsert_match_async(conn: asyncmy.Connection, row: Row) -> None:
             INSERT INTO matches (
               match_id, championship_id, season, division_num, best_of,
               configured_at, started_at, finished_at, scheduled_at,
-              status, last_seen_at, team1_id, team2_id, winner_team_id,
+              status, last_seen_at, activity_ts, team1_id, team2_id, winner_team_id,
               is_forfeit, ignored_due_ban
             )
             VALUES (
               %(match_id)s, %(championship_id)s, %(season)s, %(division_num)s, %(best_of)s,
               %(configured_at)s, %(started_at)s, %(finished_at)s, %(scheduled_at)s,
-              %(status)s, %(last_seen_at)s, %(team1_id)s, %(team2_id)s, %(winner_team_id)s,
+              %(status)s, %(last_seen_at)s, %(activity_ts)s, %(team1_id)s, %(team2_id)s, %(winner_team_id)s,
               %(is_forfeit)s, %(ignored_due_ban)s
             )
             ON DUPLICATE KEY UPDATE
@@ -177,6 +317,7 @@ async def upsert_match_async(conn: asyncmy.Connection, row: Row) -> None:
               scheduled_at = VALUES(scheduled_at),
               status = VALUES(status),
               last_seen_at = VALUES(last_seen_at),
+              activity_ts = VALUES(activity_ts),
               team1_id = VALUES(team1_id),
               team2_id = VALUES(team2_id),
               winner_team_id = VALUES(winner_team_id),
@@ -187,14 +328,8 @@ async def upsert_match_async(conn: asyncmy.Connection, row: Row) -> None:
         )
 
 
-async def upsert_map_async(
-    conn: asyncmy.Connection,
-    match_id: str,
-    season: int,
-    division_num: int,
-    row: Row,
-) -> None:
-    payload = {
+def _prepare_map_payload(match_id: str, season: int, division_num: int, row: Row) -> Dict[str, Any]:
+    return {
         "match_id": match_id,
         "season": season,
         "division_num": division_num,
@@ -205,26 +340,34 @@ async def upsert_map_async(
         "winner_team_id": row.get("winner_team_id"),
         "is_forfeit": 1 if row.get("is_forfeit") else 0,
     }
+
+
+async def upsert_maps_bulk_async(
+    conn: asyncmy.Connection,
+    match_id: str,
+    season: int,
+    division_num: int,
+    rows: Iterable[Row],
+) -> None:
+    payloads = [
+        _prepare_map_payload(match_id, season, division_num, row)
+        for row in rows
+        if "round_index" in row
+    ]
+    if not payloads:
+        return
     async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO maps (
-              match_id, season, division_num, round_index, map_name,
-              score_team1, score_team2, winner_team_id, is_forfeit
-            )
-            VALUES (
-              %(match_id)s, %(season)s, %(division_num)s, %(round_index)s, %(map_name)s,
-              %(score_team1)s, %(score_team2)s, %(winner_team_id)s, %(is_forfeit)s
-            )
-            ON DUPLICATE KEY UPDATE
-              map_name = VALUES(map_name),
-              score_team1 = VALUES(score_team1),
-              score_team2 = VALUES(score_team2),
-              winner_team_id = VALUES(winner_team_id),
-              is_forfeit = VALUES(is_forfeit)
-            """,
-            payload,
-        )
+        await cur.executemany(_MAP_UPSERT_SQL, payloads)
+
+
+async def upsert_map_async(
+    conn: asyncmy.Connection,
+    match_id: str,
+    season: int,
+    division_num: int,
+    row: Row,
+) -> None:
+    await upsert_maps_bulk_async(conn, match_id, season, division_num, [row])
 
 
 async def get_map_id_lookup_async(conn: asyncmy.Connection, match_id: str) -> Dict[int, int]:
@@ -276,18 +419,17 @@ async def replace_map_votes_async(
         )
 
 
-async def upsert_player_stat_async(
-    conn: asyncmy.Connection,
+def _prepare_player_stat_payload(
     season: int,
     division_num: int,
     match_id: str,
     round_index: int,
-    map_lookup: Dict[int, int],
+    map_lookup: Mapping[int, int],
     row: Row,
     is_forfeit_map: bool,
-) -> None:
+) -> Dict[str, Any]:
     map_id = map_lookup.get(round_index)
-    payload = {
+    return {
         "season": season,
         "division_num": division_num,
         "match_id": match_id,
@@ -324,63 +466,40 @@ async def upsert_player_stat_async(
         "pistol_kills": row.get("pistol_kills"),
         "damage": row.get("damage"),
     }
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO player_stats (
-              season, division_num, match_id, round_index, map_id, player_id, team_id, opponent_team_id,
-              is_forfeit_map, kills, deaths, assists, kd, kr, adr, hs_pct, mvps, sniper_kills,
-              utility_damage, enemies_flashed, flash_count, flash_successes,
-              mk_2k, mk_3k, mk_4k, mk_5k,
-              clutch_kills, cl_1v1_attempts, cl_1v1_wins,
-              cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
-              pistol_kills, damage
+
+
+async def upsert_player_stats_bulk_async(
+    conn: asyncmy.Connection,
+    season: int,
+    division_num: int,
+    match_id: str,
+    map_lookup: Mapping[int, int],
+    rows: Iterable[Row],
+    forfeit_lookup: Mapping[int, bool],
+) -> None:
+    payloads = []
+    for row in rows:
+        round_index = row.get("round_index")
+        if round_index is None:
+            continue
+        payloads.append(
+            _prepare_player_stat_payload(
+                season,
+                division_num,
+                match_id,
+                int(round_index),
+                map_lookup,
+                row,
+                bool(forfeit_lookup.get(int(round_index), False)),
             )
-            VALUES (
-              %(season)s, %(division_num)s, %(match_id)s, %(round_index)s, %(map_id)s, %(player_id)s, %(team_id)s, %(opponent_team_id)s,
-              %(is_forfeit_map)s, %(kills)s, %(deaths)s, %(assists)s, %(kd)s, %(kr)s, %(adr)s, %(hs_pct)s, %(mvps)s, %(sniper_kills)s,
-              %(utility_damage)s, %(enemies_flashed)s, %(flash_count)s, %(flash_successes)s,
-              %(mk_2k)s, %(mk_3k)s, %(mk_4k)s, %(mk_5k)s,
-              %(clutch_kills)s, %(cl_1v1_attempts)s, %(cl_1v1_wins)s,
-              %(cl_1v2_attempts)s, %(cl_1v2_wins)s, %(entry_count)s, %(entry_wins)s,
-              %(pistol_kills)s, %(damage)s
-            )
-            ON DUPLICATE KEY UPDATE
-              team_id = VALUES(team_id),
-              opponent_team_id = VALUES(opponent_team_id),
-              is_forfeit_map = VALUES(is_forfeit_map),
-              kills = VALUES(kills),
-              deaths = VALUES(deaths),
-              assists = VALUES(assists),
-              kd = VALUES(kd),
-              kr = VALUES(kr),
-              adr = VALUES(adr),
-              hs_pct = VALUES(hs_pct),
-              mvps = VALUES(mvps),
-              sniper_kills = VALUES(sniper_kills),
-              utility_damage = VALUES(utility_damage),
-              enemies_flashed = VALUES(enemies_flashed),
-              flash_count = VALUES(flash_count),
-              flash_successes = VALUES(flash_successes),
-              mk_2k = VALUES(mk_2k),
-              mk_3k = VALUES(mk_3k),
-              mk_4k = VALUES(mk_4k),
-              mk_5k = VALUES(mk_5k),
-              clutch_kills = VALUES(clutch_kills),
-              cl_1v1_attempts = VALUES(cl_1v1_attempts),
-              cl_1v1_wins = VALUES(cl_1v1_wins),
-              cl_1v2_attempts = VALUES(cl_1v2_attempts),
-              cl_1v2_wins = VALUES(cl_1v2_wins),
-              entry_count = VALUES(entry_count),
-              entry_wins = VALUES(entry_wins),
-              pistol_kills = VALUES(pistol_kills),
-              damage = VALUES(damage)
-            """,
-            payload,
         )
+    if not payloads:
+        return
+    async with conn.cursor() as cur:
+        await cur.executemany(_PLAYER_STAT_UPSERT_SQL, payloads)
 
 
-async def upsert_team_stat_async(
+async def upsert_player_stat_async(
     conn: asyncmy.Connection,
     season: int,
     division_num: int,
@@ -390,8 +509,28 @@ async def upsert_team_stat_async(
     row: Row,
     is_forfeit_map: bool,
 ) -> None:
+    await upsert_player_stats_bulk_async(
+        conn,
+        season,
+        division_num,
+        match_id,
+        map_lookup,
+        [dict(row, round_index=round_index)],
+        {round_index: is_forfeit_map},
+    )
+
+
+def _prepare_team_stat_payload(
+    season: int,
+    division_num: int,
+    match_id: str,
+    round_index: int,
+    map_lookup: Mapping[int, int],
+    row: Row,
+    is_forfeit_map: bool,
+) -> Dict[str, Any]:
     map_id = map_lookup.get(round_index)
-    payload = {
+    return {
         "season": season,
         "division_num": division_num,
         "match_id": match_id,
@@ -407,32 +546,58 @@ async def upsert_team_stat_async(
         "headshot_pct": row.get("headshot_pct"),
         "win": 1 if row.get("win") else 0,
     }
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO team_stats (
-              season, division_num, match_id, round_index, team_id, opponent_team_id,
-              map_id, is_forfeit_map, final_score, first_half_score, second_half_score,
-              overtime_score, headshot_pct, win
+
+
+async def upsert_team_stats_bulk_async(
+    conn: asyncmy.Connection,
+    season: int,
+    division_num: int,
+    match_id: str,
+    map_lookup: Mapping[int, int],
+    rows: Iterable[Row],
+    forfeit_lookup: Mapping[int, bool],
+) -> None:
+    payloads = []
+    for row in rows:
+        round_index = row.get("round_index")
+        if round_index is None:
+            continue
+        payloads.append(
+            _prepare_team_stat_payload(
+                season,
+                division_num,
+                match_id,
+                int(round_index),
+                map_lookup,
+                row,
+                bool(forfeit_lookup.get(int(round_index), False)),
             )
-            VALUES (
-              %(season)s, %(division_num)s, %(match_id)s, %(round_index)s, %(team_id)s, %(opponent_team_id)s,
-              %(map_id)s, %(is_forfeit_map)s, %(final_score)s, %(first_half_score)s, %(second_half_score)s,
-              %(overtime_score)s, %(headshot_pct)s, %(win)s
-            )
-            ON DUPLICATE KEY UPDATE
-              opponent_team_id = VALUES(opponent_team_id),
-              map_id = VALUES(map_id),
-              is_forfeit_map = VALUES(is_forfeit_map),
-              final_score = VALUES(final_score),
-              first_half_score = VALUES(first_half_score),
-              second_half_score = VALUES(second_half_score),
-              overtime_score = VALUES(overtime_score),
-              headshot_pct = VALUES(headshot_pct),
-              win = VALUES(win)
-            """,
-            payload,
         )
+    if not payloads:
+        return
+    async with conn.cursor() as cur:
+        await cur.executemany(_TEAM_STAT_UPSERT_SQL, payloads)
+
+
+async def upsert_team_stat_async(
+    conn: asyncmy.Connection,
+    season: int,
+    division_num: int,
+    match_id: str,
+    round_index: int,
+    map_lookup: Dict[int, int],
+    row: Row,
+    is_forfeit_map: bool,
+) -> None:
+    await upsert_team_stats_bulk_async(
+        conn,
+        season,
+        division_num,
+        match_id,
+        map_lookup,
+        [dict(row, round_index=round_index)],
+        {round_index: is_forfeit_map},
+    )
 
 
 async def delete_stats_for_match_async(

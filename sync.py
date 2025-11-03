@@ -7,28 +7,17 @@ import asyncio
 import logging
 import sys
 import time
-from typing import Sequence
+from typing import Any, Sequence
 
 from db_async import create_schema_async, fetch_val, reset_db_async, connection
 from division_overrides import load_division_overrides
 from faceit_client_async import get_rate_limit_stats, reset_rate_limit_stats, shutdown_clients
 from faceit_config import DIVISIONS, CURRENT_SEASON
 from sync_pipeline import ChampionshipSyncResult, sync_championship_async, update_single_match_async
-from db_ops_async import upsert_championship_async
+from db_ops_async import upsert_championships_async
+from utils import format_hms, log_stage
 
 LOGGER = logging.getLogger("pappaliiga.sync")
-
-def _format_hms(seconds: float) -> str:
-    if seconds < 1:
-        return f"{seconds:.2f}s"
-    seconds = int(seconds)
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
-    if h:
-        return f"{h:02}:{m:02}:{s:02}"
-    else:
-        return f"{m:02}:{s:02}"
 
 def _configure_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
@@ -156,51 +145,66 @@ async def main_async(args: argparse.Namespace) -> int:
             return 1
     else:
         targets = _resolve_targets(args.championship_id, args.all_seasons, season=args.season)
-        total_start_time = time.time()
+        total_start_time = time.perf_counter()
         total_synced_matches = 0
         total_skipped_matches = 0
-        
-        # Group championships by season for better organization
-        championships_by_season = {}
-        for championship_id in targets:
-            division = next((d for d in DIVISIONS if d["championship_id"] == championship_id), None)
-            if division:
-                season = division["season"]
-                if season not in championships_by_season:
-                    championships_by_season[season] = []
-                championships_by_season[season].append((championship_id, division))
-        
-        LOGGER.info("Starting sync for %d championship(s) across %d season(s)", 
-                   len(targets), len(championships_by_season))
 
-        # Ensure all championships exist in DB before syncing matches. This avoids
-        # foreign-key failures when match rows reference championships that haven't
-        # been upserted yet. We use a single DB connection and upsert sequentially.
-        try:
-            LOGGER.info("Upserting %d championship rows into DB", len(targets))
-            async with connection() as conn:
-                for season_key in sorted(championships_by_season.keys()):
-                    for championship_id, division in championships_by_season[season_key]:
-                        row = {
-                            "championship_id": championship_id,
-                            "season": division.get("season"),
-                            "division_num": division.get("division_num"),
-                            "name": division.get("name") or division.get("slug") or f"div{division.get('division_num')}-s{division.get('season')}",
-                            "is_playoffs": 1 if division.get("is_playoffs") else 0,
-                            "slug": division.get("slug") or f"div{division.get('division_num')}-s{division.get('season')}",
-                        }
-                        try:
-                            await upsert_championship_async(conn, row)
-                        except Exception:
-                            # If upsert fails for a single championship, log and continue so other
-                            # divisions can still be processed. The failure will be obvious in logs.
-                            LOGGER.exception("Failed to upsert championship %s before sync", championship_id)
-        except Exception:
-            LOGGER.exception("Unexpected error while upserting championships - continuing with sync")
-        
+        division_lookup = {str(item["championship_id"]): item for item in DIVISIONS}
+        championships_by_season: dict[int, list[dict[str, Any]]] = {}
+        championship_rows: list[dict[str, Any]] = []
+        seen_championships: set[str] = set()
+
+        for championship_id in targets:
+            if championship_id in seen_championships:
+                continue
+            seen_championships.add(championship_id)
+            division = division_lookup.get(championship_id)
+            if not division:
+                LOGGER.warning("Division metadata missing for championship %s - skipping", championship_id)
+                continue
+            season = division.get("season")
+            if season is None:
+                LOGGER.warning("Division %s missing season - skipping", championship_id)
+                continue
+            entry = {"championship_id": championship_id, "division": division}
+            championships_by_season.setdefault(season, []).append(entry)
+            fallback_slug = f"div{division.get('division_num')}-s{season}"
+            championship_rows.append(
+                {
+                    "championship_id": championship_id,
+                    "season": season,
+                    "division_num": division.get("division_num"),
+                    "name": division.get("name") or division.get("slug") or fallback_slug,
+                    "is_playoffs": 1 if division.get("is_playoffs") else 0,
+                    "slug": division.get("slug") or fallback_slug,
+                }
+            )
+
+        LOGGER.info(
+            "Starting sync for %d championship(s) across %d season(s)",
+            len(championship_rows),
+            len(championships_by_season),
+        )
+
+        if championship_rows:
+            upsert_start = time.perf_counter()
+            try:
+                async with connection() as conn:
+                    await upsert_championships_async(conn, championship_rows)
+                upsert_elapsed = time.perf_counter() - upsert_start
+                log_stage(
+                    LOGGER,
+                    "upsert_championships",
+                    upsert_elapsed,
+                    counts={"championships": len(championship_rows)},
+                    prefix="bootstrap",
+                )
+            except Exception:
+                LOGGER.exception("Unexpected error while upserting championships - continuing with sync")
+
         # Process each season
         for season in sorted(championships_by_season.keys()):
-            season_start_time = time.time()
+            season_start_time = time.perf_counter()
             season_synced_matches = 0
             season_skipped_matches = 0
             season_championships = championships_by_season[season]
@@ -210,10 +214,11 @@ async def main_async(args: argparse.Namespace) -> int:
             
             sem = asyncio.Semaphore(max_concurrency)
             async def sync_division(
-                championship_id: str,
-                division: dict,
+                entry: dict[str, Any],
             ) -> ChampionshipSyncResult | None:
                 async with sem:
+                    championship_id = entry["championship_id"]
+                    division = entry["division"]
                     division_name = division.get("name", f"Division {division.get('division_num', '?')}")
                     LOGGER.info("Syncing championship %s (%s)", championship_id, division_name)
                     try:
@@ -221,6 +226,7 @@ async def main_async(args: argparse.Namespace) -> int:
                             championship_id,
                             full=args.full,
                             overrides=overrides,
+                            division=division,
                         )
                         LOGGER.info(
                             "Synced %s matches for %s (skipped %s)",
@@ -234,7 +240,7 @@ async def main_async(args: argparse.Namespace) -> int:
                         return None
 
             season_results = await asyncio.gather(
-                *(sync_division(championship_id, division) for championship_id, division in season_championships)
+                *(sync_division(entry) for entry in season_championships)
             )
 
             processed_championships = 0
@@ -247,7 +253,7 @@ async def main_async(args: argparse.Namespace) -> int:
                 total_synced_matches += len(result.synced_match_ids)
                 total_skipped_matches += result.skipped_matches
             
-            season_elapsed = time.time() - season_start_time
+            season_elapsed = time.perf_counter() - season_start_time
             LOGGER.info("=== SEASON %d SYNC COMPLETED ===", season)
             LOGGER.info(
                 "Season %d: %d divisions, %d synced matches, %d skipped matches in %s",
@@ -255,18 +261,18 @@ async def main_async(args: argparse.Namespace) -> int:
                 len(season_championships),
                 season_synced_matches,
                 season_skipped_matches,
-                _format_hms(season_elapsed),
+                format_hms(season_elapsed),
             )
             if processed_championships:
                 LOGGER.info(
                     "Season %d averages: %s/division, %s/synced match",
                     season,
-                    _format_hms(season_elapsed / processed_championships),
-                    _format_hms(season_elapsed / max(season_synced_matches or 1, 1)),
+                    format_hms(season_elapsed / processed_championships),
+                    format_hms(season_elapsed / max(season_synced_matches or 1, 1)),
                 )
             LOGGER.info("")
         
-        total_elapsed = time.time() - total_start_time
+        total_elapsed = time.perf_counter() - total_start_time
         if len(targets) > 1:
             LOGGER.info("=== FULL SYNC COMPLETED ===")
             LOGGER.info(
@@ -275,12 +281,12 @@ async def main_async(args: argparse.Namespace) -> int:
                 len(targets),
                 total_synced_matches,
                 total_skipped_matches,
-                _format_hms(total_elapsed),
+                format_hms(total_elapsed),
             )
             LOGGER.info(
                 "Overall averages: %s/championship, %s/synced match",
-                _format_hms(total_elapsed / max(len(targets), 1)),
-                _format_hms(total_elapsed / max(total_synced_matches or 1, 1)),
+                format_hms(total_elapsed / max(len(targets), 1)),
+                format_hms(total_elapsed / max(total_synced_matches or 1, 1)),
             )
 
     rate_stats = await get_rate_limit_stats()
@@ -301,7 +307,7 @@ async def main_async(args: argparse.Namespace) -> int:
         LOGGER.info(
             "Faceit rate limits encountered %d time(s); cumulative enforced wait %s",
             throttle_hits,
-            _format_hms(throttle_wait),
+            format_hms(throttle_wait),
         )
     else:
         LOGGER.info("Faceit rate limits were not encountered during this run")
@@ -310,7 +316,7 @@ async def main_async(args: argparse.Namespace) -> int:
         LOGGER.info(
             "Hourly cap enforced %d time(s); cumulative scheduled wait %s",
             hourly_events,
-            _format_hms(hourly_wait),
+            format_hms(hourly_wait),
         )
 
     if args.verify:

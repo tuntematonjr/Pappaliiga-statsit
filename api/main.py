@@ -20,6 +20,7 @@ from db_async import close_pool, get_pool
 
 from .routers import championships, divisions, matches, players, stats, teams
 from .routers import maps_catalog, image_proxy
+from api.exceptions import BadRequestError, NotFoundError
 
 # Load environment variables from .env file if present
 try:
@@ -148,7 +149,17 @@ async def spa_fallback(full_path: str):
         raise HTTPException(status_code=404, detail="Frontend not found")
 
 
-# Global exception handler
+# Global exception handlers
+@app.exception_handler(NotFoundError)
+async def not_found_handler(request, exc: NotFoundError):
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+
+@app.exception_handler(BadRequestError)
+async def bad_request_handler(request, exc: BadRequestError):
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Catch-all exception handler."""

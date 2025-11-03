@@ -121,6 +121,14 @@ class ApiClient {
         return this.request(`/divisions/${championshipId}/map-stats`);
     }
 
+    async getDivisionStandings(championshipId) {
+        return this.request(`/divisions/${championshipId}/standings`);
+    }
+
+    async getDivisionHighlights(championshipId) {
+        return this.request(`/divisions/${championshipId}/highlights`);
+    }
+
     // Teams
     async getTeamInfo(teamId) {
         return this.request(`/teams/${teamId}`);

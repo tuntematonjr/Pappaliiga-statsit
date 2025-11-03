@@ -1,426 +1,415 @@
-﻿
 const TEAM_PLAYER_COLUMNS = [
-    { key: 'nickname', label: 'Pelaaja', sortable: true, align: 'left', colClass: 'col-name' },
+    { key: 'player', label: 'Pelaaja', sortable: true, align: 'left' },
     { key: 'maps', label: 'Kartat', sortable: true, numeric: true },
     { key: 'rounds', label: 'Erät', sortable: true, numeric: true },
     { key: 'rating', label: 'Rating', sortable: true, numeric: true, decimals: 2 },
     { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2 },
     { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1 },
     { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 2 },
-    { key: 'hs_percent', label: 'HS%', sortable: true, numeric: true, decimals: 1 },
-    { key: 'damage', label: 'Damage', sortable: true, numeric: true },
-    { key: 'assists', label: 'Assistit', sortable: true, numeric: true },
-    { key: 'clutches', label: 'Clutchit', sortable: true, numeric: true },
-    { key: 'utility', label: 'Utility dmg', sortable: true, numeric: true }
-];
-
-const TEAM_MAP_COLUMNS = [
-    { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-map-name' },
-    { key: 'maps_played', label: 'Ottelut', sortable: true, numeric: true },
-    { key: 'wins', label: 'Voitot', sortable: true, numeric: true },
-    { key: 'losses', label: 'Tappiot', sortable: true, numeric: true },
-    { key: 'win_rate', label: 'Voitto%', sortable: true, numeric: true, format: value => `${value.toFixed(1)} %` },
-    { key: 'rating', label: 'Rating', sortable: true, numeric: true, decimals: 2 },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1 },
+    { key: 'hs', label: 'HS%', sortable: true, numeric: true, decimals: 1 },
     { key: 'clutches', label: 'Clutchit', sortable: true, numeric: true }
 ];
 
+const MATCHES_PAGE_SIZE = 8;
+
+function createSegment() {
+    return {
+        data: null,
+        loading: false,
+        error: null,
+        fetchedAt: null
+    };
+}
+
+function toNumber(value, fallback = 0) {
+    if (value === null || value === undefined) return fallback;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) return numeric;
+    const parsed = Number(String(value).replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function formatPercent(value, decimals = 1) {
+    const numeric = toNumber(value);
+    return `${numeric.toFixed(decimals)} %`;
+}
+
+function buildMetrics(stats) {
+    if (!stats) return [];
+    const wins = toNumber(stats.wins ?? stats.matches_won ?? stats.maps_won);
+    const losses = toNumber(stats.losses ?? stats.matches_lost ?? stats.maps_lost);
+    const matches = toNumber(stats.matches ?? stats.matches_played ?? stats.series_played);
+    const roundsDiff = toNumber(stats.rounds_diff ?? stats.round_diff ?? stats.rounds_delta);
+    const winRate = matches > 0 ? (wins / matches) * 100 : toNumber(stats.win_rate);
+    const rating = toNumber(stats.rating ?? stats.rating_2 ?? stats.hltv_rating);
+    const kd = toNumber(stats.kd ?? stats.kd_ratio);
+    const adr = toNumber(stats.adr ?? stats.average_damage);
+    const hs = toNumber(stats.hs_percent ?? stats.headshot_percent);
+
+    return [
+        { key: 'matches', label: 'Ottelut', value: matches },
+        { key: 'winrate', label: 'Voitto%', value: formatPercent(winRate) },
+        { key: 'roundDiff', label: 'Eräero', value: roundsDiff > 0 ? `+${roundsDiff}` : `${roundsDiff}` },
+        { key: 'rating', label: 'Rating', value: rating.toFixed(2) },
+        { key: 'kd', label: 'K/D', value: kd.toFixed(2) },
+        { key: 'adr', label: 'ADR', value: adr.toFixed(1) },
+        { key: 'hs', label: 'HS%', value: `${hs.toFixed(1)} %` }
+    ];
+}
+
+function buildSparkline(matches) {
+    if (!Array.isArray(matches) || !matches.length) {
+        return [];
+    }
+    const tail = matches.slice(-12);
+    return tail.map(match => {
+        if (match == null) return 0;
+        if (typeof match.result === 'string') {
+            const normalized = match.result.toLowerCase();
+            if (normalized.includes('win') || normalized.includes('voitto')) return 1;
+            if (normalized.includes('loss') || normalized.includes('tappio')) return -1;
+        }
+        const score = toNumber(match.team_score ?? match.score_for ?? match.for);
+        const opponent = toNumber(match.opponent_score ?? match.score_against ?? match.against);
+        if (score > opponent) return 1;
+        if (score < opponent) return -1;
+        return 0;
+    });
+}
+
+function buildMapHighlights(mapStats) {
+    if (!Array.isArray(mapStats)) return [];
+    return mapStats
+        .map(entry => {
+            const current = entry.curr || entry;
+            const name = current.map_name || entry.map_name || 'Kartta';
+            const played = toNumber(current.matches ?? current.maps ?? current.maps_played);
+            const wins = toNumber(current.wins ?? current.maps_won);
+            const winRate = played ? (wins / played) * 100 : toNumber(current.win_rate);
+            return {
+                id: name,
+                name,
+                played,
+                winRate: Number.isFinite(winRate) ? winRate : 0,
+                rating: toNumber(current.rating),
+                adr: toNumber(current.adr)
+            };
+        })
+        .sort((a, b) => b.winRate - a.winRate)
+        .slice(0, 3);
+}
+
+function buildPlayerRows(players) {
+    if (!Array.isArray(players)) return [];
+    return players.map((player, index) => {
+        const maps = toNumber(player.maps ?? player.maps_played ?? player.map_count);
+        const rounds = toNumber(player.rounds ?? player.rounds_played);
+        const rating = toNumber(player.rating ?? player.rating_2 ?? player.hltv_rating);
+        const kd = toNumber(player.kd ?? player.kd_ratio);
+        const adr = toNumber(player.adr ?? player.average_damage);
+        const kr = toNumber(player.kr ?? player.kills_per_round);
+        const hs = toNumber(player.hs_percent ?? player.headshot_percent);
+        const clutches = toNumber(player.clutches ?? player.clutch_wins);
+        return {
+            id: player.player_id || player.id || `player-${index}`,
+            player,
+            maps,
+            rounds,
+            rating,
+            kd,
+            adr,
+            kr,
+            hs,
+            clutches
+        };
+    });
+}
+
+function paginate(items, page, pageSize) {
+    if (!Array.isArray(items) || !items.length) {
+        return { items: [], total: 0, totalPages: 0 };
+    }
+    const total = items.length;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const safePage = Math.min(Math.max(page, 1), totalPages);
+    const start = (safePage - 1) * pageSize;
+    return {
+        items: items.slice(start, start + pageSize),
+        total,
+        totalPages,
+        page: safePage
+    };
+}
+
 window.TeamDetail = {
     name: 'TeamDetail',
+    components: {
+        get LoadingSpinner() { return window.LoadingSpinner; },
+        get ErrorMessage() { return window.ErrorMessage; },
+        get TeamView() { return window.TeamView; }
+    },
     props: {
         teamId: { type: [String, Number], required: true },
         championshipId: { type: [String, Number], default: null }
     },
-    components: {
-        get LoadingSpinner() { return window.LoadingSpinner; },
-        get ErrorMessage() { return window.ErrorMessage; },
-        get SplitBar() { return window.SplitBar; },
-        get ProgressBar() { return window.ProgressBar; },
-        get SortableTable() { return window.SortableTable; },
-        get MapStatsTable() { return window.MapStatsTable; },
-        get TeamMatches() { return window.TeamMatches; },
-        get CopyLink() { return window.CopyLink; }
-    },
     data() {
+        const teamStore = typeof window.useTeamStore === 'function' ? window.useTeamStore() : null;
+        const seasonsStore = typeof window.useSeasonsStore === 'function' ? window.useSeasonsStore() : null;
         return {
-            loading: true,
-            error: null,
-            seasons: [],
+            teamStore,
+            seasonsStore,
             selectedChampionship: this.championshipId ? String(this.championshipId) : null,
-            team: null,
-            teamStats: null,
-            players: [],
-            mapStats: [],
-            mapStatsLoading: false,
-            mapStatsError: null,
-            matches: [],
-            matchesLoading: false,
-            matchesError: null,
-            defaultAvatar: '/static/pappaliiga-logo-white-bg.png'
+            activeTab: 'overview',
+            matchesPage: 1,
+            pageSize: MATCHES_PAGE_SIZE
         };
     },
     computed: {
-        activeChampionship() {
-            return this.selectedChampionship;
+        teamEntry() {
+            if (!this.teamStore || !this.teamId) {
+                return null;
+            }
+            return this.teamStore.getTeamState(this.teamId) || null;
+        },
+        profileSegment() {
+            return this.teamEntry?.profile || createSegment();
+        },
+        profile() {
+            return this.profileSegment.data || null;
+        },
+        seasonsSegment() {
+            return this.teamEntry?.seasonsList || createSegment();
         },
         seasonOptions() {
-            return (this.seasons || []).map(season => ({
-                value: String(season.championship_id || season.id || season.championshipId || ''),
-                label: season.name || season.season_name || `Kausi ${season.season}`,
-                isCurrent: Boolean(season.is_current || season.isCurrent)
-            })).filter(option => option.value);
+            const seasons = Array.isArray(this.seasonsSegment.data) ? this.seasonsSegment.data : [];
+            return seasons.map(season => {
+                const value = String(season.championship_id || season.championshipId || season.id || '');
+                return {
+                    value,
+                    label: season.name || `Kausi ${season.season} · Div ${season.division_num}`,
+                    season: season.season,
+                    division: season.division_num,
+                    championshipId: value,
+                    isCurrent: Boolean(season.is_current || season.current)
+                };
+            }).filter(option => option.value);
         },
-        displayName() {
-            return this.team?.display_name || this.team?.team_name || this.team?.name || 'Tuntematon joukkue';
+        currentChampionshipId() {
+            if (this.selectedChampionship) {
+                return String(this.selectedChampionship);
+            }
+            return this.seasonOptions.length ? this.seasonOptions[0].value : null;
         },
-        logoUrl() {
-            const src = this.team?.logo || this.team?.avatar || this.team?.team_logo;
-            return this.ensureAvatar(src);
+        seasonEntry() {
+            if (!this.teamEntry || !this.currentChampionshipId) {
+                return null;
+            }
+            return this.teamEntry.seasons?.[this.currentChampionshipId] || null;
         },
-        faceitUrl() {
-            return this.team?.faceit_url || this.team?.faceit || this.team?.links?.faceit;
+        seasonDetailsSegment() {
+            return this.seasonEntry?.details || createSegment();
         },
-        summaryStats() {
-            const stats = this.teamStats || {};
-            const wins = Number(stats.wins ?? stats.maps_won ?? 0);
-            const losses = Number(stats.losses ?? stats.maps_lost ?? 0);
-            const matches = Number(stats.matches ?? stats.matches_played ?? stats.series_played ?? 0);
-            const roundsDiff = Number(stats.rounds_diff ?? stats.round_diff ?? stats.rounds_delta ?? 0);
-            const winRate = matches > 0 ? (wins / matches) * 100 : (stats.win_rate ?? 0);
-            return {
-                wins,
-                losses,
-                matches,
-                roundsDiff,
-                roundsDiffDisplay: roundsDiff > 0 ? `+${roundsDiff}` : `${roundsDiff}`,
-                winRate: Number.isFinite(winRate) ? winRate : 0,
-                rating: this.safeNumber(stats.rating ?? stats.rating_2 ?? stats.hltv_rating),
-                kd: this.safeNumber(stats.kd ?? stats.kd_ratio),
-                adr: this.safeNumber(stats.adr ?? stats.average_damage),
-                hs: this.safeNumber(stats.hs_percent ?? stats.headshot_percent ?? stats.hs)
-            };
+        seasonDetails() {
+            return this.seasonDetailsSegment.data || null;
         },
-        statEntries() {
-            const stats = this.summaryStats;
-            return [
-                { label: 'Ottelut', value: stats.matches },
-                { label: 'Eräero', value: stats.roundsDiffDisplay },
-                { label: 'Voitto%', value: `${stats.winRate.toFixed(1)} %` },
-                { label: 'Rating', value: stats.rating.toFixed(2) },
-                { label: 'K/D', value: stats.kd.toFixed(2) },
-                { label: 'ADR', value: stats.adr.toFixed(1) },
-                { label: 'HS%', value: `${stats.hs.toFixed(1)} %` }
+        seasonStats() {
+            return this.seasonDetails?.stats || this.seasonDetails?.team_stats || this.seasonDetails || null;
+        },
+        seasonErrorMessage() {
+            if (!this.seasonDetailsSegment.error) return null;
+            if (this.seasonDetailsSegment.data) {
+                return null;
+            }
+            return this.seasonDetailsSegment.error;
+        },
+        mapStatsSegment() {
+            return this.seasonEntry?.mapStats || createSegment();
+        },
+        mapStats() {
+            return Array.isArray(this.mapStatsSegment.data)
+                ? this.mapStatsSegment.data
+                : Array.isArray(this.seasonDetails?.map_stats)
+                    ? this.seasonDetails.map_stats
+                    : [];
+        },
+        matchesSegment() {
+            return this.seasonEntry?.matches || createSegment();
+        },
+        matchesList() {
+            return Array.isArray(this.matchesSegment.data) ? this.matchesSegment.data : [];
+        },
+        paginatedMatches() {
+            return paginate(this.matchesList, this.matchesPage, this.pageSize);
+        },
+        playersList() {
+            return Array.isArray(this.seasonDetails?.players)
+                ? this.seasonDetails.players
+                : Array.isArray(this.seasonDetails?.roster)
+                    ? this.seasonDetails.roster
+                    : Array.isArray(this.profile?.players)
+                        ? this.profile.players
+                        : [];
+        },
+        playerRows() {
+            return buildPlayerRows(this.playersList);
+        },
+        playersLoading() {
+            return this.seasonDetailsSegment.loading && !this.playerRows.length;
+        },
+        breadcrumbs() {
+            const crumbs = [
+                { label: 'Home', to: { name: 'home' } }
             ];
+            const season = this.currentSeasonOption;
+            if (season) {
+                crumbs.push({ label: `Kausi ${season.season}`, to: { name: 'seasons' } });
+                if (season.championshipId) {
+                    crumbs.push({ label: `Div ${season.division}`, to: { name: 'division', params: { championshipId: season.championshipId } } });
+                }
+            }
+            if (this.profile) {
+                crumbs.push({ label: this.profile.display_name || this.profile.team_name || 'Joukkue' });
+            }
+            return crumbs;
         },
-        playerTableColumns() {
-            return TEAM_PLAYER_COLUMNS;
+        currentSeasonOption() {
+            if (!this.currentChampionshipId) return null;
+            return this.seasonOptions.find(option => option.value === this.currentChampionshipId) || null;
         },
-        playerTableRows() {
-            if (!Array.isArray(this.players)) return [];
-            return this.players.map((player, index) => {
-                const maps = Number(player.maps ?? player.maps_played ?? player.map_count ?? 0);
-                const rounds = Number(player.rounds ?? player.rounds_played ?? 0);
-                const rating = this.safeNumber(player.rating ?? player.rating_2 ?? player.hltv_rating ?? 0);
-                const kd = this.safeNumber(player.kd ?? player.kd_ratio ?? 0);
-                const adr = this.safeNumber(player.adr ?? player.average_damage ?? 0);
-                const kr = this.safeNumber(player.kr ?? player.kills_per_round ?? 0);
-                const hs = this.safeNumber(player.hs_percent ?? player.headshot_percent ?? 0);
-                const damage = this.safeNumber(player.damage ?? player.total_damage);
-                const assists = this.safeNumber(player.assists);
-                const clutches = this.safeNumber(player.clutches ?? player.clutch_wins);
-                const utility = this.safeNumber(player.utility_damage ?? player.utility);
-                return {
-                    id: player.player_id || player.id || `player-${index}`,
-                    nickname: player.nickname || player.player_name || player.name || 'Tuntematon',
-                    maps,
-                    rounds,
-                    rating,
-                    kd,
-                    adr,
-                    kr,
-                    hs_percent: hs,
-                    damage,
-                    assists,
-                    clutches,
-                    utility
-                };
-            });
+        overviewMetrics() {
+            return buildMetrics(this.seasonStats || this.profile?.stats);
         },
-        mapColumns() {
-            return TEAM_MAP_COLUMNS;
+        sparklinePoints() {
+            return buildSparkline(this.matchesList);
         },
-        mapStatsTableData() {
-            if (!Array.isArray(this.mapStats)) return [];
-            return this.mapStats.map((stats, index) => {
-                const base = stats.curr || stats;
-                const matches = Number(base.matches ?? base.maps ?? base.maps_played ?? 0);
-                const wins = Number(base.wins ?? base.maps_won ?? 0);
-                const losses = Number(base.losses ?? base.maps_lost ?? 0);
-                const winRate = matches > 0 ? (wins / matches) * 100 : this.safeNumber(base.win_rate);
-                const rating = this.safeNumber(base.rating ?? base.rating_2 ?? base.hltv_rating);
-                const adr = this.safeNumber(base.adr);
-                const clutches = this.safeNumber(base.clutches ?? base.clutch_wins);
-                const mapName = stats.map_name || base.map_name || stats.map || 'Kartta';
-                const logo = base.logo || stats.logo || base.image || null;
-                return {
-                    map_name: mapName,
-                    curr: {
-                        map_name: mapName,
-                        maps_played: matches,
-                        wins,
-                        losses,
-                        win_rate: winRate,
-                        rating,
-                        adr,
-                        clutches,
-                        logo
-                    }
-                };
-            });
+        mapHighlights() {
+            return buildMapHighlights(this.mapStats);
         },
-        hasPlayers() {
-            return this.playerTableRows.length > 0;
+        loading() {
+            return this.profileSegment.loading || this.seasonsSegment.loading || this.seasonDetailsSegment.loading;
         },
-        hasMapStats() {
-            return this.mapStatsTableData.length > 0;
+        loadError() {
+            return this.profileSegment.error || this.seasonsSegment.error;
         }
     },
     watch: {
-        championshipId: {
-            immediate: false,
-            handler(newVal) {
-                if (newVal && String(newVal) !== this.selectedChampionship) {
-                    this.selectedChampionship = String(newVal);
-                }
-                if (!newVal) {
-                    this.selectedChampionship = null;
-                    this.loadTeamData();
-                }
+        teamId: {
+            immediate: true,
+            handler() {
+                this.bootstrap();
             }
         },
-        selectedChampionship(newVal, oldVal) {
-            if (newVal && newVal !== oldVal) {
-                this.loadTeamData();
+        championshipId(newValue) {
+            if (newValue) {
+                this.selectedChampionship = String(newValue);
+                this.matchesPage = 1;
+                this.loadSeasonData(this.selectedChampionship, { force: true });
+            }
+        },
+        currentChampionshipId(newValue, oldValue) {
+            if (newValue && newValue !== oldValue) {
+                this.matchesPage = 1;
+                this.loadSeasonData(newValue);
+            }
+        },
+        seasonOptions(newOptions, oldOptions) {
+            if (!Array.isArray(newOptions) || !newOptions.length) {
+                return;
+            }
+            if (this.selectedChampionship && newOptions.some(option => option.value === this.selectedChampionship)) {
+                return;
+            }
+            if (!this.selectedChampionship || !oldOptions || !oldOptions.length) {
+                this.selectedChampionship = newOptions[0].value;
             }
         }
     },
-    async mounted() {
-        await this.loadSeasons();
-    },
     methods: {
-        async loadSeasons() {
-            this.loading = true;
-            this.error = null;
+        async bootstrap() {
+            if (!this.teamStore || !this.teamId) return;
             try {
-                const seasons = await window.apiClient.getTeamSeasons(this.teamId);
-                this.seasons = Array.isArray(seasons) ? seasons : [];
-                const initialSelection = this.selectedChampionship;
-                if (!this.selectedChampionship && this.seasons.length) {
-                    const current = this.seasons.find(season => season.is_current) || this.seasons[0];
+                await Promise.allSettled([
+                    this.teamStore.fetchTeamProfile(this.teamId),
+                    this.teamStore.fetchTeamSeasons(this.teamId)
+                ]);
+                if (!this.selectedChampionship && this.seasonOptions.length) {
+                    const current = this.seasonOptions.find(option => option.isCurrent) || this.seasonOptions[0];
                     if (current) {
-                        this.selectedChampionship = String(current.championship_id || current.championshipId || current.id);
+                        this.selectedChampionship = current.value;
                     }
                 }
-                if (this.selectedChampionship && this.selectedChampionship === initialSelection) {
-                    await this.loadTeamData();
+                if (this.currentChampionshipId) {
+                    await this.loadSeasonData(this.currentChampionshipId);
                 }
-            } catch (err) {
-                console.error('TeamDetail seasons fetch failed', err);
-                this.error = err?.message || 'Joukkueen kausien haku epäonnistui';
-                this.loading = false;
+            } catch (error) {
+                console.error('TeamDetail bootstrap error', error);
             }
         },
-        async loadTeamData() {
-            this.loading = true;
-            this.error = null;
-            try {
-                if (this.selectedChampionship) {
-                    const details = await window.apiClient.getTeamDetails(this.selectedChampionship, this.teamId);
-                    this.team = details.team || details;
-                    this.teamStats = details.stats || details.team_stats || details;
-                    this.players = details.players || details.roster || [];
-                    await Promise.all([
-                        this.loadMapStats(),
-                        this.loadMatches()
-                    ]);
-                } else {
-                    const info = await window.apiClient.getTeamInfo(this.teamId);
-                    this.team = info;
-                    this.teamStats = info.stats || info;
-                    this.players = info.players || info.roster || [];
-                    this.mapStats = [];
-                    this.matches = [];
-                }
-            } catch (err) {
-                console.error('TeamDetail load failed', err);
-                this.error = err?.message || 'Joukkueen tietojen haku epäonnistui';
-            } finally {
-                this.loading = false;
+        async loadSeasonData(championshipId, options = {}) {
+            if (!this.teamStore || !this.teamId || !championshipId) return;
+            const tasks = [
+                this.teamStore.fetchSeasonDetails(this.teamId, championshipId, options)
+            ];
+            tasks.push(this.teamStore.fetchSeasonMapStats(this.teamId, championshipId, options));
+            tasks.push(this.teamStore.fetchSeasonMatches(this.teamId, championshipId, options));
+            await Promise.allSettled(tasks);
+        },
+        handleSeasonSelect(seasonId) {
+            if (!seasonId || seasonId === this.currentChampionshipId) {
+                return;
+            }
+            this.selectedChampionship = seasonId;
+            this.matchesPage = 1;
+            this.loadSeasonData(seasonId);
+        },
+        handleTabSelect(tab) {
+            this.activeTab = tab;
+        },
+        handleRefresh() {
+            this.teamStore?.fetchTeamProfile(this.teamId, { force: true });
+            this.teamStore?.fetchTeamSeasons(this.teamId, { force: true });
+            if (this.currentChampionshipId) {
+                this.loadSeasonData(this.currentChampionshipId, { force: true });
             }
         },
-        async loadMapStats() {
-            this.mapStatsLoading = true;
-            this.mapStatsError = null;
-            try {
-                const maps = await window.apiClient.getTeamMapStats(this.teamId, this.selectedChampionship);
-                this.mapStats = Array.isArray(maps) ? maps : [];
-            } catch (err) {
-                console.error('TeamDetail map stats failed', err);
-                this.mapStatsError = err?.message || 'Karttatilastojen haku epäonnistui';
-                this.mapStats = [];
-            } finally {
-                this.mapStatsLoading = false;
-            }
-        },
-        async loadMatches() {
-            this.matchesLoading = true;
-            this.matchesError = null;
-            try {
-                const matches = await window.apiClient.getTeamMatches(this.selectedChampionship, this.teamId);
-                this.matches = Array.isArray(matches) ? matches : [];
-            } catch (err) {
-                console.error('TeamDetail matches failed', err);
-                this.matchesError = err?.message || 'Otteluiden haku epäonnistui';
-                this.matches = [];
-            } finally {
-                this.matchesLoading = false;
-            }
-        },
-        handleSeasonChange(event) {
-            const value = event?.target?.value;
-            if (value && value !== this.selectedChampionship) {
-                this.selectedChampionship = value;
-            }
-        },
-        ensureAvatar(src) {
-            if (!src) return this.defaultAvatar;
-            try {
-                return window.apiClient.proxyAvatar(src);
-            } catch (err) {
-                return src || this.defaultAvatar;
-            }
-        },
-        formatNumber(value, decimals = 2) {
-            const numeric = this.safeNumber(value);
-            return numeric.toFixed(decimals);
-        },
-        safeNumber(value) {
-            const numeric = Number(value);
-            if (Number.isFinite(numeric)) return numeric;
-            if (value === null || value === undefined) return 0;
-            const parsed = Number(String(value).replace(',', '.'));
-            return Number.isFinite(parsed) ? parsed : 0;
+        handlePageChange(page) {
+            this.matchesPage = page;
         }
     },
     template: `
         <div class="team-detail">
-            <loading-spinner v-if="loading && !team" message="Joukkuetta ladataan..."></loading-spinner>
-            <error-message v-else-if="error" :message="error" @retry="loadTeamData"></error-message>
-
-            <div v-else class="team-detail-content">
-                <section class="team-card card">
-                    <div class="team-card-left">
-                        <img class="team-logo-large" :src="logoUrl" :alt="displayName" loading="lazy" />
-                        <div class="team-meta">
-                            <h1>{{ displayName }}</h1>
-                            <div class="team-tags">
-                                <span class="team-tag" v-if="team?.country">{{ team.country }}</span>
-                                <span class="team-tag" v-if="team?.division_name">{{ team.division_name }}</span>
-                            </div>
-                            <div class="team-season-select" v-if="seasonOptions.length">
-                                <label for="team-season">Kausi</label>
-                                <select id="team-season" :value="selectedChampionship" @change="handleSeasonChange">
-                                    <option v-for="option in seasonOptions" :value="option.value" :key="option.value">
-                                        {{ option.label }}<span v-if="option.isCurrent"> (nykyinen)</span>
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="team-card-actions">
-                        <a v-if="faceitUrl" class="btn btn-primary" :href="faceitUrl" target="_blank" rel="noopener">
-                            Faceit
-                        </a>
-                        <copy-link :label="'Kopioi sivun linkki'" class="btn btn-ghost"></copy-link>
-                    </div>
-                </section>
-
-                <section class="team-summary card">
-                    <header class="card-head">
-                        <h2 class="title">Joukkueen yhteenveto</h2>
-                    </header>
-                    <div class="card-content">
-                        <split-bar
-                            :wins="summaryStats.wins"
-                            :losses="summaryStats.losses"
-                            height="36px"
-                            :show-percent="true"
-                        ></split-bar>
-                        <div class="team-stat-grid">
-                            <div v-for="entry in statEntries" :key="entry.label" class="team-stat-item">
-                                <div class="team-stat-label">{{ entry.label }}</div>
-                                <div class="team-stat-value">{{ entry.value }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="team-players card">
-                    <header class="card-head">
-                        <h2 class="title">Pelaajat</h2>
-                    </header>
-                    <div class="card-content">
-                        <sortable-table
-                            v-if="hasPlayers"
-                            :columns="playerTableColumns"
-                            :data="playerTableRows"
-                            :default-sort="{ column: 'rating', order: 'desc', numeric: true }"
-                            :compact="false"
-                        >
-                            <template #cell-hs_percent="{ row }">
-                                <span>{{ row.hs_percent.toFixed(1) }} %</span>
-                            </template>
-                            <template #cell-rating="{ row }">
-                                <span>{{ row.rating.toFixed(2) }}</span>
-                            </template>
-                            <template #cell-kd="{ row }">
-                                <span>{{ row.kd.toFixed(2) }}</span>
-                            </template>
-                            <template #cell-adr="{ row }">
-                                <span>{{ row.adr.toFixed(1) }}</span>
-                            </template>
-                            <template #cell-kr="{ row }">
-                                <span>{{ row.kr.toFixed(2) }}</span>
-                            </template>
-                        </sortable-table>
-                        <p v-else class="muted">Ei pelaajatietoja saatavilla.</p>
-                    </div>
-                </section>
-
-                <section class="team-maps card">
-                    <header class="card-head">
-                        <h2 class="title">Karttamenestys</h2>
-                    </header>
-                    <div class="card-content">
-                        <loading-spinner v-if="mapStatsLoading" message="Karttatilastoja ladataan..."></loading-spinner>
-                        <error-message v-else-if="mapStatsError" :message="mapStatsError" @retry="loadMapStats"></error-message>
-                        <map-stats-table
-                            v-else
-                            :map-stats="mapStatsTableData"
-                            :columns-config="mapColumns"
-                            :colorize-columns-config="['rating', 'adr', 'win_rate']"
-                        ></map-stats-table>
-                    </div>
-                </section>
-
-                <section class="team-matches-section">
-                    <team-matches
-                        :matches="matches"
-                        :loading="matchesLoading"
-                        :error="matchesError"
-                    ></team-matches>
-                </section>
-            </div>
+            <loading-spinner v-if="loading && !profile" message="Joukkuetta ladataan..."></loading-spinner>
+            <error-message v-else-if="loadError && !profile" :message="loadError" @retry="bootstrap"></error-message>
+            <team-view
+                v-else
+                :profile="profile"
+                :breadcrumbs="breadcrumbs"
+                :season-options="seasonOptions"
+                :selected-season="currentChampionshipId"
+                :season-loading="seasonDetailsSegment.loading"
+                :season-error="seasonErrorMessage"
+                :active-tab="activeTab"
+                :metrics="overviewMetrics"
+                :sparkline="sparklinePoints"
+                :map-highlights="mapHighlights"
+                :map-stats="mapStats"
+                :map-stats-loading="mapStatsSegment.loading"
+                :map-stats-error="mapStatsSegment.error"
+                :matches="paginatedMatches.items"
+                :matches-loading="matchesSegment.loading"
+                :matches-error="matchesSegment.error"
+                :matches-page="paginatedMatches.page"
+                :matches-total-pages="paginatedMatches.totalPages"
+                :matches-page-size="pageSize"
+                :players="playerRows"
+                :player-columns="TEAM_PLAYER_COLUMNS"
+                :players-loading="playersLoading"
+                :players-error="seasonErrorMessage"
+                @select-season="handleSeasonSelect"
+                @select-tab="handleTabSelect"
+                @refresh="handleRefresh"
+                @change-page="handlePageChange"
+            ></team-view>
         </div>
     `
 };
