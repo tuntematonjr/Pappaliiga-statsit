@@ -7,6 +7,12 @@
                 required: true
             }
         },
+        data() {
+            return {
+                glowDelay: Number((Math.random() * 2.5).toFixed(2)),
+                glowDuration: Number((5 + Math.random() * 3).toFixed(2))
+            };
+        },
         computed: {
             hasLink() {
                 return Boolean(this.division.route);
@@ -30,6 +36,13 @@
                     return 0;
                 }
                 return Math.max(0, Math.min(100, Math.round(percent)));
+            },
+            progressStyle() {
+                return {
+                    width: `${this.progressValue}%`,
+                    '--glow-delay': `${this.glowDelay}s`,
+                    '--glow-duration': `${this.glowDuration}s`
+                };
             },
             ariaLabel() {
                 const name = this.division.name || 'Division';
@@ -72,7 +85,7 @@
 
                     <div class="division-card__progress" role="group" aria-label="Kausi etenee">
                         <div class="division-card__progress-bar">
-                            <span class="division-card__progress-fill" :style="{ width: progressValue + '%' }"></span>
+                            <span class="division-card__progress-fill" :style="progressStyle"></span>
                         </div>
                         <span class="division-card__progress-value">{{ progressValue }} %</span>
                     </div>
@@ -159,4 +172,3 @@
         `
     };
 })();
-

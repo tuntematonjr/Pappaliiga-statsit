@@ -25,7 +25,7 @@ const API_BASE_URL = (() => {
 class ApiClient {
     // Return a proxied avatar URL for whitelisted hosts to avoid client-side opaque responses
     proxyAvatar(url) {
-        const DEFAULT_AVATAR = new URL('/static/pappaliiga-logo-white-bg.png', window.location.origin).href;
+        const DEFAULT_AVATAR = window.PAPPALIIGA_DEFAULT_LOGO;
         if (!url) {
             return DEFAULT_AVATAR;
         }

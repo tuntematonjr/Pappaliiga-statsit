@@ -25,7 +25,7 @@ window.LeadersPanel = {
                             <div class="stat-cards leader-mini-grid">
                                 <article v-for="(leader, j) in (cat.leaders || []).slice(0,6)" :key="leaderKey(leader, j)" class="card leader-mini" role="listitem" tabindex="0">
                                     <div class="leader-mini-left">
-                                        <img v-if="leader.logo" :src="avatarUrl(leader.logo)" class="leader-mini-logo" :alt="(leader.teamName || '') + ' logo'" loading="lazy" onerror="this.onerror=null;this.src='/web_static/img/team-placeholder.svg'" />
+                                        <img :src="avatarUrl(leader.logo)" class="leader-mini-logo" :alt="(leader.teamName || '') + ' logo'" loading="lazy" />
                                         <div class="leader-mini-meta">
                                             <div class="leader-mini-name">{{ leader.title || leader.playerName || 'Unknown' }}</div>
                                             <div class="leader-mini-sub muted">{{ leader.subtitle || leader.teamName || '' }}</div>
@@ -47,8 +47,14 @@ window.LeadersPanel = {
     },
     methods: {
         avatarUrl(src) {
-            if (!src) return '/web_static/img/team-placeholder.svg';
-            try { return (window.apiClient && window.apiClient.proxyAvatar) ? window.apiClient.proxyAvatar(src) : src; } catch (e) { return src; }
+            const fallback = window.PAPPALIIGA_DEFAULT_LOGO;
+            if (!src) return fallback;
+            try {
+                const proxied = (window.apiClient && window.apiClient.proxyAvatar) ? window.apiClient.proxyAvatar(src) : src;
+                return proxied || fallback;
+            } catch (e) {
+                return fallback;
+            }
         },
         leaderKey(leader, idx) {
             if (leader && leader.id) return leader.id;

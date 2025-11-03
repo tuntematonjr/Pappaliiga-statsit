@@ -157,20 +157,50 @@ window.HomeView = {
         return {
             seasonsStore,
             homeStore,
-            localSegment: 'active'
+            localSegment: 'active',
+            progressGlowMeta: {}
         };
     },
     computed: {
         heroTitle() {
-            return 'Pappaliiga Stats Hub';
+            return 'AFIn epävirallinen Pappaliiga Stats Hub';
         },
         heroSubtitle() {
-            return 'Uusimmat kausikatsaukset, joukkueiden kehitys ja pelaajatilastot yhdestä näkymästä.';
+            return 'AFI:n epävirallinen tilastokeskus – yhteenveto kaikista kausista, ajantasaiset divarit ja pelaajien kehityskäyrät.';
         },
-        heroEyebrow() {
-            return 'AFI · Faceit API data';
+        // heroEyebrow() {
+        //     return 'AFI · Faceit API DATA';
+        // },
+        partnerCallouts() {
+            return [
+                {
+                    id: 'armafi',
+                    eyebrow: 'Epävirallisen statsisivuston ylläpitäjä',
+                    name: 'Armafinland',
+                    description: 'Yhteisö on avoin kaikille pelaajille ja ryhmille, jotka haluavat kokeilla taktista pelaamista myös Arma-sarjan peleissä. Pelaamme Arma 3 ja Arma Reforger, sekä järjestämme kansainvälisiä TvT-tehtäviä, joissa painotetaan realismia, joukkuepeliä ja yhteistoimintaa. Pelien ulkopuolella meno on rentoa ja mutkatonta, mutta pelissä otetaan tehtävät tosissaan. ',
+                    primaryLabel: 'Liity AFI Discord',
+                    primaryHref: 'https://discord.gg/armafinland',
+                    secondaryLabel: 'Tutustu sivustoon',
+                    secondaryHref: 'https://armafinland.fi',
+                    logo: 'https://armafinland.fi/logot/images/armafin-logo-400px.png',
+                    glowColor: '#0e2250',
+                    glowSoft: 'rgba(26, 56, 130, 0.55)'
+                },
+                {
+                    id: 'pappaliiga',
+                    eyebrow: 'Liiga',
+                    name: 'Pappaliiga',
+                    description: 'Pappaliigan tarkoituksena on tarjota varttuneemmalle väelle mahdollisuus kilpapelaamiseen; tosissaan ja `ei niin tosissaan`. ',
+                    primaryLabel: 'Liity Pappaliiga Discord',
+                    primaryHref: 'https://discord.gg/pappaliiga',
+                    secondaryLabel: 'Lue lisää',
+                    secondaryHref: 'https://pappaliiga.fi',
+                    logo: 'https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png',
+                    glowColor: '#ff8a3d',
+                    glowSoft: 'rgba(255, 138, 61, 0.55)'
+                }
+            ];
         },
-
         summaryLoading() {
             return this.homeStore?.summaryLoading ?? false;
         },
@@ -248,7 +278,20 @@ window.HomeView = {
             return Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
         },
         progressMetrics() {
-            return buildProgressItems(this.seasonState.progress);
+            const meta = this.progressGlowMeta;
+            return buildProgressItems(this.seasonState.progress).map(item => {
+                if (!meta[item.key]) {
+                    meta[item.key] = {
+                        glowDelay: Number((Math.random() * 2.5).toFixed(2)),
+                        glowDuration: Number((5 + Math.random() * 3).toFixed(2))
+                    };
+                }
+                return {
+                    ...item,
+                    glowDelay: meta[item.key].glowDelay,
+                    glowDuration: meta[item.key].glowDuration
+                };
+            });
         },
         hasProgress() {
             return this.progressMetrics.length > 0;
@@ -276,6 +319,18 @@ window.HomeView = {
                 segments.push('Käynnissä');
             }
             return segments.join(' · ');
+        },
+        divisionCount() {
+            return this.seasonDivisions.length;
+        },
+        divisionProgressPercent() {
+            const percent = this.seasonState?.progress?.overall?.percent ?? 0;
+            return Number.isFinite(percent) ? percent : 0;
+        },
+        divisionHeaderMeta() {
+            if (!this.selectedSeason) return '';
+            const percent = this.divisionProgressPercent.toFixed(0);
+            return `${this.divisionCount} divisioonaa · ${percent}% pelattu`;
         }
     },
     async mounted() {
@@ -387,35 +442,72 @@ window.HomeView = {
                     <button class="btn-primary" type="button" @click="scrollToSeasons">Siirry kausiin</button>
                     <router-link to="/seasons" class="btn-link">Kaikki kaudet</router-link>
                 </template>
-                <template #meta>
-                    <loading-spinner
-                        v-if="summaryLoading"
-                        message="Kokonaisstatistiikkaa ladataan..."
-                    ></loading-spinner>
-                    <error-message
-                        v-else-if="summaryError"
-                        :message="summaryError"
-                        @retry="retrySummary"
-                    ></error-message>
-                    <stat-panel
-                        v-else
-                        :items="summaryMetrics"
-                        :columns="4"
-                        dense
-                    ></stat-panel>
-                </template>
             </hero-banner>
+            <section class="home-partners" aria-label="Kumppanikuvaukset">
+                <article
+                    v-for="callout in partnerCallouts"
+                    :key="callout.id"
+                    class="partner-callout"
+                    :style="{
+                        '--callout-accent': callout.glowColor,
+                        '--callout-glow': callout.glowSoft
+                    }"
+                >
+                    <div class="partner-callout__glow-bar" aria-hidden="true"></div>
+                    <header class="partner-callout__header">
+                        <img
+                            class="partner-callout__logo"
+                            :src="callout.logo"
+                            :alt="callout.name + ' logo'"
+                            loading="lazy"
+                        >
+                        <div class="partner-callout__titles">
+                            <span class="partner-callout__eyebrow">{{ callout.eyebrow }}</span>
+                            <h2>{{ callout.name }}</h2>
+                        </div>
+                    </header>
+                    <p class="partner-callout__body">{{ callout.description }}</p>
+                    <footer class="partner-callout__footer">
+                        <a :href="callout.primaryHref" class="btn-primary" target="_blank" rel="noopener">
+                            {{ callout.primaryLabel }}
+                        </a>
+                        <a :href="callout.secondaryHref" class="btn-link" target="_blank" rel="noopener">
+                            {{ callout.secondaryLabel }}
+                        </a>
+                    </footer>
+                </article>
+            </section>
 
-            <section class="home-section" ref="seasonPicker">
+            <section class="home-summary">
+                <header class="home-summary__header">
+                    <h2>Kaikki kaudet yhteensä</h2>
+                    <button type="button" class="btn-link" @click="retrySummary">Päivitä</button>
+                </header>
+                <loading-spinner
+                    v-if="summaryLoading"
+                    message="Kokonaisstatistiikkaa ladataan..."
+                ></loading-spinner>
+                <error-message
+                    v-else-if="summaryError"
+                    :message="summaryError"
+                    @retry="retrySummary"
+                ></error-message>
+                <stat-panel
+                    v-else
+                    :items="summaryMetrics"
+                    :columns="4"
+                ></stat-panel>
+            </section>
+
+            <section class="home-seasons" ref="seasonPicker">
                 <header class="section-heading">
                     <div>
-                        <h2>Kaudet</h2>
+                        <h2>Valitse kausi</h2>
                         <p class="section-subtitle">
                             Valitse käynnissä oleva kausi tai tutustu arkistoon.
                         </p>
                     </div>
                 </header>
-
                 <season-toggle
                     :active-seasons="activeSeasons"
                     :archived-seasons="archivedSeasons"
@@ -429,15 +521,14 @@ window.HomeView = {
                 ></season-toggle>
             </section>
 
-            <section class="home-section season-overview" v-if="selectedSeasonKey">
-                <header class="section-heading">
-                    <div>
-                        <p v-if="seasonSubtitle" class="section-eyebrow">{{ seasonSubtitle }}</p>
+            <section class="season-overview-panel glass-card" v-if="selectedSeasonKey">
+                <div class="season-overview__header">
+                    <div class="season-overview__titles">
+                        <span v-if="seasonSubtitle" class="section-eyebrow">{{ seasonSubtitle }}</span>
                         <h2>{{ seasonTitle }}</h2>
                     </div>
                     <router-link to="/seasons" class="btn-link">Kaikki kaudet</router-link>
-                </header>
-
+                </div>
                 <loading-spinner
                     v-if="seasonLoading"
                     message="Kausitietoja ladataan..."
@@ -449,18 +540,14 @@ window.HomeView = {
                     @retry="retrySeason"
                 ></error-message>
 
-                <div v-else class="season-overview__content">
+                <template v-else>
                     <stat-panel
+                        class="season-overview__metrics"
                         :items="seasonMetrics"
                         :columns="4"
                     ></stat-panel>
 
-                    <div
-                        v-if="hasProgress"
-                        class="season-progress"
-                        role="group"
-                        aria-label="Kausien eteneminen"
-                    >
+                    <div v-if="hasProgress" class="season-overview__progress" role="group" aria-label="Kausi etenee">
                         <div
                             v-for="item in progressMetrics"
                             :key="item.key"
@@ -472,20 +559,34 @@ window.HomeView = {
                                 <span class="progress-pill__value">{{ item.played }} / {{ item.total }}</span>
                             </div>
                             <div class="progress-pill__bar">
-                                <span class="progress-pill__fill" :style="{ width: item.percent + '%' }"></span>
+                                <span
+                                    class="progress-pill__fill"
+                                    :style="{
+                                        width: item.percent + '%',
+                                        '--glow-delay': item.glowDelay + 's',
+                                        '--glow-duration': item.glowDuration + 's'
+                                    }"
+                                ></span>
                             </div>
                             <span class="progress-pill__percent">{{ item.percent }} %</span>
                         </div>
                     </div>
+                </template>
+            </section>
 
-                    <division-card-list
-                        :divisions="seasonDivisions"
-                        :season-label="seasonTitle"
-                        empty-message="Tälle kaudelle ei löytynyt divisioonia."
-                    ></division-card-list>
-                </div>
+            <section class="divisions-section">
+                <header class="divisions-section__header">
+                    <div>
+                        <h2>Season {{ selectedSeason?.seasonNumber || seasonTitle }} Divisions</h2>
+                        <p class="divisions-section__meta">{{ divisionHeaderMeta }}</p>
+                    </div>
+                </header>
+                <division-card-list
+                    :divisions="seasonDivisions"
+                    :season-label="seasonTitle"
+                    empty-message="Tälle kaudelle ei löytynyt divisioonia."
+                ></division-card-list>
             </section>
         </div>
     `
 };
-

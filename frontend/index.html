@@ -17,38 +17,46 @@
 <body>
     <div id="app">
         <nav class="main-nav">
-            <div class="nav-container">
+            <div class="layout-boundary nav-container">
                 <div class="nav-brand">
-                    <div class="brand-logos">
-                        <img src="https://armafinland.fi/logot/images/armafin-logo-200px.png" alt="AFI" class="nav-logo">
-                        <img src="https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png" alt="Pappaliiga" class="nav-logo">
+                    <div class="brand-lockup">
+                        <img src="https://armafinland.fi/logot/images/armafin-logo-400px.png" alt="Armafinland logo" class="nav-logo nav-logo--afi">
+                        <span class="brand-divider" aria-hidden="true"></span>
+                        <img src="https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png" alt="Pappaliiga logo" class="nav-logo nav-logo--ppl">
                     </div>
-                    <div>
-                        <span class="nav-title">AFI - Unofficial Pappaliiga CS Stats</span>
+                    <div class="nav-copy">
+                        <span class="nav-title">AFI · Pappaliiga Stats Hub</span>
+                        <span class="nav-subtitle">Epävirallinen tilastokeskus Faceit-integraatiolla</span>
                     </div>
                 </div>
                 <div class="nav-links">
-                    <router-link to="/" class="nav-link">Home</router-link>
-                    <router-link to="/seasons" class="nav-link">Seasons</router-link>
+                    <router-link to="/" class="nav-link">Etusivu</router-link>
+                    <router-link to="/seasons" class="nav-link">Kaudet</router-link>
                 </div>
             </div>
         </nav>
-        
+
         <main class="main-content">
-            <router-view v-slot="{ Component }">
-                <transition name="fade" mode="out-in">
-                    <component :is="Component"></component>
-                </transition>
-            </router-view>
+            <div class="layout-boundary main-surface">
+                <router-view v-slot="{ Component }">
+                    <transition name="fade" mode="out-in">
+                        <component :is="Component"></component>
+                    </transition>
+                </router-view>
+            </div>
         </main>
 
         <footer class="main-footer">
-            <p>&copy; 2025 Pappaliiga Stats | Data from Faceit API</p>
+            <div class="layout-boundary footer-inner">
+                <p>&copy; 2025 Pappaliiga Stats · Data from Faceit API</p>
+            </div>
         </footer>
     </div>
 
     <!-- API Client -->
     <script src="/static/api-client.js"></script>
+    <!-- Shared constants -->
+    <script src="/static/constants.js"></script>
     <!-- Composables (must load before components that use them) -->
     <script src="/static/composables/useTableSort.js"></script>
     <script src="/static/composables/useProgressBars.js"></script>

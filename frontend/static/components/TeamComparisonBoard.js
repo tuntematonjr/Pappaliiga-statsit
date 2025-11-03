@@ -90,16 +90,17 @@ window.TeamComparisonBoard = {
     },
     methods: {
         avatarUrl(src) {
+            const fallback = window.PAPPALIIGA_DEFAULT_LOGO;
             if (!src) {
-                return '/static/pappaliiga-logo-white-bg.png';
+                return fallback;
             }
             try {
                 return window.apiClient && typeof window.apiClient.proxyAvatar === 'function'
                     ? window.apiClient.proxyAvatar(src)
-                    : src;
+                    : (src || fallback);
             } catch (err) {
                 console.warn('TeamComparisonBoard avatar fallback failed', err);
-                return src;
+                return src || fallback;
             }
         },
         parseNumber(value, fallback = 0) {
@@ -178,4 +179,3 @@ window.TeamComparisonBoard = {
         </section>
     `
 };
-

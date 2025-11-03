@@ -20,6 +20,8 @@ const DIVISION_MAP_COLUMNS = [
     { key: 'pistol_kills', label: 'Pistoolitap.', sortable: true, numeric: true }
 ];
 
+const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
+
 function pickValue(obj, keys) {
     if (!obj) return undefined;
     const paths = Array.isArray(keys) ? keys : [keys];
@@ -302,11 +304,12 @@ window.DivisionView = {
         highlightAvatar(highlight) {
             if (!highlight?.team) return null;
             const src = highlight.team.logo || highlight.team.avatar || highlight.team.raw?.avatar;
-            if (!src) return null;
+            if (!src) return DEFAULT_TEAM_LOGO;
             try {
-                return window.apiClient.proxyAvatar(src);
+                const resolved = window.apiClient.proxyAvatar(src);
+                return resolved || DEFAULT_TEAM_LOGO;
             } catch (error) {
-                return src;
+                return src || DEFAULT_TEAM_LOGO;
             }
         },
         retryHighlights() {

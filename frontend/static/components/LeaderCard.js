@@ -1,5 +1,5 @@
 // LeaderCard - renders a single leader category with up to 4 entries
-const LEADER_CARD_DEFAULT_AVATAR = '/static/pappaliiga-logo-white-bg.png';
+const LEADER_CARD_DEFAULT_AVATAR = window.PAPPALIIGA_DEFAULT_LOGO;
 
 window.LeaderCard = {
     name: 'LeaderCard',
@@ -24,11 +24,11 @@ window.LeaderCard = {
             if (!src) return LEADER_CARD_DEFAULT_AVATAR;
             try {
                 return window.apiClient && typeof window.apiClient.proxyAvatar === 'function'
-                    ? window.apiClient.proxyAvatar(src)
-                    : src;
+                    ? window.apiClient.proxyAvatar(src) || LEADER_CARD_DEFAULT_AVATAR
+                    : (src || LEADER_CARD_DEFAULT_AVATAR);
             } catch (err) {
                 console.warn('LeaderCard avatar fallback failed', err);
-                return src || LEADER_CARD_DEFAULT_AVATAR;
+                return LEADER_CARD_DEFAULT_AVATAR;
             }
         },
         formatValue(value) {

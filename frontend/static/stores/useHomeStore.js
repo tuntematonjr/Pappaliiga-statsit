@@ -92,12 +92,15 @@
         return progress;
     }
 
+    const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
+
     function ensureAvatar(url) {
-        if (!url) return null;
+        if (!url) return DEFAULT_TEAM_LOGO;
         try {
-            return window.apiClient.proxyAvatar(url);
+            const resolved = window.apiClient.proxyAvatar(url);
+            return resolved || DEFAULT_TEAM_LOGO;
         } catch (error) {
-            return url;
+            return DEFAULT_TEAM_LOGO;
         }
     }
 
@@ -347,4 +350,3 @@
         }
     });
 })();
-

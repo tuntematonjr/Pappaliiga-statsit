@@ -18,7 +18,7 @@ window.LeadersGrid = {
                         </header>
                         <div class="leader-info">
                             <div class="leader-player-row">
-                                <img v-if="leader.teamLogo" class="leader-team-logo" :src="avatarUrl(leader.teamLogo)" :alt="(leader.teamName || 'team') + ' logo'" loading="lazy" onerror="this.onerror=null;this.src='/web_static/img/team-placeholder.svg'">
+                                <img class="leader-team-logo" :src="avatarUrl(leader.teamLogo)" :alt="(leader.teamName || 'team') + ' logo'" loading="lazy">
                                 <div class="leader-player">{{ leader.playerName || 'Unknown player' }}</div>
                             </div>
                             <div class="leader-team">{{ leader.teamName || '' }}</div>
@@ -31,8 +31,16 @@ window.LeadersGrid = {
     `,
     methods: {
         avatarUrl(src) {
-            if (!src) return '/web_static/img/team-placeholder.svg';
-            try { return window.apiClient && window.apiClient.proxyAvatar ? window.apiClient.proxyAvatar(src) : src; } catch (e) { return src; }
+            const fallback = window.PAPPALIIGA_DEFAULT_LOGO;
+            if (!src) return fallback;
+            try {
+                const proxied = window.apiClient && window.apiClient.proxyAvatar
+                    ? window.apiClient.proxyAvatar(src)
+                    : src;
+                return proxied || fallback;
+            } catch (e) {
+                return fallback;
+            }
         },
         leaderKey(leader, idx) {
             // Prefer stable id, fallback to a composite key, then index

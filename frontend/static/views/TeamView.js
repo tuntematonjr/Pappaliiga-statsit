@@ -1,3 +1,5 @@
+const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
+
 window.TeamView = {
     name: 'TeamView',
     components: {
@@ -41,11 +43,12 @@ window.TeamView = {
         },
         crestUrl() {
             const src = this.profile?.avatar || this.profile?.logo || this.profile?.team_logo;
-            if (!src) return null;
+            if (!src) return DEFAULT_TEAM_LOGO;
             try {
-                return window.apiClient.proxyAvatar(src);
+                const resolved = window.apiClient.proxyAvatar(src);
+                return resolved || DEFAULT_TEAM_LOGO;
             } catch (error) {
-                return src;
+                return src || DEFAULT_TEAM_LOGO;
             }
         },
         faceitLink() {
@@ -143,9 +146,8 @@ window.TeamView = {
                 </nav>
                 <div class="team-header__content">
                     <div class="team-header__identity">
-                        <div class="team-header__crest" aria-hidden="crestUrl ? 'false' : 'true'">
-                            <img v-if="crestUrl" :src="crestUrl" :alt="teamName" loading="lazy" />
-                            <span v-else>{{ teamName.charAt(0).toUpperCase() }}</span>
+                        <div class="team-header__crest">
+                            <img :src="crestUrl" :alt="teamName" loading="lazy" />
                         </div>
                         <div class="team-header__meta">
                             <h1>{{ teamName }}</h1>

@@ -34,6 +34,12 @@ window.ProgressBar = {
             default: false
         }
     },
+    data() {
+        return {
+            glowDelay: Number((Math.random() * 2.5).toFixed(2)),
+            glowDuration: Number((5 + Math.random() * 3).toFixed(2))
+        };
+    },
     computed: {
         percentage() {
             return Math.min(100, Math.max(0, (this.value / this.max) * 100));
@@ -41,7 +47,9 @@ window.ProgressBar = {
         barStyle() {
             return {
                 width: `${this.percentage}%`,
-                height: this.height
+                height: this.height,
+                '--glow-delay': `${this.glowDelay}s`,
+                '--glow-duration': `${this.glowDuration}s`
             };
         },
         barClass() {
