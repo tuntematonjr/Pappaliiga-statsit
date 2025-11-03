@@ -30,10 +30,16 @@ function buildKpis(season) {
     const rating = toNumber(season.rating ?? season.rating_2 ?? season.hltv_rating);
     const adr = toNumber(season.adr ?? season.average_damage);
     const kd = toNumber(season.kd ?? season.kd_ratio);
-    const entry = toNumber(season.entry_success ?? season.entry_percent ?? season.entry_rate)
-        || toNumber(season.opening_duels_won) / Math.max(1, toNumber(season.opening_duels_played)) * 100;
+    const entrySource = season.entry_success ?? season.entry_percent ?? season.entry_rate;
+    let entry = toNumber(entrySource ?? 0);
+    if (!entry) {
+        const wins = toNumber(season.opening_duels_won ?? 0);
+        const played = Math.max(1, toNumber(season.opening_duels_played ?? 0));
+        entry = (wins / played) * 100;
+    }
     const clutch = toNumber(season.clutch_percent ?? season.clutch_rate ?? season.clutch_success ?? 0);
-    const util = toNumber(season.utility_per_round ?? season.utility || 0);
+    const utilSource = season.utility_per_round ?? season.utility;
+    const util = toNumber(utilSource ?? 0);
 
     const base = { rating, adr, kd, entry, clutch, util };
     return PLAYER_KPI_SCHEMA.map(def => ({
@@ -406,4 +412,3 @@ window.PlayerView = {
         </div>
     `
 };
-

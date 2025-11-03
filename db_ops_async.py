@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import time
 
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
 
 import asyncmy
-from asyncmy import cursors
+from asyncmy import cursors, errors as asyncmy_errors
 
 DEFAULT_TEAM_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
 
@@ -388,7 +389,16 @@ async def replace_map_votes_async(
     votes: Iterable[Row],
 ) -> None:
     async with conn.cursor() as cur:
-        await cur.execute("DELETE FROM map_votes WHERE match_id = %s", (match_id,))
+        for attempt in range(3):
+            try:
+                await cur.execute("DELETE FROM map_votes WHERE match_id = %s", (match_id,))
+            except asyncmy_errors.OperationalError as exc:
+                if exc.args and exc.args[0] == 1020 and attempt < 2:
+                    await asyncio.sleep(0.05)
+                    continue
+                raise
+            else:
+                break
         rows = [
             {
                 "match_id": match_id,
@@ -978,7 +988,7 @@ async def upsert_player_season_totals_async(
               %s, %s, %s, %s,
               %s, %s, %s, %s,
               %s, %s, %s, %s,
-              %s, %s
+              %s, %s, %s
             )
             ON DUPLICATE KEY UPDATE
               team_id = VALUES(team_id),
@@ -1205,7 +1215,7 @@ async def upsert_player_map_season_totals_async(
               COALESCE(
                 NULLIF(TRIM(mp.map_name), ''),
                 CONCAT('map_', COALESCE(mp.map_id, ps.map_id, ps.round_index))
-              ) AS map_name,
+              ) AS normalized_map_name,
               MAX(ps.team_id) AS team_id,
               SUM(CASE WHEN ps.is_forfeit_map = 0 THEN 1 ELSE 0 END) AS maps_played,
               SUM(
@@ -1237,7 +1247,10 @@ async def upsert_player_map_season_totals_async(
               SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
               SUM(ps.mvps) AS mvps,
               SUM(ps.damage) AS damage,
-              SUM(ps.hs_pct * ps.kills) AS hs_weight
+              SUM(ps.hs_pct * ps.kills) AS hs_weight,
+              SUM(
+                (COALESCE(mp.score_team1, 0) + COALESCE(mp.score_team2, 0)) * COALESCE(ps.kr, 0)
+              ) AS kr_weight
             FROM player_stats ps
             JOIN matches mt ON mt.match_id = ps.match_id
             LEFT JOIN maps mp
@@ -1247,14 +1260,14 @@ async def upsert_player_map_season_totals_async(
               AND ps.division_num = %s
               AND ps.player_id = %s
               AND mt.ignored_due_ban = 0
-            GROUP BY map_name
+            GROUP BY normalized_map_name
             """,
             (season, division_num, player_id),
         )
         aggregates = await cur.fetchall()
 
         for row in aggregates:
-            map_name = row["map_name"] or "unknown"
+            map_name = row.get("normalized_map_name") or "unknown"
             team_id = row["team_id"]
             maps_played = row["maps_played"] or 0
             rounds_played = row["rounds_played"] or 0
@@ -1280,8 +1293,8 @@ async def upsert_player_map_season_totals_async(
             cl_1v2_wins = row["cl_1v2_wins"] or 0
             mvps = row["mvps"] or 0
             damage = row["damage"] or 0
-            hs_weight = row["hs_weight"] or 0.0
-            kr_weight = row["kr_weight"] or 0.0
+            hs_weight = row.get("hs_weight") or 0.0
+            kr_weight = row.get("kr_weight") or 0.0
 
             kd = float(kills) / float(deaths) if deaths else float(kills)
             adr = float(damage) / float(rounds_played) if rounds_played else 0.0
@@ -1334,7 +1347,7 @@ async def upsert_player_map_season_totals_async(
                   %s, %s, %s, %s,
                   %s, %s, %s, %s,
                   %s, %s, %s, %s,
-                  %s, %s, %s, %s, %s
+                  %s, %s, %s, %s, %s, %s
                 )
                 ON DUPLICATE KEY UPDATE
                   team_id = VALUES(team_id),

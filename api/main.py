@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from db_async import close_pool, get_pool
 
+from api.services import stats_service
 from .routers import championships, divisions, matches, players, stats, teams
 from .routers import maps_catalog, image_proxy
 from api.exceptions import BadRequestError, NotFoundError
@@ -86,6 +87,13 @@ app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 @app.get('/api/seasons/{season}/stats')
 async def seasons_stats_compat(season: int):
     return await stats.get_season_stats(season)
+
+
+@app.get("/api/home")
+async def home_overview():
+    """Legacy home endpoint returning aggregate stats."""
+    overview = await stats_service.get_overview_stats()
+    return {"aggregates": overview}
 
 
 

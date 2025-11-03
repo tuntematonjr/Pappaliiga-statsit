@@ -36,6 +36,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--season", type=int, default=None, help="Sync only the provided season number (overrides --all-seasons)")
     parser.add_argument("--verify", action="store_true", help="Run post-sync verification queries")
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
+    parser.add_argument("--end-on-error", action="store_true", help="Stop immediately if a division sync fails")
     parser.add_argument(
         "--max-concurrency",
         type=int,
@@ -112,6 +113,18 @@ async def main_async(args: argparse.Namespace) -> int:
         LOGGER.error("--force-reset must be used together with --reset-db")
         return 2
 
+    if args.reset_db:
+        if not args.force_reset:
+            LOGGER.error("--reset-db requires --force-reset to avoid accidental data loss")
+            return 2
+        await reset_db_async(confirm=True)
+        await create_schema_async(force=True)
+        # Do not proceed to syncing when performing a reset. Optionally run verify, then exit.
+        if args.verify:
+            await _verify_counts()
+        await shutdown_clients()
+        return 0
+
     await reset_rate_limit_stats()
 
     if args.create_schema:
@@ -119,20 +132,9 @@ async def main_async(args: argparse.Namespace) -> int:
     else:
         await create_schema_async(force=False)
 
-    if args.reset_db:
-        if not args.force_reset:
-            LOGGER.error("--reset-db requires --force-reset to avoid accidental data loss")
-            return 2
-        await reset_db_async(confirm=True)
-        await create_schema_async(force=False)
-        # Do not proceed to syncing when performing a reset. Optionally run verify, then exit.
-        if args.verify:
-            await _verify_counts()
-        await shutdown_clients()
-        return 0
-
     overrides = load_division_overrides()
     max_concurrency = max(1, args.max_concurrency)
+    end_on_error = bool(getattr(args, "end_on_error", False))
 
     if args.match_id:
         LOGGER.info("Refreshing single match %s", args.match_id)
@@ -203,19 +205,20 @@ async def main_async(args: argparse.Namespace) -> int:
                 LOGGER.exception("Unexpected error while upserting championships - continuing with sync")
 
         # Process each season
+        abort_exc: Exception | None = None
+
         for season in sorted(championships_by_season.keys()):
             season_start_time = time.perf_counter()
             season_synced_matches = 0
             season_skipped_matches = 0
             season_championships = championships_by_season[season]
-            
+
             LOGGER.info("=== SEASON %d SYNC START ===", season)
             LOGGER.info("Processing %d divisions for Season %d", len(season_championships), season)
-            
+
             sem = asyncio.Semaphore(max_concurrency)
-            async def sync_division(
-                entry: dict[str, Any],
-            ) -> ChampionshipSyncResult | None:
+
+            async def sync_division(entry: dict[str, Any]) -> ChampionshipSyncResult | None:
                 async with sem:
                     championship_id = entry["championship_id"]
                     division = entry["division"]
@@ -227,6 +230,7 @@ async def main_async(args: argparse.Namespace) -> int:
                             full=args.full,
                             overrides=overrides,
                             division=division,
+                            end_on_error=end_on_error,
                         )
                         LOGGER.info(
                             "Synced %s matches for %s (skipped %s)",
@@ -237,11 +241,23 @@ async def main_async(args: argparse.Namespace) -> int:
                         return result
                     except Exception as exc:
                         LOGGER.exception("Championship sync failed for %s: %s", championship_id, exc)
+                        if end_on_error:
+                            raise
                         return None
 
-            season_results = await asyncio.gather(
-                *(sync_division(entry) for entry in season_championships)
-            )
+            try:
+                season_results = await asyncio.gather(
+                    *(sync_division(entry) for entry in season_championships)
+                )
+            except Exception as exc:
+                if end_on_error:
+                    abort_exc = exc
+                    LOGGER.error(
+                        "Aborting remaining syncs because --end-on-error was supplied (season %s)",
+                        season,
+                    )
+                    break
+                raise
 
             processed_championships = 0
             for result in season_results:
@@ -252,7 +268,7 @@ async def main_async(args: argparse.Namespace) -> int:
                 season_skipped_matches += result.skipped_matches
                 total_synced_matches += len(result.synced_match_ids)
                 total_skipped_matches += result.skipped_matches
-            
+
             season_elapsed = time.perf_counter() - season_start_time
             LOGGER.info("=== SEASON %d SYNC COMPLETED ===", season)
             LOGGER.info(
@@ -271,7 +287,10 @@ async def main_async(args: argparse.Namespace) -> int:
                     format_hms(season_elapsed / max(season_synced_matches or 1, 1)),
                 )
             LOGGER.info("")
-        
+
+            if abort_exc:
+                break
+
         total_elapsed = time.perf_counter() - total_start_time
         if len(targets) > 1:
             LOGGER.info("=== FULL SYNC COMPLETED ===")
@@ -319,10 +338,12 @@ async def main_async(args: argparse.Namespace) -> int:
             format_hms(hourly_wait),
         )
 
-    if args.verify:
+    if args.verify and not abort_exc:
         await _verify_counts()
 
     await shutdown_clients()
+    if abort_exc:
+        return 1
     return 0
 
 

@@ -829,6 +829,7 @@ async def sync_championship_async(
     full: bool = False,
     force_matches: bool = False,
     overrides: Mapping[str, dict[str, List[dict[str, str]]]] | None = None,
+    end_on_error: bool = False,
 ) -> ChampionshipSyncResult:
     start_time = time.perf_counter()
     force_all_matches = full or force_matches
@@ -964,6 +965,8 @@ async def sync_championship_async(
             synced.append(match_id)
         except Exception as exc:  # pragma: no cover - logged for visibility
             LOGGER.exception("Failed to sync match %s: %s", match_id, exc)
+            if end_on_error:
+                raise
     
     process_elapsed = time.perf_counter() - process_start_time
     total_elapsed = time.perf_counter() - start_time
