@@ -110,15 +110,6 @@ window.SeasonToggle = {
                         Arkisto
                     </button>
                 </div>
-                <button
-                    type="button"
-                    class="season-toggle__refresh"
-                    @click="handleRetry"
-                    :disabled="loading"
-                    aria-label="Päivitä kausilista"
-                >
-                    Päivitä
-                </button>
             </div>
 
             <loading-spinner
@@ -157,4 +148,3 @@ window.SeasonToggle = {
         </div>
     `
 };
-

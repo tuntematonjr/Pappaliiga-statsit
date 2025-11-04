@@ -155,13 +155,13 @@ a {
     font-weight: 700;
     cursor: pointer;
     box-shadow: 0 12px 24px rgba(59, 125, 255, 0.32);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
 }
 
 .btn-primary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 16px 32px rgba(59, 125, 255, 0.35);
-    filter: brightness(1.05);
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 18px 34px rgba(59, 125, 255, 0.45), 0 0 18px rgba(91, 148, 255, 0.35);
+    filter: brightness(1.08);
 }
 
 .btn-primary:focus-visible {
@@ -177,12 +177,13 @@ a {
     font-weight: 600;
     text-decoration: none;
     padding: 0.5rem 0;
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .btn-link:hover,
 .btn-link:focus-visible {
     color: #b1e5ff;
+    transform: translateY(-1px);
 }
 
 /* ---- Glass surfaces ---- */
@@ -196,7 +197,7 @@ a {
     padding: 1.75rem;
     position: relative;
     overflow: hidden;
-    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .glass-card::after {
@@ -215,7 +216,7 @@ a {
 
 .glass-card:hover {
     border-color: rgba(120, 160, 255, 0.35);
-    box-shadow: 0 24px 36px rgba(5, 9, 25, 0.4);
+    box-shadow: 0 28px 42px rgba(5, 9, 25, 0.45), 0 0 22px rgba(90, 150, 255, 0.28);
 }
 
 /* ---- Layout ---- */
@@ -260,6 +261,160 @@ a {
     gap: clamp(1.5rem, 3vw, 2.5rem);
 }
 
+@property --glow-scale {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 1;
+}
+
+@property --pulse-scale-min {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0.97;
+}
+
+@property --pulse-scale-max {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 1.03;
+}
+
+@property --pulse-opacity-min {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0.35;
+}
+
+@property --pulse-opacity-max {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 0.62;
+}
+
+@property --glow-blur {
+    syntax: '<length>';
+    inherits: true;
+    initial-value: 40px;
+}
+
+@property --glow-brightness {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 1;
+}
+
+.logo-wrap {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    isolation: isolate;
+    --logo-width: 240px;
+    --glow-multiplier: 1.45;
+    --glow-base-size: clamp(calc(var(--logo-width, 240px) * 1.05), calc(var(--logo-width, 240px) * var(--glow-multiplier, 1.45)), 60vw);
+}
+
+.logo-card {
+    --glow-scale: 1;
+    --glow-blur: 40px;
+    --glow-brightness: 1;
+    --pulse-scale-min: 0.97;
+    --pulse-scale-max: 1.03;
+    --pulse-opacity-min: 0.35;
+    --pulse-opacity-max: 0.62;
+    --pulse-duration: var(--idle-duration, 9s);
+}
+
+.logo-card::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--glow-base-size);
+    height: var(--glow-base-size);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 50%;
+    filter: blur(var(--glow-blur, 40px)) brightness(var(--glow-brightness, 1));
+    opacity: var(--pulse-opacity-max, 0.62);
+    animation: glowPulse var(--pulse-duration, 9s) ease-in-out infinite;
+    animation-delay: var(--pulse-delay, 0s);
+    transform: translate(-50%, -50%) scale(calc(var(--glow-scale, 1) * var(--scale-jitter, 1)));
+    transition:
+        --glow-scale 1680ms cubic-bezier(0.25, 1, 0.3, 1),
+        --pulse-scale-min 1260ms ease,
+        --pulse-scale-max 1260ms ease,
+        --pulse-opacity-min 960ms ease,
+        --pulse-opacity-max 960ms ease,
+        --glow-blur 1080ms ease,
+        --glow-brightness 1080ms ease,
+        opacity 960ms ease;
+}
+
+.logo-card:is(:hover, :focus-within),
+.partner-callout:is(:hover, :focus-within) .logo-card,
+.brand-lockup:is(:hover, :focus-within) .logo-card {
+    --glow-scale: 1.35;
+    --pulse-scale-min: 0.92;
+    --pulse-scale-max: 1.08;
+    --pulse-opacity-min: 0.68;
+    --pulse-opacity-max: 1;
+    --pulse-duration: var(--hover-duration, 6.5s);
+    --glow-blur: 48px;
+    --glow-brightness: 1.05;
+}
+
+.logo-card--armafinland::before {
+    background: radial-gradient(circle, rgba(58, 140, 255, 0.92) 0%, rgba(58, 140, 255, 0.7) 38%, rgba(58, 140, 255, 0.42) 62%, rgba(58, 140, 255, 0) 100%);
+}
+
+.logo-card--pappaliiga::before {
+    background: radial-gradient(circle, rgba(255, 155, 64, 0.96) 0%, rgba(255, 155, 64, 0.68) 40%, rgba(255, 155, 64, 0.35) 66%, rgba(255, 155, 64, 0) 100%);
+}
+
+.logo-wrap img {
+    position: relative;
+    z-index: 1;
+    display: block;
+    pointer-events: none;
+}
+
+@media (max-width: 1024px) {
+    .logo-wrap {
+        --glow-multiplier: 1.3;
+    }
+}
+
+@media (max-width: 640px) {
+    .logo-wrap {
+        --glow-multiplier: 1.15;
+    }
+}
+
+@keyframes glowPulse {
+    0%,
+    100% {
+        transform: translate(-50%, -50%) scale(calc(var(--glow-scale, 1) * var(--scale-jitter, 1) * var(--pulse-scale-min, 0.97)));
+        opacity: var(--pulse-opacity-min, 0.35);
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(calc(var(--glow-scale, 1) * var(--scale-jitter, 1) * var(--pulse-scale-max, 1.03)));
+        opacity: var(--pulse-opacity-max, 0.62);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .logo-card::before {
+        animation: none;
+        transform: translate(-50%, -50%) scale(calc(var(--glow-scale, 1) * var(--scale-jitter, 1)));
+    }
+
+    .logo-card:is(:hover, :focus-within)::before,
+    .partner-callout:is(:hover, :focus-within) .logo-card::before,
+    .brand-lockup:is(:hover, :focus-within) .logo-card::before {
+        animation: none;
+    }
+}
+
 .partner-callout {
     position: relative;
     display: flex;
@@ -270,54 +425,43 @@ a {
     background: linear-gradient(160deg, rgba(16, 25, 52, 0.92), rgba(10, 17, 38, 0.88));
     border: 1px solid rgba(102, 142, 228, 0.28);
     box-shadow: 0 26px 48px rgba(5, 9, 20, 0.55);
-    overflow: hidden;
-}
-
-.partner-callout::before {
-    content: '';
-    position: absolute;
-    inset: -60% -15% 45% -25%;
-    background: radial-gradient(90% 90% at 15% 20%, rgba(120, 160, 255, 0.28), transparent 65%);
-    opacity: 0.8;
-    pointer-events: none;
-    mix-blend-mode: lighten;
-}
-
-.partner-callout__glow-bar {
-    position: absolute;
-    left: clamp(1.2rem, 3vw, 1.8rem);
-    right: clamp(1.2rem, 3vw, 1.8rem);
-    top: clamp(0.75rem, 2vw, 1.1rem);
-    height: 6px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, transparent 0%, var(--callout-accent, rgba(120, 160, 255, 0.85)) 45%, rgba(255, 255, 255, 0.95) 50%, var(--callout-accent, rgba(120, 160, 255, 0.85)) 55%, transparent 100%);
-    box-shadow: 0 0 28px var(--callout-glow, rgba(120, 160, 255, 0.55));
-    pointer-events: none;
+    align-items: center;
+    text-align: center;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .partner-callout__header {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: clamp(1rem, 2.4vw, 1.75rem);
+    gap: clamp(1rem, 2.4vw, 1.2rem);
     position: relative;
     z-index: 1;
 }
 
-.partner-callout__logo {
-    width: clamp(72px, 14vw, 96px);
+.partner-callout__logo-wrap {
+    width: clamp(144px, 24vw, 192px);
     aspect-ratio: 1;
+    border-radius: 50%;
+    padding: clamp(0.4rem, 2vw, 0.6rem);
+    background: rgba(12, 18, 36, 0.68);
+}
+
+.partner-callout__logo {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
     object-fit: contain;
-    background: radial-gradient(120% 120% at 50% 45%, rgba(255, 255, 255, 0.12), transparent 70%);
-    border-radius: 22px;
-    padding: clamp(0.65rem, 2vw, 0.9rem);
-    border: 1px solid rgba(140, 178, 255, 0.35);
-    box-shadow: 0 18px 32px rgba(12, 20, 45, 0.55);
+    border-radius: 50%;
+    border: none;
+    box-shadow: none;
 }
 
 .partner-callout__titles {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
+    text-align: center;
 }
 
 .partner-callout__eyebrow {
@@ -340,14 +484,18 @@ a {
     color: rgba(205, 220, 255, 0.85);
     font-size: clamp(0.97rem, 1.6vw, 1.05rem);
     line-height: 1.65;
+    text-align: center;
 }
 
 .partner-callout__footer {
-    display: inline-flex;
+    display: flex;
     flex-wrap: wrap;
     gap: 0.9rem;
     position: relative;
     z-index: 1;
+    justify-content: center;
+    margin-top: auto;
+    width: 100%;
 }
 
 .season-overview-panel {
@@ -443,7 +591,10 @@ a {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    max-width: 720px;
+    max-width: min(90vw, 960px);
+    text-align: center;
+    align-items: center;
+    margin: 0 auto;
 }
 
 .hero-banner__eyebrow {
@@ -465,13 +616,15 @@ a {
 .hero-banner__subtitle {
     font-size: clamp(1.05rem, 2.2vw, 1.35rem);
     color: rgba(207, 219, 255, 0.88);
-    max-width: 560px;
+    max-width: min(90vw, 760px);
+    margin: 0 auto;
 }
 
 .hero-banner__actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem 1rem;
+    justify-content: center;
 }
 
 .hero-banner__meta {
@@ -576,22 +729,6 @@ a {
 .season-toggle__tab:focus-visible {
     outline: 2px solid rgba(130, 180, 255, 0.65);
     outline-offset: 2px;
-}
-
-.season-toggle__refresh {
-    background: rgba(98, 140, 255, 0.15);
-    border: 1px solid rgba(116, 156, 255, 0.35);
-    border-radius: 999px;
-    color: rgba(199, 214, 255, 0.86);
-    font-weight: 600;
-    padding: 0.45rem 1.2rem;
-    cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
-}
-
-.season-toggle__refresh:disabled {
-    cursor: progress;
-    opacity: 0.7;
 }
 
 .season-toggle__list {
@@ -751,79 +888,310 @@ a {
 }
 
 /* ---- Division Cards ---- */
+.division-card-list-wrapper {
+    margin-top: 1.75rem;
+}
+
 .division-card-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: clamp(1.25rem, 2vw, 1.75rem);
 }
 
 .division-card-list__empty {
     color: rgba(200, 212, 250, 0.72);
     font-size: 1rem;
     text-align: center;
-    padding: 2rem;
+    padding: 2.5rem 1.5rem;
+    background: rgba(12, 18, 34, 0.55);
+    border: 1px solid rgba(66, 92, 158, 0.35);
+    border-radius: var(--radius);
 }
 
 .division-card {
+    position: relative;
+    display: block;
+    min-height: 320px;
+    border-radius: var(--radius);
+    background: linear-gradient(160deg, rgba(16, 24, 48, 0.98), rgba(10, 15, 30, 0.94));
+    border: 1px solid rgba(82, 132, 255, 0.22);
+    box-shadow: 0 22px 44px rgba(5, 9, 18, 0.35);
+    color: inherit;
+    text-decoration: none;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    overflow: hidden;
+}
+
+.division-card:focus-visible {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 4px;
+}
+
+.division-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 28px 52px rgba(5, 9, 18, 0.48);
+    border-color: rgba(114, 162, 255, 0.45);
+}
+
+.division-card--status-ended:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 20px 38px rgba(5, 9, 18, 0.38);
+}
+
+.division-card--status-running {
+    background: linear-gradient(160deg, rgba(16, 28, 58, 0.98), rgba(8, 18, 40, 0.94));
+}
+
+.division-card--status-ended {
+    background: linear-gradient(160deg, rgba(14, 22, 40, 0.95), rgba(9, 14, 28, 0.93));
+    border-color: rgba(90, 118, 170, 0.28);
+    box-shadow: 0 18px 34px rgba(5, 9, 18, 0.3);
+}
+
+.division-card--muted {
+    border-color: rgba(74, 108, 170, 0.22);
+    box-shadow: 0 18px 36px rgba(5, 9, 18, 0.32);
+}
+
+.division-card--muted:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 22px 42px rgba(5, 9, 18, 0.4);
+}
+
+.division-card::after {
+    content: '';
+    position: absolute;
+    top: 0.85rem;
+    left: 1.5rem;
+    right: 1.5rem;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(82, 148, 255, 0.9), rgba(61, 198, 255, 0.8));
+    opacity: 0.85;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+}
+
+.division-card--kind-masters::after {
+    background: linear-gradient(135deg, rgba(255, 214, 153, 0.85), rgba(255, 236, 189, 0.85));
+}
+
+.division-card--kind-playoffs::after {
+    background: linear-gradient(135deg, rgba(255, 174, 120, 0.85), rgba(255, 134, 88, 0.85));
+}
+
+.division-card--status-upcoming::after {
+    opacity: 0.45;
+}
+
+.division-card--status-ended::after {
+    opacity: 0.6;
+    filter: saturate(0.78);
+}
+
+.division-card__ribbon {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 0.35rem 1.65rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: right;
+    color: rgba(255, 230, 180, 0.78);
+    background: linear-gradient(135deg, rgba(255, 193, 110, 0.12), rgba(255, 231, 178, 0.08));
+    border-bottom: 1px solid rgba(255, 214, 143, 0.18);
+}
+
+.division-card__inner {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-    min-height: 260px;
+    gap: 1.4rem;
+    padding: 1.7rem 1.8rem 1.85rem;
+    min-height: 100%;
 }
 
-.division-card__header {
+.division-card__top {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
+    align-items: center;
+    gap: 1.1rem;
 }
 
-.division-card__eyebrow {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: rgba(160, 210, 255, 0.75);
-    font-weight: 600;
+.division-card__badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(74, 118, 202, 0.4), rgba(120, 170, 255, 0.45));
+    border: 1px solid rgba(118, 168, 255, 0.4);
+    color: rgba(237, 244, 255, 0.88);
+    flex-shrink: 0;
 }
 
-.division-card__title {
-    font-size: 1.3rem;
+.badge-masters {
+    background: linear-gradient(135deg, rgba(255, 224, 150, 0.75), rgba(255, 236, 189, 0.9));
+    border-color: rgba(255, 239, 194, 0.8);
+    color: rgba(75, 50, 0, 0.85);
+}
+
+.badge-playoffs {
+    background: linear-gradient(135deg, rgba(255, 167, 120, 0.7), rgba(255, 201, 148, 0.85));
+    border-color: rgba(255, 185, 132, 0.75);
+    color: rgba(58, 30, 0, 0.85);
+}
+
+.division-card__badge svg {
+    width: 26px;
+    height: 26px;
+    fill: currentColor;
+}
+
+.division-card__titles {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.division-card__name {
+    font-size: 1.35rem;
     font-weight: 700;
     color: #ffffff;
-}
-
-.division-card__subtitle {
-    color: rgba(205, 218, 255, 0.75);
-    font-size: 0.95rem;
-}
-
-.division-card__meta {
-    font-size: 0.85rem;
-    color: rgba(200, 210, 240, 0.7);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.division-card__body {
-    display: grid;
-    gap: 0.75rem;
+.division-card__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.28rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: rgba(86, 120, 190, 0.2);
+    color: rgba(186, 204, 240, 0.85);
+}
+
+.chip-upcoming {
+    background: rgba(132, 150, 205, 0.18);
+    color: rgba(196, 210, 240, 0.88);
+}
+
+.chip-running {
+    background: rgba(76, 192, 255, 0.23);
+    color: rgba(152, 228, 255, 0.95);
+}
+
+.chip-ended {
+    background: rgba(132, 150, 189, 0.16);
+    color: rgba(194, 205, 230, 0.85);
+}
+
+.chip__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff6955;
+    box-shadow: 0 0 12px rgba(255, 105, 85, 0.6);
+    animation: chip-dot-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes chip-dot-pulse {
+    0%, 100% {
+        transform: scale(0.85);
+        opacity: 0.8;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+}
+
+.division-card__stats {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
 }
 
 .division-card__stat {
     display: flex;
-    justify-content: space-between;
-    font-size: 0.95rem;
-    color: rgba(210, 220, 255, 0.9);
+    align-items: center;
+    gap: 0.85rem;
+    background: rgba(14, 24, 46, 0.62);
+    border-radius: var(--radius-sm);
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(74, 110, 190, 0.22);
+}
+
+.division-card__stat--muted {
+    background: rgba(12, 18, 36, 0.45);
+    border-color: rgba(74, 110, 190, 0.14);
+}
+
+.division-card__icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    background: rgba(84, 126, 210, 0.28);
+    color: rgba(210, 224, 255, 0.95);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.division-card__stat--muted .division-card__icon {
+    background: rgba(92, 118, 170, 0.22);
+    color: rgba(182, 196, 225, 0.8);
+}
+
+.division-card__icon svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.division-card__stat-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
 }
 
 .division-card__stat-label {
-    color: rgba(190, 200, 240, 0.72);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(176, 196, 235, 0.78);
+}
+
+.division-card__stat-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: rgba(234, 242, 255, 0.95);
+}
+
+.division-card__stat--muted .division-card__stat-value {
+    color: rgba(200, 212, 236, 0.8);
 }
 
 .division-card__progress {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.85rem;
+    padding: 0.75rem 1rem;
+    background: rgba(14, 26, 48, 0.6);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(76, 120, 198, 0.2);
 }
 
 .division-card__progress-bar {
@@ -837,94 +1205,134 @@ a {
 .division-card__progress-fill {
     display: block;
     height: 100%;
-    background: linear-gradient(135deg, rgba(80, 150, 255, 0.95), rgba(69, 255, 205, 0.85));
     border-radius: inherit;
+    background: linear-gradient(135deg, rgba(74, 196, 255, 0.95), rgba(112, 228, 189, 0.9));
     transition: width 0.3s ease;
     position: relative;
-    overflow: hidden;
 }
 
-.division-card__progress-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: -120%;
-    width: 140%;
-    background: linear-gradient(90deg, transparent 5%, rgba(255, 255, 255, 0.08) 35%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0.08) 70%, transparent 95%);
-    opacity: 0;
-    animation: progress-glow var(--glow-duration, 6s) ease-in-out infinite;
-    animation-delay: var(--glow-delay, 0s);
+.division-card--status-ended .division-card__progress-fill {
+    background: linear-gradient(135deg, rgba(150, 164, 200, 0.8), rgba(186, 198, 228, 0.75));
 }
 
-.division-card__progress-value {
+.division-card__progress-label {
     font-weight: 700;
-    color: rgba(225, 236, 255, 0.9);
+    color: rgba(214, 228, 255, 0.92);
+    font-size: 0.95rem;
+    min-width: 3.5rem;
+    text-align: right;
 }
 
-.division-card__leader {
+.division-card__winner {
     display: flex;
     align-items: center;
-    gap: 0.85rem;
-    background: rgba(15, 26, 48, 0.72);
+    gap: 0.35rem;
+    font-size: 0.95rem;
+    color: rgba(220, 232, 255, 0.92);
+    background: rgba(12, 20, 38, 0.55);
     border-radius: var(--radius-sm);
-    padding: 0.85rem 1rem;
+    border: 1px solid rgba(98, 132, 198, 0.18);
+    padding: 0.7rem 1rem;
 }
 
-.division-card__leader-logo {
-    width: 42px;
-    height: 42px;
-    border-radius: 12px;
-    object-fit: cover;
-    background: rgba(12, 18, 36, 0.9);
-    border: 1px solid rgba(118, 158, 255, 0.28);
-}
-
-.division-card__leader-label {
-    font-size: 0.75rem;
+.division-card__winner-label {
     text-transform: uppercase;
-    color: rgba(170, 190, 255, 0.7);
     letter-spacing: 0.08em;
+    font-size: 0.78rem;
+    color: rgba(186, 200, 228, 0.75);
 }
 
-.division-card__leader-name {
+.division-card__winner-value {
     font-weight: 600;
-    color: #ffffff;
-}
-
-.division-card__leader-record {
-    font-size: 0.85rem;
-    color: rgba(205, 215, 255, 0.7);
 }
 
 .division-card__footer {
     margin-top: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-top: 0.5rem;
 }
 
 .division-card__cta {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.75rem 1.1rem;
-    border-radius: var(--radius-sm);
-    font-weight: 600;
-    color: #0a101f;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(164, 203, 255, 0.9));
-    text-decoration: none;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    padding: 0.5rem 1.2rem;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-strong), #3aa3ff);
+    color: #071020;
+    box-shadow: 0 14px 28px rgba(58, 163, 255, 0.28);
 }
 
-.division-card__cta:hover,
-.division-card__cta:focus-visible {
-    transform: translateY(-2px);
-    box-shadow: 0 16px 26px rgba(200, 220, 255, 0.3);
+.division-card--status-upcoming .division-card__cta {
+    background: linear-gradient(135deg, rgba(152, 186, 255, 0.95), rgba(118, 167, 255, 0.92));
+    color: #0a1730;
+    box-shadow: 0 12px 24px rgba(118, 167, 255, 0.32);
 }
 
-.division-card__cta--disabled {
-    opacity: 0.6;
-    cursor: default;
-    color: rgba(200, 210, 240, 0.6);
+.division-card--status-ended .division-card__cta {
+    background: linear-gradient(135deg, rgba(160, 176, 210, 0.95), rgba(190, 204, 232, 0.9));
+    color: #0c1528;
+    box-shadow: 0 10px 22px rgba(148, 164, 204, 0.28);
 }
+
+.division-card__secondary {
+    font-size: 0.82rem;
+    color: rgba(178, 206, 255, 0.78);
+    white-space: nowrap;
+}
+
+.division-card__secondary--link {
+    color: rgba(196, 218, 255, 0.86);
+}
+
+@media (max-width: 960px) {
+    .division-card__inner {
+        padding: 1.55rem 1.6rem 1.7rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .division-card {
+        min-height: 0;
+    }
+    .division-card__inner {
+        padding: 1.4rem 1.45rem 1.5rem;
+        gap: 1.2rem;
+    }
+    .division-card__top {
+        align-items: flex-start;
+    }
+    .division-card__name {
+        font-size: 1.18rem;
+    }
+    .division-card__stats {
+        gap: 0.75rem;
+    }
+    .division-card__progress {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .division-card__progress-label {
+        text-align: left;
+    }
+    .division-card__footer {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .division-card__cta {
+        width: 100%;
+        justify-content: center;
+    }
+    .division-card__secondary {
+        width: 100%;
+    }
+}
+
 
 /* ---- Division view ---- */
 .division-view {
@@ -1923,14 +2331,6 @@ a {
     display: block;
 }
 
-.nav-logo--afi {
-    filter: drop-shadow(0 12px 16px rgba(23, 39, 90, 0.55));
-}
-
-.nav-logo--ppl {
-    filter: drop-shadow(0 12px 20px rgba(255, 140, 64, 0.35));
-}
-
 .brand-divider {
     width: 1px;
     height: 32px;
@@ -2618,9 +3018,13 @@ a{ color:var(--accent); text-decoration:none; }
 	border:1px solid rgba(255,255,255,0.12);
 	background:linear-gradient(180deg, rgba(58,163,255,0.12), rgba(125,211,252,0.08));
 	color:var(--fg); padding:10px 14px; border-radius:10px;
-	transition:.15s transform, .15s background, .15s border-color;
+	transition:.25s transform, .25s background, .25s border-color, .25s box-shadow;
 }
-.btn:hover{ transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
+.btn:hover{
+	transform: translateY(-1px) scale(1.02);
+	border-color: rgba(255,255,255,0.35);
+	box-shadow: 0 12px 26px rgba(45, 120, 255, 0.25);
+}
 .btn-primary{ background:linear-gradient(180deg, #3aa3ff, #2a7cd6); border:none; color:#fff; }
 .btn-ghost{ background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); }
 .btn-floating{
@@ -3131,213 +3535,6 @@ a{ color:var(--accent); text-decoration:none; }
 	color: var(--muted);
 	margin-top: 4px;
 	text-align: center;
-}
-
-/* Divisions Section */
-.divisions-title {
-	text-align: center;
-	font-size: 1.8rem;
-	font-weight: 700;
-	margin: 48px 0 32px 0;
-	background: linear-gradient(135deg, var(--fg), var(--accent-2));
-	background-clip: text;
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-}
-
-.divisions-grid {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-	gap: 24px;
-	margin-bottom: 48px;
-}
-
-/* Enhanced Division Cards */
-.division-card {
-	background: linear-gradient(135deg, rgba(18,25,50,0.9), rgba(12,18,36,0.85));
-	border: 1px solid rgba(255,255,255,0.08);
-	border-radius: 16px;
-	padding: 0;
-	box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-	transition: all 0.3s ease;
-	text-decoration: none;
-	color: inherit;
-	position: relative;
-	overflow: hidden;
-	display: flex;
-	flex-direction: column;
-	min-height: 200px;
-}
-
-.division-card::before {
-	content: '';
-	position: absolute;
-	top: 0;
-	left: 0;
-	right: 0;
-	height: 3px;
-	transition: all 0.3s ease;
-}
-
-.division-card.tier-master::before { background: linear-gradient(90deg, #ffd700, #ffed4e); }
-.division-card.tier-div1::before { background: linear-gradient(90deg, #c0c0c0, #e5e5e5); }
-.division-card.tier-div2::before { background: linear-gradient(90deg, #cd7f32, #daa520); }
-.division-card.tier-div3::before { background: linear-gradient(90deg, #8b4513, #cd853f); }
-.division-card.tier-regular::before { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-.division-card.tier-playoffs::before { background: linear-gradient(90deg, #8a2be2, #da70d6); }
-
-.division-card:hover {
-	transform: translateY(-6px);
-	border-color: rgba(255,255,255,0.2);
-	box-shadow: 0 20px 40px rgba(0,0,0,0.4);
-}
-
-.division-card:hover::before {
-	height: 4px;
-	box-shadow: 0 0 20px rgba(255,255,255,0.3);
-}
-
-.card-header {
-	padding: 20px 24px 16px 24px;
-	text-align: center;
-	position: relative;
-}
-
-/* Make sure season indicators size down on small screens and sit correctly */
-.season-indicator {
-	font-size: 0.75rem; /* default */
-	padding: 4px 8px;
-}
-
-@media (max-width: 640px) {
-	.season-indicator {
-		font-size: 0.65rem;
-		padding: 2px 6px;
-		top: 8px;
-		right: 8px;
-	}
-	.division-card {
-		min-height: 160px;
-	}
-}
-
-.tier-badge {
-	font-size: 2rem;
-	margin-bottom: 8px;
-	display: block;
-}
-
-.card-header h3 {
-	margin: 0 0 4px 0;
-	font-size: 1.25rem;
-	font-weight: 700;
-	color: var(--fg);
-	line-height: 1.2;
-}
-
-.tier-label {
-	font-size: 0.85rem;
-	color: var(--muted);
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
-	font-weight: 500;
-}
-
-.card-stats {
-	flex: 1;
-	padding: 0 24px 16px 24px;
-	display: flex;
-	flex-direction: column;
-	gap: 12px;
-	align-items: center;
-}
-
-.stat-row {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 0.95rem;
-	color: var(--muted);
-}
-
-.stat-row .stat-icon {
-	font-size: 1.1rem;
-}
-
-.progress-section {
-	margin-top: auto;
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-}
-
-.progress-text {
-	font-size: 0.9rem;
-	color: var(--muted);
-	font-weight: 500;
-}
-
-.card-footer {
-	padding: 16px 24px 16px 24px;
-	border-top: 1px solid rgba(255,255,255,0.05);
-	background: rgba(0,0,0,0.2);
-	align-items: center;
-}
-
-.update-time {
-	font-size: 0.8rem;
-	color: var(--muted);
-	text-align: center;
-	opacity: 0.8;
-}
-
-.gen-note {
-	font-size: 0.7rem;
-	color: rgba(255,255,255,0.55);
-	text-align: center;
-	margin-top: 4px;
-}
-
-/* Season indicator badges for division cards */
-.season-indicator {
-	display: block;
-	margin: 0 auto 8px auto;
-	padding: 4px 10px;
-	border-radius: 14px;
-	font-size: 0.75rem;
-	font-weight: 600;
-	text-transform: none;
-	letter-spacing: 0.2px;
-	backdrop-filter: blur(6px);
-	border: 1px solid rgba(255,255,255,0.06);
-	white-space: nowrap;
-	text-align: center;
-	max-width: 90%;
-	align-self: center;
-}
-
-.season-indicator.completed {
-	background: rgba(57, 217, 138, 0.15);
-	color: var(--ok);
-	border-color: rgba(57, 217, 138, 0.3);
-}
-
-.season-indicator.archived {
-	background: rgba(157, 177, 209, 0.15);
-	color: var(--muted);
-	border-color: rgba(157, 177, 209, 0.3);
-}
-
-@media (max-width: 640px) {
-	.season-indicator {
-		bottom: 44px;
-		padding: 3px 8px;
-		font-size: 0.65rem;
-	}
-	/* ensure update-time has extra bottom padding to avoid overlap on very small cards */
-	.card-footer .update-time {
-		margin-bottom: 6px;
-	}
 }
 
 /* Enhanced animations and interactions */
@@ -4770,4 +4967,8 @@ body.is-division .card.maps-section {
         flex-direction: column;
         align-items: stretch;
     }
+}
+.partner-callout:hover {
+    border-color: rgba(140, 180, 255, 0.5);
+    box-shadow: 0 32px 56px rgba(8, 14, 32, 0.55), 0 0 24px rgba(98, 148, 255, 0.35);
 }

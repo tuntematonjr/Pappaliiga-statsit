@@ -175,29 +175,25 @@ window.HomeView = {
             return [
                 {
                     id: 'armafi',
-                    eyebrow: 'Epävirallisen statsisivuston ylläpitäjä',
+                    // eyebrow: 'Epävirallisen statsisivuston ylläpitäjä',
                     name: 'Armafinland',
                     description: 'Yhteisö on avoin kaikille pelaajille ja ryhmille, jotka haluavat kokeilla taktista pelaamista myös Arma-sarjan peleissä. Pelaamme Arma 3 ja Arma Reforger, sekä järjestämme kansainvälisiä TvT-tehtäviä, joissa painotetaan realismia, joukkuepeliä ja yhteistoimintaa. Pelien ulkopuolella meno on rentoa ja mutkatonta, mutta pelissä otetaan tehtävät tosissaan. ',
                     primaryLabel: 'Liity AFI Discord',
                     primaryHref: 'https://discord.gg/armafinland',
                     secondaryLabel: 'Tutustu sivustoon',
                     secondaryHref: 'https://armafinland.fi',
-                    logo: 'https://armafinland.fi/logot/images/armafin-logo-400px.png',
-                    glowColor: '#0e2250',
-                    glowSoft: 'rgba(26, 56, 130, 0.55)'
+                    logo: 'https://armafinland.fi/logot/images/armafin-logo-400px.png'
                 },
                 {
                     id: 'pappaliiga',
-                    eyebrow: 'Liiga',
+                    // eyebrow: 'Liiga',
                     name: 'Pappaliiga',
                     description: 'Pappaliigan tarkoituksena on tarjota varttuneemmalle väelle mahdollisuus kilpapelaamiseen; tosissaan ja `ei niin tosissaan`. ',
                     primaryLabel: 'Liity Pappaliiga Discord',
                     primaryHref: 'https://discord.gg/pappaliiga',
                     secondaryLabel: 'Lue lisää',
                     secondaryHref: 'https://pappaliiga.fi',
-                    logo: 'https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png',
-                    glowColor: '#ff8a3d',
-                    glowSoft: 'rgba(255, 138, 61, 0.55)'
+                    logo: 'https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png'
                 }
             ];
         },
@@ -448,19 +444,19 @@ window.HomeView = {
                     v-for="callout in partnerCallouts"
                     :key="callout.id"
                     class="partner-callout"
-                    :style="{
-                        '--callout-accent': callout.glowColor,
-                        '--callout-glow': callout.glowSoft
-                    }"
                 >
-                    <div class="partner-callout__glow-bar" aria-hidden="true"></div>
                     <header class="partner-callout__header">
-                        <img
-                            class="partner-callout__logo"
-                            :src="callout.logo"
-                            :alt="callout.name + ' logo'"
-                            loading="lazy"
+                        <div
+                            class="logo-wrap logo-card partner-callout__logo-wrap"
+                            :class="callout.id === 'armafi' ? 'logo-card--armafinland' : 'logo-card--pappaliiga'"
                         >
+                            <img
+                                class="partner-callout__logo"
+                                :src="callout.logo"
+                                :alt="callout.name + ' logo'"
+                                loading="lazy"
+                            >
+                        </div>
                         <div class="partner-callout__titles">
                             <span class="partner-callout__eyebrow">{{ callout.eyebrow }}</span>
                             <h2>{{ callout.name }}</h2>
@@ -481,7 +477,6 @@ window.HomeView = {
             <section class="home-summary">
                 <header class="home-summary__header">
                     <h2>Kaikki kaudet yhteensä</h2>
-                    <button type="button" class="btn-link" @click="retrySummary">Päivitä</button>
                 </header>
                 <loading-spinner
                     v-if="summaryLoading"

@@ -365,7 +365,6 @@ window.DivisionView = {
                 <section id="overview" class="division-section">
                     <div class="division-section__header">
                         <h2>Katsaus</h2>
-                        <button type="button" class="btn-link" @click="refreshAll">Päivitä data</button>
                     </div>
                     <stat-panel
                         :items="statMetrics"

@@ -153,7 +153,6 @@ window.TeamView = {
                             <h1>{{ teamName }}</h1>
                             <div class="team-header__actions">
                                 <a v-if="faceitLink" :href="faceitLink" target="_blank" rel="noopener" class="btn-primary">Faceit</a>
-                                <button type="button" class="btn-link" @click="emitRefresh">Päivitä</button>
                                 <copy-link label="Jaa joukkue"></copy-link>
                             </div>
                         </div>
