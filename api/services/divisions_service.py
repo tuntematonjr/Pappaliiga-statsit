@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from async_db import query_async
 from division_overrides import combined_status_teams
@@ -66,6 +66,19 @@ async def count_divisions(season: Optional[int] = None) -> int:
 async def list_divisions_by_season(season: int, limit: int, offset: int) -> List[dict[str, Any]]:
     rows = await query_async(
         """
+        WITH team_counts AS (
+            SELECT championship_id, COUNT(DISTINCT team_id) AS teams_count
+            FROM (
+                SELECT championship_id, team1_id AS team_id
+                FROM matches
+                WHERE team1_id IS NOT NULL
+                UNION ALL
+                SELECT championship_id, team2_id AS team_id
+                FROM matches
+                WHERE team2_id IS NOT NULL
+            ) team_lookup
+            GROUP BY championship_id
+        )
         SELECT
             c.championship_id,
             c.slug,
@@ -73,14 +86,35 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
             c.season,
             c.division_num,
             CASE WHEN c.slug LIKE '%%-po%%' THEN 1 ELSE 0 END AS is_playoff,
-            0 AS teams_count,
+            COALESCE(tc.teams_count, 0) AS teams_count,
             COUNT(DISTINCT CASE WHEN m.finished_at IS NOT NULL THEN m.match_id END) AS played_matches,
             COUNT(DISTINCT m.match_id) AS total_matches,
+            SUM(CASE WHEN m.finished_at IS NOT NULL THEN 1 ELSE 0 END) AS finished_matches,
+            SUM(
+                CASE
+                    WHEN UPPER(COALESCE(m.status, '')) IN ('LIVE', 'ONGOING', 'IN_PROGRESS', 'STARTED')
+                        THEN 1
+                    ELSE 0
+                END
+            ) AS live_matches,
+            SUM(
+                CASE
+                    WHEN UPPER(COALESCE(m.status, '')) IN ('CONFIGURED', 'PENDING', 'READY', 'SCHEDULED')
+                        THEN 1
+                    ELSE 0
+                END
+            ) AS upcoming_matches,
+            MIN(NULLIF(m.started_at, 0)) AS first_started_at,
+            MIN(NULLIF(m.scheduled_at, 0)) AS first_scheduled_at,
+            MAX(NULLIF(m.finished_at, 0)) AS last_finished_at,
+            MAX(NULLIF(m.scheduled_at, 0)) AS last_scheduled_at,
+            MAX(NULLIF(m.activity_ts, 0)) AS last_activity_ts,
             MAX(m.updated_at) AS last_updated
         FROM championships c
         LEFT JOIN matches m ON c.championship_id = m.championship_id
+        LEFT JOIN team_counts tc ON tc.championship_id = c.championship_id
         WHERE c.season = :season
-        GROUP BY c.championship_id, c.slug, c.name, c.season, c.division_num, is_playoff
+        GROUP BY c.championship_id, c.slug, c.name, c.season, c.division_num, is_playoff, tc.teams_count
         ORDER BY c.division_num ASC
         LIMIT :limit OFFSET :offset
         """,
@@ -473,3 +507,51 @@ async def _get_division_leaders(championship_id: str, season: int, division_num:
             }
         )
     return leaders
+
+
+async def fetch_division_winners(championship_ids: Sequence[str]) -> dict[str, dict[str, Any]]:
+    if not championship_ids:
+        return {}
+
+    placeholders = ", ".join(f":champ{idx}" for idx in range(len(championship_ids)))
+    params = {f"champ{idx}": str(cid) for idx, cid in enumerate(championship_ids)}
+
+    rows = await query_async(
+        f"""
+        SELECT
+            c.championship_id,
+            tst.team_id,
+            t.name AS team_name,
+            tst.matches_won,
+            (
+                CAST(COALESCE(tst.rounds_won, 0) AS SIGNED) -
+                CAST(COALESCE(tst.rounds_lost, 0) AS SIGNED)
+            ) AS round_diff,
+            tst.rounds_won
+        FROM championships c
+        JOIN team_season_totals tst
+          ON tst.season = c.season
+         AND tst.division_num = c.division_num
+        LEFT JOIN teams t ON t.team_id = tst.team_id
+        WHERE c.championship_id IN ({placeholders})
+        ORDER BY
+            c.championship_id,
+            tst.matches_won DESC,
+            round_diff DESC,
+            tst.rounds_won DESC,
+            COALESCE(t.name, '') ASC,
+            tst.team_id ASC
+        """,
+        params,
+    )
+
+    winners: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        champ_id = str(row.get("championship_id"))
+        if champ_id in winners:
+            continue
+        winners[champ_id] = {
+            "team_id": row.get("team_id"),
+            "team_name": row.get("team_name") or row.get("team_id"),
+        }
+    return winners

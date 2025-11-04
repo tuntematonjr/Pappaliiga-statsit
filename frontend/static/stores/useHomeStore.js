@@ -120,8 +120,26 @@
         const phase = raw.phase || (raw.is_playoff ? 'Playoffs' : null);
         const subtitle = raw.subtitle || raw.tagline || phase || null;
 
-        const matchesPlayed = toNumber(raw.played_matches ?? raw.matches_played ?? raw.matches ?? 0);
-        const matchesTotal = toNumber(raw.total_matches ?? raw.scheduled_matches ?? raw.schedule_count ?? 0);
+        const matchesPlayed = toNumber(
+            raw.played_matches ??
+                raw.matches_played ??
+                raw.matches ??
+                raw.playedMatches ??
+                raw.matchesPlayed ??
+                raw.finished_matches ??
+                raw.finishedMatches ??
+                0
+        );
+        const matchesTotal = toNumber(
+            raw.total_matches ??
+                raw.scheduled_matches ??
+                raw.schedule_count ??
+                raw.totalMatches ??
+                raw.matchesTotal ??
+                raw.scheduledMatches ??
+                raw.scheduleCount ??
+                0
+        );
         const progressPercent = matchesTotal > 0 ? Math.min(100, Math.round((matchesPlayed / matchesTotal) * 100)) : 0;
 
         const wins = toNumber(raw.win_count ?? raw.wins ?? raw.matches_won ?? 0);
@@ -130,7 +148,18 @@
         const roundDiff = toNumber(raw.rounds_diff ?? raw.round_diff ?? raw.rounds_delta ?? 0);
 
         const teams = Array.isArray(raw.teams) ? raw.teams : [];
-        const teamCount = teams.length || toNumber(raw.team_count ?? raw.teams_count ?? 0);
+        const teamCount =
+            teams.length ||
+            toNumber(
+                raw.team_count ??
+                    raw.teams_count ??
+                    raw.teamCount ??
+                    raw.teamsCount ??
+                    raw.team_total ??
+                    raw.teamTotal ??
+                    raw.teamcount ??
+                    0
+            );
 
         const topTeam = teams
             .slice()
@@ -201,6 +230,8 @@
             stats: {},
             rawStats: null,
             divisions: [],
+            rawDivisions: [],
+            divisionsMeta: null,
             progress: defaultProgress()
         };
     }
@@ -301,14 +332,28 @@
                 };
 
                 try {
-                    const [seasonStats, divisions] = await Promise.all([
+                    const [seasonStats, divisionsResponse] = await Promise.all([
                         window.apiClient.getSeasonStats(identifier),
                         window.apiClient.getDivisionsBySeason(identifier)
                     ]);
 
-                    const normalizedDivisions = Array.isArray(divisions)
-                        ? divisions.map((entry, index) => normalizeDivision(entry, index)).filter(Boolean)
-                        : [];
+                    let divisionItems = [];
+                    let divisionMeta = null;
+
+                    if (Array.isArray(divisionsResponse)) {
+                        divisionItems = divisionsResponse;
+                    } else if (divisionsResponse && typeof divisionsResponse === 'object') {
+                        if (Array.isArray(divisionsResponse.items)) {
+                            divisionItems = divisionsResponse.items;
+                        }
+                        if (divisionsResponse.meta && typeof divisionsResponse.meta === 'object') {
+                            divisionMeta = divisionsResponse.meta;
+                        }
+                    }
+
+                    const normalizedDivisions = divisionItems
+                        .map((entry, index) => normalizeDivision(entry, index))
+                        .filter(Boolean);
 
                     const stats = seasonStats?.aggregates || seasonStats?.stats || seasonStats || {};
                     const progress = computeProgress(seasonStats, normalizedDivisions);
@@ -320,6 +365,8 @@
                         fetchedAt: Date.now(),
                         stats,
                         rawStats: seasonStats,
+                        rawDivisions: divisionItems,
+                        divisionsMeta: divisionMeta,
                         divisions: normalizedDivisions,
                         progress
                     };

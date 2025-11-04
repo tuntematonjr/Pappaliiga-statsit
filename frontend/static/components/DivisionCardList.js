@@ -1,8 +1,8 @@
 (function () {
     const STATUS_COPY = Object.freeze({
-        upcoming: { label: 'Alkamaton', action: 'Katso tiedot', secondary: 'Sarjan aikataulu' },
-        running: { label: 'Käynnissä', action: 'Avaa sarja', secondary: 'Tilastot & ottelut' },
-        ended: { label: 'Päättynyt', action: 'Avaa arkisto', secondary: 'Tilastot & historia' }
+        upcoming: { label: 'Alkamaton', action: 'Avaa divisioona' },
+        running: { label: 'Käynnissä', action: 'Avaa divisioona' },
+        ended: { label: 'Päättynyt', action: 'Avaa divisioona' }
     });
 
     function toNumber(value, fallback = 0) {
@@ -94,55 +94,117 @@
     }
 
     function parseTeams(division) {
+        const raw = division || {};
+        const rawData = raw.raw || {};
+        const teamsNode = raw.teams;
         let count = 0;
-        if (Array.isArray(division?.teams)) {
-            count = division.teams.length;
-        } else if (division?.teams && typeof division.teams === 'object' && division.teams.count != null) {
-            count = toNumber(division.teams.count);
-        } else {
-            count =
-                toNumber(division?.teamCount ?? division?.team_count ?? division?.team_total ?? division?.teamcount ?? 0);
-            if (!count && division?.raw) {
-                count = toNumber(
-                    division.raw.teamCount ??
-                        division.raw.team_count ??
-                        division.raw.team_total ??
-                        division.raw.teams_count ??
-                        0
-                );
+
+        if (Array.isArray(teamsNode)) {
+            count = teamsNode.length;
+        } else if (teamsNode && typeof teamsNode === 'object' && teamsNode.count != null) {
+            count = toNumber(teamsNode.count);
+        }
+
+        const candidateKeys = [
+            'teamsCount',
+            'teams_count',
+            'team_count',
+            'teamCount',
+            'team_total',
+            'teamTotal',
+            'teams',
+            'teamcount',
+            'teamCountTotal',
+            'teams_total'
+        ];
+        const rawCandidateKeys = [
+            'teamsCount',
+            'teams_count',
+            'team_count',
+            'teamCount',
+            'team_total',
+            'teamTotal',
+            'teams',
+            'teamcount',
+            'teamCountTotal',
+            'teams_total'
+        ];
+
+        if (!count) {
+            for (const key of candidateKeys) {
+                const value = raw[key];
+                if (value != null) {
+                    count = toNumber(value);
+                    if (count) break;
+                }
             }
         }
+
+        if (!count) {
+            for (const key of rawCandidateKeys) {
+                const value = rawData[key];
+                if (value != null) {
+                    count = toNumber(value);
+                    if (count) break;
+                }
+            }
+        }
+
         const label = count ? `${count}` : '–';
         return { count, label };
     }
 
     function parseMatches(division) {
-        const matchesSource = division?.matches || division?.raw?.matches || {};
-        const played = toNumber(
-            matchesSource.played ??
-                matchesSource.completed ??
-                matchesSource.played_matches ??
-                matchesSource.playedGames ??
-                matchesSource.played ??
-                division?.matchesPlayed ??
-                division?.matches_played ??
-                division?.played_matches ??
-                division?.raw?.matches_played ??
-                0
-        );
-        const total = toNumber(
-            matchesSource.total ??
-                matchesSource.scheduled ??
-                matchesSource.total_matches ??
-                matchesSource.max ??
-                matchesSource.count ??
-                division?.matchesTotal ??
-                division?.matches_total ??
-                division?.total_matches ??
-                division?.schedule_count ??
-                division?.raw?.total_matches ??
-                0
-        );
+        const raw = division || {};
+        const rawData = raw.raw || {};
+
+        const matchesSource = raw.matches || rawData.matches || {};
+        const extraSource = rawData?.aggregates || rawData?.stats || {};
+        const playedCandidateKeys = [
+            'played',
+            'playedMatches',
+            'played_matches',
+            'matchesPlayed',
+            'matches_played',
+            'matches',
+            'completed',
+            'finished_matches',
+            'finishedMatches',
+            'played_games',
+            'playedGames',
+            'gamesPlayed'
+        ];
+        const totalCandidateKeys = [
+            'total',
+            'totalMatches',
+            'matchesTotal',
+            'matches_total',
+            'total_matches',
+            'matches',
+            'scheduled',
+            'scheduled_matches',
+            'schedule_count',
+            'max',
+            'count'
+        ];
+
+        const rawMatchNodes = [matchesSource, raw, rawData, extraSource];
+
+        function pickFirstNumber(keys, sources) {
+            for (const source of sources) {
+                if (!source || typeof source !== 'object') continue;
+                for (const key of keys) {
+                    if (Object.prototype.hasOwnProperty.call(source, key)) {
+                        const numeric = toNumber(source[key]);
+                        if (numeric) return numeric;
+                    }
+                }
+            }
+            return 0;
+        }
+
+        const played = pickFirstNumber(playedCandidateKeys, rawMatchNodes);
+        const total = pickFirstNumber(totalCandidateKeys, rawMatchNodes);
         const label = total > 0 ? `${played} / ${total}` : played ? `${played}` : '–';
         return { played, total, label };
     }
@@ -310,7 +372,11 @@
 
     function normalizeDivision(division, index) {
         if (!division) return null;
-        const name = division.name || division.title || division.label || 'Divisioona';
+        const rawName = division.name || division.title || division.label || '';
+        const name =
+            !rawName || /arkisto/i.test(rawName)
+                ? 'Divisioona'
+                : rawName;
         const teams = parseTeams(division);
         const matches = parseMatches(division);
         const progressPercent = computePercent(division, matches);
@@ -318,23 +384,37 @@
             division.start ||
                 division.start_date ||
                 division.startDate ||
+                division.start_ts ||
                 division.scheduled_start ||
+                division.first_started_at ||
+                division.first_started_ts ||
+                division.firstScheduledAt ||
                 division.raw?.start_date ||
-                division.raw?.start
+                division.raw?.start ||
+                division.raw?.first_started_at
         );
         const endDate = coerceDate(
             division.end ||
                 division.end_date ||
                 division.endDate ||
+                division.end_ts ||
                 division.scheduled_end ||
+                division.last_finished_at ||
+                division.last_finished_ts ||
+                division.lastScheduledAt ||
                 division.raw?.end_date ||
-                division.raw?.end
+                division.raw?.end ||
+                division.raw?.last_finished_at
         );
         const updatedAt = coerceDate(
             division.updated ||
                 division.updated_at ||
                 division.last_updated ||
                 division.lastUpdate ||
+                division.lastActivityAt ||
+                division.last_activity_at ||
+                division.updated_ts ||
+                division.last_activity_ts ||
                 division.raw?.updated_at ||
                 division.raw?.last_updated
         );
@@ -392,7 +472,6 @@
             status,
             statusLabel: statusCopy.label,
             actionLabel: statusCopy.action,
-            secondaryLabel: division.secondaryLabel || statusCopy.secondary || '',
             statItems,
             teamsCount: teams.count,
             matchesPlayed: matches.played,
@@ -424,14 +503,6 @@
 
         card.progressPercent = Math.max(0, Math.min(100, Math.round(card.progressPercent)));
 
-        if (!card.secondaryLabel) {
-            card.secondaryLabel =
-                card.status === 'running'
-                    ? 'Tilastot & ottelut'
-                    : card.status === 'ended'
-                    ? 'Sarjan historia'
-                    : 'Lisätiedot';
-        }
         if (!card.winner && card.status === 'ended') {
             card.winner = 'TBD';
         }
@@ -522,7 +593,6 @@
                 @keydown.space="handleKeypress"
                 @keydown.enter="handleKeypress"
             >
-                <span v-if="card.status === 'ended'" class="division-card__ribbon" aria-hidden="true">Päättynyt</span>
                 <div class="division-card__inner">
                     <header class="division-card__top">
                         <span class="division-card__badge" :class="'badge-' + card.kind" aria-hidden="true">
@@ -539,7 +609,7 @@
                             </svg>
                         </span>
                         <div class="division-card__titles">
-                            <h3 class="division-card__name" :title="card.name">{{ card.name }}</h3>
+            <h3 class="division-card__name" :title="card.name">{{ card.name || 'Divisioona' }}</h3>
                             <span class="division-card__chip" :class="'chip-' + card.status">
                                 <span v-if="card.status === 'running'" class="chip__dot" aria-hidden="true"></span>
                                 {{ card.statusLabel }}
@@ -600,14 +670,6 @@
 
                     <footer class="division-card__footer">
                         <span class="division-card__cta">{{ card.actionLabel }}</span>
-                        <span
-                            v-if="card.secondaryLabel"
-                            class="division-card__secondary"
-                            :class="{ 'division-card__secondary--link': Boolean(card.detailHref) }"
-                            :title="card.detailHref || null"
-                        >
-                            {{ card.secondaryLabel }}
-                        </span>
                     </footer>
                 </div>
             </component>
