@@ -24,7 +24,7 @@ from typing import Iterable, List, Set
 
 from db_async import connection
 from db_ops_async import upsert_player_season_totals_async, upsert_team_season_totals_async
-from faceit_config import DIVISIONS
+import faceit_config
 
 OVERRIDES_PATH = (Path(__file__).resolve().parent.parent / "division_overrides.json")
 
@@ -43,7 +43,7 @@ def load_overrides(path: Path = OVERRIDES_PATH) -> dict:
 
 
 def _find_division(championship_id: str):
-    for d in DIVISIONS:
+    for d in faceit_config.DIVISIONS:
         if d.get("championship_id") == championship_id:
             return d
     return None

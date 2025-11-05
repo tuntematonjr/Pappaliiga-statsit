@@ -17,7 +17,7 @@ from faceit_client_async import (
     get_match_stats_async,
 )
 
-from faceit_config import DIVISIONS
+import faceit_config
 
 from db_async import connection, readonly_connection, fetch_all
 from db_ops_async import (
@@ -833,7 +833,7 @@ async def sync_championship_async(
 ) -> ChampionshipSyncResult:
     start_time = time.perf_counter()
     force_all_matches = full or force_matches
-    division_info = division or next((d for d in DIVISIONS if d["championship_id"] == championship_id), None)
+    division_info = division or next((d for d in faceit_config.DIVISIONS if d["championship_id"] == championship_id), None)
     if not division_info:
         raise ValueError(f"Championship {championship_id} not found in DIVISIONS")
 
@@ -1024,7 +1024,7 @@ async def sync_championship_async(
 
 
 async def update_single_match_async(match_id: str) -> Optional[str]:
-    division = next((d for d in DIVISIONS if d.get("championship_id") == match_id), None)
+    division = next((d for d in faceit_config.DIVISIONS if d.get("championship_id") == match_id), None)
     if division:
         raise ValueError("update_single_match_async expects a match_id, not a championship_id")
 
@@ -1037,7 +1037,7 @@ async def update_single_match_async(match_id: str) -> Optional[str]:
     if not championship_id:
         raise RuntimeError(f"Match {match_id} lacks competition id")
 
-    division = next((d for d in DIVISIONS if d["championship_id"] == championship_id), None)
+    division = next((d for d in faceit_config.DIVISIONS if d["championship_id"] == championship_id), None)
     if not division:
         raise RuntimeError(f"Championship {championship_id} not configured")
 

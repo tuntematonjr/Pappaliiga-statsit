@@ -12,10 +12,11 @@ from typing import Any, Sequence
 from db_async import create_schema_async, fetch_val, reset_db_async, connection
 from division_overrides import load_division_overrides
 from faceit_client_async import get_rate_limit_stats, reset_rate_limit_stats, shutdown_clients
-from faceit_config import DIVISIONS, CURRENT_SEASON
+import faceit_config
 from sync_pipeline import ChampionshipSyncResult, sync_championship_async, update_single_match_async
 from db_ops_async import upsert_championships_async
 from utils import format_hms, log_stage
+from division_registry import refresh_divisions
 
 LOGGER = logging.getLogger("pappaliiga.sync")
 
@@ -37,6 +38,15 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--verify", action="store_true", help="Run post-sync verification queries")
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
     parser.add_argument("--end-on-error", action="store_true", help="Stop immediately if a division sync fails")
+    parser.add_argument("--refresh-divisions", action="store_true", help="Refresh divisions.json from Faceit before syncing")
+    parser.add_argument(
+        "--refresh-min-season",
+        type=int,
+        default=faceit_config.DEFAULT_CURRENT_SEASON,
+        help=f"Minimum season to include when refreshing divisions (default: {faceit_config.DEFAULT_CURRENT_SEASON})",
+    )
+    parser.add_argument("--refresh-dry-run", action="store_true", help="Run the division refresh without writing to disk")
+    parser.add_argument("--refresh-allow-empty", action="store_true", help="Allow new divisions with no registered teams")
     parser.add_argument(
         "--max-concurrency",
         type=int,
@@ -44,6 +54,22 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Maximum number of divisions to sync concurrently (default: 10)",
     )
     return parser
+
+
+def _is_refresh_only(args: argparse.Namespace) -> bool:
+    """Return True when caller only requested division refresh."""
+    if not args.refresh_divisions:
+        return False
+    has_sync_target = any(
+        [
+            args.match_id,
+            args.championship_id,
+            args.all_seasons,
+            args.season is not None,
+        ]
+    )
+    has_setup_task = any([args.create_schema, args.reset_db, args.verify])
+    return not has_sync_target and not has_setup_task
 
 
 async def _verify_counts() -> None:
@@ -88,23 +114,23 @@ def _resolve_targets(championship_id: str | None, all_seasons: bool = False, sea
 
     # If explicit season provided, use that (overrides all_seasons)
     if season is not None:
-        season_divisions = [item["championship_id"] for item in DIVISIONS if item.get("season") == season]
+        season_divisions = [item["championship_id"] for item in faceit_config.DIVISIONS if item.get("season") == season]
         LOGGER.info("Syncing Season %s divisions (%d total)", season, len(season_divisions))
         return season_divisions
 
     if all_seasons:
         # Return all championships from all seasons
-        LOGGER.info("All seasons requested - syncing all divisions from all seasons (%d total)", len(DIVISIONS))
-        return [item["championship_id"] for item in DIVISIONS]
+        LOGGER.info("All seasons requested - syncing all divisions from all seasons (%d total)", len(faceit_config.DIVISIONS))
+        return [item["championship_id"] for item in faceit_config.DIVISIONS]
 
     # Default to current season only
     current_season_divisions = [
-        item["championship_id"] for item in DIVISIONS 
-        if item.get("season") == CURRENT_SEASON
+        item["championship_id"] for item in faceit_config.DIVISIONS 
+        if item.get("season") == faceit_config.CURRENT_SEASON
     ]
 
     LOGGER.info("No specific championship provided - syncing all Season %d divisions (%d total)", 
-                CURRENT_SEASON, len(current_season_divisions))
+                faceit_config.CURRENT_SEASON, len(current_season_divisions))
     return current_season_divisions
 
 
@@ -126,6 +152,45 @@ async def main_async(args: argparse.Namespace) -> int:
         return 0
 
     await reset_rate_limit_stats()
+
+    if args.refresh_divisions:
+        min_season = args.refresh_min_season if args.refresh_min_season is not None else faceit_config.DEFAULT_CURRENT_SEASON
+        min_new_division_teams = 0 if args.refresh_allow_empty else 1
+        try:
+            refresh_result = await refresh_divisions(
+                min_season=min_season,
+                min_new_division_teams=min_new_division_teams,
+                dry_run=args.refresh_dry_run,
+            )
+        except Exception as exc:
+            LOGGER.exception("Failed to refresh divisions: %s", exc)
+            return 1
+
+        LOGGER.info(
+            "Division refresh complete: total=%d, new=%d, changed=%s",
+            refresh_result.total,
+            refresh_result.created,
+            refresh_result.changed,
+        )
+        if refresh_result.new_championship_ids:
+            LOGGER.info(
+                "New championships: %s",
+                ", ".join(refresh_result.new_championship_ids),
+            )
+        if refresh_result.skipped_championship_ids:
+            LOGGER.info(
+                "Skipped championships lacking teams: %s",
+                ", ".join(refresh_result.skipped_championship_ids),
+            )
+        if args.refresh_dry_run:
+            LOGGER.info("Dry run requested - divisions.json left unchanged.")
+        else:
+            LOGGER.info("Updated divisions written to %s", refresh_result.output_path)
+
+        if _is_refresh_only(args):
+            LOGGER.info("Refresh-only invocation detected; skipping sync pipeline.")
+            await shutdown_clients()
+            return 0
 
     if args.create_schema:
         await create_schema_async(force=True)
@@ -151,7 +216,7 @@ async def main_async(args: argparse.Namespace) -> int:
         total_synced_matches = 0
         total_skipped_matches = 0
 
-        division_lookup = {str(item["championship_id"]): item for item in DIVISIONS}
+        division_lookup = {str(item["championship_id"]): item for item in faceit_config.DIVISIONS}
         championships_by_season: dict[int, list[dict[str, Any]]] = {}
         championship_rows: list[dict[str, Any]] = []
         seen_championships: set[str] = set()

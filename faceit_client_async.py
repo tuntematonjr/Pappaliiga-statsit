@@ -380,6 +380,43 @@ async def get_map_votes_async(match_id: str) -> Optional[Dict[str, Any]]:
     return await _request_json(demo_client, "GET", f"/match/{match_id}/history")
 
 
+async def get_championship_teams_async(championship_id: str, limit: int = 100) -> Optional[List[Dict[str, Any]]]:
+    """
+    List registered teams for a championship.
+    Args:
+        championship_id: Faceit championship identifier.
+        limit: Page size (Faceit allows up to 100).
+    Returns:
+        List of team dictionaries (may be empty).
+    """
+    open_client, _ = await _get_clients()
+    results: List[Dict[str, Any]] = []
+    offset = 0
+    failed = False
+    while True:
+        payload = await _request_json(
+            open_client,
+            "GET",
+            f"/championships/{championship_id}/teams",
+            params={"offset": offset, "limit": limit},
+            expected_status={200},
+        )
+        if payload is None:
+            LOGGER.warning("Failed to fetch teams for championship %s", championship_id)
+            failed = True
+            break
+        items = payload.get("items") or []
+        if not items:
+            break
+        results.extend(items)
+        if len(items) < limit:
+            break
+        offset += limit
+        await asyncio.sleep(0.05)
+    if failed:
+        return None
+    return results
+
 
 async def list_championships_for_organizer_async(organizer_id: str, limit: int = 100) -> List[Dict[str, Any]]:
     """

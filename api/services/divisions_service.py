@@ -522,36 +522,144 @@ async def fetch_division_winners(championship_ids: Sequence[str]) -> dict[str, d
             c.championship_id,
             tst.team_id,
             t.name AS team_name,
+            COALESCE(tst.matches_played, 0) AS matches_played,
             tst.matches_won,
-            (
-                CAST(COALESCE(tst.rounds_won, 0) AS SIGNED) -
-                CAST(COALESCE(tst.rounds_lost, 0) AS SIGNED)
-            ) AS round_diff,
-            tst.rounds_won
+            COALESCE(tst.rounds_won, 0) AS rounds_won,
+            COALESCE(tst.rounds_lost, 0) AS rounds_lost
         FROM championships c
         JOIN team_season_totals tst
           ON tst.season = c.season
          AND tst.division_num = c.division_num
         LEFT JOIN teams t ON t.team_id = tst.team_id
         WHERE c.championship_id IN ({placeholders})
-        ORDER BY
-            c.championship_id,
-            tst.matches_won DESC,
-            round_diff DESC,
-            tst.rounds_won DESC,
-            COALESCE(t.name, '') ASC,
-            tst.team_id ASC
         """,
         params,
     )
 
-    winners: dict[str, dict[str, Any]] = {}
+    teams_by_champ: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         champ_id = str(row.get("championship_id"))
-        if champ_id in winners:
-            continue
-        winners[champ_id] = {
-            "team_id": row.get("team_id"),
+        team = {
+            "team_id": str(row.get("team_id")),
             "team_name": row.get("team_name") or row.get("team_id"),
+            "matches_played": int(row.get("matches_played") or 0),
+            "matches_won": int(row.get("matches_won") or 0),
+            "rounds_won": int(row.get("rounds_won") or 0),
+            "rounds_lost": int(row.get("rounds_lost") or 0),
         }
+        teams_by_champ.setdefault(champ_id, []).append(team)
+
+    winners: dict[str, dict[str, Any]] = {}
+    for champ_id, teams in teams_by_champ.items():
+        ordered = await _rank_division_teams(champ_id, teams)
+        if ordered:
+            top = ordered[0]
+            winners[champ_id] = {
+                "team_id": top["team_id"],
+                "team_name": top.get("team_name") or top["team_id"],
+            }
     return winners
+
+
+async def _rank_division_teams(championship_id: str, teams: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rank teams according to league rules (wins → round diff → head-to-head maps → head-to-head round diff)."""
+    if not teams:
+        return []
+
+    for team in teams:
+        team["round_diff"] = int(team.get("rounds_won", 0) - team.get("rounds_lost", 0))
+
+    teams.sort(
+        key=lambda row: (
+            -row.get("matches_won", 0),
+            -row.get("round_diff", 0),
+            -row.get("rounds_won", 0),
+            (row.get("team_name") or "").lower(),
+            row.get("team_id")
+        )
+    )
+
+    index = 0
+    while index < len(teams):
+        j = index + 1
+        while (
+            j < len(teams)
+            and teams[j].get("matches_won") == teams[index].get("matches_won")
+            and teams[j].get("round_diff") == teams[index].get("round_diff")
+        ):
+            j += 1
+
+        if j - index > 1:
+            tie_group = teams[index:j]
+            tie_ids = [team["team_id"] for team in tie_group if team.get("team_id")]
+            head_to_head = await _compute_head_to_head_stats(championship_id, tie_ids)
+
+            ranked_group = sorted(
+                tie_group,
+                key=lambda row: (
+                    -(head_to_head.get(row["team_id"], {}).get("map_diff", 0)),
+                    -(head_to_head.get(row["team_id"], {}).get("round_diff", 0)),
+                    -row.get("rounds_won", 0),
+                    (row.get("team_name") or "").lower(),
+                    row.get("team_id")
+                )
+            )
+            teams[index:j] = ranked_group
+
+        index = j
+
+    return teams
+
+
+async def _compute_head_to_head_stats(championship_id: str, team_ids: list[str]) -> dict[str, dict[str, int]]:
+    """Return head-to-head map and round differentials between teams."""
+    stats: dict[str, dict[str, int]] = {tid: {"map_wins": 0, "map_losses": 0, "map_diff": 0, "round_diff": 0} for tid in team_ids}
+    if len(team_ids) < 2:
+        return stats
+
+    placeholders = ", ".join(f":tid{idx}" for idx in range(len(team_ids)))
+    params = {"champ": championship_id}
+    for idx, tid in enumerate(team_ids):
+        params[f"tid{idx}"] = tid
+
+    rows = await query_async(
+        f"""
+        SELECT
+            m.team1_id,
+            m.team2_id,
+            mp.winner_team_id,
+            mp.score_team1,
+            mp.score_team2
+        FROM matches m
+        JOIN maps mp ON mp.match_id = m.match_id
+        WHERE m.championship_id = :champ
+          AND m.team1_id IN ({placeholders})
+          AND m.team2_id IN ({placeholders})
+        """,
+        params,
+    )
+
+    for row in rows:
+        team1 = str(row.get("team1_id"))
+        team2 = str(row.get("team2_id"))
+        if team1 not in stats or team2 not in stats:
+            continue
+
+        score1 = int(row.get("score_team1") or 0)
+        score2 = int(row.get("score_team2") or 0)
+        winner = row.get("winner_team_id")
+
+        if winner == team1:
+            stats[team1]["map_wins"] += 1
+            stats[team2]["map_losses"] += 1
+        elif winner == team2:
+            stats[team2]["map_wins"] += 1
+            stats[team1]["map_losses"] += 1
+
+        stats[team1]["round_diff"] += score1 - score2
+        stats[team2]["round_diff"] += score2 - score1
+
+    for tid, record in stats.items():
+        record["map_diff"] = record.get("map_wins", 0) - record.get("map_losses", 0)
+
+    return stats

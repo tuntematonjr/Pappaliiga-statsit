@@ -1175,43 +1175,323 @@ a {
 }
 
 .division-card__progress {
-    display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    padding: 0.75rem 1rem;
-    background: rgba(14, 26, 48, 0.6);
+    position: relative;
     border-radius: var(--radius-sm);
-    border: 1px solid rgba(76, 120, 198, 0.2);
-    margin-top: 0.25rem;
+    margin-top: 0.35rem;
+    min-height: 74px;
+    transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease, filter 0.35s ease;
 }
 
-.division-card__progress-bar {
-    flex: 1;
-    height: 8px;
+.division-card__progress--active {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.95rem 1.05rem 1.05rem;
+    background: linear-gradient(150deg, rgba(16, 29, 58, 0.92), rgba(10, 19, 38, 0.94));
+    border: 1px solid rgba(82, 148, 236, 0.32);
+    box-shadow: inset 0 0 0 1px rgba(38, 72, 132, 0.22), 0 20px 32px rgba(6, 12, 28, 0.38);
+}
+
+.division-card__progress--active::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top, rgba(122, 200, 255, 0.22), transparent 55%);
+    opacity: 0.7;
+    pointer-events: none;
+    transition: opacity 0.35s ease;
+}
+
+.division-card__progress--active:hover {
+    border-color: rgba(128, 196, 255, 0.46);
+    box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.3), 0 22px 38px rgba(6, 12, 28, 0.48);
+}
+
+.division-card__progress--active:hover::after {
+    opacity: 1;
+}
+
+.division-card__progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.82rem;
+    color: rgba(170, 195, 240, 0.78);
+}
+
+.division-card__progress-percent {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: rgba(232, 246, 255, 0.97);
+    text-shadow: 0 0 14px rgba(86, 176, 255, 0.75);
+    letter-spacing: 0.02em;
+}
+
+.division-card__progress-caption {
+    font-size: 0.82rem;
+    color: rgba(162, 190, 236, 0.85);
+    white-space: nowrap;
+}
+
+.division-card__progress-track {
+    position: relative;
+    height: 10px;
     border-radius: 999px;
-    background: rgba(70, 110, 180, 0.35);
     overflow: hidden;
+    background: linear-gradient(90deg, rgba(28, 44, 76, 0.95), rgba(18, 30, 52, 0.95));
+    border: 1px solid rgba(96, 146, 220, 0.38);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .division-card__progress-fill {
-    display: block;
-    height: 100%;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 0;
     border-radius: inherit;
-    background: linear-gradient(135deg, rgba(74, 196, 255, 0.95), rgba(112, 228, 189, 0.9));
-    transition: width 0.3s ease;
+    background: linear-gradient(135deg, rgba(74, 196, 255, 0.98), rgba(88, 255, 222, 0.85));
+    box-shadow: 0 0 18px rgba(74, 196, 255, 0.45);
+    transition: width 0.45s cubic-bezier(0.45, 0, 0.2, 1), filter 0.35s ease;
+}
+
+.division-card__progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 45%;
+    left: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.38) 45%, transparent 100%);
+    transform: translateX(-120%);
+    animation: division-progress-shimmer 5.8s linear infinite;
+}
+
+.division-card__progress--active:hover .division-card__progress-fill {
+    filter: brightness(1.05);
+}
+
+.division-card__progress--upcoming {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.05rem 1rem;
+    background: rgba(18, 26, 44, 0.58);
+    border: 1px dashed rgba(120, 140, 176, 0.42);
+    color: rgba(182, 196, 222, 0.78);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+
+.division-card__progress-empty {
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+.division-card__progress--ended {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.95rem 1rem;
+    background: linear-gradient(150deg, rgba(32, 68, 54, 0.6), rgba(18, 42, 34, 0.62));
+    border: 1px solid rgba(86, 182, 134, 0.38);
+    color: rgba(216, 248, 232, 0.95);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.division-card__progress--ended:hover {
+    border-color: rgba(118, 218, 164, 0.52);
+    box-shadow: inset 0 0 0 1px rgba(134, 236, 182, 0.16), 0 18px 32px rgba(12, 30, 22, 0.4);
+}
+
+.division-card__progress-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: rgba(120, 236, 174, 0.28);
+    border: 1px solid rgba(150, 255, 206, 0.4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 6px rgba(12, 32, 24, 0.35), 0 0 12px rgba(120, 236, 174, 0.4);
+}
+
+.division-card__progress-check svg {
+    width: 12px;
+    height: 12px;
+    fill: rgba(224, 255, 240, 0.95);
+}
+
+.division-card__progress-done {
+    font-size: 0.9rem;
+}
+
+.division-card__playoff {
+    margin-top: 1.05rem;
+    padding: 0.85rem 1rem 1rem;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(160deg, rgba(18, 34, 66, 0.82), rgba(10, 22, 40, 0.88));
+    border: 1px solid rgba(92, 138, 204, 0.32);
     position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 118px;
+    animation: playoff-fade-in 0.35s ease forwards;
 }
 
-.division-card--status-ended .division-card__progress-fill {
-    background: linear-gradient(135deg, rgba(150, 164, 200, 0.8), rgba(186, 198, 228, 0.75));
+.division-card__playoff::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(120, 160, 228, 0.45), rgba(84, 118, 180, 0.22), rgba(120, 160, 228, 0.45));
+    opacity: 0.6;
 }
 
-.division-card__progress-label {
-    font-weight: 700;
-    color: rgba(214, 228, 255, 0.92);
-    font-size: 0.95rem;
-    min-width: 3.5rem;
-    text-align: right;
+.division-card__playoff-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.82rem;
+    color: rgba(186, 202, 236, 0.86);
+}
+
+.division-card__playoff-title {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+
+.division-card__playoff-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    background: rgba(100, 140, 220, 0.22);
+    color: rgba(208, 224, 250, 0.9);
+}
+
+.playoff-chip--running {
+    background: rgba(78, 196, 255, 0.25);
+    color: rgba(214, 245, 255, 0.95);
+}
+
+.playoff-chip--ended {
+    background: rgba(120, 236, 174, 0.28);
+    color: rgba(224, 255, 240, 0.95);
+}
+
+.division-card__playoff-line {
+    font-size: 0.82rem;
+    color: rgba(188, 204, 236, 0.82);
+}
+
+.division-card__playoff-dates {
+    font-size: 0.8rem;
+    color: rgba(168, 190, 230, 0.75);
+}
+
+.division-card__playoff-winner {
+    font-size: 0.82rem;
+    color: rgba(224, 255, 240, 0.92);
+}
+
+.division-card__playoff-actions {
+    margin-top: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+.division-card__playoff-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 1rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, rgba(92, 176, 255, 0.94), rgba(108, 216, 255, 0.88));
+    color: #071020;
+    box-shadow: 0 12px 24px rgba(70, 150, 255, 0.28);
+    text-decoration: none;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.division-card__playoff-button:hover,
+.division-card__playoff-button:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 28px rgba(70, 150, 255, 0.38);
+}
+
+.division-card__playoff-button--disabled {
+    background: rgba(120, 140, 180, 0.22);
+    color: rgba(190, 206, 234, 0.7);
+    cursor: default;
+    box-shadow: none;
+}
+
+.division-card__playoff--upcoming {
+    background: linear-gradient(160deg, rgba(18, 30, 54, 0.78), rgba(10, 18, 36, 0.84));
+    border-color: rgba(92, 130, 186, 0.28);
+}
+
+.division-card__playoff--running {
+    border-color: rgba(124, 196, 255, 0.4);
+    box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.2);
+}
+
+.division-card__playoff--ended {
+    background: linear-gradient(150deg, rgba(34, 74, 58, 0.72), rgba(18, 38, 32, 0.76));
+    border-color: rgba(120, 236, 174, 0.42);
+    color: rgba(214, 248, 232, 0.95);
+}
+
+.division-card__playoff--placeholder {
+    margin-top: 1.05rem;
+    min-height: 118px;
+    border: 1px solid transparent;
+    background: transparent;
+    pointer-events: none;
+    animation: none;
+}
+
+@keyframes playoff-fade-in {
+    0% {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes division-progress-shimmer {
+    0% {
+        transform: translateX(-120%);
+        opacity: 0.25;
+    }
+    30% {
+        opacity: 0.55;
+    }
+    100% {
+        transform: translateX(220%);
+        opacity: 0.25;
+    }
 }
 
 .division-card__winner {
@@ -1296,12 +1576,31 @@ a {
     .division-card__stats {
         gap: 0.75rem;
     }
-    .division-card__progress {
+    .division-card__progress--active {
+        gap: 0.55rem;
+        padding: 0.9rem 0.95rem 1rem;
+    }
+    .division-card__progress-meta {
         flex-direction: column;
         align-items: flex-start;
+        gap: 0.3rem;
     }
-    .division-card__progress-label {
-        text-align: left;
+    .division-card__progress-caption {
+        white-space: normal;
+    }
+    .division-card__progress--upcoming,
+    .division-card__progress--ended {
+        padding: 0.9rem 0.95rem;
+        text-align: center;
+    }
+    .division-card__playoff {
+        padding: 0.8rem 0.85rem 0.9rem;
+    }
+    .division-card__playoff-actions {
+        justify-content: flex-start;
+    }
+    .division-card__playoff-button {
+        width: 100%;
     }
     .division-card__footer {
         flex-direction: column;
@@ -1310,9 +1609,6 @@ a {
     .division-card__cta {
         width: 100%;
         justify-content: center;
-    }
-    .division-card__secondary {
-        width: 100%;
     }
 }
 

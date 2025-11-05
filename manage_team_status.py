@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 from async_db import fetch_all
 from division_overrides import load_division_overrides
-from faceit_config import DIVISIONS
+import faceit_config
 
 OVERRIDES_PATH = Path(__file__).with_name("division_overrides.json")
 STATUS_KEYS = {"banned": "banned_teams", "quit": "quit_teams"}
@@ -165,7 +165,7 @@ def _render_status_table(data: Dict[str, Dict[str, List[Dict[str, Any]]]]) -> No
         print("No banned or quit teams recorded.")
         return
     for champ_id, section in sorted(data.items()):
-        division = next((d for d in DIVISIONS if d.get("championship_id") == champ_id), None)
+        division = next((d for d in faceit_config.DIVISIONS if d.get("championship_id") == champ_id), None)
         title = division["name"] if division else champ_id
         print(f"\n{title} ({champ_id})")
         for status, key in STATUS_KEYS.items():
@@ -180,16 +180,16 @@ def _render_status_table(data: Dict[str, Dict[str, List[Dict[str, Any]]]]) -> No
 
 
 async def _interactive_flow() -> None:
-    all_divisions = [div for div in DIVISIONS if div.get("championship_id")]
+    all_divisions = [div for div in faceit_config.DIVISIONS if div.get("championship_id")]
     if not all_divisions:
         raise RuntimeError("No divisions configured in divisions.json")
 
     # Show only current season by default
-    from faceit_config import CURRENT_SEASON
-    current_divisions = [d for d in all_divisions if d.get("season") == CURRENT_SEASON]
-    
+    current_season = faceit_config.CURRENT_SEASON
+    current_divisions = [d for d in all_divisions if d.get("season") == current_season]
+
     if current_divisions:
-        show_all = input(f"Show only Season {CURRENT_SEASON} divisions? [Y/n]: ").strip().lower()
+        show_all = input(f"Show only Season {current_season} divisions? [Y/n]: ").strip().lower()
         divisions = all_divisions if show_all in {"n", "no"} else current_divisions
     else:
         divisions = all_divisions
