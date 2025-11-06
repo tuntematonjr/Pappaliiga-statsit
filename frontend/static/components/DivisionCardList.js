@@ -11,6 +11,9 @@
         ended: 'Taputeltu loppuun'
     });
 
+    const PLAYOFF_SERIES_CAPTION = '8 joukkuetta — 7 ottelua';
+    const DEFAULT_PLAYOFF_MATCHES = 7;
+
     function pickString(source, keys) {
         if (!source) return '';
         for (const key of keys) {
@@ -88,6 +91,41 @@
         }
 
         return normaliseKey(fallbackKey);
+    }
+
+    function toSortableTime(date) {
+        if (date instanceof Date) {
+            const value = date.getTime();
+            if (Number.isFinite(value)) {
+                return value;
+            }
+        }
+        return Number.NEGATIVE_INFINITY;
+    }
+
+    function pickLatestPlayoff(playoffs) {
+        if (!Array.isArray(playoffs) || playoffs.length === 0) {
+            return null;
+        }
+        return playoffs.reduce((selected, candidate) => {
+            if (!candidate) return selected;
+            if (!selected) return candidate;
+
+            const candidateStart = toSortableTime(candidate.startDate);
+            const selectedStart = toSortableTime(selected.startDate);
+            if (candidateStart !== selectedStart) {
+                return candidateStart > selectedStart ? candidate : selected;
+            }
+
+            const candidateUpdated = toSortableTime(candidate.updatedAt);
+            const selectedUpdated = toSortableTime(selected.updatedAt);
+            if (candidateUpdated !== selectedUpdated) {
+                return candidateUpdated > selectedUpdated ? candidate : selected;
+            }
+
+            // Fall back to keeping the existing selection to preserve original ordering
+            return selected;
+        }, null);
     }
 
     function extractNumber(value) {
@@ -312,7 +350,18 @@
         if (explicit) {
             return 'division';
         }
-        if (division?.raw?.is_playoff || division?.is_playoff || division?.isPlayoff) {
+        const playoffFlags = [
+            division?.raw?.is_playoff,
+            division?.raw?.is_playoffs,
+            division?.is_playoff,
+            division?.is_playoff_secondary,
+            division?.isPlayoff,
+            division?.is_playoffs,
+            division?.isPlayoffs,
+            division?.stage && String(division.stage).toLowerCase().includes('playoff'),
+            division?.phase && String(division.phase).toLowerCase().includes('playoff')
+        ];
+        if (playoffFlags.some(Boolean)) {
             return 'playoffs';
         }
         const divisionNumber =
@@ -480,11 +529,49 @@
         if (!playoffCard) return null;
         const status = playoffCard.status;
         const statusLabel = PLAYOFF_STATUS_LABELS[status] || playoffCard.statusLabel || '';
-        const dateLabel = playoffCard.dateLabel || 'Ajankohta vahvistuu';
-        const winner =
-            status === 'ended' && playoffCard.winner && playoffCard.winner !== 'TBD'
-                ? playoffCard.winner
+        const startDate = playoffCard.startDate instanceof Date ? playoffCard.startDate : null;
+        const endDate = playoffCard.endDate instanceof Date ? playoffCard.endDate : null;
+        const startLabel = startDate ? formatDate(startDate) : '';
+        const endLabel = endDate ? formatDate(endDate) : '';
+
+        let dateLabel = '';
+        if (startLabel && endLabel) {
+            dateLabel = `${startLabel} – ${endLabel}`;
+        } else if (status === 'running' && startLabel) {
+            dateLabel = `${startLabel} –`;
+        } else if (status === 'ended' && endLabel) {
+            dateLabel = `Päättyi ${endLabel}`;
+        } else if (startLabel) {
+            dateLabel = startLabel;
+        }
+        if (!dateLabel && status === 'upcoming') {
+            dateLabel = 'Ei vielä alkanut';
+        }
+
+        const matchesTotalRaw =
+            Number.isFinite(playoffCard.matchesTotal) && playoffCard.matchesTotal > 0
+                ? playoffCard.matchesTotal
                 : null;
+        const matchesTotal = matchesTotalRaw || DEFAULT_PLAYOFF_MATCHES;
+        const matchesPlayedRaw = Number.isFinite(playoffCard.matchesPlayed) ? playoffCard.matchesPlayed : 0;
+        const matchesPlayed = Math.max(0, Math.min(matchesTotal, matchesPlayedRaw));
+
+        let progressPercent = Number.isFinite(playoffCard.progressPercent) ? playoffCard.progressPercent : NaN;
+        if (!Number.isFinite(progressPercent)) {
+            progressPercent = matchesTotal > 0 ? Math.round((matchesPlayed / matchesTotal) * 100) : 0;
+        }
+        progressPercent = Math.max(0, Math.min(100, Math.round(progressPercent)));
+
+        const progressLabel =
+            matchesTotal > 0 ? `${matchesPlayed} / ${matchesTotal} ottelua` : `${matchesPlayed} ottelua`;
+        const progressTooltip = progressLabel;
+        const progressAriaLabel = status === 'running' ? `Playoff-sarja etenee: ${progressLabel}` : '';
+
+        const winner =
+            status === 'ended'
+                ? (playoffCard.winner && String(playoffCard.winner).trim()) || 'TBD'
+                : null;
+
         let link = null;
         if (playoffCard.route) {
             link = { type: 'route', to: playoffCard.route };
@@ -495,9 +582,20 @@
             status,
             statusLabel,
             dateLabel,
+            hasDates: Boolean(dateLabel),
             winner,
-            matchesCaption: '8 joukkuetta — 7 ottelua',
-            link
+            matchesCaption: PLAYOFF_SERIES_CAPTION,
+            link,
+            isUpcoming: status === 'upcoming',
+            isRunning: status === 'running',
+            isEnded: status === 'ended',
+            progressPercent,
+            progressPercentText: `${progressPercent} %`,
+            progressLabel,
+            progressTooltip,
+            progressAriaLabel,
+            matchesPlayed,
+            matchesTotal
         };
     }
 
@@ -508,6 +606,7 @@
         const name = sanitizeDivisionName(rawName, division, kind);
 
         const slugValue = pickString(division, ['slug', 'code', 'identifier', 'championship_slug', 'championshipSlug']);
+        const slugBase = deriveBaseSlug(slugValue);
         const championshipId = pickString(division, ['championship_id', 'championshipId', 'id', 'championshipID']);
         const seasonNumber = toNumber(
             division.season ??
@@ -527,9 +626,8 @@
                 division?.raw?.division,
             NaN
         );
-        const baseSlug = deriveBaseSlug(slugValue);
         const canonicalKey = normaliseKey(
-            baseSlug ||
+            slugBase ||
                 championshipId ||
                 deriveSeasonDivisionKey(seasonNumber, divisionNumber) ||
                 name ||
@@ -667,6 +765,7 @@
             season: Number.isFinite(seasonNumber) ? seasonNumber : null,
             divisionNumber: Number.isFinite(divisionNumber) ? divisionNumber : null,
             slug: slugValue || null,
+            slugBase: slugBase || null,
             championshipId: championshipId || null,
             lookupKey: canonicalKey,
             parentKey,
@@ -917,8 +1016,38 @@
                             </span>
                         </header>
                         <p class="division-card__playoff-line">{{ playoffInfo.matchesCaption }}</p>
-                        <p class="division-card__playoff-dates">{{ playoffInfo.dateLabel }}</p>
-                        <p v-if="playoffInfo.winner" class="division-card__playoff-winner">Voittaja: {{ playoffInfo.winner }}</p>
+                        <p v-if="playoffInfo.hasDates" class="division-card__playoff-dates">
+                            {{ playoffInfo.dateLabel }}
+                        </p>
+                        <div
+                            v-if="playoffInfo.isRunning"
+                            class="division-card__playoff-progress"
+                            role="group"
+                            :aria-label="playoffInfo.progressAriaLabel"
+                            :title="playoffInfo.progressTooltip"
+                        >
+                            <div class="division-card__playoff-progress-meta">
+                                <span class="division-card__playoff-progress-percent">{{ playoffInfo.progressPercentText }}</span>
+                                <span class="division-card__playoff-progress-caption">{{ playoffInfo.progressLabel }}</span>
+                            </div>
+                            <div class="division-card__playoff-progress-track">
+                                <span
+                                    class="division-card__playoff-progress-fill"
+                                    :style="{ width: playoffInfo.progressPercent + '%' }"
+                                ></span>
+                            </div>
+                        </div>
+                        <div
+                            v-else-if="playoffInfo.isUpcoming"
+                            class="division-card__playoff-placeholder"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            Ei vielä alkanut
+                        </div>
+                        <div v-else class="division-card__playoff-result">
+                            <p class="division-card__playoff-winner">Voittaja: {{ playoffInfo.winner }}</p>
+                        </div>
                         <div class="division-card__playoff-actions">
                             <router-link
                                 v-if="playoffInfo.link && playoffInfo.link.type === 'route'"
@@ -981,53 +1110,70 @@
                 if (!Array.isArray(this.divisions)) {
                     return [];
                 }
-                const entries = [];
+
+                const groups = new Map();
+
                 this.divisions.forEach((division, index) => {
                     const normalized = normalizeDivision(division, index);
-                    if (normalized) {
-                        entries.push({ raw: division, normalized });
+                    if (!normalized) {
+                        return;
                     }
-                });
 
-                const playoffLookup = new Map();
-                entries.forEach(({ normalized }) => {
+                    let key = normaliseKey(
+                        normalized.lookupKey ||
+                            normalized.parentKey ||
+                            normalized.slug ||
+                            normalized.championshipId ||
+                            deriveSeasonDivisionKey(normalized.season, normalized.divisionNumber) ||
+                            normalized.key
+                    );
+                    if (!key) {
+                        key = `__division_${index}`;
+                    }
+
+                    if (!groups.has(key)) {
+                        groups.set(key, { main: null, playoffs: [] });
+                    }
+                    const bucket = groups.get(key);
                     if (normalized.kind === 'playoffs') {
-                        const key = normaliseKey(normalized.parentKey || normalized.lookupKey || normalized.championshipId);
-                        if (!key) return;
-                        if (!playoffLookup.has(key)) {
-                            playoffLookup.set(key, []);
-                        }
-                        playoffLookup.get(key).push(normalized);
+                        bucket.playoffs.push(normalized);
+                    } else if (!bucket.main) {
+                        bucket.main = normalized;
+                    } else {
+                        // multiple regular entries; create a separate bucket with unique key
+                        const altKey = `${key}::${bucket.playoffs.length + 1}`;
+                        groups.set(altKey, { main: normalized, playoffs: [] });
                     }
                 });
 
-                return entries
-                    .filter(({ normalized }) => normalized.kind !== 'playoffs')
-                    .map(({ normalized }) => {
-                        const keyCandidates = [
-                            normalized.lookupKey,
-                            normalized.parentKey,
-                            normaliseKey(normalized.championshipId),
-                            normaliseKey(normalized.slug),
-                            normaliseKey(deriveSeasonDivisionKey(normalized.season, normalized.divisionNumber))
-                        ].filter(Boolean);
-                        let playoffCard = null;
-                        for (const key of keyCandidates) {
-                            const bucket = playoffLookup.get(normaliseKey(key));
-                            if (bucket && bucket.length) {
-                                playoffCard = bucket[0];
-                                break;
-                            }
-                        }
-                        if (playoffCard) {
-                            normalized.hasPlayoffs = true;
-                            normalized.playoff = buildPlayoffDescriptor(playoffCard);
-                        } else {
-                            normalized.hasPlayoffs = false;
-                            normalized.playoff = null;
-                        }
-                        return normalized;
-                    });
+                const result = [];
+                groups.forEach(bucket => {
+                    const main = bucket.main;
+                    if (!main) {
+                        return;
+                    }
+
+                    const playoffCard = pickLatestPlayoff(bucket.playoffs);
+                    if (playoffCard) {
+                        main.hasPlayoffs = true;
+                        main.playoff = buildPlayoffDescriptor(playoffCard);
+                    } else {
+                        main.hasPlayoffs = false;
+                        main.playoff = null;
+                    }
+
+                    if (main.kind === 'playoffs') {
+                        return;
+                    }
+
+                    if (main.slug && /-(?:po|playoffs?)$/i.test(main.slug)) {
+                        return;
+                    }
+
+                    result.push(main);
+                });
+
+                return result;
             },
             hasDivisions() {
                 return this.normalizedDivisions.length > 0;

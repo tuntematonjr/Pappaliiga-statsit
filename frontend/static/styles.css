@@ -1331,17 +1331,18 @@ a {
 }
 
 .division-card__playoff {
-    margin-top: 1.05rem;
-    padding: 0.85rem 1rem 1rem;
+    margin-top: 1.1rem;
+    padding: 1rem 1.1rem 1.1rem;
     border-radius: var(--radius-sm);
-    background: linear-gradient(160deg, rgba(18, 34, 66, 0.82), rgba(10, 22, 40, 0.88));
-    border: 1px solid rgba(92, 138, 204, 0.32);
+    background: linear-gradient(160deg, rgba(28, 40, 68, 0.92), rgba(16, 26, 48, 0.94));
+    border: 1px solid rgba(86, 124, 192, 0.3);
     position: relative;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
-    min-height: 118px;
+    gap: 0.7rem;
+    min-height: 152px;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.3s ease;
     animation: playoff-fade-in 0.35s ease forwards;
 }
 
@@ -1352,8 +1353,8 @@ a {
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, rgba(120, 160, 228, 0.45), rgba(84, 118, 180, 0.22), rgba(120, 160, 228, 0.45));
-    opacity: 0.6;
+    background: linear-gradient(90deg, rgba(120, 160, 228, 0.4), rgba(84, 118, 180, 0.18), rgba(120, 160, 228, 0.4));
+    opacity: 0.65;
 }
 
 .division-card__playoff-header {
@@ -1362,7 +1363,7 @@ a {
     justify-content: space-between;
     gap: 0.75rem;
     font-size: 0.82rem;
-    color: rgba(186, 202, 236, 0.86);
+    color: rgba(190, 206, 238, 0.88);
 }
 
 .division-card__playoff-title {
@@ -1375,42 +1376,136 @@ a {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    padding: 0.25rem 0.6rem;
+    padding: 0.24rem 0.66rem;
     border-radius: 999px;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.05em;
-    background: rgba(100, 140, 220, 0.22);
-    color: rgba(208, 224, 250, 0.9);
+    background: rgba(110, 148, 216, 0.22);
+    color: rgba(210, 226, 254, 0.92);
+    transition: background 0.25s ease, color 0.25s ease;
 }
 
 .playoff-chip--running {
-    background: rgba(78, 196, 255, 0.25);
-    color: rgba(214, 245, 255, 0.95);
+    background: rgba(78, 196, 255, 0.24);
+    color: rgba(210, 244, 255, 0.96);
 }
 
 .playoff-chip--ended {
     background: rgba(120, 236, 174, 0.28);
-    color: rgba(224, 255, 240, 0.95);
+    color: rgba(224, 255, 240, 0.94);
 }
 
 .division-card__playoff-line {
     font-size: 0.82rem;
-    color: rgba(188, 204, 236, 0.82);
+    color: rgba(194, 208, 240, 0.85);
 }
 
 .division-card__playoff-dates {
     font-size: 0.8rem;
-    color: rgba(168, 190, 230, 0.75);
+    color: rgba(172, 192, 230, 0.78);
+}
+
+.division-card__playoff-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.85rem 0.95rem 0.95rem;
+    border-radius: var(--radius-sm);
+    background: rgba(16, 32, 58, 0.68);
+    border: 1px solid rgba(92, 150, 226, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(60, 110, 194, 0.12);
+}
+
+.division-card__playoff-progress-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6rem;
+    color: rgba(214, 230, 255, 0.92);
+}
+
+.division-card__playoff-progress-percent {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.division-card__playoff-progress-caption {
+    font-size: 0.78rem;
+    color: rgba(184, 202, 236, 0.78);
+}
+
+.division-card__playoff-progress-track {
+    position: relative;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(68, 96, 150, 0.45);
+    overflow: hidden;
+}
+
+.division-card__playoff-progress-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: inherit;
+    width: 0;
+    background: linear-gradient(135deg, rgba(96, 188, 255, 0.95), rgba(122, 255, 214, 0.88));
+    box-shadow: 0 0 14px rgba(96, 188, 255, 0.32);
+    transition: width 0.4s cubic-bezier(0.45, 0, 0.2, 1), filter 0.3s ease;
+}
+
+.division-card__playoff-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 40%;
+    left: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.35) 55%, transparent 100%);
+    transform: translateX(-120%);
+    animation: division-progress-shimmer 6s linear infinite;
+}
+
+.division-card__playoff-progress:hover .division-card__playoff-progress-fill {
+    filter: brightness(1.06);
+}
+
+.division-card__playoff-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.95rem;
+    border-radius: var(--radius-sm);
+    background: rgba(20, 30, 48, 0.62);
+    border: 1px dashed rgba(112, 138, 188, 0.36);
+    color: rgba(188, 204, 236, 0.78);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.division-card__playoff-result {
+    padding: 0.9rem 0.95rem;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(150deg, rgba(32, 68, 54, 0.62), rgba(18, 42, 34, 0.64));
+    border: 1px solid rgba(92, 192, 142, 0.36);
+    color: rgba(218, 248, 234, 0.95);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
 .division-card__playoff-winner {
     font-size: 0.82rem;
-    color: rgba(224, 255, 240, 0.92);
 }
 
 .division-card__playoff-actions {
-    margin-top: 0.2rem;
+    margin-top: auto;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -1424,45 +1519,46 @@ a {
     border-radius: 999px;
     font-size: 0.82rem;
     font-weight: 600;
-    background: linear-gradient(135deg, rgba(92, 176, 255, 0.94), rgba(108, 216, 255, 0.88));
+    background: linear-gradient(135deg, rgba(92, 176, 255, 0.92), rgba(108, 216, 255, 0.86));
     color: #071020;
-    box-shadow: 0 12px 24px rgba(70, 150, 255, 0.28);
+    box-shadow: 0 12px 24px rgba(70, 150, 255, 0.26);
     text-decoration: none;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
 .division-card__playoff-button:hover,
 .division-card__playoff-button:focus-visible {
     transform: translateY(-1px);
-    box-shadow: 0 16px 28px rgba(70, 150, 255, 0.38);
+    box-shadow: 0 16px 28px rgba(70, 150, 255, 0.34);
 }
 
 .division-card__playoff-button--disabled {
-    background: rgba(120, 140, 180, 0.22);
+    background: rgba(120, 140, 180, 0.24);
     color: rgba(190, 206, 234, 0.7);
     cursor: default;
     box-shadow: none;
 }
 
 .division-card__playoff--upcoming {
-    background: linear-gradient(160deg, rgba(18, 30, 54, 0.78), rgba(10, 18, 36, 0.84));
-    border-color: rgba(92, 130, 186, 0.28);
+    background: linear-gradient(160deg, rgba(28, 40, 64, 0.9), rgba(16, 26, 44, 0.92));
+    border-color: rgba(84, 114, 176, 0.26);
 }
 
 .division-card__playoff--running {
-    border-color: rgba(124, 196, 255, 0.4);
-    box-shadow: inset 0 0 0 1px rgba(90, 160, 255, 0.2);
+    border-color: rgba(120, 198, 255, 0.4);
+    box-shadow: inset 0 0 0 1px rgba(90, 154, 242, 0.16), 0 12px 26px rgba(6, 16, 34, 0.4);
 }
 
 .division-card__playoff--ended {
-    background: linear-gradient(150deg, rgba(34, 74, 58, 0.72), rgba(18, 38, 32, 0.76));
-    border-color: rgba(120, 236, 174, 0.42);
-    color: rgba(214, 248, 232, 0.95);
+    background: linear-gradient(155deg, rgba(32, 64, 52, 0.88), rgba(18, 34, 28, 0.88));
+    border-color: rgba(120, 236, 174, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(120, 236, 174, 0.22), 0 12px 26px rgba(8, 22, 16, 0.35);
 }
 
 .division-card__playoff--placeholder {
-    margin-top: 1.05rem;
-    min-height: 118px;
+    margin-top: 1.1rem;
+    min-height: 152px;
+    border-radius: var(--radius-sm);
     border: 1px solid transparent;
     background: transparent;
     pointer-events: none;
@@ -1594,10 +1690,23 @@ a {
         text-align: center;
     }
     .division-card__playoff {
-        padding: 0.8rem 0.85rem 0.9rem;
+        padding: 0.85rem 0.9rem 0.95rem;
     }
-    .division-card__playoff-actions {
-        justify-content: flex-start;
+    .division-card__playoff-progress {
+        padding: 0.75rem 0.8rem 0.85rem;
+    }
+    .division-card__playoff-progress-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+    }
+    .division-card__playoff-result {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+    }
+    .division-card__playoff-placeholder {
+        padding: 0.85rem;
     }
     .division-card__playoff-button {
         width: 100%;
