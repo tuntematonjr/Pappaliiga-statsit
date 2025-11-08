@@ -28,6 +28,7 @@ class DivisionSummary(CamelModel):
     season: int
     division_num: int
     is_playoff: bool
+    parent_championship_id: Optional[str] = None
     teams_count: int | None = 0
     played_matches: int | None = 0
     total_matches: int | None = 0
@@ -138,6 +139,7 @@ class DivisionDetails(CamelModel):
     season: int
     division_num: int
     is_playoff: bool
+    parent_championship_id: Optional[str] = None
     teams: List[TeamBasic]
     excluded_team_ids: List[str]
     map_stats: Optional[List[MapVoteStats]] = None

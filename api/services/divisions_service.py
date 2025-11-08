@@ -42,7 +42,7 @@ async def list_divisions(limit: int, offset: int) -> List[dict[str, Any]]:
     rows = await query_async(
         """
         SELECT championship_id, slug, name, season, division_num,
-               is_playoffs AS is_playoff
+               is_playoffs AS is_playoff, parent_championship_id
         FROM championships
         ORDER BY season DESC, division_num, is_playoffs
         LIMIT :limit OFFSET :offset
@@ -85,7 +85,8 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
             c.name,
             c.season,
             c.division_num,
-            CASE WHEN c.slug LIKE '%%-po%%' THEN 1 ELSE 0 END AS is_playoff,
+            c.is_playoffs AS is_playoff,
+            c.parent_championship_id,
             COALESCE(tc.teams_count, 0) AS teams_count,
             COUNT(DISTINCT CASE WHEN m.finished_at IS NOT NULL THEN m.match_id END) AS played_matches,
             COUNT(DISTINCT m.match_id) AS total_matches,
@@ -114,7 +115,7 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
         LEFT JOIN matches m ON c.championship_id = m.championship_id
         LEFT JOIN team_counts tc ON tc.championship_id = c.championship_id
         WHERE c.season = :season
-        GROUP BY c.championship_id, c.slug, c.name, c.season, c.division_num, is_playoff, tc.teams_count
+        GROUP BY c.championship_id, c.slug, c.name, c.season, c.division_num, c.is_playoffs, c.parent_championship_id, tc.teams_count
         ORDER BY c.division_num ASC
         LIMIT :limit OFFSET :offset
         """,
@@ -127,7 +128,7 @@ async def _fetch_champ_row(where_clause: str, params: dict[str, Any]) -> dict[st
     rows = await query_async(
         f"""
         SELECT championship_id, slug, name, season, division_num,
-            CASE WHEN slug LIKE '%%-po%%' THEN 1 ELSE 0 END AS is_playoff
+            is_playoffs AS is_playoff, parent_championship_id
         FROM championships
         WHERE {where_clause}
         LIMIT 1

@@ -17,14 +17,15 @@ _TS_EXPR = (
 )
 
 _CHAMPIONSHIP_UPSERT_SQL = """
-    INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug)
-    VALUES (%(championship_id)s, %(season)s, %(division_num)s, %(name)s, %(is_playoffs)s, %(slug)s)
+    INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug, parent_championship_id)
+    VALUES (%(championship_id)s, %(season)s, %(division_num)s, %(name)s, %(is_playoffs)s, %(slug)s, %(parent_championship_id)s)
     ON DUPLICATE KEY UPDATE
       season = VALUES(season),
       division_num = VALUES(division_num),
       name = CASE WHEN championships.name = '' THEN VALUES(name) ELSE championships.name END,
       is_playoffs = VALUES(is_playoffs),
-      slug = CASE WHEN championships.slug = '' THEN VALUES(slug) ELSE championships.slug END
+      slug = CASE WHEN championships.slug = '' THEN VALUES(slug) ELSE championships.slug END,
+      parent_championship_id = VALUES(parent_championship_id)
 """
 
 _TEAM_UPSERT_SQL = """
@@ -175,6 +176,7 @@ def _prepare_championship_payload(row: Row) -> Optional[Dict[str, Any]]:
         "name": row.get("name"),
         "is_playoffs": 1 if row.get("is_playoffs") else 0,
         "slug": row.get("slug"),
+        "parent_championship_id": row.get("parent_championship_id"),
     }
 
 

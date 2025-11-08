@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -98,6 +99,56 @@ def safe_float(value: Any, default: Optional[float] = None) -> Optional[float]:
         return float(s)
     except Exception:
         return default
+
+
+def derive_slug_base(slug: str) -> str:
+    """Strip playoff/runko suffixes from slug to get base slug."""
+    if not slug:
+        return ""
+    base = slug.lower().strip()
+    # Remove playoff-related suffixes
+    base = re.sub(r'-(?:playoffs?|po|pudotuspelit).*$', '', base)
+    base = re.sub(r'-(?:rk|runko|regular).*$', '', base)
+    base = re.sub(r'-+', '-', base)
+    base = base.strip('-')
+    return base
+
+
+async def find_parent_championship_id(
+    slug: str,
+    season: int,
+    division_num: int,
+    is_playoffs: bool
+) -> Optional[str]:
+    """Find parent championship ID for a playoff division.
+    
+    Returns championship_id of matching non-playoff division, or None.
+    """
+    if not is_playoffs:
+        return None
+    
+    slug_base = derive_slug_base(slug)
+    if not slug_base:
+        return None
+    
+    # Query for matching non-playoff championship
+    rows = await fetch_all(
+        """
+        SELECT championship_id
+        FROM championships
+        WHERE is_playoffs = 0
+          AND season = %s
+          AND division_num = %s
+          AND slug LIKE %s
+        LIMIT 1
+        """,
+        (season, division_num, f"{slug_base}%")
+    )
+    
+    if rows:
+        return str(rows[0]["championship_id"])
+    
+    return None
 
 
 def _extract_rounds(stats_json: Dict[str, Any] | None) -> List[Dict[str, Any]]:
@@ -855,6 +906,9 @@ async def sync_championship_async(
     status_entries = combined_status_teams(championship_id, override_source)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
 
+    # Find parent championship if this is a playoff division
+    parent_championship_id = await find_parent_championship_id(slug, season, division_num, is_playoffs)
+
     async with connection() as conn:
         await upsert_championship_async(
             conn,
@@ -865,6 +919,7 @@ async def sync_championship_async(
                 "name": division_info.get("name") or slug,
                 "is_playoffs": 1 if is_playoffs else 0,
                 "slug": slug,
+                "parent_championship_id": parent_championship_id,
             },
         )
         team_payloads = [
@@ -1050,6 +1105,9 @@ async def update_single_match_async(match_id: str) -> Optional[str]:
     status_entries = combined_status_teams(championship_id, overrides)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
 
+    # Find parent championship if this is a playoff division
+    parent_championship_id = await find_parent_championship_id(slug, season, division_num, is_playoffs)
+
     async with connection() as conn:
         await upsert_championship_async(
             conn,
@@ -1060,6 +1118,7 @@ async def update_single_match_async(match_id: str) -> Optional[str]:
                 "name": division.get("name") or slug,
                 "is_playoffs": 1 if is_playoffs else 0,
                 "slug": slug,
+                "parent_championship_id": parent_championship_id,
             },
         )
         team_payloads = [

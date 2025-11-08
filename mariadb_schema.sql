@@ -8,12 +8,16 @@ CREATE TABLE IF NOT EXISTS championships (
     name VARCHAR(255) NOT NULL,
     is_playoffs TINYINT(1) NOT NULL DEFAULT 0,
     slug VARCHAR(120) NOT NULL,
+    parent_championship_id VARCHAR(64) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (championship_id),
     UNIQUE KEY uq_championships_slug (slug),
     KEY idx_championships_season_division (season, division_num),
-    KEY idx_championships_division (division_num)
+    KEY idx_championships_division (division_num),
+    KEY idx_championships_parent (parent_championship_id),
+    CONSTRAINT fk_championships_parent FOREIGN KEY (parent_championship_id) 
+        REFERENCES championships (championship_id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS teams (
