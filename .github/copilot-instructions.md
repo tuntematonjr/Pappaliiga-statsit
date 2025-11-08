@@ -1,211 +1,204 @@
-# ⚠️ **DO NOT EDIT FILES IN `docs/` DIRECTLY**
-
-All source changes to CSS/JS must be made in `web_static/` and copied to `docs/` using `copy_static.bat`. The `docs/` directory is auto-generated and will be overwritten. Manual edits to `docs/` will be lost and may break the site.
-
-# Pappaliiga Stats Generator - AI Agent Instructions
+# Copilot Instructions for Pappaliiga-statsit
 
 ## Project Overview
-CS2 tournament statistics generator for Pappaliiga (Finnish esports league). Fetches data from Faceit API, stores in MariaDB, generates static HTML pages for GitHub Pages hosting.
 
-## Architecture & Data Flow
-- **sync.py**: Fetches championship/match data from Faceit API → MariaDB (fully async)
-- **html_gen.py**: Reads MariaDB → generates division HTML pages (fully async)
-- **Output**: Static HTML files in `docs/` for GitHub Pages deployment
-- **Database**: MariaDB schema defined in `mariadb_schema.sql`
+This is a **Pappaliiga Statistics System** - a full-stack application that fetches, processes, and displays CS2 (Counter-Strike 2) competitive match data from FACEIT API. The system consists of:
 
-## Key Components
+1. **Data Sync Pipeline** - Fetches championship, match, and player statistics from FACEIT API
+2. **REST API Backend** - FastAPI-based service providing data endpoints
+3. **Frontend SPA** - Vanilla JavaScript single-page application with component-based architecture
+4. **Database** - MariaDB/MySQL for persistent storage
 
-### Configuration System
-- `faceit_config.py`: API keys (env: `FACEIT_API_KEY`), season constants
-- `divisions.json`: Championship metadata (IDs, slugs, division numbers)
-- `division_overrides.json`: **Season-specific** team exclusions (banned/quit teams), managed per championship
-- Schema: `championships` table is the core entity, matches/teams/players join to it
+**Important**: This project does **NOT** use GitHub Actions, deployment automation, or any CI/CD pipelines. All operations are manual and local.
 
-### Async Patterns (Critical)
-- **async_db.py**: Connection pooling, all DB operations have async equivalents
-- **sync.py**: Fully async data pipeline with concurrent API fetching
-- **html_gen.py**: Async file I/O with aiofiles, concurrent division processing
-- Use async patterns for all new code and when refactoring existing components
+## Architecture
 
-### Database Schema Patterns
-- Championship-centric: `championship_id` is primary foreign key
-- Slugs for stable URLs: `div1-s11`, `div1-s11-po` (playoffs)
-- Per-map stats: `map_team_stats`, `map_player_stats` tables
-- Map voting: `map_votes` tracks veto/pick sequences
-- **No global bans**: `is_banned` removed from `teams` table; all exclusions are JSON-based and season-specific
+### Backend (Python)
+- **API Framework**: FastAPI with async/await patterns
+- **Database**: asyncmy for async MariaDB/MySQL connections
+- **HTTP Client**: httpx for FACEIT API calls with retry logic (tenacity)
+- **Key Files**:
+  - `api/main.py` - FastAPI application entry point
+  - `sync_pipeline.py` - Main data synchronization logic
+  - `faceit_client_async.py` - FACEIT API client
+  - `db_async.py` - Database connection pool
+  - `db_ops_async.py` - Database operations
 
-## Development Workflows
+### Frontend (Vanilla JavaScript)
+- **Architecture**: Component-based SPA with no framework dependencies
+- **Router**: History mode routing (handled by `spa_server.py`)
+- **State Management**: Store pattern (`stores/` directory)
+- **Components**: Reusable UI components in `frontend/static/components/`
+- **Key Files**:
+  - `frontend/index.html` - Application entry point
+  - `frontend/static/app-main.js` - Router and app initialization
+  - `frontend/static/api-client.js` - API communication layer
+  - `frontend/spa_server.py` - Development server with SPA fallback
 
-### Data Pipeline Commands
-```bash
-# Full refresh (daily in CI)
-python sync.py && python html_gen.py --force
+### Database Schema
+- Located in `mariadb_schema.sql`
+- Tables include: championships, divisions, teams, players, matches, maps, match_stats, player_stats, team_stats, etc.
+- Uses snapshot timestamps for data versioning
 
-# Quick local updates
-python html_gen.py                    # skips unchanged files
-python html_gen.py --div 1           # single division
+## Development Workflow
+
+### Environment Setup
+1. Python virtual environment with dependencies from `requirements.txt`
+2. MariaDB/MySQL database (connection via `.env` file)
+3. FACEIT API credentials in environment variables
+
+### Starting Development Servers
+Use the PowerShell script for convenience:
+```powershell
+.\scripts\dev_start.ps1
 ```
 
-### Debugging Tools
-- `debug_raw.py --match MATCH_ID`: Raw Faceit API responses
-- `serve_docs.bat`: Local HTTP server for testing generated HTML
-- `log_server.py`: Local HTTP server for collecting client-side debug logs
-- `copy_static.bat`: Utility to copy `web_static/` files to `docs/`
-- `division_overrides.py`: Helper for managing banned/quit teams via CLI (see TEAM_STATUS_GUIDE.md)
+Or manually:
+```powershell
+# Backend (default port 8000)
+python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 
-### Windows Batch Helpers
-- `run_all.bat`: Complete sync + generate cycle
-- `serve_docs.bat`: Local development server (hardcoded IP binding)
-- `copy_static.bat`: Copy static assets from `web_static/` to `docs/`
+# Frontend (default port 8001)
+python frontend\spa_server.py 8001
+```
 
-### Local Development & Testing
-- **LAN Testing**: Bind servers to LAN IP (192.168.0.13) for multi-device testing
-- **Client Logging**: `sendClientLog()` function posts debug events to `log_server.py`
-- **Log Events**: 'toggle-start', 'opening', 'closing', 'forced-collapse', 'class-removed'
-- **Static Asset Workflow**: Edit in `web_static/` → run `copy_static.bat` → test in `docs/`
+### Database Operations
+- **Apply schema**: `python tools\apply_schema.py`
+- **Check connection**: `python tools\check_db_connection.py`
+- **Drop tables**: `python drop_all_tables.py` (use with caution)
 
-## Code of Conduct for Development
+### Data Synchronization
+Run the sync pipeline to fetch latest data from FACEIT:
+```powershell
+python sync.py
+```
 
-### Code Quality Standards
-- **Type Hints**: Always use type hints for function parameters and return values
-- **Docstrings**: Document all public functions with clear descriptions, parameters, and return values
-- **Naming Conventions**: 
-  - Functions: `snake_case`, async functions should end with `_async` suffix
-  - Classes: `PascalCase`
-  - Constants: `UPPER_CASE`
-  - Private functions: prefix with `_`
-- **Line Length**: Maximum 120 characters per line
-- **Error Messages**: Use clear, actionable error messages with context
+## Coding Standards
 
-### Code Organization
-- **Single Responsibility**: Each function should do one thing well
-- **DRY Principle**: Don't Repeat Yourself - extract common logic into helper functions
-- **File Structure**: Group related functions together, keep files focused on specific domains
-- **Import Order**: Standard library → third-party → local imports, alphabetically sorted within each group
+### Python
+- **Async/await**: All database and API calls use async patterns
+- **Type hints**: Use `from __future__ import annotations` for forward references
+- **Docstrings**: Include module-level docstrings explaining purpose
+- **Error handling**: Use custom exceptions from `api/exceptions.py`
+- **Logging**: Use Python's logging module, not print statements (except for startup messages)
+- **Database**: Always use connection context managers, never leave connections open
+- **Import order**: Standard library → Third-party → Local modules
 
-### Async Best Practices
-- **Connection Management**: Always use connection pooling, never create individual connections
-- **Error Handling**: Wrap async operations in try/except, log errors with full context
-- **Concurrent Operations**: Use `asyncio.gather()` for parallel operations, handle exceptions properly
-- **Resource Cleanup**: Use context managers (`async with`) for database connections and file operations
+### JavaScript (Frontend)
+- **ES6+ syntax**: Use modern JavaScript (const/let, arrow functions, async/await, destructuring)
+- **No framework dependencies**: Pure vanilla JS, no React/Vue/Angular
+- **Component pattern**: Self-contained components that return DOM elements
+- **Store pattern**: Centralized state management with reactivity
+- **API calls**: Use `api-client.js` for all backend communication
+- **Error handling**: Always handle promise rejections and display user-friendly errors
+- **CSS**: Scoped styles in `styles.css`, use CSS custom properties for theming
 
-### Database Interactions
-- **Parameterized Queries**: Always use parameterized queries (`:param` syntax) to prevent SQL injection
-- **Transaction Safety**: Use transactions for multi-step operations that must be atomic
-- **Upsert Pattern**: Prefer `INSERT ... ON DUPLICATE KEY UPDATE` for idempotent operations
-- **Index Awareness**: Consider query performance and index usage when writing SQL
+### File Naming
+- Python: snake_case for files and functions
+- JavaScript: PascalCase for component files, camelCase for utilities
+- Directories: lowercase with hyphens if needed
 
-### Testing & Validation
-- **Before Commit**: Test locally with full sync + generation cycle
-- **Edge Cases**: Test with missing data, empty results, and error conditions
-- **Performance**: Profile slow operations, optimize before committing
-- **Schema Changes**: Test migrations thoroughly, document breaking changes
+## Common Tasks
 
-### Git Workflow
-- **Commit Messages**: Use clear, descriptive messages explaining "why" not just "what"
-- **Branch Naming**: Use feature branches (`feature/description` or `fix/issue`)
-- **Pull Requests**: Include context, testing steps, and screenshots for UI changes
-- **Code Review**: Review your own diff before requesting review
+### Adding a New API Endpoint
+1. Create route handler in `api/routers/`
+2. Add service logic in `api/services/` if needed
+3. Update models in `api/models.py` with Pydantic schemas
+4. Register router in `api/main.py`
+5. Test endpoint manually (no automated testing framework)
 
-## Code Conventions
+### Adding a New Frontend Component
+1. Create component file in `frontend/static/components/`
+2. Export function that returns DOM element
+3. Import in relevant view (`frontend/static/views/`)
+4. Add to component examples if reusable (`component-examples.html`)
 
-### Error Handling Patterns
-- Faceit API: Graceful degradation, log warnings but continue processing
-- Database: Foreign key constraints enforced, upsert patterns everywhere
-- Async operations: Use connection pools, handle asyncmy properly with try/except blocks
+### Adding a New Database Table
+1. Update `mariadb_schema.sql` with new table definition
+2. Add corresponding operations in `db_ops_async.py`
+3. Apply schema changes: `python tools\apply_schema.py`
+4. Update sync pipeline if data source is FACEIT API
 
-### HTML Generation
-- Template versioning: `HTML_TEMPLATE_VERSION` constant for cache busting
-- Content diffing: Compares generated vs existing files to skip unchanged
-- CSS/JS externalized: `styles.css`, `app.js` shared across all pages
+### Debugging
+- **Check database schema**: `python check_schema.py`
+- **Verify data integrity**: Scripts in `scripts/` directory (e.g., `check_team_totals.py`)
+- **Inspect API responses**: Check `[API] match_id=*.json` files in project root
+- **Database diagnostics**: `python scripts\db_diag.py`
 
-## File Organization
-- `docs/`: **AUTO-GENERATED** HTML output (GitHub Pages root) - **DO NOT EDIT MANUALLY**
-- `web_static/`: Source CSS/JS files - edit these, then copy to `docs/` when modified
-- All content in `docs/` is regenerated by `html_gen.py` and static assets are copied by `copy_static.bat`
+## Project-Specific Context
 
-## External Dependencies
-- **Faceit Open Data API**: Match details, player stats
-- **Faceit Democracy API**: Map veto history
-- **GitHub Actions**: Daily scheduled sync (secrets: `FACEIT_API_KEY`)
+### Division Management
+- Division overrides stored in `division_overrides.json`
+- Registry in `division_registry.py` and `divisions.json`
+- Team status managed via `manage_team_status.py`
 
-## Common Patterns
-- Function naming: `compute_*_async()` for async aggregations
-- Database queries: Use `query_async()` wrapper with proper connection handling
-- HTML escaping: Always escape user data with `html.escape()`
-- Timezone handling: UTC storage, Finnish display (`Europe/Helsinki`)
+### Data Flow
+1. **Fetch**: FACEIT API → `faceit_client_async.py`
+2. **Transform**: `sync_pipeline.py` processes raw data
+3. **Store**: `db_ops_async.py` writes to MariaDB
+4. **Serve**: FastAPI exposes via REST endpoints
+5. **Display**: Frontend fetches and renders data
 
-## UI/UX Patterns
+### Key Configuration Files
+- `.env` - Database credentials and API keys (not in git)
+- `faceit_config.py` - FACEIT API configuration
+- `division_overrides.json` - Manual division/team overrides
+- `mariadb_schema.sql` - Complete database schema
 
-### Visual Design System
-- **Dark theme**: CSS custom properties in `:root` define color palette (`--bg`, `--card`, `--accent`, etc.)
-- **Card-based layout**: `.stat-card`, `.hero-card`, `.card` classes with consistent styling
-- **Index page**: Dual hero cards (AFI + Pappaliiga), stats overview grid, season navigation
-- **Division pages**: Team navigation bar with logos, collapsible team/match sections
+## Important Constraints
 
-### Interactive Elements
-- **Collapsible sections**: Use `<details>` with custom JavaScript animations
-  - Team sections: `.team-section` with `custom-expanded` class for state management
-  - Match details: `.match-row` within `.matches-mirror` containers
-  - All sections start collapsed, expand with smooth height/opacity transitions
-  - **Critical**: Remove resize listener (`window.addEventListener('resize', adaptDetails)`) to prevent mobile collapse issues
-- **Table sorting**: `sortTable()` function with visual indicators and persistent state
-- **Responsive filters**: Show/hide played-only matches with checkbox controls
-- **Progress bars**: Smooth shimmer animation with opacity transitions (avoid class toggling that resets animation)
+### What NOT to suggest:
+- ❌ GitHub Actions or any CI/CD automation
+- ❌ Deployment scripts or production configurations
+- ❌ Docker/containerization (unless explicitly requested)
+- ❌ Testing frameworks (pytest, jest, etc.) - testing is manual
+- ❌ Build tools or bundlers for frontend (it's vanilla JS)
+- ❌ TypeScript migration
+- ❌ Framework migrations (React, Vue, etc.)
 
-### JavaScript Patterns
-- **Custom animations**: Override default `<details>` behavior with `custom-expanded` class
-- **Mobile/PC compatibility**: Event handling works across devices with touch/click
-  - Use precise touch detection (max movement: 8px, max time: 400ms)
-  - Suppress synthetic click events after touch with `_isTouch` flag
-  - Single event handler per summary with `dataset.hasSummaryListener` guard
-- **Team navigation**: Auto-expand target sections when clicking team links (# team-{id}
-- **State preservation**: Collapsible state managed through CSS classes, not `open` attribute
-- **Debug logging**: `sendClientLog()` posts events to local collector (LAN IP configurable)
-
-## Team Status Management
-- **Banned/Quit Teams**: Managed exclusively via `division_overrides.json` (season-specific)
-- **No Database Field**: `is_banned` removed from `teams` table; runtime flag only for display/exclusion
-- **Season Isolation**: Bans/quits only affect their specific championship, not other seasons
-- **CLI Tool**: Use `python division_overrides.py` to add/remove/list team exclusions
-- **Statistics**: All index/division stats automatically exclude banned/quit teams per season
-- **Documentation**: See `TEAM_STATUS_GUIDE.md` for detailed workflow
-
-## Development Principles
-- **Async-First**: All new code should use async patterns; migrate sync code when touching it
-- **Generated Content**: Never manually edit files in `docs/` - they're auto-regenerated
-- **Source of Truth**: CSS/JS changes go in `web_static/`, then copied to `docs/`
-- **Season-Specific Exclusions**: Always use `_get_excluded_team_ids_for_championships()` for team filtering
-- **UI Consistency**: Follow existing card/section patterns and collapsible behavior
-- **Mobile-First UX**: Test expand/collapse on mobile devices; avoid resize listeners that force collapse
-- **Smooth Animations**: Use CSS opacity transitions for shimmer effects; avoid class toggling that resets animations
+### What to prefer:
+- ✅ Simple, direct solutions that work locally
+- ✅ PowerShell scripts for Windows automation
+- ✅ Manual verification and testing approaches
+- ✅ Async patterns for I/O operations
+- ✅ Clear, documented code over clever abstractions
+- ✅ Performance optimizations for database queries
+- ✅ Error handling and logging
 
 ## Performance Considerations
-- Async batch processing for division generation
-- MariaDB connection pooling (asyncmy)
-- Content comparison to avoid unnecessary file writes
-- GitHub Pages deployment: Static files only, no server-side processing
 
-## Common Issues & Solutions
+- Database queries should use proper indexes (see schema)
+- Batch operations for bulk inserts/updates
+- Cache frequently accessed data where appropriate (`api/utils/cache.py`)
+- Use async HTTP calls with connection pooling
+- Minimize frontend re-renders by checking state changes
 
-### Mobile Expand/Collapse Problems
-- **Symptom**: Team sections collapse immediately after expanding on mobile
-- **Cause**: `window.addEventListener('resize', adaptDetails)` fires frequently on mobile due to viewport changes
-- **Solution**: Remove resize listener; only run `adaptDetails()` on `DOMContentLoaded`
+## Security Notes
 
-### Progress Bar Glow Reset
-- **Symptom**: Shimmer animation resets/flashes when progress reaches 0% or 100%
-- **Cause**: Removing and re-adding CSS classes restarts pseudo-element animations
-- **Solution**: Use opacity transitions instead of class toggling; keep shimmer continuous
+- API keys and database credentials via environment variables only
+- No sensitive data in git repository
+- CORS configured in `api/main.py` for frontend access
+- Input validation using Pydantic models
+- SQL injection prevention via parameterized queries
 
-### Touch vs Click Events
-- **Symptom**: Double toggles or unresponsive touch on mobile
-- **Cause**: Both touch and synthetic click events firing
-- **Solution**: Use `touchstart`/`touchend` with movement/time thresholds; suppress click with `_isTouch` flag
+## When Helping with Code
 
-### Index Page Team Counting
-- **Issue**: Banned/quit teams were incorrectly included in index statistics
-- **Root Cause**: SQL exclusion clauses used column alias `tid` instead of actual column names in WHERE clause
-- **Solution**: Apply exclusion clauses separately to `team1_id` and `team2_id` in UNION queries
-- **Key Function**: `_index_card_stats_async()` and `_calculate_comprehensive_stats_async()` in `html_gen.py`
-- **Best Practice**: Always call `_get_excluded_team_ids_for_championships(championship_ids)` before team/player counting queries
+1. **Understand context first**: Check related files before suggesting changes
+2. **Respect existing patterns**: Follow the established architecture and style
+3. **Test implications**: Consider database state, API dependencies, and frontend impact
+4. **Provide complete solutions**: Include necessary imports, error handling, and documentation
+5. **Explain trade-offs**: Mention any performance or maintenance implications
+6. **Stay pragmatic**: Simple working code > complex elegant code
+
+## Questions to Ask When Uncertain
+
+- Does this change require database schema modifications?
+- Will this affect existing API contracts that the frontend depends on?
+- Should this be an async operation?
+- Does this need error handling and logging?
+- Is there an existing utility or pattern I should reuse?
+- What's the impact on existing data?
+
+---
+
+**Remember**: This is a local development project with manual deployment. Focus on code quality, maintainability, and local development experience.
