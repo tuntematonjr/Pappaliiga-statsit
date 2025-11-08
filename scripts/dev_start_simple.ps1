@@ -16,7 +16,8 @@ What it does:
 param(
     [int]$BackendPort = 8000,
     [int]$FrontendPort = 8001,
-    [string]$VenvPath = ".\\venv\\Scripts\\Activate.ps1"
+    [string]$VenvPath = ".\\venv\\Scripts\\Activate.ps1",
+    [switch]$FrontendLiveReload = $false
 )
 
 Set-Location -Path (Split-Path -Path $MyInvocation.MyCommand.Path -Parent) | Out-Null
@@ -28,10 +29,18 @@ $activateExists = Test-Path $VenvPath
 if ($activateExists) {
     # Use a command string that activates venv then runs the command
     $backendCmd = "& { `"$VenvPath`"; python -m uvicorn api.main:app --reload --host 0.0.0.0 --port $BackendPort }"
-    $frontendCmd = "& { `"$VenvPath`"; python .\\frontend\\spa_server.py $FrontendPort }"
+    if ($FrontendLiveReload) {
+        $frontendCmd = "& { `"$VenvPath`"; python .\\scripts\\lr_frontend.py $FrontendPort }"
+    } else {
+        $frontendCmd = "& { `"$VenvPath`"; python .\\frontend\\spa_server.py $FrontendPort }"
+    }
 } else {
     $backendCmd = "python -m uvicorn api.main:app --reload --host 0.0.0.0 --port $BackendPort"
-    $frontendCmd = "python .\\frontend\\spa_server.py $FrontendPort"
+    if ($FrontendLiveReload) {
+        $frontendCmd = "python .\\scripts\\lr_frontend.py $FrontendPort"
+    } else {
+        $frontendCmd = "python .\\frontend\\spa_server.py $FrontendPort"
+    }
 }
 
 Write-Host "Launching backend on port $BackendPort and frontend on port $FrontendPort..."

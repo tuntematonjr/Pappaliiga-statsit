@@ -24,15 +24,22 @@ from .routers import maps_catalog, image_proxy
 from api.exceptions import BadRequestError, NotFoundError
 
 # Load environment variables from .env file if present
+env_path = Path(__file__).parent.parent / ".env"
 try:
     from dotenv import load_dotenv
-    env_path = Path(__file__).parent.parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
         print(f"[info] Loaded environment from {env_path}")
 except ImportError:
-    # python-dotenv not installed, environment must be set externally
-    pass
+    # python-dotenv not installed, fallback to lightweight local loader
+    try:
+        import env_loader
+        if env_path.exists():
+            env_loader.load_env(env_path)
+            print(f"[info] Loaded environment from {env_path} using env_loader")
+    except Exception:
+        # best-effort only; if this fails the environment should be provided externally
+        pass
 
 
 @asynccontextmanager

@@ -1119,14 +1119,46 @@
                         return;
                     }
 
-                    let key = normaliseKey(
-                        normalized.lookupKey ||
+                    // For playoff divisions, use parentKey to group with their parent
+                    // For regular divisions, use their own lookupKey
+                    let key;
+                    if (normalized.kind === 'playoffs') {
+                        // Playoff division - use parent key to find the parent bucket
+                        key = normaliseKey(
                             normalized.parentKey ||
-                            normalized.slug ||
-                            normalized.championshipId ||
-                            deriveSeasonDivisionKey(normalized.season, normalized.divisionNumber) ||
-                            normalized.key
-                    );
+                                normalized.slugBase ||
+                                deriveSeasonDivisionKey(normalized.season, normalized.divisionNumber) ||
+                                normalized.lookupKey
+                        );
+                        // Debug logging
+                        if (console && console.log) {
+                            console.log('[PLAYOFF] Division:', normalized.name, 
+                                '\n  - kind:', normalized.kind,
+                                '\n  - parentKey:', normalized.parentKey,
+                                '\n  - slugBase:', normalized.slugBase,
+                                '\n  - slug:', normalized.slug,
+                                '\n  - lookupKey:', normalized.lookupKey,
+                                '\n  - final key:', key);
+                        }
+                    } else {
+                        // Regular division - use its own lookupKey
+                        key = normaliseKey(
+                            normalized.lookupKey ||
+                                normalized.slug ||
+                                normalized.championshipId ||
+                                deriveSeasonDivisionKey(normalized.season, normalized.divisionNumber) ||
+                                normalized.key
+                        );
+                        // Debug logging
+                        if (console && console.log) {
+                            console.log('[REGULAR] Division:', normalized.name,
+                                '\n  - kind:', normalized.kind,
+                                '\n  - lookupKey:', normalized.lookupKey,
+                                '\n  - slug:', normalized.slug,
+                                '\n  - final key:', key);
+                        }
+                    }
+                    
                     if (!key) {
                         key = `__division_${index}`;
                     }
@@ -1149,6 +1181,17 @@
                 const result = [];
                 groups.forEach(bucket => {
                     const main = bucket.main;
+                    
+                    // Handle orphaned playoff divisions (no parent regular division found)
+                    if (!main && bucket.playoffs.length > 0) {
+                        // Log warning in dev mode (optional)
+                        if (console && console.warn) {
+                            console.warn('Orphaned playoff division(s) found (no matching parent):', bucket.playoffs);
+                        }
+                        // Skip orphaned playoffs - they should have a parent division
+                        return;
+                    }
+                    
                     if (!main) {
                         return;
                     }
@@ -1162,10 +1205,12 @@
                         main.playoff = null;
                     }
 
+                    // Don't render playoff divisions as standalone cards - they should be attached to parents
                     if (main.kind === 'playoffs') {
                         return;
                     }
 
+                    // Skip divisions with playoff-like slugs that are standalone
                     if (main.slug && /-(?:po|playoffs?)$/i.test(main.slug)) {
                         return;
                     }
