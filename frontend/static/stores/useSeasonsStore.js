@@ -124,6 +124,9 @@
                 this.error = null;
 
                 try {
+                    if (typeof window !== 'undefined' && window.console) {
+                        console.info('[seasonsStore] fetchSeasons start', { force });
+                    }
                     const payload = await window.apiClient.getSeasons();
                     const normalized = Array.isArray(payload)
                         ? payload.map((season, index) => normalizeSeason(season, index)).filter(Boolean)
@@ -158,8 +161,15 @@
                         }
                     }
 
+                    if (typeof window !== 'undefined' && window.console) {
+                        console.info('[seasonsStore] fetchSeasons success', {
+                            count: normalized.length,
+                            selectedSeasonKey: this.selectedSeasonKey
+                        });
+                    }
                     return this.seasons;
                 } catch (error) {
+                    console.error('[seasonsStore] fetchSeasons failed', error);
                     this.error = error?.message || 'Kausilistan lataus epäonnistui';
                     throw error;
                 } finally {

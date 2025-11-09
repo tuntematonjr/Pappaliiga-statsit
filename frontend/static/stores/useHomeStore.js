@@ -1,5 +1,6 @@
 (function () {
     const { defineStore } = Pinia;
+    const DEV_MODE = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
     function toNumber(value, fallback = 0) {
         if (value === null || value === undefined) {
@@ -57,10 +58,10 @@
 
         const overallPlayed =
             pickValue(source, ['progress.overall.played', 'matches_played', 'played_matches']) ??
-            divisions.reduce((sum, division) => sum + toNumber(division?.matchesPlayed ?? division?.played_matches), 0);
+            divisions.reduce((sum, division) => sum + toNumber(division?.season?.matches_played), 0);
         const overallTotal =
             pickValue(source, ['progress.overall.total', 'matches_total', 'scheduled_matches']) ??
-            divisions.reduce((sum, division) => sum + toNumber(division?.matchesTotal ?? division?.total_matches), 0);
+            divisions.reduce((sum, division) => sum + toNumber(division?.season?.matches_total), 0);
 
         progress.overall = {
             played: toNumber(overallPlayed),
@@ -68,144 +69,110 @@
             percent: computePercent(overallPlayed, overallTotal)
         };
 
-        const regularPlayed = pickValue(source, ['progress.regular.played', 'progress.runkosarja.played']);
-        const regularTotal = pickValue(source, ['progress.regular.total', 'progress.runkosarja.total']);
-        const playoffPlayed = pickValue(source, ['progress.playoffs.played', 'progress.playoff.played']);
-        const playoffTotal = pickValue(source, ['progress.playoffs.total', 'progress.playoff.total']);
+        const regularPlayed =
+            pickValue(source, ['progress.regular.played', 'progress.runkosarja.played']) ?? overallPlayed;
+        const regularTotal =
+            pickValue(source, ['progress.regular.total', 'progress.runkosarja.total']) ?? overallTotal;
+        progress.regular = {
+            played: toNumber(regularPlayed, overallPlayed),
+            total: toNumber(regularTotal, overallTotal),
+            percent: computePercent(regularPlayed, regularTotal)
+        };
 
-        if (regularPlayed !== undefined || regularTotal !== undefined) {
-            progress.regular = {
-                played: toNumber(regularPlayed, overallPlayed),
-                total: toNumber(regularTotal, overallTotal),
-                percent: computePercent(regularPlayed ?? overallPlayed, regularTotal ?? overallTotal)
-            };
-        }
-
-        if (playoffPlayed !== undefined || playoffTotal !== undefined) {
-            progress.playoffs = {
-                played: toNumber(playoffPlayed),
-                total: toNumber(playoffTotal),
-                percent: computePercent(playoffPlayed, playoffTotal)
-            };
-        }
+        const playoffPlayed =
+            pickValue(source, ['progress.playoffs.played', 'progress.playoff.played']) ??
+            divisions.reduce((sum, division) => sum + toNumber(division?.playoffs?.matches_played), 0);
+        const playoffTotal =
+            pickValue(source, ['progress.playoffs.total', 'progress.playoff.total']) ??
+            divisions.reduce((sum, division) => sum + toNumber(division?.playoffs?.matches_total), 0);
+        progress.playoffs = {
+            played: toNumber(playoffPlayed),
+            total: toNumber(playoffTotal),
+            percent: computePercent(playoffPlayed, playoffTotal)
+        };
 
         return progress;
     }
 
-    const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
-
-    function ensureAvatar(url) {
-        if (!url) return DEFAULT_TEAM_LOGO;
-        try {
-            const resolved = window.apiClient.proxyAvatar(url);
-            return resolved || DEFAULT_TEAM_LOGO;
-        } catch (error) {
-            return DEFAULT_TEAM_LOGO;
-        }
+    function inferTierValue(divisionId) {
+        const numeric = toNumber(divisionId, 0);
+        if (numeric >= 1 && numeric <= 5) return 1;
+        if (numeric >= 6 && numeric <= 10) return 2;
+        if (numeric >= 11 && numeric <= 15) return 3;
+        if (numeric >= 16 && numeric <= 20) return 4;
+        return 5;
     }
 
-    function normalizeDivision(raw, index) {
-        if (!raw || typeof raw !== 'object' || raw.is_playoff_secondary) {
+    function legacyNormalizeDivision(raw, index) {
+        if (!raw || typeof raw !== 'object') {
             return null;
         }
-
-        const fallbackKey = `division-${index}`;
-        const identifier = raw.championship_id ?? raw.id ?? raw.slug ?? raw.code ?? raw.uid;
-        const key = identifier != null ? String(identifier) : fallbackKey;
-        const name =
-            raw.name ||
-            raw.display_name ||
-            raw.title ||
-            (raw.division != null ? `Division ${raw.division}` : `Division ${index + 1}`);
-        const phase = raw.phase || (raw.is_playoff ? 'Playoffs' : null);
-        const subtitle = raw.subtitle || raw.tagline || phase || null;
-
-        const matchesPlayed = toNumber(
-            raw.played_matches ??
-                raw.matches_played ??
-                raw.matches ??
-                raw.playedMatches ??
-                raw.matchesPlayed ??
-                raw.finished_matches ??
-                raw.finishedMatches ??
-                0
-        );
-        const matchesTotal = toNumber(
-            raw.total_matches ??
-                raw.scheduled_matches ??
-                raw.schedule_count ??
-                raw.totalMatches ??
-                raw.matchesTotal ??
-                raw.scheduledMatches ??
-                raw.scheduleCount ??
-                0
-        );
-        const progressPercent = matchesTotal > 0 ? Math.min(100, Math.round((matchesPlayed / matchesTotal) * 100)) : 0;
-
-        const wins = toNumber(raw.win_count ?? raw.wins ?? raw.matches_won ?? 0);
-        const losses = toNumber(raw.loss_count ?? raw.losses ?? raw.matches_lost ?? 0);
-        const draws = toNumber(raw.draws ?? raw.ties ?? raw.matches_drawn ?? 0);
-        const roundDiff = toNumber(raw.rounds_diff ?? raw.round_diff ?? raw.rounds_delta ?? 0);
-
-        const teams = Array.isArray(raw.teams) ? raw.teams : [];
-        const teamCount =
-            teams.length ||
-            toNumber(
-                raw.team_count ??
-                    raw.teams_count ??
-                    raw.teamCount ??
-                    raw.teamsCount ??
-                    raw.team_total ??
-                    raw.teamTotal ??
-                    raw.teamcount ??
-                    0
-            );
-
-        const topTeam = teams
-            .slice()
-            .sort(
-                (a, b) =>
-                    toNumber(b.points ?? b.wins ?? b.rating ?? b.score ?? 0) -
-                    toNumber(a.points ?? a.wins ?? a.rating ?? a.score ?? 0)
-            )[0];
-
-        const topTeamInfo = topTeam
-            ? {
-                  id: topTeam.team_id ?? topTeam.id ?? topTeam.slug ?? null,
-                  name: topTeam.display_name || topTeam.team_name || topTeam.name || '',
-                  logo: ensureAvatar(topTeam.logo || topTeam.avatar || topTeam.team_logo || topTeam.image),
-                  record: {
-                      wins: toNumber(topTeam.wins ?? topTeam.win_count ?? topTeam.matches_won ?? 0),
-                      losses: toNumber(topTeam.losses ?? topTeam.loss_count ?? topTeam.matches_lost ?? 0)
-                  },
-                  rating: toNumber(topTeam.rating ?? topTeam.rating_2 ?? topTeam.hltv_rating ?? 0),
-                  points: toNumber(topTeam.points ?? topTeam.score ?? 0)
-              }
-            : null;
-
-        const routeParam = raw.championship_id ?? raw.id ?? raw.slug ?? raw.code ?? key;
-
+        const fallbackId = raw.division_id ?? raw.id ?? raw.slug ?? index;
+        const seasonData = raw.season && typeof raw.season === 'object' ? raw.season : {};
+        const playoffsData = raw.playoffs && typeof raw.playoffs === 'object' ? raw.playoffs : {};
         return {
-            key,
-            name,
-            subtitle,
-            phase,
-            status: raw.status || raw.state || null,
-            matchesPlayed,
-            matchesTotal,
-            progressPercent,
-            wins,
-            losses,
-            draws,
-            roundDiff,
-            teamCount,
-            topTeam: topTeamInfo,
-            badge: ensureAvatar(raw.badge || raw.image || raw.logo),
-            route: routeParam
-                ? { name: 'division', params: { championshipId: String(routeParam) } }
-                : null,
+            id: String(fallbackId),
+            divisionId: toNumber(fallbackId, index),
+            name: raw.name || `Division ${fallbackId}`,
+            tier: toNumber(raw.tier, inferTierValue(fallbackId)),
+            season: {
+                teams: toNumber(seasonData.teams, 0),
+                matches_played: toNumber(seasonData.matches_played, 0),
+                matches_total: toNumber(seasonData.matches_total, 0),
+                status: (seasonData.status || raw.status || 'waiting').toLowerCase(),
+                winner: seasonData.winner || null
+            },
+            playoffs: {
+                teams: toNumber(playoffsData.teams, 8),
+                matches_played: toNumber(playoffsData.matches_played, 0),
+                matches_total: toNumber(playoffsData.matches_total, 7),
+                status: (playoffsData.status || 'waiting').toLowerCase(),
+                winner: playoffsData.winner || null
+            },
+            slug: raw.slug || null,
+            seasonNumber: raw.season_number ?? raw.seasonNumber ?? null,
             raw
         };
+    }
+
+    const normalizerRef = typeof window !== 'undefined' ? window.divisionNormalizer : null;
+
+    function getCacheDebugKeys() {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return [];
+        }
+        const keys = [];
+        try {
+            for (let i = 0; i < window.localStorage.length; i += 1) {
+                const key = window.localStorage.key(i);
+                if (key && key.startsWith('pl:cache')) {
+                    keys.push(key);
+                }
+            }
+        } catch (error) {
+            // ignore cache key issues
+        }
+        return keys;
+    }
+
+    function normalizeDivisionEntry(raw, index) {
+        if (normalizerRef && typeof normalizerRef.normalizeDivision === 'function') {
+            const result = normalizerRef.normalizeDivision(raw);
+            if (result && result.ok && result.division) {
+                return { ok: true, division: result.division, warnings: result.warnings || [] };
+            }
+            return {
+                ok: false,
+                division: null,
+                warnings: result?.warnings || [],
+                error: result?.error || 'Normalization failed'
+            };
+        }
+        const fallback = legacyNormalizeDivision(raw, index);
+        if (fallback) {
+            return { ok: true, division: fallback, warnings: [] };
+        }
+        return { ok: false, division: null, warnings: ['Normalization failed'] };
     }
 
     function normalizeSummary(raw) {
@@ -232,7 +199,12 @@
             divisions: [],
             rawDivisions: [],
             divisionsMeta: null,
-            progress: defaultProgress()
+            progress: defaultProgress(),
+            offline: false,
+            cacheTimestamp: null,
+            validationWarnings: [],
+            warningMessage: '',
+            usingCache: false
         };
     }
 
@@ -267,9 +239,11 @@
                 this.summaryError = null;
 
                 try {
-                    let summary = await window.apiClient.getHome();
+                    let summaryResponse = await window.apiClient.fetchLifetimeSummary();
+                    let summary = summaryResponse?.data ?? summaryResponse;
                     if (!summary || typeof summary !== 'object') {
-                        summary = await window.apiClient.getStatsOverview();
+                        const fallbackResponse = await window.apiClient.getStatsOverview();
+                        summary = fallbackResponse?.data ?? fallbackResponse;
                     }
                     this.lifetimeSummary = normalizeSummary(summary);
                     this.summaryFetchedAt = Date.now();
@@ -278,7 +252,8 @@
                     if (error && error.status === 404) {
                         try {
                             const fallback = await window.apiClient.getStatsOverview();
-                            this.lifetimeSummary = normalizeSummary(fallback);
+                            const payload = fallback?.data ?? fallback;
+                            this.lifetimeSummary = normalizeSummary(payload);
                             this.summaryFetchedAt = Date.now();
                             return this.lifetimeSummary;
                         } catch (fallbackError) {
@@ -332,31 +307,93 @@
                 };
 
                 try {
-                    const [seasonStats, divisionsResponse] = await Promise.all([
-                        window.apiClient.getSeasonStats(identifier),
-                        window.apiClient.getDivisionsBySeason(identifier)
+                    if (DEV_MODE) {
+                        console.info('[homeStore] fetchSeason start', { key, identifier, force });
+                    }
+                    const [healthResult, summaryResult, divisionsResult] = await Promise.allSettled([
+                        window.apiClient.healthCheck(identifier).catch(() => false),
+                        window.apiClient.getSeasonSummary(identifier),
+                        window.apiClient.getDivisions(identifier)
                     ]);
 
-                    let divisionItems = [];
-                    let divisionMeta = null;
+                    const healthOk = healthResult.status === 'fulfilled' ? Boolean(healthResult.value) : false;
 
-                    if (Array.isArray(divisionsResponse)) {
-                        divisionItems = divisionsResponse;
-                    } else if (divisionsResponse && typeof divisionsResponse === 'object') {
-                        if (Array.isArray(divisionsResponse.items)) {
-                            divisionItems = divisionsResponse.items;
-                        }
-                        if (divisionsResponse.meta && typeof divisionsResponse.meta === 'object') {
-                            divisionMeta = divisionsResponse.meta;
+                    let summaryData = null;
+                    let summaryMeta = null;
+                    if (summaryResult.status === 'fulfilled') {
+                        summaryData = summaryResult.value.data || summaryResult.value;
+                        summaryMeta = summaryResult.value.meta || {};
+                    } else {
+                        summaryData = await window.apiClient
+                            .getSeasonStats(identifier)
+                            .then(res => res.data || res)
+                            .catch(() => ({}));
+                    }
+
+                    let divisionsData = [];
+                    let divisionsMeta = null;
+                    let apiValidationWarnings = [];
+                    if (divisionsResult.status === 'fulfilled') {
+                        divisionsData = divisionsResult.value.data || [];
+                        divisionsMeta = divisionsResult.value.meta || {};
+                        apiValidationWarnings = (divisionsResult.value.errors || []).map(
+                            error => error?.message || 'Division validation error'
+                        );
+                    } else {
+                        const fallback = await window.apiClient
+                            .getDivisionsBySeason(identifier)
+                            .then(res => (Array.isArray(res?.data) ? res.data : res))
+                            .catch(() => []);
+                        divisionsData = Array.isArray(fallback) ? fallback : [];
+                    }
+
+                    if (divisionsData.length === 0 && DEV_MODE) {
+                        console.warn('[homeStore] Divisions API returned 0 items', {
+                            meta: divisionsMeta,
+                            cacheKeys: getCacheDebugKeys()
+                        });
+                    }
+
+                    const normalizationWarnings = [];
+                    let normalizedDivisions = divisionsData
+                        .map((entry, index) => {
+                            const result = normalizeDivisionEntry(entry, index);
+                            if (result.ok && result.division) {
+                                if (Array.isArray(result.warnings) && result.warnings.length) {
+                                    normalizationWarnings.push(...result.warnings);
+                                }
+                                return result.division;
+                            }
+                            if (result.error) {
+                                normalizationWarnings.push(result.error);
+                            }
+                            return null;
+                        })
+                        .filter(Boolean);
+
+                    if (!normalizedDivisions.length && divisionsData.length) {
+                        const fallback = divisionsData
+                            .map((entry, index) => legacyNormalizeDivision(entry, index))
+                            .filter(Boolean);
+                        if (fallback.length) {
+                            normalizationWarnings.push('Normalized set empty; falling back to legacy mapping.');
+                            normalizedDivisions = fallback;
                         }
                     }
 
-                    const normalizedDivisions = divisionItems
-                        .map((entry, index) => normalizeDivision(entry, index))
-                        .filter(Boolean);
+                    if (DEV_MODE) {
+                        console.info('[homeStore] divisions counts', {
+                            raw: divisionsData.length,
+                            normalized: normalizedDivisions.length,
+                            warnings: [...apiValidationWarnings, ...normalizationWarnings]
+                        });
+                    }
 
-                    const stats = seasonStats?.aggregates || seasonStats?.stats || seasonStats || {};
-                    const progress = computeProgress(seasonStats, normalizedDivisions);
+                    const stats = summaryData?.aggregates || summaryData?.stats || summaryData || {};
+                    const progress = computeProgress(stats, normalizedDivisions);
+                    const usingCache = Boolean(summaryMeta?.usedCacheDueToError || divisionsMeta?.usedCacheDueToError);
+                    const cacheTimestamp = summaryMeta?.cacheTimestamp || divisionsMeta?.cacheTimestamp || null;
+                    const offline = !healthOk || usingCache;
 
                     const payload = {
                         loading: false,
@@ -364,14 +401,27 @@
                         apiParam: identifier,
                         fetchedAt: Date.now(),
                         stats,
-                        rawStats: seasonStats,
-                        rawDivisions: divisionItems,
-                        divisionsMeta: divisionMeta,
+                        rawStats: summaryData,
+                        rawDivisions: divisionsData,
+                        divisionsMeta,
                         divisions: normalizedDivisions,
-                        progress
+                        progress,
+                        offline,
+                        cacheTimestamp,
+                        usingCache,
+                        validationWarnings: [...apiValidationWarnings, ...normalizationWarnings],
+                        warningMessage: normalizedDivisions.length ? '' : 'Division data missing or invalid.'
                     };
 
                     this.seasonCache[key] = payload;
+                    if (DEV_MODE) {
+                        console.info('[homeStore] fetchSeason success', {
+                            key,
+                            divisions: normalizedDivisions.length,
+                            offline,
+                            cacheTimestamp
+                        });
+                    }
                     return payload;
                 } catch (error) {
                     this.seasonCache[key] = {

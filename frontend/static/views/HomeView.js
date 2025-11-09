@@ -354,7 +354,16 @@ window.HomeView = {
             return buildMetricCards(this.seasonState.stats || {}, HOME_METRIC_SCHEMA);
         },
         seasonDivisions() {
-            return Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
+            const list = Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
+            if (typeof window !== 'undefined' && window.console && window.console.info) {
+                console.info('[HomeView] seasonDivisions resolved', {
+                    count: list.length,
+                    hasSelectedSeason: Boolean(this.selectedSeasonKey),
+                    loading: this.seasonState.loading,
+                    cached: this.seasonState.usingCache
+                });
+            }
+            return list;
         },
         progressMetrics() {
             const meta = this.progressGlowMeta;
@@ -421,6 +430,30 @@ window.HomeView = {
             const percent = this.seasonState?.progress?.overall?.percent ?? 0;
             return Number.isFinite(percent) ? percent : 0;
         },
+        divisionOfflineMessage() {
+            if (!this.seasonState.offline) return '';
+            const timestamp = this.seasonState.cacheTimestamp;
+            let formatted = 'unknown time';
+            if (timestamp) {
+                try {
+                    formatted = new Date(timestamp).toLocaleString('fi-FI', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        day: 'numeric',
+                        month: 'numeric',
+                        year: 'numeric'
+                    });
+                } catch (error) {
+                    formatted = new Date(timestamp).toISOString();
+                }
+            }
+            return `Offline: showing cached data (${formatted}). Some values may be outdated.`;
+        },
+        divisionWarningMessage() {
+            const warnings = this.seasonState.validationWarnings || [];
+            if (!warnings.length) return '';
+            return 'Some divisions could not be loaded (validation error).';
+        },
         divisionHeaderMeta() {
             if (!this.selectedSeason) return '';
             const percent = this.divisionProgressPercent.toFixed(0);
@@ -436,18 +469,21 @@ window.HomeView = {
             return 'Tälle kaudelle ei löytynyt divisioonia.';
         }
     },
-    async mounted() {
-        await this.bootstrap();
-    },
-    watch: {
-        selectedSeasonKey: {
-            immediate: true,
-            handler(newKey, oldKey) {
-                if (!newKey || newKey === oldKey) {
-                    return;
-                }
-                const season = this.selectedSeason;
-                this.loadSeason(newKey, { apiParam: season?.apiParam });
+        async mounted() {
+            await this.bootstrap();
+        },
+        watch: {
+            selectedSeasonKey: {
+                immediate: true,
+                handler(newKey, oldKey) {
+                    if (typeof window !== 'undefined' && window.console) {
+                        console.info('[HomeView] selectedSeasonKey changed', { newKey, oldKey });
+                    }
+                    if (!newKey || newKey === oldKey) {
+                        return;
+                    }
+                    const season = this.selectedSeason;
+                    this.loadSeason(newKey, { apiParam: season?.apiParam });
             }
         }
     },
@@ -474,10 +510,18 @@ window.HomeView = {
             const season = this.seasonsStore?.getSeasonByKey(key);
             const apiParam = options.apiParam ?? season?.apiParam ?? key;
             try {
-                await this.homeStore.fetchSeason(key, {
+                const payload = await this.homeStore.fetchSeason(key, {
                     apiParam,
                     force: options.force === true
                 });
+                if (typeof window !== 'undefined' && window.console) {
+                    console.info('[HomeView] Season loaded', {
+                        seasonKey: key,
+                        divisions: payload?.divisions?.length ?? 0,
+                        offline: payload?.offline,
+                        cacheTimestamp: payload?.cacheTimestamp
+                    });
+                }
             } catch (error) {
                 console.error('Season fetch failed', error);
             }
@@ -502,6 +546,16 @@ window.HomeView = {
         retrySeason() {
             if (!this.selectedSeasonKey) return;
             const season = this.selectedSeason;
+            if (season) {
+                console.info('[HomeView] retrySeason triggered', {
+                    key: this.selectedSeasonKey,
+                    apiParam: season?.apiParam
+                });
+            } else {
+                console.info('[HomeView] retrySeason triggered without selectedSeason', {
+                    key: this.selectedSeasonKey
+                });
+            }
             this.loadSeason(this.selectedSeasonKey, {
                 apiParam: season?.apiParam,
                 force: true
@@ -517,10 +571,14 @@ window.HomeView = {
             }
         },
         setDivisionFilter(filter) {
+            console.info('[HomeView] setDivisionFilter', filter);
             this.divisionFilter = filter;
         },
-        handleDivisionSearch(event) {
-            this.divisionSearch = event?.target?.value ?? '';
+        resetDivisionFilters() {
+            console.info('[HomeView] resetDivisionFilters');
+            this.divisionFilter = 'all';
+            this.divisionSearch = '';
+            this.divisionSort = 'tier';
         }
     },
     template: `
@@ -594,80 +652,20 @@ window.HomeView = {
 
             <section
                 class="season-dashboard"
-                v-if="selectedSeasonKey"
+                ref="seasonControls"
             >
-                <div class="season-control-bar glass-card" ref="seasonControls">
-                    <div class="season-control-bar__season">
-                        <label class="season-control-bar__label" for="season-select">Season</label>
-                        <select
-                            id="season-select"
-                            class="season-control-bar__select"
-                            v-model="selectedSeasonKey"
-                            :disabled="seasonsLoading || !seasonSelectGroups.length"
-                        >
-                            <template v-if="seasonSelectGroups.length">
-                                <optgroup
-                                    v-for="group in seasonSelectGroups"
-                                    :key="group.id"
-                                    :label="group.label"
-                                >
-                                    <option
-                                        v-for="season in group.options"
-                                        :key="season.key"
-                                        :value="season.key"
-                                    >
-                                        {{ season.label }}
-                                    </option>
-                                </optgroup>
-                            </template>
-                            <option v-else disabled>Ei kausia</option>
-                        </select>
-                    </div>
 
-                    <div class="season-control-bar__filters" role="group" aria-label="Divisioona tilat">
-                        <button
-                            v-for="state in ['all', 'active', 'finished', 'waiting']"
-                            :key="state"
-                            type="button"
-                            class="filter-chip"
-                            :data-state="state"
-                            :class="{ 'filter-chip--active': divisionFilter === state }"
-                            :aria-pressed="divisionFilter === state"
-                            @click="setDivisionFilter(state)"
-                        >
-                            {{ state === 'all' ? 'All' : state.charAt(0).toUpperCase() + state.slice(1) }}
-                        </button>
-                    </div>
-
-                    <label class="season-control-bar__search" aria-label="Hae divisioonaa">
-                        <span class="sr-only">Search divisions</span>
-                        <input
-                            type="search"
-                            class="season-control-bar__input"
-                            placeholder="Search divisions"
-                            :value="divisionSearch"
-                            @input="handleDivisionSearch"
-                        >
-                    </label>
-
-                    <div class="season-control-bar__sort">
-                        <label class="season-control-bar__label" for="division-sort">Sort</label>
-                        <select
-                            id="division-sort"
-                            class="season-control-bar__select"
-                            v-model="divisionSort"
-                        >
-                            <option value="tier">By tier</option>
-                            <option value="progress">By progress</option>
-                            <option value="alphabetical">Alphabetical</option>
-                        </select>
+                <div
+                    v-if="seasonLoading"
+                    class="season-skeleton"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <div class="season-skeleton__header"></div>
+                    <div class="season-skeleton__grid">
+                        <div v-for="n in 3" :key="'skeleton-' + n" class="season-skeleton__card"></div>
                     </div>
                 </div>
-
-                <loading-spinner
-                    v-if="seasonLoading"
-                    message="Kausitietoja ladataan..."
-                ></loading-spinner>
 
                 <error-message
                     v-else-if="seasonError"
@@ -675,7 +673,7 @@ window.HomeView = {
                     @retry="retrySeason"
                 ></error-message>
 
-                <template v-else>
+                <template v-else-if="selectedSeasonKey">
                     <section class="season-summary-row glass-card">
                         <div class="season-summary-row__header">
                             <div>
@@ -739,13 +737,34 @@ window.HomeView = {
                         <division-card-list
                             :divisions="seasonDivisions"
                             :season-label="seasonTitle"
+                            :season-subtitle="seasonSubtitle"
+                            :season-options="seasonSelectGroups"
+                            :season-loading="seasonsLoading"
+                            :selected-season="selectedSeasonKey"
+                            :offline-message="divisionOfflineMessage"
+                            :warning-message="divisionWarningMessage"
+                            :is-loading="seasonLoading"
                             :empty-message="divisionEmptyMessage"
                             :filter-state="divisionFilter"
                             :sort-mode="divisionSort"
                             :search-query="divisionSearch"
+                            @change-season="value => (selectedSeasonKey = value)"
+                            @change-filter="setDivisionFilter"
+                            @change-search="divisionSearch = $event"
+                            @change-sort="divisionSort = $event"
+                            @reset-filters="resetDivisionFilters"
                         ></division-card-list>
                     </section>
                 </template>
+                <div
+                    v-else
+                    class="season-empty-state glass-card"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <p>Valitse kausi yläpuolisesta valikosta tai odota, että kausitiedot latautuvat.</p>
+                    <button class="btn-primary" type="button" @click="retrySeason">Retry now</button>
+                </div>
             </section>
         </div>
     `
