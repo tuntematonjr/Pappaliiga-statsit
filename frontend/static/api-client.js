@@ -18,6 +18,88 @@
     const FAILURE_WINDOW_MS = 60000;
     const BREAKER_COOLDOWN_MS = 30000;
     const isDev = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const API_ROOT = (() => {
+        if (typeof window === 'undefined') {
+            return { origin: '', path: '' };
+        }
+        try {
+            const parsed = new URL(DEFAULTS.baseUrl, window.location.origin);
+            return {
+                origin: `${parsed.protocol}//${parsed.host}`,
+                path: parsed.pathname.replace(/\/$/, '') || ''
+            };
+        } catch (error) {
+            return {
+                origin: window.location.origin,
+                path: ''
+            };
+        }
+    })();
+
+    class ApiEndpointNotFound extends Error {
+        constructor(message, details = {}) {
+            super(message);
+            this.name = 'ApiEndpointNotFound';
+            this.paths = details.paths || [];
+        }
+    }
+
+    const ROUTE_MAP = Object.freeze({
+        divisions: seasonId => [
+            `/api/divisions/season/${seasonId}`,
+            `/api/seasons/${seasonId}/divisions`,
+            `/api/v1/divisions/season/${seasonId}`,
+            `/api/v1/seasons/${seasonId}/divisions`,
+            `/api/divisions?season=${seasonId}`,
+            `/api/v1/divisions?season=${seasonId}`
+        ],
+        summary: seasonId => [
+            `/api/seasons/${seasonId}/summary`,
+            `/api/v1/seasons/${seasonId}/summary`,
+            `/api/seasons/${seasonId}/stats/summary`
+        ],
+        health: () => [`/api/health`, `/api/v1/health`, `/healthz`]
+    });
+
+    function encodeSeasonId(value) {
+        return encodeURIComponent(value == null ? '' : value);
+    }
+
+    function normalizeRouteCandidate(route) {
+        if (!route) return null;
+        const raw = String(route).trim();
+        if (!raw) return null;
+        if (/^https?:\/\//i.test(raw)) {
+            return {
+                absoluteUrl: raw,
+                displayPath: raw
+            };
+        }
+        const normalized = raw.startsWith('/') ? raw : `/${raw}`;
+        const origin = API_ROOT.origin || (typeof window !== 'undefined' && window.location ? window.location.origin : '');
+        if (!origin) {
+            return {
+                absoluteUrl: `${DEFAULTS.baseUrl}${normalized}`,
+                displayPath: normalized
+            };
+        }
+        return {
+            absoluteUrl: `${origin}${normalized}`,
+            displayPath: normalized
+        };
+    }
+
+    function buildRouteCandidates(key, seasonId) {
+        const resolver = ROUTE_MAP[key];
+        if (!resolver) {
+            return [];
+        }
+        const list = resolver(seasonId);
+        if (!Array.isArray(list)) {
+            return [];
+        }
+        return list.map(normalizeRouteCandidate).filter(Boolean);
+    }
 
     function now() {
         return Date.now();
@@ -58,8 +140,8 @@
         return `${DEFAULTS.baseUrl}|${path}`;
     }
 
-    function getCached(path) {
-        const key = makeCacheKey(path);
+    function readCacheEntry(key) {
+        if (!key) return null;
         const mem = MEMORY_CACHE.get(key);
         if (mem && now() - mem.timestamp <= DEFAULTS.cacheTtlMs) {
             return { ...mem, source: 'memory' };
@@ -72,13 +154,45 @@
         return null;
     }
 
-    function storeCache(path, payload, etag) {
-        const key = makeCacheKey(path);
+    function writeCacheEntry(key, payload, etag) {
+        if (!key) return;
         const entry = { data: payload, timestamp: now(), etag: etag || null };
         MEMORY_CACHE.set(key, entry);
         persistentStore.data[key] = entry;
         persistentStore.meta[key] = { cachedAt: entry.timestamp };
         writePersistentCache(persistentStore.data, persistentStore.meta);
+    }
+
+    function resolveRequestTarget(path, options = {}) {
+        const rawPath = typeof path === 'string' ? path : String(path || '');
+        const absoluteOverride = options.absoluteUrl;
+        const pathLabel = rawPath || '/';
+        if (absoluteOverride) {
+            return {
+                url: absoluteOverride,
+                cacheKey: absoluteOverride,
+                breakerKey: absoluteOverride,
+                displayPath: pathLabel || absoluteOverride,
+                isAbsolute: true
+            };
+        }
+        if (/^https?:\/\//i.test(pathLabel)) {
+            return {
+                url: pathLabel,
+                cacheKey: pathLabel,
+                breakerKey: pathLabel,
+                displayPath: pathLabel,
+                isAbsolute: true
+            };
+        }
+        const normalizedPath = pathLabel.startsWith('/') ? pathLabel : `/${pathLabel}`;
+        return {
+            url: `${DEFAULTS.baseUrl}${normalizedPath}`,
+            cacheKey: makeCacheKey(normalizedPath),
+            breakerKey: normalizedPath,
+            displayPath: normalizedPath,
+            isAbsolute: false
+        };
     }
 
     function circuitBreaker(path) {
@@ -230,6 +344,37 @@
         };
     }
 
+    function extractDivisionArray(raw) {
+        const metaHints = {};
+        if (!raw || typeof raw !== 'object') {
+            return { list: Array.isArray(raw) ? raw : [], meta: metaHints };
+        }
+        if (Array.isArray(raw)) {
+            return { list: raw, meta: metaHints };
+        }
+        if (Array.isArray(raw.items)) {
+            return { list: raw.items, meta: raw.meta || raw.pagination || metaHints };
+        }
+        if (Array.isArray(raw.divisions)) {
+            return { list: raw.divisions, meta: raw.meta || metaHints };
+        }
+        if (Array.isArray(raw.results)) {
+            return { list: raw.results, meta: raw.meta || metaHints };
+        }
+        if (Array.isArray(raw.records)) {
+            return { list: raw.records, meta: raw.meta || metaHints };
+        }
+        const nested = raw.data || raw.payload || raw.body || raw.result;
+        if (nested && nested !== raw) {
+            const nestedExtract = extractDivisionArray(nested);
+            return {
+                list: nestedExtract.list,
+                meta: nestedExtract.meta || raw.meta || metaHints
+            };
+        }
+        return { list: [], meta: raw.meta || metaHints };
+    }
+
     let validationCounts = {};
 
     function recordValidationError(error) {
@@ -245,28 +390,32 @@
     }
 
     async function fetchJson(path, options = {}) {
-        const breaker = circuitBreaker(path);
-        let cacheEntry = getCached(path);
+        const target = resolveRequestTarget(path, options);
+        const breaker = circuitBreaker(target.breakerKey);
+        let cacheEntry = readCacheEntry(target.cacheKey);
         const requestId = `req_${Math.random().toString(36).slice(2, 8)}`;
         const meta = {
             requestId,
             attempts: 0,
             fromCache: false,
             cacheTimestamp: cacheEntry?.timestamp ?? null,
+            cacheSource: cacheEntry?.source || null,
             usedCacheDueToError: false,
             breakerOpen: false,
-            telemetry: []
+            telemetry: [],
+            path: target.displayPath,
+            requestUrl: target.url
         };
 
         if (breaker.isOpen()) {
             meta.breakerOpen = true;
-            if (cache) {
+            if (cacheEntry) {
                 meta.fromCache = true;
                 meta.usedCacheDueToError = true;
                 if (isDev) {
-                    console.debug(`[apiClient] breaker open for ${path}, serving cache`, meta);
+                    console.debug(`[apiClient] breaker open for ${target.displayPath}, serving cache`, meta);
                 }
-                return { data: cache.data, meta };
+                return { data: cacheEntry.data, meta };
             }
         }
 
@@ -287,7 +436,7 @@
             }
             const start = performance.now();
             try {
-                const response = await fetch(`${DEFAULTS.baseUrl}${path}`, {
+                const response = await fetch(target.url, {
                     method: options.method || 'GET',
                     signal: options.signal || controller.signal,
                     headers,
@@ -298,7 +447,8 @@
                 const attemptMeta = {
                     attempt,
                     status: response.status,
-                    latency: performance.now() - start
+                    latency: performance.now() - start,
+                    path: target.displayPath
                 };
                 meta.telemetry.push(attemptMeta);
                 const retryAfter = parseRetryAfter(response.headers);
@@ -330,6 +480,7 @@
                             await sleep(Math.pow(2, attempt) * 150);
                         }
                         lastError = new Error(`HTTP ${response.status}`);
+                        lastError.status = response.status;
                         continue;
                     }
                     const bodyText = await response.text().catch(() => '');
@@ -340,10 +491,11 @@
                 const text = await response.text();
                 const data = text ? JSON.parse(text) : null;
                 const etag = response.headers.get('ETag');
-                storeCache(path, data, etag);
+                writeCacheEntry(target.cacheKey, data, etag);
                 breaker.recordSuccess();
                 meta.fromCache = false;
                 meta.cacheTimestamp = now();
+                meta.cacheSource = 'network';
                 if (retryAfter) {
                     meta.retryAfter = retryAfter;
                 }
@@ -352,7 +504,7 @@
                 clearTimeout(timeoutId);
                 lastError = error;
                 if (isDev) {
-                    console.warn(`[apiClient] request error ${path}`, { requestId, attempt, error });
+                    console.warn(`[apiClient] request error ${target.displayPath}`, { requestId, attempt, error });
                 }
                 if (attempt < retries && shouldRetry(error.status, error)) {
                     await sleep(Math.pow(2, attempt) * 150);
@@ -369,34 +521,143 @@
             meta.cacheTimestamp = cacheEntry.timestamp;
             meta.cacheSource = cacheEntry.source || 'memory';
             if (isDev) {
-                console.debug(`[apiClient] serving cache after failure for ${path}`, meta);
+                console.debug(`[apiClient] serving cache after failure for ${target.displayPath}`, meta);
             }
             return { data: cacheEntry.data, meta };
         }
         throw lastError || new Error('Network request failed');
     }
 
-    async function healthCheck(seasonId) {
-        try {
-            const { data } = await fetchJson('/health', { retries: 0, timeoutMs: 2000 });
-            return !!(data && data.ok);
-        } catch (error) {
-            if (isDev) {
-                console.warn('[apiClient] /health unavailable, falling back to HEAD probe', error);
-            }
+    async function fetchWithFallback(paths, options = {}) {
+        const candidates = (Array.isArray(paths) ? paths : [])
+            .map(entry => (typeof entry === 'string' ? normalizeRouteCandidate(entry) : entry))
+            .filter(Boolean);
+        if (!candidates.length) {
+            throw new ApiEndpointNotFound('No API routes configured', { paths: [] });
+        }
+        const tried = [];
+        let lastError = null;
+        const initialMethod = options.method || 'GET';
+
+        for (let index = 0; index < candidates.length; index += 1) {
+            const candidate = candidates[index];
             try {
-                const season = encodeURIComponent(seasonId || 'current');
-                const response = await fetch(`${DEFAULTS.baseUrl}/seasons/${season}/divisions`, {
-                    method: 'HEAD'
+                const result = await fetchJson(candidate.displayPath, {
+                    ...options,
+                    absoluteUrl: candidate.absoluteUrl
                 });
-                if (response.status === 405) {
-                    return true;
+                result.meta = {
+                    ...(result.meta || {}),
+                    resolvedPath: candidate.displayPath
+                };
+                if (index > 0 && typeof console !== 'undefined') {
+                    console.info(`[apiClient] fallback resolved via ${candidate.displayPath}`);
                 }
-                return response.status >= 200 && response.status < 400;
-            } catch (probeError) {
-                return false;
+                return result;
+            } catch (error) {
+                const status = error?.status;
+                tried.push(candidate.displayPath);
+                lastError = error;
+                if (status === 404 || status === 410 || status === 501) {
+                    continue;
+                }
+                if (status === 405 && initialMethod.toUpperCase() === 'HEAD') {
+                    try {
+                        const retryResult = await fetchJson(candidate.displayPath, {
+                            ...options,
+                            method: 'GET',
+                            absoluteUrl: candidate.absoluteUrl
+                        });
+                        retryResult.meta = {
+                            ...(retryResult.meta || {}),
+                            resolvedPath: candidate.displayPath,
+                            methodOverride: 'GET'
+                        };
+                        if (typeof console !== 'undefined') {
+                            console.info(`[apiClient] HEAD rejected for ${candidate.displayPath}, retried with GET`);
+                        }
+                        return retryResult;
+                    } catch (retryError) {
+                        lastError = retryError;
+                        continue;
+                    }
+                }
+                throw error;
             }
         }
+        const error = new ApiEndpointNotFound('API endpoints not found', { paths: tried });
+        error.paths = tried;
+        if (lastError) {
+            error.cause = lastError;
+        }
+        throw error;
+    }
+
+    async function healthCheck(seasonId) {
+        const healthRoutes = buildRouteCandidates('health');
+        for (const candidate of healthRoutes) {
+            try {
+                const response = await fetch(candidate.absoluteUrl, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json' }
+                });
+                if (response.status === 404) {
+                    continue;
+                }
+                if (response.ok) {
+                    let payload = null;
+                    try {
+                        payload = await response.json();
+                    } catch (parseError) {
+                        payload = null;
+                    }
+                    const ok = payload && Object.prototype.hasOwnProperty.call(payload, 'ok') ? Boolean(payload.ok) : true;
+                    return { ok, status: response.status, route: candidate.displayPath, source: 'health', probableRoute: false };
+                }
+                if (response.status === 204) {
+                    return { ok: true, status: 204, route: candidate.displayPath, source: 'health', probableRoute: false };
+                }
+                if (response.status >= 200 && response.status < 500) {
+                    return { ok: true, status: response.status, route: candidate.displayPath, source: 'health', probableRoute: false };
+                }
+            } catch (error) {
+                // ignore individual health errors, fall through to next candidate
+            }
+        }
+
+        const fallbackSeason = encodeSeasonId(seasonId || 'current');
+        const divisionRoutes = buildRouteCandidates('divisions', fallbackSeason);
+        if (divisionRoutes.length) {
+            const primary = divisionRoutes[0];
+            try {
+                const response = await fetch(primary.absoluteUrl, {
+                    method: 'HEAD',
+                    credentials: 'same-origin'
+                });
+                const allow = response.headers ? response.headers.get('Allow') || '' : '';
+                if (response.status === 405 && /GET/i.test(allow)) {
+                    return {
+                        ok: true,
+                        probableRoute: true,
+                        status: response.status,
+                        route: primary.displayPath,
+                        source: 'divisions-head'
+                    };
+                }
+                    return {
+                        ok: response.ok,
+                        status: response.status,
+                        route: primary.displayPath,
+                        source: 'divisions-head',
+                        probableRoute: false
+                    };
+            } catch (error) {
+                // ignore and fall through
+            }
+        }
+
+        return { ok: false, status: null, route: null, probableRoute: false, source: 'health' };
     }
 
     class ApiClient {
@@ -421,67 +682,36 @@
         }
 
         async getSeasonSummary(seasonId) {
-            const path = `/seasons/${encodeURIComponent(seasonId)}/summary`;
+            const identifier = encodeSeasonId(seasonId);
+            const routes = buildRouteCandidates('summary', identifier);
             try {
-                const result = await fetchJson(path, {});
+                const result = await fetchWithFallback(routes);
                 const payload = result?.data ?? result;
                 return { data: payload || {}, meta: result?.meta || {} };
             } catch (error) {
-                if (error && error.status === 404) {
+                if (error instanceof ApiEndpointNotFound) {
                     if (isDev) {
-                        console.warn('[apiClient] /seasons/:id/summary missing, falling back to stats endpoint');
+                        console.warn('[apiClient] summary routes missing, falling back to stats summary');
                     }
                     const fallback = await this.getSeasonStats(seasonId).catch(() => ({}));
                     const payload = fallback?.data ?? fallback ?? {};
-                    return { data: payload, meta: { fallback: 'stats' } };
+                    return { data: payload, meta: { fallback: 'stats', error: 'summary-routes-missing' } };
                 }
                 throw error;
             }
         }
 
         async getDivisions(seasonId) {
-            const path = `/seasons/${encodeURIComponent(seasonId)}/divisions`;
-            try {
-                const result = await fetchJson(path, {});
-                const payload = Array.isArray(result?.data)
-                    ? result.data
-                    : Array.isArray(result)
-                        ? result
-                        : [];
-                return { data: payload, meta: result?.meta || {}, errors: [], validationCounts: {} };
-            } catch (error) {
-                if (error && error.status === 404) {
-                    if (isDev) {
-                        console.warn('[apiClient] /seasons/:id/divisions missing, falling back to legacy endpoint');
-                    }
-                    let legacyPayload = null;
-                    try {
-                        legacyPayload = await fetchJson(`/divisions/season/${encodeURIComponent(seasonId)}`);
-                    } catch (legacyError) {
-                        if (isDev) {
-                            console.error('[apiClient] legacy divisions endpoint also failed', legacyError);
-                        }
-                        return {
-                            data: [],
-                            meta: { fallback: 'legacy-error' },
-                            errors: [],
-                            validationCounts: {}
-                        };
-                    }
-                    const payload = Array.isArray(legacyPayload?.data)
-                        ? legacyPayload.data
-                        : Array.isArray(legacyPayload)
-                            ? legacyPayload
-                            : [];
-                    return {
-                        data: payload,
-                        meta: { ...(legacyPayload?.meta || {}), fallback: 'legacy' },
-                        errors: [],
-                        validationCounts: {}
-                    };
-                }
-                throw error;
+            const identifier = encodeSeasonId(seasonId);
+            const routes = buildRouteCandidates('divisions', identifier);
+            const result = await fetchWithFallback(routes);
+            const basePayload = result?.data ?? result;
+            const { list, meta: payloadMeta } = extractDivisionArray(basePayload);
+            const meta = { ...(payloadMeta || {}), ...(result?.meta || {}) };
+            if (!list.length && isDev) {
+                console.warn('[apiClient] Division payload empty from', meta.resolvedPath || 'unknown route');
             }
+            return { data: list, meta, errors: [], validationCounts: {} };
         }
 
         async fetchLifetimeSummary() {
@@ -507,5 +737,6 @@
     }
 
     window.ApiValidationError = ApiValidationError;
+    window.ApiEndpointNotFound = ApiEndpointNotFound;
     window.apiClient = new ApiClient();
 })();

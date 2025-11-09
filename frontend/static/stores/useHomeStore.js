@@ -1,6 +1,25 @@
 (function () {
     const { defineStore } = Pinia;
     const DEV_MODE = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const DEV_MOCK_DATA = typeof window !== 'undefined' ? window.__PAPPALIIGA_DEV_DIVISIONS__ : null;
+
+    function formatCacheBanner(timestamp) {
+        if (!timestamp) {
+            return 'Backend routes not found; showing cached data.';
+        }
+        try {
+            const formatted = new Date(timestamp).toLocaleString('fi-FI', {
+                hour: '2-digit',
+                minute: '2-digit',
+                day: 'numeric',
+                month: 'numeric',
+                year: 'numeric'
+            });
+            return `Backend routes not found; showing cached data from ${formatted}.`;
+        } catch (error) {
+            return `Backend routes not found; showing cached data (timestamp: ${timestamp}).`;
+        }
+    }
 
     function toNumber(value, fallback = 0) {
         if (value === null || value === undefined) {
@@ -156,23 +175,58 @@
     }
 
     function normalizeDivisionEntry(raw, index) {
+        const warnings = [];
         if (normalizerRef && typeof normalizerRef.normalizeDivision === 'function') {
-            const result = normalizerRef.normalizeDivision(raw);
-            if (result && result.ok && result.division) {
-                return { ok: true, division: result.division, warnings: result.warnings || [] };
+            try {
+                const result = normalizerRef.normalizeDivision(raw);
+                if (Array.isArray(result?.warnings) && result.warnings.length) {
+                    warnings.push(...result.warnings);
+                }
+                if (result && result.division) {
+                    return { ok: result.ok !== false, division: result.division, warnings };
+                }
+                if (result?.error) {
+                    warnings.push(result.error);
+                }
+            } catch (error) {
+                warnings.push(error?.message || 'Normalization error');
             }
-            return {
-                ok: false,
-                division: null,
-                warnings: result?.warnings || [],
-                error: result?.error || 'Normalization failed'
-            };
         }
         const fallback = legacyNormalizeDivision(raw, index);
         if (fallback) {
-            return { ok: true, division: fallback, warnings: [] };
+            if (!warnings.length) {
+                warnings.push('Used legacy normalization fallback.');
+            }
+            return { ok: true, division: fallback, warnings };
         }
-        return { ok: false, division: null, warnings: ['Normalization failed'] };
+        warnings.push('Normalization failed');
+        return { ok: false, division: null, warnings };
+    }
+
+    function normalizeDivisionCollection(source) {
+        if (!Array.isArray(source) || !source.length) {
+            return { divisions: [], warnings: [] };
+        }
+        const warnings = [];
+        const mapped = source
+            .map((entry, index) => {
+                const result = normalizeDivisionEntry(entry, index);
+                if (Array.isArray(result.warnings) && result.warnings.length) {
+                    warnings.push(...result.warnings);
+                }
+                return result.division;
+            })
+            .filter(Boolean);
+        if (!mapped.length) {
+            const fallback = source
+                .map((entry, index) => legacyNormalizeDivision(entry, index))
+                .filter(Boolean);
+            if (fallback.length) {
+                warnings.push('Normalized set empty; falling back to legacy mapping.');
+                return { divisions: fallback, warnings };
+            }
+        }
+        return { divisions: mapped, warnings };
     }
 
     function normalizeSummary(raw) {
@@ -204,7 +258,10 @@
             cacheTimestamp: null,
             validationWarnings: [],
             warningMessage: '',
-            usingCache: false
+            usingCache: false,
+            bannerMessage: '',
+            dataBadge: '',
+            health: { ok: true, probableRoute: false, route: null }
         };
     }
 
@@ -310,13 +367,15 @@
                     if (DEV_MODE) {
                         console.info('[homeStore] fetchSeason start', { key, identifier, force });
                     }
+                    const EndpointMissingError = typeof window !== 'undefined' ? window.ApiEndpointNotFound : null;
                     const [healthResult, summaryResult, divisionsResult] = await Promise.allSettled([
-                        window.apiClient.healthCheck(identifier).catch(() => false),
+                        window.apiClient.healthCheck(identifier).catch(() => ({ ok: false })),
                         window.apiClient.getSeasonSummary(identifier),
                         window.apiClient.getDivisions(identifier)
                     ]);
 
-                    const healthOk = healthResult.status === 'fulfilled' ? Boolean(healthResult.value) : false;
+                    const healthPayload = healthResult.status === 'fulfilled' ? healthResult.value || { ok: false } : { ok: false };
+                    const healthOk = Boolean(healthPayload?.ok);
 
                     let summaryData = null;
                     let summaryMeta = null;
@@ -333,18 +392,29 @@
                     let divisionsData = [];
                     let divisionsMeta = null;
                     let apiValidationWarnings = [];
+                    let missingRoutes = false;
                     if (divisionsResult.status === 'fulfilled') {
-                        divisionsData = divisionsResult.value.data || [];
+                        divisionsData = Array.isArray(divisionsResult.value.data)
+                            ? divisionsResult.value.data
+                            : Array.isArray(divisionsResult.value)
+                                ? divisionsResult.value
+                                : [];
                         divisionsMeta = divisionsResult.value.meta || {};
                         apiValidationWarnings = (divisionsResult.value.errors || []).map(
                             error => error?.message || 'Division validation error'
                         );
                     } else {
-                        const fallback = await window.apiClient
-                            .getDivisionsBySeason(identifier)
-                            .then(res => (Array.isArray(res?.data) ? res.data : res))
-                            .catch(() => []);
-                        divisionsData = Array.isArray(fallback) ? fallback : [];
+                        const reason = divisionsResult.reason;
+                        const isRouteError = EndpointMissingError && reason instanceof EndpointMissingError;
+                        if (isRouteError) {
+                            missingRoutes = true;
+                        } else {
+                            const fallback = await window.apiClient
+                                .getDivisionsBySeason(identifier)
+                                .then(res => (Array.isArray(res?.data) ? res.data : res))
+                                .catch(() => []);
+                            divisionsData = Array.isArray(fallback) ? fallback : [];
+                        }
                     }
 
                     if (divisionsData.length === 0 && DEV_MODE) {
@@ -354,46 +424,53 @@
                         });
                     }
 
-                    const normalizationWarnings = [];
-                    let normalizedDivisions = divisionsData
-                        .map((entry, index) => {
-                            const result = normalizeDivisionEntry(entry, index);
-                            if (result.ok && result.division) {
-                                if (Array.isArray(result.warnings) && result.warnings.length) {
-                                    normalizationWarnings.push(...result.warnings);
-                                }
-                                return result.division;
-                            }
-                            if (result.error) {
-                                normalizationWarnings.push(result.error);
-                            }
-                            return null;
-                        })
-                        .filter(Boolean);
+                    const { divisions: normalizedDivisionsFromApi, warnings: normalizationWarningsRaw } = normalizeDivisionCollection(divisionsData);
+                    const normalizationWarnings = [...apiValidationWarnings, ...normalizationWarningsRaw];
+                    const rawCount = Array.isArray(divisionsData) ? divisionsData.length : 0;
+                    const normalizedCount = normalizedDivisionsFromApi.length;
 
-                    if (!normalizedDivisions.length && divisionsData.length) {
-                        const fallback = divisionsData
-                            .map((entry, index) => legacyNormalizeDivision(entry, index))
-                            .filter(Boolean);
-                        if (fallback.length) {
-                            normalizationWarnings.push('Normalized set empty; falling back to legacy mapping.');
-                            normalizedDivisions = fallback;
+                    let finalDivisions = normalizedDivisionsFromApi;
+                    let finalRawDivisions = divisionsData;
+                    let dataBadge = '';
+                    let bannerMessage = '';
+                    let usingCache = Boolean(summaryMeta?.usedCacheDueToError || divisionsMeta?.usedCacheDueToError);
+                    let cacheTimestamp = summaryMeta?.cacheTimestamp || divisionsMeta?.cacheTimestamp || null;
+                    let resolvedPathLabel = divisionsMeta?.resolvedPath || 'unresolved';
+
+                    if (missingRoutes) {
+                        if (existing && Array.isArray(existing.divisions) && existing.divisions.length) {
+                            finalDivisions = existing.divisions.slice();
+                            finalRawDivisions = Array.isArray(existing.rawDivisions)
+                                ? existing.rawDivisions.slice()
+                                : [];
+                            bannerMessage = formatCacheBanner(existing.cacheTimestamp || existing.fetchedAt);
+                            cacheTimestamp = existing.cacheTimestamp || existing.fetchedAt || cacheTimestamp;
+                            usingCache = true;
+                            resolvedPathLabel = 'cache';
+                        } else if (DEV_MOCK_DATA && Array.isArray(DEV_MOCK_DATA.divisions) && DEV_MOCK_DATA.divisions.length) {
+                            const devResult = normalizeDivisionCollection(DEV_MOCK_DATA.divisions);
+                            finalDivisions = devResult.divisions;
+                            finalRawDivisions = DEV_MOCK_DATA.divisions;
+                            normalizationWarnings.push(...devResult.warnings, 'Using developer mock dataset.');
+                            bannerMessage = 'Backend routes not found; showing developer mock data.';
+                            dataBadge = 'DEV DATA';
+                            cacheTimestamp = DEV_MOCK_DATA.timestamp || cacheTimestamp || Date.now();
+                            usingCache = true;
+                            resolvedPathLabel = 'dev-mock';
+                        } else {
+                            throw divisionsResult.reason || new Error('Division routes unavailable');
                         }
                     }
 
-                    if (DEV_MODE) {
-                        console.info('[homeStore] divisions counts', {
-                            raw: divisionsData.length,
-                            normalized: normalizedDivisions.length,
-                            warnings: [...apiValidationWarnings, ...normalizationWarnings]
-                        });
-                    }
-
+                    const finalCount = finalDivisions.length;
                     const stats = summaryData?.aggregates || summaryData?.stats || summaryData || {};
-                    const progress = computeProgress(stats, normalizedDivisions);
-                    const usingCache = Boolean(summaryMeta?.usedCacheDueToError || divisionsMeta?.usedCacheDueToError);
-                    const cacheTimestamp = summaryMeta?.cacheTimestamp || divisionsMeta?.cacheTimestamp || null;
-                    const offline = !healthOk || usingCache;
+                    const progress = computeProgress(stats, finalDivisions);
+                    const offline = !healthOk || usingCache || Boolean(bannerMessage);
+                    divisionsMeta = { ...(divisionsMeta || {}), resolvedPath: resolvedPathLabel };
+
+                    if (typeof console !== 'undefined' && console.info) {
+                        console.info('[homeStore] divisions raw %s → normalized %s → filtered %s (used=%s)', rawCount, normalizedCount, finalCount, resolvedPathLabel);
+                    }
 
                     const payload = {
                         loading: false,
@@ -402,24 +479,30 @@
                         fetchedAt: Date.now(),
                         stats,
                         rawStats: summaryData,
-                        rawDivisions: divisionsData,
+                        rawDivisions: finalRawDivisions,
                         divisionsMeta,
-                        divisions: normalizedDivisions,
+                        divisions: finalDivisions,
                         progress,
                         offline,
                         cacheTimestamp,
                         usingCache,
-                        validationWarnings: [...apiValidationWarnings, ...normalizationWarnings],
-                        warningMessage: normalizedDivisions.length ? '' : 'Division data missing or invalid.'
+                        validationWarnings: normalizationWarnings,
+                        warningMessage: finalDivisions.length ? '' : 'Division data missing or invalid.',
+                        bannerMessage,
+                        dataBadge,
+                        health: healthPayload
                     };
 
                     this.seasonCache[key] = payload;
                     if (DEV_MODE) {
                         console.info('[homeStore] fetchSeason success', {
                             key,
-                            divisions: normalizedDivisions.length,
+                            divisions: finalDivisions.length,
                             offline,
-                            cacheTimestamp
+                            cacheTimestamp,
+                            resolvedPath: resolvedPathLabel,
+                            banner: bannerMessage || null,
+                            badge: dataBadge || null
                         });
                     }
                     return payload;

@@ -90,10 +90,30 @@ app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 
 
-# Expose a compatibility endpoint for /api/seasons/{season}/stats (frontend expects this path)
+# Shared helper so legacy/compat routes stay in sync
+async def _season_stats_payload(season: int):
+    return await stats.get_season_stats(season)
+
+
+# Expose compatibility endpoints the SPA probes dynamically
 @app.get('/api/seasons/{season}/stats')
 async def seasons_stats_compat(season: int):
-    return await stats.get_season_stats(season)
+    return await _season_stats_payload(season)
+
+
+@app.get('/api/seasons/{season}/summary')
+async def seasons_summary_compat(season: int):
+    return await _season_stats_payload(season)
+
+
+@app.get('/api/seasons/{season}/stats/summary')
+async def seasons_stats_summary(season: int):
+    return await _season_stats_payload(season)
+
+
+@app.get('/api/v1/seasons/{season}/summary')
+async def seasons_summary_v1(season: int):
+    return await _season_stats_payload(season)
 
 
 @app.get("/api/home")
@@ -143,6 +163,11 @@ async def health_check():
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Database unhealthy: {e}")
+
+
+@app.get("/api/health")
+async def api_health():
+    return await health_check()
 
 
 # SPA fallback - must be last route!

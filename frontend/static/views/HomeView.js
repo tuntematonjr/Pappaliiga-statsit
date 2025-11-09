@@ -431,6 +431,9 @@ window.HomeView = {
             return Number.isFinite(percent) ? percent : 0;
         },
         divisionOfflineMessage() {
+            if (this.seasonState.bannerMessage) {
+                return this.seasonState.bannerMessage;
+            }
             if (!this.seasonState.offline) return '';
             const timestamp = this.seasonState.cacheTimestamp;
             let formatted = 'unknown time';
@@ -448,6 +451,9 @@ window.HomeView = {
                 }
             }
             return `Offline: showing cached data (${formatted}). Some values may be outdated.`;
+        },
+        divisionDataBadge() {
+            return this.seasonState.dataBadge || '';
         },
         divisionWarningMessage() {
             const warnings = this.seasonState.validationWarnings || [];
@@ -742,6 +748,7 @@ window.HomeView = {
                             :season-loading="seasonsLoading"
                             :selected-season="selectedSeasonKey"
                             :offline-message="divisionOfflineMessage"
+                            :data-badge="divisionDataBadge"
                             :warning-message="divisionWarningMessage"
                             :is-loading="seasonLoading"
                             :empty-message="divisionEmptyMessage"

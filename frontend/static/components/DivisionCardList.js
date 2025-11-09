@@ -286,7 +286,8 @@
             handleCTA() {
                 storeDivisionId(this.division.id);
                 this.$emit('remember', this.division.id);
-            }
+            },
+            stateClass
         },
         template: `
             <article class="division-card" :class="'division-card--' + stateClass(division.season.status)">
@@ -421,6 +422,7 @@
             selectedSeason: { type: [String, Number], default: '' },
             seasonLoading: { type: Boolean, default: false },
             offlineMessage: { type: String, default: '' },
+            dataBadge: { type: String, default: '' },
             warningMessage: { type: String, default: '' },
             isLoading: { type: Boolean, default: false }
         },
@@ -756,6 +758,7 @@
                     @reset-filters="handleReset"
                 ></season-bar>
                 <div v-if="offlineMessage" class="offline-banner" role="status" aria-live="polite">{{ offlineMessage }}</div>
+                <div v-if="dataBadge" class="dev-data-badge badge-small" role="status" aria-live="polite">{{ dataBadge }}</div>
                 <div v-if="warningMessage" class="inline-toast" role="status" aria-live="polite">{{ warningMessage }}</div>
                 <template v-if="isLoading">
                     <div class="division-hub__skeletons" role="status" aria-live="polite">
