@@ -1,8 +1,8 @@
 /**
- * DivisionCardList Component - Simplified Rewrite
- * 
- * Displays division cards with playoff divisions nested inside parent cards.
- * Uses parentChampionshipId from API for reliable parent-child relationships.
+ * DivisionCardList Component - Season 11 hub rewrite
+ *
+ * Groups divisions into tier-based accordions, exposes search/filter controls,
+ * and renders responsive cards with explicit state colors.
  */
 (function () {
     'use strict';
@@ -18,19 +18,45 @@
     });
 
     const STATUS_ACTIONS = Object.freeze({
-        upcoming: 'Avaa divisioona',
-        running: 'Avaa divisioona',
-        ended: 'Avaa divisioona'
+        upcoming: 'Open division',
+        running: 'Open division',
+        ended: 'Open division'
     });
 
-    const PLAYOFF_STATUS_LABELS = Object.freeze({
-        upcoming: 'Ei vielä alkanut',
-        running: 'Käynnissä',
-        ended: 'Taputeltu loppuun'
+    const STATE_MAP = Object.freeze({
+        running: 'active',
+        live: 'active',
+        ended: 'finished',
+        completed: 'finished',
+        finished: 'finished',
+        upcoming: 'waiting'
     });
+
+    const STATE_LABELS = Object.freeze({
+        active: 'Active',
+        finished: 'Finished',
+        waiting: 'Waiting'
+    });
+
+    const FILTER_STATES = Object.freeze(['all', 'active', 'finished', 'waiting']);
+
+    const PROGRESS_TOOLTIP = 'Computed as matches played divided by total scheduled matches.';
+
+    const STORAGE_KEY = 'pappaliiga:last-division';
+
+    const TIER_BUCKETS = Object.freeze([
+        { id: 'tier-1', label: 'Tier 1 (Div 1-5)', range: 'Div 1-5', min: 1, max: 5, order: 1 },
+        { id: 'tier-2', label: 'Tier 2 (Div 6-10)', range: 'Div 6-10', min: 6, max: 10, order: 2 },
+        { id: 'tier-3', label: 'Tier 3 (Div 11-15)', range: 'Div 11-15', min: 11, max: 15, order: 3 },
+        { id: 'tier-4', label: 'Tier 4 (Div 16-20)', range: 'Div 16-20', min: 16, max: 20, order: 4 },
+        { id: 'tier-5', label: 'Tier 5 (Div 21-25)', range: 'Div 21-25', min: 21, max: 25, order: 5 }
+    ]);
+
+    const EXTRA_TIER = Object.freeze({ id: 'tier-extra', label: 'Tier 6 (Div 26+)', range: 'Div 26+', order: 6 });
+    const PLAYOFF_TIER = Object.freeze({ id: 'tier-playoffs', label: 'Playoffs', range: 'Bracket', order: 7 });
 
     // ============================================================================
-    // UTILITY FUNCTIONS
+    // UTILITY HELPERS
     // ============================================================================
 
     function safeNumber(value, fallback = 0) {
@@ -58,12 +84,8 @@
     function parseDate(dateValue) {
         if (!dateValue) return null;
         const date = new Date(dateValue);
-        return isNaN(date.getTime()) ? null : date;
+        return Number.isNaN(date.getTime()) ? null : date;
     }
-
-    // ============================================================================
-    // FORMATTING FUNCTIONS
-    // ============================================================================
 
     function formatDate(dateString) {
         const date = parseDate(dateString);
@@ -77,7 +99,7 @@
 
     function formatDateTime(dateString) {
         const date = parseDate(dateString);
-        if (!date) return '–';
+        if (!date) return '';
         return date.toLocaleDateString('fi-FI', {
             day: 'numeric',
             month: 'numeric',
@@ -91,41 +113,42 @@
         const start = formatDate(startDate);
         const end = formatDate(endDate);
 
-        if (start && end) return `${start} – ${end}`;
+        if (start && end) return `${start} - ${end}`;
         if (start) return `Alkaen ${start}`;
         if (end) return `Päättyy ${end}`;
         return 'Ajankohta vahvistuu';
     }
 
-    function formatTeamsLabel(count) {
-        const num = safeNumber(count);
-        if (num === 0) return 'Ei joukkueita';
-        return `${num} ${num === 1 ? 'joukkue' : 'joukkuetta'}`;
-    }
-
     function formatMatchesLabel(played, total) {
-        const p = safeNumber(played);
-        const t = safeNumber(total);
-        
-        if (t === 0) return p > 0 ? `${p} ottelua` : 'Ei otteluita';
-        return `${p} / ${t} pelattu`;
+        const playedMatches = safeNumber(played);
+        const totalMatches = safeNumber(total);
+        if (!totalMatches) {
+            return playedMatches > 0 ? `${playedMatches} matches` : 'Ei otteluita';
+        }
+        return `${playedMatches} / ${totalMatches} matches`;
     }
 
     function formatProgressLabel(played, total) {
-        const p = safeNumber(played);
-        const t = safeNumber(total);
-        
-        if (t === 0) return '';
-        return `${p} / ${t} ottelua`;
+        const playedMatches = safeNumber(played);
+        const totalMatches = safeNumber(total);
+        if (!totalMatches) return '0%';
+        const percent = Math.round((playedMatches / totalMatches) * 100);
+        return `${playedMatches} / ${totalMatches} · ${percent}%`;
     }
 
     function normalizeStatusValue(status) {
         if (!status && status !== 0) return 'upcoming';
         const value = String(status).toLowerCase();
         if (value === 'live') return 'running';
-        if (value === 'completed' || value === 'finished') return 'ended';
+        if (value === 'completed') return 'ended';
+        if (value === 'finished') return 'ended';
         if (value === 'running' || value === 'upcoming' || value === 'ended') return value;
         return 'upcoming';
+    }
+
+    function resolveState(status) {
+        const normalized = normalizeStatusValue(status);
+        return STATE_MAP[normalized] || 'waiting';
     }
 
     function stripSeasonFromName(name, seasonNumber) {
@@ -158,6 +181,70 @@
         return cleaned || name;
     }
 
+    function computeMapPoolSize(raw) {
+        if (!raw) return null;
+        const pool = raw.mapPool || raw.map_pool || raw.maps || raw.map_list || raw.mapList;
+        if (Array.isArray(pool)) {
+            return pool.length;
+        }
+        const count = safeNumber(
+            coalesce(
+                raw.mapCount,
+                raw.map_count,
+                raw.mapsCount,
+                raw.maps_count,
+                raw.map_total,
+                raw.mapsTotal
+            ),
+            null
+        );
+        return count || null;
+    }
+
+    function determineTierMeta(divisionNum, isPlayoff) {
+        if (isPlayoff) {
+            return { ...PLAYOFF_TIER };
+        }
+        if (!Number.isFinite(divisionNum)) {
+            return { ...EXTRA_TIER };
+        }
+        if (divisionNum === 0) {
+            return { ...TIER_BUCKETS[0] };
+        }
+        const bucket = TIER_BUCKETS.find(entry => divisionNum >= entry.min && divisionNum <= entry.max);
+        return bucket ? { ...bucket } : { ...EXTRA_TIER };
+    }
+
+    function buildSearchIndex(parts) {
+        return parts
+            .map(part => safeString(part).toLowerCase())
+            .filter(Boolean)
+            .join(' ');
+    }
+
+    function getStoredDivisionId() {
+        try {
+            if (typeof window === 'undefined' || !window.localStorage) {
+                return null;
+            }
+            return window.localStorage.getItem(STORAGE_KEY);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function storeDivisionId(id) {
+        if (!id) return;
+        try {
+            if (typeof window === 'undefined' || !window.localStorage) {
+                return;
+            }
+            window.localStorage.setItem(STORAGE_KEY, id);
+        } catch (error) {
+            // ignore storage failures
+        }
+    }
+
     // ============================================================================
     // DATA NORMALIZATION
     // ============================================================================
@@ -180,15 +267,8 @@
 
         const name = safeString(apiDiv.name);
         const slug = safeString(apiDiv.slug);
-        
         const raw = apiDiv.raw || apiDiv;
-        const season = safeNumber(
-            coalesce(
-                raw.season,
-                apiDiv.season
-            ),
-            null
-        );
+        const season = safeNumber(coalesce(raw.season, apiDiv.season), null);
         const divisionNum = safeNumber(
             coalesce(
                 raw.divisionNum,
@@ -198,7 +278,6 @@
             ),
             null
         );
-        const phase = safeString(apiDiv.phase);
 
         const explicitIsPlayoff = coalesce(
             apiDiv.isPlayoff,
@@ -223,34 +302,39 @@
             null
         );
 
-        // Teams
         const teamsCount = safeNumber(apiDiv.teamsCount || apiDiv.teams_count);
-
-        // Matches
         const totalMatches = safeNumber(coalesce(apiDiv.totalMatches, apiDiv.total_matches));
         const playedMatches = safeNumber(coalesce(apiDiv.playedMatches, apiDiv.played_matches));
         const finishedMatches = safeNumber(coalesce(apiDiv.finishedMatches, apiDiv.finished_matches));
         const liveMatches = safeNumber(coalesce(apiDiv.liveMatches, apiDiv.live_matches));
         const upcomingMatches = safeNumber(coalesce(apiDiv.upcomingMatches, apiDiv.upcoming_matches));
 
-        // Dates
         const startDate = apiDiv.start || apiDiv.start_date || apiDiv.startDate;
         const endDate = apiDiv.end || apiDiv.end_date || apiDiv.endDate;
         const updatedDate = apiDiv.updated || apiDiv.updated_at || apiDiv.updatedAt;
 
-        // Status & Progress
         const status = normalizeStatusValue(apiDiv.status);
-        const progressPercent = safeNumber(coalesce(apiDiv.progressPercent, apiDiv.progress_percent));
-        const kind = safeString(apiDiv.kind, isPlayoff ? 'playoffs' : 'regular');
+        const state = resolveState(status);
+        const tierMeta = determineTierMeta(divisionNum, isPlayoff);
 
-        // Winner
+        const rawProgress = totalMatches > 0 ? Math.min(100, Math.round((playedMatches / totalMatches) * 100)) : 0;
+        const progressPercent = status === 'ended' ? 100 : rawProgress;
+
         const winnerTeamId = safeString(apiDiv.winnerTeamId || apiDiv.winner_team_id, null);
         const winnerTeamName = safeString(apiDiv.winnerTeamName || apiDiv.winner_team_name || apiDiv.winner, null);
 
-        // Build href
         const href = `/division/${slug || id}`;
-
         const displayName = stripSeasonFromName(name, season);
+        const mapPoolSize = computeMapPoolSize(raw);
+        const searchIndex = buildSearchIndex([
+            id,
+            slug,
+            name,
+            displayName,
+            divisionNum != null ? `division ${divisionNum}` : '',
+            raw.code,
+            raw.title
+        ]);
 
         return {
             id,
@@ -261,9 +345,14 @@
             divisionNum,
             isPlayoff,
             parentId,
+            tierId: tierMeta.id,
+            tierLabel: tierMeta.label,
+            tierRangeLabel: tierMeta.range,
+            tierOrder: tierMeta.order,
+            mapPoolSize,
             teams: {
                 count: teamsCount,
-                label: formatTeamsLabel(teamsCount)
+                label: teamsCount ? `${teamsCount} teams` : 'Ei joukkueita'
             },
             matches: {
                 total: totalMatches,
@@ -281,66 +370,22 @@
                 updatedLabel: formatDateTime(updatedDate)
             },
             progress: {
-                percent: status === 'ended' ? 100 : progressPercent,
+                percent: progressPercent,
                 label: formatProgressLabel(playedMatches, totalMatches)
             },
             status,
             statusLabel: STATUS_LABELS[status] || STATUS_LABELS.upcoming,
+            state,
+            stateLabel: STATE_LABELS[state] || STATE_LABELS.waiting,
             actionLabel: STATUS_ACTIONS[status] || STATUS_ACTIONS.upcoming,
-            kind,
             winner: winnerTeamId ? {
                 id: winnerTeamId,
                 name: winnerTeamName
             } : null,
-            href
+            href,
+            raw,
+            searchIndex
         };
-    }
-
-    function groupDivisions(normalizedDivisions) {
-        if (!Array.isArray(normalizedDivisions)) {
-            return { divisionGroups: [], orphanedPlayoffs: [] };
-        }
-
-        const regularDivisions = [];
-        const playoffDivisions = [];
-        normalizedDivisions.forEach(division => {
-            if (division.isPlayoff) {
-                playoffDivisions.push(division);
-            } else {
-                regularDivisions.push(division);
-            }
-        });
-
-        const divisionGroups = regularDivisions.map(regular => ({
-            main: regular,
-            playoff: null
-        }));
-
-        const groupById = new Map();
-        divisionGroups.forEach(group => {
-            groupById.set(group.main.id, group);
-        });
-
-        const orphanedPlayoffs = [];
-
-        playoffDivisions.forEach(playoff => {
-            let parentGroup = playoff.parentId ? groupById.get(playoff.parentId) : null;
-
-            if (!parentGroup && playoff.divisionNum && playoff.season) {
-                parentGroup = divisionGroups.find(group =>
-                    group.main.divisionNum === playoff.divisionNum &&
-                    group.main.season === playoff.season
-                );
-            }
-
-            if (parentGroup && !parentGroup.playoff) {
-                parentGroup.playoff = playoff;
-            } else {
-                orphanedPlayoffs.push(playoff);
-            }
-        });
-
-        return { divisionGroups, orphanedPlayoffs };
     }
 
     // ============================================================================
@@ -361,397 +406,492 @@
             emptyMessage: {
                 type: String,
                 default: 'Ei divisioonia saatavilla'
+            },
+            filterState: {
+                type: String,
+                default: 'all'
+            },
+            searchQuery: {
+                type: String,
+                default: ''
+            },
+            sortMode: {
+                type: String,
+                default: 'tier'
             }
         },
         data() {
-            return {};
+            return {
+                expandedTiers: {},
+                visibleTiers: {},
+                observer: null,
+                tierRefs: {},
+                preferredDivisionId: getStoredDivisionId(),
+                initializedExpansion: false
+            };
         },
         computed: {
             normalizedDivisions() {
                 if (!Array.isArray(this.divisions)) return [];
                 return this.divisions.map(normalizeApiDivision).filter(Boolean);
             },
-            groupedDivisions() {
-                const { divisionGroups, orphanedPlayoffs } = groupDivisions(this.normalizedDivisions);
-                return [...divisionGroups, ...orphanedPlayoffs.map(p => ({ main: p, playoff: null, isOrphaned: true }))];
+            filterStateNormalized() {
+                const value = String(this.filterState || 'all').toLowerCase();
+                return FILTER_STATES.includes(value) ? value : 'all';
+            },
+            searchQueryNormalized() {
+                return safeString(this.searchQuery).toLowerCase();
+            },
+            sortModeNormalized() {
+                const value = String(this.sortMode || 'tier').toLowerCase();
+                if (value === 'progress' || value === 'alphabetical') {
+                    return value;
+                }
+                return 'tier';
+            },
+            filteredDivisions() {
+                const query = this.searchQueryNormalized;
+                const filterState = this.filterStateNormalized;
+                return this.normalizedDivisions.filter(division => {
+                    if (filterState !== 'all' && division.state !== filterState) {
+                        return false;
+                    }
+                    if (query && division.searchIndex.indexOf(query) === -1) {
+                        return false;
+                    }
+                    return true;
+                });
+            },
+            tierGroups() {
+                const buckets = new Map();
+                this.filteredDivisions.forEach(division => {
+                    const key = division.tierId || EXTRA_TIER.id;
+                    if (!buckets.has(key)) {
+                        buckets.set(key, {
+                            id: key,
+                            label: division.tierLabel || EXTRA_TIER.label,
+                            rangeLabel: division.tierRangeLabel || EXTRA_TIER.range,
+                            order: division.tierOrder || EXTRA_TIER.order,
+                            divisions: [],
+                            finishedCount: 0
+                        });
+                    }
+                    const bucket = buckets.get(key);
+                    bucket.divisions.push(division);
+                    if (division.state === 'finished') {
+                        bucket.finishedCount += 1;
+                    }
+                });
+
+                const comparator = this.getSorter();
+                return Array.from(buckets.values())
+                    .sort((a, b) => a.order - b.order)
+                    .map(group => {
+                        group.divisions.sort(comparator);
+                        group.totalCount = group.divisions.length;
+                        group.progressPercent = group.totalCount
+                            ? Math.round((group.finishedCount / group.totalCount) * 100)
+                            : 0;
+                        return group;
+                    });
             },
             hasDivisions() {
-                return this.groupedDivisions.length > 0;
+                return this.tierGroups.length > 0;
             }
         },
+        watch: {
+            normalizedDivisions: {
+                immediate: true,
+                handler() {
+                    this.initializedExpansion = false;
+                    this.$nextTick(() => this.ensureInitialExpansion(true));
+                }
+            },
+            filteredDivisions() {
+                this.$nextTick(() => this.ensureAtLeastOneExpanded());
+            },
+            tierGroups() {
+                this.$nextTick(() => this.observeTiers());
+            }
+        },
+        mounted() {
+            this.initObserver();
+            this.$nextTick(() => {
+                this.ensureInitialExpansion(true);
+                this.observeTiers();
+            });
+        },
+        beforeUnmount() {
+            this.teardownObserver();
+        },
         methods: {
-            getStatItems(division) {
-                if (!division) return [];
-                const fallback = 'Tietoja päivitetään';
-                const teams = division.teams || {};
+            initObserver() {
+                if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+                    this.observer = null;
+                    return;
+                }
+                this.observer = new IntersectionObserver(entries => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const tierId = entry.target?.dataset?.tierId;
+                            if (tierId) {
+                                this.markTierVisible(tierId);
+                                if (this.observer) {
+                                    this.observer.unobserve(entry.target);
+                                }
+                            }
+                        }
+                    });
+                }, {
+                    root: null,
+                    rootMargin: '0px 0px 200px 0px',
+                    threshold: 0.2
+                });
+            },
+            teardownObserver() {
+                if (this.observer) {
+                    this.observer.disconnect();
+                    this.observer = null;
+                }
+            },
+            registerTierRef(id, el) {
+                if (!id) return;
+                if (!el) {
+                    delete this.tierRefs[id];
+                    return;
+                }
+                this.tierRefs[id] = el;
+                el.dataset.tierId = id;
+                if (this.observer) {
+                    this.observer.observe(el);
+                } else {
+                    this.markTierVisible(id);
+                }
+            },
+            observeTiers() {
+                if (!this.observer) {
+                    Object.keys(this.tierRefs).forEach(id => this.markTierVisible(id));
+                    return;
+                }
+                Object.values(this.tierRefs).forEach(el => {
+                    if (el) {
+                        this.observer.observe(el);
+                    }
+                });
+            },
+            markTierVisible(id) {
+                if (!id || this.visibleTiers[id]) {
+                    return;
+                }
+                this.visibleTiers = { ...this.visibleTiers, [id]: true };
+            },
+            getSorter() {
+                if (this.sortModeNormalized === 'progress') {
+                    return (a, b) => {
+                        if (b.progress.percent !== a.progress.percent) {
+                            return b.progress.percent - a.progress.percent;
+                        }
+                        return (a.displayName || '').localeCompare(b.displayName || '', 'fi');
+                    };
+                }
+                if (this.sortModeNormalized === 'alphabetical') {
+                    return (a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'fi');
+                }
+                return (a, b) => {
+                    if (a.tierOrder !== b.tierOrder) {
+                        return a.tierOrder - b.tierOrder;
+                    }
+                    if (Number.isFinite(a.divisionNum) && Number.isFinite(b.divisionNum)) {
+                        return a.divisionNum - b.divisionNum;
+                    }
+                    return (a.displayName || '').localeCompare(b.displayName || '', 'fi');
+                };
+            },
+            ensureInitialExpansion(force = false) {
+                if (this.initializedExpansion && !force) {
+                    this.ensureAtLeastOneExpanded();
+                    return;
+                }
+                const groups = this.tierGroups;
+                if (!groups.length) {
+                    this.expandedTiers = {};
+                    return;
+                }
+                let target = null;
+                if (this.preferredDivisionId) {
+                    target = groups.find(group => group.divisions.some(div => div.id === this.preferredDivisionId)) || null;
+                }
+                if (!target) {
+                    target = groups[0];
+                }
+                if (target) {
+                    this.expandedTiers = { [target.id]: true };
+                    this.markTierVisible(target.id);
+                } else {
+                    this.expandedTiers = {};
+                }
+                this.initializedExpansion = true;
+            },
+            ensureAtLeastOneExpanded() {
+                const groups = this.tierGroups;
+                if (!groups.length) {
+                    this.expandedTiers = {};
+                    return;
+                }
+                const allowed = new Set(groups.map(group => group.id));
+                const activeIds = Object.keys(this.expandedTiers).filter(id => this.expandedTiers[id] && allowed.has(id));
+                if (activeIds.length) {
+                    const nextState = {};
+                    activeIds.forEach(id => {
+                        nextState[id] = true;
+                        this.markTierVisible(id);
+                    });
+                    this.expandedTiers = nextState;
+                    return;
+                }
+                const fallback = groups[0];
+                if (fallback) {
+                    this.expandedTiers = { [fallback.id]: true };
+                    this.markTierVisible(fallback.id);
+                }
+            },
+            toggleTier(id) {
+                if (!id) return;
+                const next = { ...this.expandedTiers, [id]: !this.expandedTiers[id] };
+                this.expandedTiers = next;
+                if (next[id]) {
+                    this.markTierVisible(id);
+                }
+            },
+            isTierExpanded(id) {
+                return !!this.expandedTiers[id];
+            },
+            shouldRenderTier(id) {
+                return this.visibleTiers[id] || this.isTierExpanded(id);
+            },
+            rememberDivision(id) {
+                if (!id) return;
+                this.preferredDivisionId = id;
+                storeDivisionId(id);
+            },
+            navigateToDivision(division) {
+                if (!division || !division.href || typeof window === 'undefined') return;
+                this.rememberDivision(division.id);
+                window.location.assign(division.href);
+            },
+            handleCardKey(event, division) {
+                if (!division) return;
+                if (event && (event.key === 'Enter' || event.key === ' ')) {
+                    this.navigateToDivision(division);
+                }
+            },
+            getProgressDisplay(division) {
                 const matches = division.matches || {};
+                if (matches.total > 0) {
+                    const percent = Math.round(division.progress.percent);
+                    return `${matches.played} / ${matches.total} · ${percent}%`;
+                }
+                return division.state === 'waiting' ? '0% · Scheduling' : `${Math.round(division.progress.percent)}%`;
+            },
+            getActivityLine(division) {
                 const dates = division.dates || {};
-
-                return [
-                    {
-                        key: 'teams',
-                        icon: 'teams',
-                        label: 'Joukkueet',
-                        value: teams.label || fallback,
-                        title: `${teams.count || 0} joukkuetta`,
-                        muted: false
-                    },
+                if (division.state === 'waiting') {
+                    return 'Scheduling';
+                }
+                if (division.state === 'finished') {
+                    return dates.label || 'Taputeltu loppuun';
+                }
+                if (dates.updatedLabel) {
+                    return `Viimeksi päivitetty ${dates.updatedLabel}`;
+                }
+                return dates.label || 'Ajankohta vahvistuu';
+            },
+            getQuickFacts(division) {
+                const matches = division.matches || {};
+                const facts = [
                     {
                         key: 'matches',
                         icon: 'matches',
-                        label: 'Ottelut',
-                        value: matches.label || fallback,
-                        title: matches.label || fallback,
-                        muted: false
+                        label: 'Matches',
+                        value: matches.label || 'Ei otteluita'
                     },
                     {
-                        key: 'dates',
-                        icon: 'dates',
-                        label: 'Ajanjakso',
-                        value: dates.label || fallback,
-                        title: dates.label || fallback,
-                        muted: false
-                    },
-                    {
-                        key: 'updated',
-                        icon: 'updated',
-                        label: 'Päivitetty',
-                        value: dates.updatedLabel || fallback,
-                        title: dates.updatedLabel || fallback,
-                        muted: true
+                        key: 'teams',
+                        icon: 'teams',
+                        label: 'Teams',
+                        value: division.teams?.label || 'Ei joukkueita'
                     }
                 ];
+                facts.push({
+                    key: 'maps',
+                    icon: 'maps',
+                    label: 'Map pool',
+                    value: division.mapPoolSize ? `${division.mapPoolSize} maps` : 'N/A'
+                });
+                return facts;
             },
-            getProgressPercent(progress) {
-                return Math.min(100, Math.max(0, progress.percent || 0));
-            },
-            describeProgress(division) {
-                if (!division) {
-                    return {
-                        state: 'upcoming',
-                        percent: 0,
-                        percentLabel: '0%',
-                        caption: 'Edistyminen',
-                        tooltip: '',
-                        ariaLabel: 'Edistyminen'
-                    };
+            divisionCardActions(division) {
+                const href = division.href || '#';
+                if (division.state === 'finished') {
+                    return [
+                        { label: 'View Stats', href: `${href}#stats`, primary: true },
+                        { label: 'Results', href: `${href}#results`, primary: false }
+                    ];
                 }
-                const state = normalizeStatusValue(division.status);
-                const progressData = division.progress || {};
-                const matches = division.matches || {};
-                const dates = division.dates || {};
-                const percent = this.getProgressPercent(progressData);
-                const caption = progressData.label || formatMatchesLabel(
-                    matches.played,
-                    matches.total
-                ) || 'Ei otteluita';
-                const tooltipParts = [];
-                if (caption) tooltipParts.push(caption);
-                if (dates.label) tooltipParts.push(dates.label);
-                return {
-                    state,
-                    percent,
-                    percentLabel: `${Math.round(percent)}%`,
-                    caption,
-                    tooltip: tooltipParts.join(' • '),
-                    ariaLabel: caption
-                };
-            },
-            getPlayoffStatusLabel(status) {
-                return PLAYOFF_STATUS_LABELS[status] || STATUS_LABELS[status] || 'Unknown';
-            },
-            describePlayoff(playoff) {
-                if (!playoff) {
-                    return null;
+                if (division.state === 'waiting') {
+                    return [
+                        { label: 'Open Division', href, primary: true }
+                    ];
                 }
-                const state = normalizeStatusValue(playoff.status);
-                const matches = playoff.matches || {};
-                const dates = playoff.dates || {};
-                const progressData = playoff.progress || {};
-                const percent = this.getProgressPercent(progressData);
-                const matchesCaption = matches.label || formatMatchesLabel(
-                    matches.played,
-                    matches.total
-                ) || 'Ei otteluita';
-                const progressCaption = progressData.label || matchesCaption;
-                const tooltipParts = [];
-                if (progressCaption) tooltipParts.push(progressCaption);
-                if (dates.label) tooltipParts.push(dates.label);
-                let winnerName = null;
-                if (playoff.winner && playoff.winner.name) {
-                    winnerName = playoff.winner.name;
-                }
-                const playoffAria = progressCaption || 'Playoffien eteneminen';
-                const displayTitle = playoff.displayName || playoff.name || 'Pudotuspelit';
-                return {
-                    id: playoff.id,
-                    name: playoff.name,
-                    title: displayTitle,
-                    state,
-                    statusLabel: this.getPlayoffStatusLabel(state),
-                    matchesCaption,
-                    hasDates: Boolean(dates.label),
-                    dateLabel: dates.label,
-                    progressPercent: percent,
-                    progressPercentLabel: `${Math.round(percent)}%`,
-                    progressCaption,
-                    progressAriaLabel: playoffAria,
-                    progressTooltip: tooltipParts.join(' • '),
-                    winner: winnerName,
-                    href: playoff.href
-                };
+                return [
+                    { label: 'Open Division', href, primary: true },
+                    { label: 'View Stats', href: `${href}#stats`, primary: false }
+                ];
+            },
+            tierProgressLabel(tier) {
+                return `${tier.finishedCount} / ${tier.totalCount} divisions finished`;
+            },
+            progressTooltip() {
+                return PROGRESS_TOOLTIP;
             }
         },
         template: `
-            <div class="division-card-list-wrapper">
-                <div
-                    v-if="hasDivisions"
-                    class="division-card-list"
-                    role="list"
-                    :aria-label="'Divisioonat ' + seasonLabel"
-                >
-                    <article
-                        v-for="group in groupedDivisions"
-                        :key="group.main.id"
-                        class="division-card"
-                        :class="[
-                            'division-card--status-' + group.main.status,
-                            'division-card--kind-' + group.main.kind,
-                            { 'division-card--muted': group.main.status === 'upcoming' },
-                            { 'division-card--orphaned': group.isOrphaned },
-                            { 'division-card--has-playoff': !!group.playoff }
-                        ]"
-                        role="listitem"
-                        :aria-labelledby="'division-title-' + group.main.id"
+            <div class="division-hub">
+                <template v-if="hasDivisions">
+                    <section
+                        v-for="tier in tierGroups"
+                        :key="tier.id"
+                        class="division-tier"
                     >
-                        <div class="division-card__inner">
-                            <div v-if="group.isOrphaned" class="division-card__warning">
-                                ⚠️ Pudotuspelien päädivisioona puuttuu tai sitä ei löytynyt
+                        <button
+                            type="button"
+                            class="division-tier__toggle"
+                            :aria-expanded="isTierExpanded(tier.id)"
+                            @click="toggleTier(tier.id)"
+                        >
+                            <div class="division-tier__title">
+                                <span class="division-tier__label">{{ tier.label }}</span>
+                                <span class="division-tier__range">{{ tier.rangeLabel }}</span>
                             </div>
-
-                            <header class="division-card__top">
-                                <span
-                                    class="division-card__badge"
-                                    :class="'badge-' + (group.main.kind || 'regular')"
-                                    aria-hidden="true"
+                            <div class="division-tier__meta">
+                                <span class="division-tier__progress-label">{{ tierProgressLabel(tier) }}</span>
+                                <div
+                                    class="division-tier__progress"
+                                    role="progressbar"
+                                    :aria-valuenow="tier.progressPercent"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
                                 >
-                                    <svg
-                                        v-if="group.main.kind === 'masters'"
-                                        viewBox="0 0 24 24"
-                                        aria-hidden="true"
-                                        focusable="false"
-                                    >
-                                        <path d="M4 4l3 6 5-2 5 2 3-6h2l-1.5 14h-15L2 4h2z"></path>
-                                        <path d="M7 20h10l-5 3-5-3z"></path>
-                                    </svg>
-                                    <svg
-                                        v-else-if="group.main.kind === 'playoffs'"
-                                        viewBox="0 0 24 24"
-                                        aria-hidden="true"
-                                        focusable="false"
-                                    >
-                                        <path d="M5 3h4l1 4h4l1-4h4l-2 12h-10L5 3z"></path>
-                                        <path d="M9 17h6l-3 4-3-4z"></path>
-                                    </svg>
-                                    <svg v-else viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                                        <path d="M12 2l8 4v6c0 4.97-3.31 9.58-8 11-4.69-1.42-8-6.03-8-11V6l8-4z"></path>
-                                    </svg>
-                                </span>
-                                <div class="division-card__titles">
-                                    <h3 class="division-card__name" :id="'division-title-' + group.main.id">
-                                        {{ group.main.displayName || group.main.name }}
-                                    </h3>
-                                    <span class="division-card__chip" :class="'chip-' + group.main.status">
-                                        <span v-if="group.main.status === 'running'" class="chip__dot" aria-hidden="true"></span>
-                                        {{ group.main.statusLabel }}
-                                    </span>
+                                    <span class="division-tier__progress-fill" :style="{ width: tier.progressPercent + '%' }"></span>
                                 </div>
-                            </header>
-
-                            <ul class="division-card__stats" role="list">
-                                <li
-                                    v-for="stat in getStatItems(group.main)"
-                                    :key="stat.key"
-                                    class="division-card__stat"
-                                    role="listitem"
-                                    :class="{ 'division-card__stat--muted': stat.muted }"
-                                    :title="stat.title"
-                                >
-                                    <span class="division-card__icon" aria-hidden="true">
-                                        <svg
-                                            v-if="stat.icon === 'teams'"
-                                            viewBox="0 0 24 24"
-                                            aria-hidden="true"
-                                            focusable="false"
-                                        >
-                                            <path d="M9 12c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm6 0c-1.86 0-3.41-1.28-3.86-3h2.08c.36 1.19 1.47 2 2.78 2 1.65 0 3-1.35 3-3s-1.35-3-3-3c-1.31 0-2.42.81-2.78 2h-2.08C11.59 3.28 13.14 2 15 2c2.76 0 5 2.24 5 5s-2.24 5-5 5zm-6 2c2.67 0 8 1.34 8 4v2H1v-2c0-2.66 5.33-4 8-4zm0 2c-2.33 0-6 1.17-6 2v.01h12V18c0-.83-3.67-2-6-2zm6.92-2.74C18.46 15.37 20 17.28 20 19v1h-4v-1c0-1.54-.85-3.03-2.23-4.24.37-.05.74-.08 1.15-.08.36 0 .71.03 1.05.08z"></path>
-                                        </svg>
-                                        <svg
-                                            v-else-if="stat.icon === 'matches'"
-                                            viewBox="0 0 24 24"
-                                            aria-hidden="true"
-                                            focusable="false"
-                                        >
-                                            <path d="M4 5h16v4H4z"></path>
-                                            <path d="M6 5h2v14H6zm10 0h2v14h-2z"></path>
-                                            <path d="M9 5h6v6H9z"></path>
-                                        </svg>
-                                        <svg
-                                            v-else-if="stat.icon === 'dates'"
-                                            viewBox="0 0 24 24"
-                                            aria-hidden="true"
-                                            focusable="false"
-                                        >
-                                            <path d="M7 2v2H5a2 2 0 0 0-2 2v2h18V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm13 8H4v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10zm-9 3h2v4h-2v-4z"></path>
-                                        </svg>
-                                        <svg
-                                            v-else
-                                            viewBox="0 0 24 24"
-                                            aria-hidden="true"
-                                            focusable="false"
-                                        >
-                                            <path d="M12 1a11 11 0 1 0 11 11A11 11 0 0 0 12 1zm0 2a9 9 0 1 1-9 9 9 9 0 0 1 9-9zm-.5 3h1.5v5.25l3.5 2.1-.75 1.23L11.5 13V6z"></path>
-                                        </svg>
-                                    </span>
-                                    <div class="division-card__stat-text">
-                                        <span class="division-card__stat-label">{{ stat.label }}</span>
-                                        <span class="division-card__stat-value">{{ stat.value }}</span>
-                                    </div>
-                                </li>
-                            </ul>
-
-                            <div v-if="group.main.winner" class="division-card__winner">
-                                <span class="division-card__winner-label">Voittaja</span>
-                                <span class="division-card__winner-value">{{ group.main.winner.name }}</span>
                             </div>
-
-                            <template v-for="progress in [describeProgress(group.main)]" :key="group.main.id + '-progress'">
+                            <span class="division-tier__chevron" :class="{ 'is-open': isTierExpanded(tier.id) }" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" focusable="false">
+                                    <path d="M7 10l5 5 5-5H7z"></path>
+                                </svg>
+                            </span>
+                        </button>
+                        <transition name="accordion">
+                            <div
+                                v-show="isTierExpanded(tier.id)"
+                                class="division-tier__content"
+                                :data-tier-id="tier.id"
+                                :ref="el => registerTierRef(tier.id, el)"
+                            >
                                 <div
-                                    v-if="progress.state === 'running'"
-                                    class="division-card__progress division-card__progress--active"
-                                    role="group"
-                                    :aria-label="progress.ariaLabel"
-                                    :title="progress.tooltip"
+                                    v-if="shouldRenderTier(tier.id)"
+                                    class="division-hub__grid"
+                                    role="list"
+                                    :aria-label="tier.label"
                                 >
-                                    <div class="division-card__progress-meta">
-                                        <span class="division-card__progress-percent">{{ progress.percentLabel }}</span>
-                                        <span class="division-card__progress-caption">{{ progress.caption }}</span>
-                                    </div>
-                                    <div class="division-card__progress-track">
-                                        <span
-                                            class="division-card__progress-fill"
-                                            :style="{ width: progress.percent + '%' }"
-                                        ></span>
-                                    </div>
-                                </div>
-                                <div
-                                    v-else-if="progress.state === 'upcoming'"
-                                    class="division-card__progress division-card__progress--upcoming"
-                                    role="status"
-                                    aria-live="polite"
-                                >
-                                    <span class="division-card__progress-empty">Ei vielä alkanut</span>
-                                </div>
-                                <div
-                                    v-else
-                                    class="division-card__progress division-card__progress--ended"
-                                    role="status"
-                                    aria-live="polite"
-                                >
-                                    <span class="division-card__progress-check" aria-hidden="true">
-                                        <svg viewBox="0 0 16 16" focusable="false">
-                                            <path d="M6.6 11.2 3.4 8l1.2-1.2 2 2L11.4 4 12.6 5.2l-6 6z"></path>
-                                        </svg>
-                                    </span>
-                                    <span class="division-card__progress-done">Taputeltu loppuun</span>
-                                </div>
-                            </template>
-
-                            <template v-if="group.playoff">
-                                <div
-                                    v-for="playoff in [describePlayoff(group.playoff)]"
-                                    :key="group.playoff.id + '-playoff'"
-                                    class="division-card__playoff"
-                                    :class="'division-card__playoff--' + playoff.state"
-                                >
-                                    <header class="division-card__playoff-header">
-                                        <span class="division-card__playoff-title">{{ playoff.title }}</span>
-                                        <span class="division-card__playoff-chip" :class="'playoff-chip--' + playoff.state">
-                                            {{ playoff.statusLabel }}
-                                        </span>
-                                    </header>
-                                    <p class="division-card__playoff-line">{{ playoff.matchesCaption }}</p>
-                                    <p v-if="playoff.hasDates" class="division-card__playoff-dates">
-                                        {{ playoff.dateLabel }}
-                                    </p>
-                                    <div
-                                        v-if="playoff.state === 'running'"
-                                        class="division-card__playoff-progress"
-                                        role="group"
-                                        :aria-label="playoff.progressAriaLabel"
-                                        :title="playoff.progressTooltip"
+                                    <article
+                                        v-for="division in tier.divisions"
+                                        :key="division.id"
+                                        class="division-hub-card"
+                                        :class="'division-hub-card--' + division.state"
+                                        role="listitem"
+                                        tabindex="0"
+                                        :aria-label="division.displayName || division.name"
+                                        @click="navigateToDivision(division)"
+                                        @keydown.enter.prevent="handleCardKey($event, division)"
+                                        @keydown.space.prevent="handleCardKey($event, division)"
                                     >
-                                        <div class="division-card__playoff-progress-meta">
-                                            <span class="division-card__playoff-progress-percent">{{ playoff.progressPercentLabel }}</span>
-                                            <span class="division-card__playoff-progress-caption">{{ playoff.progressCaption }}</span>
-                                        </div>
-                                        <div class="division-card__playoff-progress-track">
-                                            <span
-                                                class="division-card__playoff-progress-fill"
-                                                :style="{ width: playoff.progressPercent + '%' }"
-                                            ></span>
-                                        </div>
-                                    </div>
-                                    <div
-                                        v-else-if="playoff.state === 'upcoming'"
-                                        class="division-card__playoff-placeholder"
-                                        role="status"
-                                        aria-live="polite"
-                                    >
-                                        Ei vielä alkanut
-                                    </div>
-                                    <div v-else class="division-card__playoff-result">
-                                        <p class="division-card__playoff-winner" v-if="playoff.winner">
-                                            Voittaja: {{ playoff.winner }}
-                                        </p>
-                                        <p v-else>Taputeltu loppuun</p>
-                                    </div>
-                                    <div class="division-card__playoff-actions">
-                                        <a
-                                            v-if="playoff.href"
-                                            :href="playoff.href"
-                                            class="division-card__playoff-button"
-                                            :aria-label="'Avaa playoff-sarja: ' + playoff.title"
-                                        >
-                                            Avaa playoff-sarja
-                                        </a>
-                                        <span
-                                            v-else
-                                            class="division-card__playoff-button division-card__playoff-button--disabled"
-                                            aria-disabled="true"
-                                        >
-                                            Avaa playoff-sarja
-                                        </span>
-                                    </div>
-                                </div>
-                            </template>
-                            <div v-else class="division-card__playoff division-card__playoff--placeholder" aria-hidden="true"></div>
+                                        <header class="division-hub-card__header">
+                                            <div>
+                                                <p class="division-hub-card__eyebrow">Division {{ division.divisionNum != null ? division.divisionNum : '-' }}</p>
+                                                <h3>{{ division.displayName || division.name }}</h3>
+                                            </div>
+                                            <span class="division-hub-card__badge" :class="'division-hub-card__badge--' + division.state">
+                                                {{ division.stateLabel }}
+                                            </span>
+                                        </header>
 
-                            <footer class="division-card__footer">
-                                <a
-                                    :href="group.main.href"
-                                    class="division-card__cta"
-                                    :aria-label="group.main.actionLabel + ': ' + (group.main.displayName || group.main.name)"
-                                >
-                                    {{ group.main.actionLabel }}
-                                </a>
-                            </footer>
-                        </div>
-                    </article>
-                </div>
-                <p v-else class="division-card-list__empty">
-                    {{ emptyMessage }}
-                </p>
+                                        <div class="division-hub-card__body">
+                                            <template v-if="division.state === 'finished'">
+                                                <div class="division-hub-card__finished">
+                                                    <p>Taputeltu loppuun</p>
+                                                    <p class="division-hub-card__winner">
+                                                        Winner: {{ division.winner?.name || 'Vahvistuu' }}
+                                                    </p>
+                                                </div>
+                                            </template>
+                                            <template v-else>
+                                                <div
+                                                    class="division-hub-card__progress"
+                                                    :class="{ 'division-hub-card__progress--waiting': division.state === 'waiting' }"
+                                                    role="progressbar"
+                                                    :aria-valuenow="Math.round(division.progress.percent)"
+                                                    aria-valuemin="0"
+                                                    aria-valuemax="100"
+                                                    :title="progressTooltip()"
+                                                >
+                                                    <div class="division-hub-card__progress-fill" :style="{ width: division.progress.percent + '%' }"></div>
+                                                    <span class="division-hub-card__progress-marker" aria-hidden="true"></span>
+                                                    <span class="division-hub-card__progress-text">{{ getProgressDisplay(division) }}</span>
+                                                </div>
+                                            </template>
+                                            <p class="division-hub-card__activity">{{ getActivityLine(division) }}</p>
+                                            <ul class="division-hub-card__facts" role="list">
+                                                <li
+                                                    v-for="fact in getQuickFacts(division)"
+                                                    :key="fact.key"
+                                                    class="division-hub-card__fact"
+                                                >
+                                                    <span class="division-hub-card__fact-icon" aria-hidden="true">
+                                                        <svg v-if="fact.icon === 'matches'" viewBox="0 0 24 24" focusable="false">
+                                                            <path d="M5 4h14v2H5zM5 11h14v2H5zM5 18h14v2H5z"></path>
+                                                        </svg>
+                                                        <svg v-else-if="fact.icon === 'teams'" viewBox="0 0 24 24" focusable="false">
+                                                            <path d="M9 11.75A3.75 3.75 0 1 1 9 4.25a3.75 3.75 0 0 1 0 7.5zm0 2.5c2.5 0 7.5 1.25 7.5 3.75V20H1.5v-2c0-2.5 5-3.75 7.5-3.75zM17 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm2.5.5c.83 0 1.5.67 1.5 1.5V14h-4v-1.5c0-.83.67-1.5 1.5-1.5z"></path>
+                                                        </svg>
+                                                        <svg v-else viewBox="0 0 24 24" focusable="false">
+                                                            <path d="M4 5h16v2H4zm2 4h12v2H6zm-2 4h16v2H4zm2 4h12v2H6z"></path>
+                                                        </svg>
+                                                    </span>
+                                                    <span class="division-hub-card__fact-label">{{ fact.label }}</span>
+                                                    <span class="division-hub-card__fact-value">{{ fact.value }}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <footer class="division-hub-card__actions">
+                                            <a
+                                                v-for="action in divisionCardActions(division)"
+                                                :key="action.label"
+                                                class="btn-chip"
+                                                :class="{ 'btn-chip--primary': action.primary }"
+                                                :href="action.href"
+                                                @click.stop="rememberDivision(division.id)"
+                                            >
+                                                {{ action.label }}
+                                            </a>
+                                        </footer>
+                                    </article>
+                                </div>
+                            </div>
+                        </transition>
+                    </section>
+                </template>
+                <p v-else class="division-hub__empty">{{ emptyMessage }}</p>
             </div>
         `
     };

@@ -42,6 +42,9 @@
     --success: var(--ok);
     --danger: var(--err);
     --warning: var(--warn);
+    --state-active: #4f82ff;
+    --state-finished: #37d499;
+    --state-waiting: #7f86a5;
 
     /* Effects */
     --radius: 18px;
@@ -142,6 +145,18 @@ a {
     margin-top: 4px;
 }
 
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* ---- Buttons & links ---- */
 .btn-primary {
     display: inline-flex;
@@ -167,6 +182,60 @@ a {
 .btn-primary:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+}
+
+.btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--fg);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, border 0.2s ease;
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus-visible {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.45rem 1.1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--fg);
+    font-size: 0.9rem;
+    font-weight: 600;
+    gap: 0.4rem;
+    transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
+}
+
+.btn-chip--primary {
+    border-color: var(--state-active);
+    background: rgba(79, 130, 255, 0.12);
+    color: var(--state-active);
+}
+
+.btn-chip:hover,
+.btn-chip:focus-visible {
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-chip--primary:hover,
+.btn-chip--primary:focus-visible {
+    border-color: var(--state-active);
+    background: rgba(79, 130, 255, 0.2);
 }
 
 .btn-link {
@@ -5680,4 +5749,485 @@ body.is-division .card.maps-section {
 .partner-callout:hover {
     border-color: rgba(140, 180, 255, 0.5);
     box-shadow: 0 32px 56px rgba(8, 14, 32, 0.55), 0 0 24px rgba(98, 148, 255, 0.35);
+}
+
+/* ---- Season dashboard ---- */
+.season-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.season-control-bar {
+    position: sticky;
+    top: clamp(0.5rem, 2vw, 1rem);
+    z-index: 12;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    padding: clamp(1rem, 2vw, 1.25rem);
+    border-radius: var(--radius);
+    background: rgba(12, 16, 32, 0.9);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(var(--glass-blur));
+}
+
+.season-control-bar__label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+}
+
+.season-control-bar__select,
+.season-control-bar__input {
+    width: 100%;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(5, 9, 20, 0.8);
+    color: var(--fg);
+    padding: 0.6rem 0.85rem;
+    font-size: 0.95rem;
+}
+
+.season-control-bar__input::placeholder {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.season-control-bar__select:focus-visible,
+.season-control-bar__input:focus-visible {
+    outline: 2px solid var(--accent);
+    border-color: var(--accent);
+}
+
+.season-control-bar__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.season-control-bar__search {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-chip {
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+    text-transform: capitalize;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.filter-chip--active {
+    color: var(--fg);
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.filter-chip--active[data-state="active"] {
+    border-color: var(--state-active);
+    background: rgba(79, 130, 255, 0.18);
+}
+
+.filter-chip--active[data-state="finished"] {
+    border-color: var(--state-finished);
+    background: rgba(55, 212, 153, 0.2);
+}
+
+.filter-chip--active[data-state="waiting"] {
+    border-color: var(--state-waiting);
+    background: rgba(127, 134, 165, 0.2);
+}
+
+.season-summary-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1.4rem;
+}
+
+.season-summary-row__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.season-summary-row__chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+}
+
+.kpi-chip {
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: var(--radius-sm);
+    padding: 0.9rem;
+    background: rgba(8, 12, 26, 0.85);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.kpi-chip__label {
+    font-size: 0.8rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.kpi-chip__value {
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.season-summary-row__progress {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.season-summary-row__progress-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.season-summary-row__progress-headline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+.season-summary-row__progress-bar {
+    position: relative;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.season-summary-row__progress-bar span {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    z-index: 1;
+    color: var(--fg);
+}
+
+.season-summary-row__progress-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, var(--state-active), #7bc5ff);
+    transform-origin: left center;
+    transform: scaleX(calc(var(--progress, 0) / 100));
+}
+
+.divisions-section__hint {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.division-hub {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.division-tier {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius);
+    background: rgba(10, 15, 32, 0.8);
+}
+
+.division-tier__toggle {
+    width: 100%;
+    border: none;
+    background: transparent;
+    display: grid;
+    grid-template-columns: 2fr 2fr auto;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    color: var(--fg);
+    text-align: left;
+    cursor: pointer;
+}
+
+.division-tier__title {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.division-tier__label {
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.division-tier__range {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.division-tier__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.division-tier__progress {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.division-tier__progress-fill {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--state-finished), #8cf1cf);
+}
+
+.division-tier__chevron {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+.division-tier__chevron svg {
+    width: 20px;
+    height: 20px;
+    fill: var(--muted);
+}
+
+.division-tier__chevron.is-open {
+    transform: rotate(180deg);
+}
+
+.division-tier__content {
+    padding: 0 1.25rem 1.25rem;
+}
+
+.division-hub__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+.division-hub-card {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    background: rgba(12, 16, 32, 0.85);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.division-hub-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+.division-hub-card--active {
+    border-color: rgba(79, 130, 255, 0.35);
+}
+
+.division-hub-card--finished {
+    border-color: rgba(55, 212, 153, 0.35);
+}
+
+.division-hub-card--waiting {
+    border-color: rgba(127, 134, 165, 0.3);
+}
+
+.division-hub-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.division-hub-card__eyebrow {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.division-hub-card__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.division-hub-card__badge--active {
+    background: rgba(79, 130, 255, 0.17);
+    color: var(--state-active);
+}
+
+.division-hub-card__badge--finished {
+    background: rgba(55, 212, 153, 0.2);
+    color: var(--state-finished);
+}
+
+.division-hub-card__badge--waiting {
+    background: rgba(127, 134, 165, 0.2);
+    color: var(--state-waiting);
+}
+
+.division-hub-card__progress {
+    position: relative;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(5, 8, 20, 0.85);
+    overflow: hidden;
+}
+
+.division-hub-card__progress-fill {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, var(--state-active), #6bc3ff);
+}
+
+.division-hub-card__progress--waiting .division-hub-card__progress-fill {
+    background: rgba(127, 134, 165, 0.35);
+}
+
+.division-hub-card__progress-marker {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.division-hub-card__progress-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--fg);
+}
+
+.division-hub-card__activity {
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+.division-hub-card__facts {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+}
+
+.division-hub-card__fact {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.4rem 0.5rem;
+    align-items: center;
+}
+
+.division-hub-card__fact-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: var(--muted);
+}
+
+.division-hub-card__fact-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.division-hub-card__fact-value {
+    grid-column: span 2;
+    font-weight: 600;
+}
+
+.division-hub-card__finished {
+    border-radius: var(--radius-sm);
+    background: rgba(55, 212, 153, 0.15);
+    padding: 0.9rem;
+    text-align: center;
+    color: var(--state-finished);
+    font-weight: 600;
+}
+
+.division-hub-card__winner {
+    margin-top: 0.2rem;
+    color: var(--fg);
+}
+
+.division-hub-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.division-hub__empty {
+    padding: 1rem;
+    text-align: center;
+    border-radius: var(--radius);
+    border: 1px dashed rgba(255, 255, 255, 0.25);
+    color: var(--muted);
+}
+
+.accordion-enter-active,
+.accordion-leave-active {
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.accordion-enter-from,
+.accordion-leave-to {
+    max-height: 0;
+    opacity: 0;
+}
+
+@media (max-width: 768px) {
+    .season-control-bar {
+        grid-template-columns: 1fr;
+    }
+
+    .division-tier__toggle {
+        grid-template-columns: 1fr;
+    }
+
+    .division-hub__grid {
+        grid-template-columns: 1fr;
+    }
 }

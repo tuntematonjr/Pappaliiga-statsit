@@ -15,6 +15,91 @@ const PROGRESS_LABELS = {
     playoffs: 'Playoffit'
 };
 
+const SEASON_KPI_SCHEMA = [
+    {
+        id: 'divisions',
+        label: 'Divisions',
+        tooltip: 'Sisältää kaikki valitun kauden divisioonat.',
+        digits: 0,
+        getter: vm => vm.divisionCount
+    },
+    {
+        id: 'teams',
+        label: 'Teams',
+        tooltip: 'Yksilöllisten joukkueiden määrä kaudella.',
+        digits: 0,
+        key: [
+            'aggregates.total_teams',
+            'team_count',
+            'teams',
+            'teams_count',
+            'total_teams'
+        ]
+    },
+    {
+        id: 'maps',
+        label: 'Maps',
+        tooltip: 'Kauden aikana pelattujen karttojen määrä.',
+        digits: 0,
+        key: [
+            'aggregates.maps_played_total',
+            'maps_played_total',
+            'maps_played',
+            'map_count',
+            'maps'
+        ]
+    },
+    {
+        id: 'rounds',
+        label: 'Rounds',
+        tooltip: 'Yhteensä pelatut erät runkosarjassa ja playoffeissa.',
+        digits: 0,
+        key: [
+            'aggregates.rounds_played_total',
+            'rounds_played_total',
+            'rounds_played',
+            'rounds'
+        ]
+    },
+    {
+        id: 'kills',
+        label: 'Kills',
+        tooltip: 'Kauden kokonaistapot.',
+        digits: 0,
+        key: [
+            'aggregates.total_kills',
+            'kills_total',
+            'kills',
+            'total_kills'
+        ]
+    },
+    {
+        id: 'headshots',
+        label: 'Headshots',
+        tooltip: 'Headshot-osumien kokonaismäärä.',
+        digits: 0,
+        key: [
+            'aggregates.total_headshots',
+            'headshots_total',
+            'headshots',
+            'total_headshots'
+        ]
+    },
+    {
+        id: 'winrate',
+        label: 'Win%',
+        tooltip: 'Kauden keskimääräinen voittoprosentti.',
+        percent: true,
+        digits: 1,
+        key: [
+            'aggregates.win_percent',
+            'win_percent',
+            'win_pct',
+            'wins_percent'
+        ]
+    }
+];
+
 function toNumber(value, fallback = 0) {
     if (value === null || value === undefined) {
         return fallback;
@@ -144,9 +229,6 @@ window.HomeView = {
         get StatPanel() {
             return window.StatPanel;
         },
-        get SeasonToggle() {
-            return window.SeasonToggle;
-        },
         get DivisionCardList() {
             return window.DivisionCardList;
         }
@@ -157,16 +239,18 @@ window.HomeView = {
         return {
             seasonsStore,
             homeStore,
-            localSegment: 'active',
-            progressGlowMeta: {}
+            progressGlowMeta: {},
+            divisionFilter: 'all',
+            divisionSort: 'tier',
+            divisionSearch: ''
         };
     },
     computed: {
         heroTitle() {
-            return 'AFIn epävirallinen Pappaliiga Stats Hub';
+            return 'AFI × Pappaliiga Stats Hub';
         },
         heroSubtitle() {
-            return 'AFI:n epävirallinen tilastokeskus – yhteenveto kaikista kausista, ajantasaiset divarit ja pelaajien kehityskäyrät.';
+            return 'Nopea näkymä Pappaliigan kauden 11 divisiooniin, tuloksiin ja seuraaviin askeliin.';
         },
         // heroEyebrow() {
         //     return 'AFI · Faceit API DATA';
@@ -214,26 +298,25 @@ window.HomeView = {
         seasonsError() {
             return this.seasonsStore?.error ?? null;
         },
-        seasonSegment: {
-            get() {
-                if (this.seasonsStore) {
-                    return this.seasonsStore.selectedSegment || this.localSegment;
-                }
-                return this.localSegment;
-            },
-            set(value) {
-                const segment = value === 'archived' ? 'archived' : 'active';
-                if (this.seasonsStore) {
-                    this.seasonsStore.setSegment(segment);
-                }
-                this.localSegment = segment;
-            }
-        },
         activeSeasons() {
             return this.seasonsStore?.activeSeasons ?? [];
         },
         archivedSeasons() {
             return this.seasonsStore?.archivedSeasons ?? [];
+        },
+        seasonSelectGroups() {
+            return [
+                {
+                    id: 'active',
+                    label: 'Käynnissä olevat kaudet',
+                    options: this.activeSeasons
+                },
+                {
+                    id: 'archived',
+                    label: 'Arkistoidut kaudet',
+                    options: this.archivedSeasons
+                }
+            ].filter(group => Array.isArray(group.options) && group.options.length > 0);
         },
         selectedSeasonKey: {
             get() {
@@ -292,6 +375,21 @@ window.HomeView = {
         hasProgress() {
             return this.progressMetrics.length > 0;
         },
+        seasonKpiChips() {
+            const stats = this.seasonState.stats || {};
+            return SEASON_KPI_SCHEMA.map(schema => {
+                const rawValue =
+                    typeof schema.getter === 'function'
+                        ? schema.getter(this, stats)
+                        : pickValue(stats, schema.key);
+                return {
+                    id: schema.id,
+                    label: schema.label,
+                    value: formatMetric(rawValue, schema),
+                    tooltip: schema.tooltip
+                };
+            });
+        },
         seasonTitle() {
             const season = this.selectedSeason;
             if (!season) {
@@ -327,6 +425,15 @@ window.HomeView = {
             if (!this.selectedSeason) return '';
             const percent = this.divisionProgressPercent.toFixed(0);
             return `${this.divisionCount} divisioonaa · ${percent}% pelattu`;
+        },
+        divisionEmptyMessage() {
+            if (!this.selectedSeasonKey) {
+                return 'Valitse kausi tarkasteltavaksi.';
+            }
+            if (this.divisionFilter !== 'all' || this.divisionSearch.trim().length > 0) {
+                return 'Ei divisioonia valituilla suodattimilla.';
+            }
+            return 'Tälle kaudelle ei löytynyt divisioonia.';
         }
     },
     async mounted() {
@@ -375,23 +482,6 @@ window.HomeView = {
                 console.error('Season fetch failed', error);
             }
         },
-        handleSeasonChange(seasonKey) {
-            if (!seasonKey || seasonKey === this.selectedSeasonKey) {
-                return;
-            }
-            this.selectedSeasonKey = seasonKey;
-        },
-        handleSegmentChange(segment) {
-            this.seasonSegment = segment;
-            const collection = segment === 'archived' ? this.archivedSeasons : this.activeSeasons;
-            if (!collection || !collection.length) {
-                return;
-            }
-            const exists = collection.some(entry => entry.key === this.selectedSeasonKey);
-            if (!exists) {
-                this.handleSeasonChange(collection[0].key);
-            }
-        },
         retrySeasons() {
             if (!this.seasonsStore) return;
             this.seasonsStore
@@ -417,14 +507,20 @@ window.HomeView = {
                 force: true
             });
         },
-        scrollToSeasons() {
-            const target = this.$refs.seasonPicker;
+        scrollToSeasonControls() {
+            const target = this.$refs.seasonControls;
             if (!target) return;
             try {
                 target.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } catch (error) {
                 window.scrollTo(0, target.offsetTop || 0);
             }
+        },
+        setDivisionFilter(filter) {
+            this.divisionFilter = filter;
+        },
+        handleDivisionSearch(event) {
+            this.divisionSearch = event?.target?.value ?? '';
         }
     },
     template: `
@@ -435,10 +531,12 @@ window.HomeView = {
                 :eyebrow="heroEyebrow"
             >
                 <template #actions>
-                    <button class="btn-primary" type="button" @click="scrollToSeasons">Siirry kausiin</button>
-                    <router-link to="/seasons" class="btn-link">Kaikki kaudet</router-link>
+                    <button class="btn-primary" type="button" @click="scrollToSeasonControls">View Current Season</button>
+                    <a class="btn-secondary" href="https://discord.gg/pappaliiga" target="_blank" rel="noopener">Join Discord</a>
+                    <router-link to="/seasons" class="btn-link">All Seasons</router-link>
                 </template>
             </hero-banner>
+
             <section class="home-partners" aria-label="Kumppanikuvaukset">
                 <article
                     v-for="callout in partnerCallouts"
@@ -494,36 +592,78 @@ window.HomeView = {
                 ></stat-panel>
             </section>
 
-            <section class="home-seasons" ref="seasonPicker">
-                <header class="section-heading">
-                    <div>
-                        <h2>Valitse kausi</h2>
-                        <p class="section-subtitle">
-                            Valitse käynnissä oleva kausi tai tutustu arkistoon.
-                        </p>
+            <section
+                class="season-dashboard"
+                v-if="selectedSeasonKey"
+            >
+                <div class="season-control-bar glass-card" ref="seasonControls">
+                    <div class="season-control-bar__season">
+                        <label class="season-control-bar__label" for="season-select">Season</label>
+                        <select
+                            id="season-select"
+                            class="season-control-bar__select"
+                            v-model="selectedSeasonKey"
+                            :disabled="seasonsLoading || !seasonSelectGroups.length"
+                        >
+                            <template v-if="seasonSelectGroups.length">
+                                <optgroup
+                                    v-for="group in seasonSelectGroups"
+                                    :key="group.id"
+                                    :label="group.label"
+                                >
+                                    <option
+                                        v-for="season in group.options"
+                                        :key="season.key"
+                                        :value="season.key"
+                                    >
+                                        {{ season.label }}
+                                    </option>
+                                </optgroup>
+                            </template>
+                            <option v-else disabled>Ei kausia</option>
+                        </select>
                     </div>
-                </header>
-                <season-toggle
-                    :active-seasons="activeSeasons"
-                    :archived-seasons="archivedSeasons"
-                    :model-value="selectedSeasonKey"
-                    :segment="seasonSegment"
-                    :loading="seasonsLoading"
-                    :error="seasonsError"
-                    @update:modelValue="handleSeasonChange"
-                    @update:segment="handleSegmentChange"
-                    @retry="retrySeasons"
-                ></season-toggle>
-            </section>
 
-            <section class="season-overview-panel glass-card" v-if="selectedSeasonKey">
-                <div class="season-overview__header">
-                    <div class="season-overview__titles">
-                        <span v-if="seasonSubtitle" class="section-eyebrow">{{ seasonSubtitle }}</span>
-                        <h2>{{ seasonTitle }}</h2>
+                    <div class="season-control-bar__filters" role="group" aria-label="Divisioona tilat">
+                        <button
+                            v-for="state in ['all', 'active', 'finished', 'waiting']"
+                            :key="state"
+                            type="button"
+                            class="filter-chip"
+                            :data-state="state"
+                            :class="{ 'filter-chip--active': divisionFilter === state }"
+                            :aria-pressed="divisionFilter === state"
+                            @click="setDivisionFilter(state)"
+                        >
+                            {{ state === 'all' ? 'All' : state.charAt(0).toUpperCase() + state.slice(1) }}
+                        </button>
                     </div>
-                    <router-link to="/seasons" class="btn-link">Kaikki kaudet</router-link>
+
+                    <label class="season-control-bar__search" aria-label="Hae divisioonaa">
+                        <span class="sr-only">Search divisions</span>
+                        <input
+                            type="search"
+                            class="season-control-bar__input"
+                            placeholder="Search divisions"
+                            :value="divisionSearch"
+                            @input="handleDivisionSearch"
+                        >
+                    </label>
+
+                    <div class="season-control-bar__sort">
+                        <label class="season-control-bar__label" for="division-sort">Sort</label>
+                        <select
+                            id="division-sort"
+                            class="season-control-bar__select"
+                            v-model="divisionSort"
+                        >
+                            <option value="tier">By tier</option>
+                            <option value="progress">By progress</option>
+                            <option value="alphabetical">Alphabetical</option>
+                        </select>
+                    </div>
                 </div>
+
                 <loading-spinner
                     v-if="seasonLoading"
                     message="Kausitietoja ladataan..."
@@ -536,51 +676,76 @@ window.HomeView = {
                 ></error-message>
 
                 <template v-else>
-                    <stat-panel
-                        class="season-overview__metrics"
-                        :items="seasonMetrics"
-                        :columns="4"
-                    ></stat-panel>
-
-                    <div v-if="hasProgress" class="season-overview__progress" role="group" aria-label="Kausi etenee">
-                        <div
-                            v-for="item in progressMetrics"
-                            :key="item.key"
-                            class="progress-pill"
-                            :aria-label="item.label + ' ' + item.played + '/' + item.total"
-                        >
-                            <div class="progress-pill__header">
-                                <span class="progress-pill__label">{{ item.label }}</span>
-                                <span class="progress-pill__value">{{ item.played }} / {{ item.total }}</span>
+                    <section class="season-summary-row glass-card">
+                        <div class="season-summary-row__header">
+                            <div>
+                                <span v-if="seasonSubtitle" class="section-eyebrow">{{ seasonSubtitle }}</span>
+                                <h2>{{ seasonTitle }}</h2>
                             </div>
-                            <div class="progress-pill__bar">
-                                <span
-                                    class="progress-pill__fill"
-                                    :style="{
-                                        width: item.percent + '%',
-                                        '--glow-delay': item.glowDelay + 's',
-                                        '--glow-duration': item.glowDuration + 's'
-                                    }"
-                                ></span>
-                            </div>
-                            <span class="progress-pill__percent">{{ item.percent }} %</span>
+                            <router-link to="/seasons" class="btn-link">All Seasons</router-link>
                         </div>
-                    </div>
-                </template>
-            </section>
+                        <div class="season-summary-row__chips" role="list">
+                            <article
+                                v-for="chip in seasonKpiChips"
+                                :key="chip.id"
+                                class="kpi-chip"
+                                role="listitem"
+                                tabindex="0"
+                                :title="chip.tooltip"
+                            >
+                                <span class="kpi-chip__label">{{ chip.label }}</span>
+                                <span class="kpi-chip__value">{{ chip.value }}</span>
+                            </article>
+                        </div>
+                        <div
+                            v-if="hasProgress"
+                            class="season-summary-row__progress"
+                            role="group"
+                            aria-label="Kausiprogessiot"
+                        >
+                            <div
+                                v-for="item in progressMetrics"
+                                :key="item.key"
+                                class="season-summary-row__progress-item"
+                                :aria-label="item.label + ' ' + item.played + ' / ' + item.total"
+                            >
+                                <div class="season-summary-row__progress-headline">
+                                    <span>{{ item.label }}</span>
+                                    <span>{{ item.played }} / {{ item.total }}</span>
+                                </div>
+                                <div
+                                    class="season-summary-row__progress-bar"
+                                    role="progressbar"
+                                    :aria-valuenow="item.percent"
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                    :title="item.label + ' eteneminen'"
+                                    :style="{ '--progress': item.percent }"
+                                >
+                                    <span>{{ item.percent }}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
 
-            <section class="divisions-section">
-                <header class="divisions-section__header">
-                    <div>
-                        <h2>Season {{ selectedSeason?.seasonNumber || seasonTitle }} Divisions</h2>
-                        <p class="divisions-section__meta">{{ divisionHeaderMeta }}</p>
-                    </div>
-                </header>
-                <division-card-list
-                    :divisions="seasonDivisions"
-                    :season-label="seasonTitle"
-                    empty-message="Tälle kaudelle ei löytynyt divisioonia."
-                ></division-card-list>
+                    <section class="divisions-section">
+                        <header class="divisions-section__header">
+                            <div>
+                                <h2>Season {{ selectedSeason?.seasonNumber || seasonTitle }} Divisions</h2>
+                                <p class="divisions-section__meta">{{ divisionHeaderMeta }}</p>
+                            </div>
+                            <span class="divisions-section__hint">Suodata ja selaa divisioonia nopeasti.</span>
+                        </header>
+                        <division-card-list
+                            :divisions="seasonDivisions"
+                            :season-label="seasonTitle"
+                            :empty-message="divisionEmptyMessage"
+                            :filter-state="divisionFilter"
+                            :sort-mode="divisionSort"
+                            :search-query="divisionSearch"
+                        ></division-card-list>
+                    </section>
+                </template>
             </section>
         </div>
     `
