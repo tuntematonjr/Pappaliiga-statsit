@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Normalizer Test</title>
+</head>
+<body>
+    <h1>Testing Division Normalizer with V3 API Data</h1>
+    <pre id="output"></pre>
+
+    <script src="/static/utils/divisionNormalizer.js"></script>
+    <script>
+        async function test() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Fetch V3 data
+                const response = await fetch('http://localhost:8000/api/v3/divisions/11');
+                const divisions = await response.json();
+                
+                // Test normalizer on first division
+                const rawDiv = divisions[0];
+                const normalized = window.divisionNormalizer.normalizeDivision(rawDiv);
+                
+                output.textContent = 'Raw V3 API Response (first division):\n' + 
+                    JSON.stringify(rawDiv, null, 2) + 
+                    '\n\n' +
+                    'Normalized Output:\n' +
+                    JSON.stringify(normalized, null, 2) +
+                    '\n\n' +
+                    'Season fields check:\n' +
+                    '  teams: ' + normalized.division.season.teams + '\n' +
+                    '  matchesPlayed: ' + normalized.division.season.matchesPlayed + '\n' +
+                    '  matchesTotal: ' + normalized.division.season.matchesTotal + '\n' +
+                    '  status: ' + normalized.division.season.status;
+                    
+            } catch (error) {
+                output.textContent = 'Error: ' + error.message + '\n' + error.stack;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>

@@ -19,9 +19,13 @@ from fastapi.staticfiles import StaticFiles
 from db_async import close_pool, get_pool
 
 from api.services import stats_service
-from .routers import championships, divisions, matches, players, stats, teams
-from .routers import maps_catalog, image_proxy
+from .routers import championships, divisions, matches, players, stats, teams, seasons
+from .routers import maps_catalog, image_proxy, v3
 from api.exceptions import BadRequestError, NotFoundError
+
+# Track app start time for uptime calculation
+import time
+_app_start_time = time.time()
 
 # Load environment variables from .env file if present
 env_path = Path(__file__).parent.parent / ".env"
@@ -80,6 +84,7 @@ if (frontend_dir / "static").exists():
     print(f"[info] Mounted static files from {frontend_dir / 'static'}")
 
 # Include routers
+app.include_router(seasons.router, prefix="/api/seasons", tags=["seasons"])
 app.include_router(divisions.router, prefix="/api/divisions", tags=["divisions"])
 app.include_router(championships.router, prefix="/api/championships", tags=["championships"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
@@ -88,6 +93,7 @@ app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
+app.include_router(v3.router, prefix="/api", tags=["v3"])
 
 
 # Shared helper so legacy/compat routes stay in sync
@@ -160,7 +166,15 @@ async def health_check():
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute("SELECT 1")
-        return {"status": "healthy", "database": "connected"}
+        
+        uptime = int(time.time() - _app_start_time)
+        
+        return {
+            "ok": True,
+            "version": "v3.1",
+            "uptime": uptime,
+            "database": "connected"
+        }
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Database unhealthy: {e}")
 

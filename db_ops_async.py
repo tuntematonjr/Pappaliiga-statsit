@@ -17,15 +17,16 @@ _TS_EXPR = (
 )
 
 _CHAMPIONSHIP_UPSERT_SQL = """
-    INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug, parent_championship_id)
-    VALUES (%(championship_id)s, %(season)s, %(division_num)s, %(name)s, %(is_playoffs)s, %(slug)s, %(parent_championship_id)s)
+    INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug, parent_championship_id, winner_team_id)
+    VALUES (%(championship_id)s, %(season)s, %(division_num)s, %(name)s, %(is_playoffs)s, %(slug)s, %(parent_championship_id)s, %(winner_team_id)s)
     ON DUPLICATE KEY UPDATE
       season = VALUES(season),
       division_num = VALUES(division_num),
       name = CASE WHEN championships.name = '' THEN VALUES(name) ELSE championships.name END,
       is_playoffs = VALUES(is_playoffs),
       slug = CASE WHEN championships.slug = '' THEN VALUES(slug) ELSE championships.slug END,
-      parent_championship_id = VALUES(parent_championship_id)
+      parent_championship_id = VALUES(parent_championship_id),
+      winner_team_id = VALUES(winner_team_id)
 """
 
 _TEAM_UPSERT_SQL = """
@@ -177,6 +178,7 @@ def _prepare_championship_payload(row: Row) -> Optional[Dict[str, Any]]:
         "is_playoffs": 1 if row.get("is_playoffs") else 0,
         "slug": row.get("slug"),
         "parent_championship_id": row.get("parent_championship_id"),
+        "winner_team_id": row.get("winner_team_id"),
     }
 
 
@@ -2029,448 +2031,108 @@ async def upsert_team_map_season_totals_async(
                 ),
             )
 
-async def _refresh_player_season_totals_async(
-    conn: asyncmy.Connection,
-    season: int,
-    division_num: int,
-) -> None:
-    async with conn.cursor() as cur:
+
+async def get_all_championships_for_season(conn: asyncmy.Connection, season: int) -> List[Row]:
+    async with conn.cursor(cursors.DictCursor) as cur:
         await cur.execute(
-            """
-            DELETE FROM player_season_totals_prev
-            WHERE season = %s AND division_num = %s
-            """,
-            (season, division_num),
+            "SELECT * FROM championships WHERE season = %s ORDER BY division_num",
+            (season,),
         )
-        await cur.execute(
-            """
-            INSERT INTO player_season_totals_prev (
-                season,
-                division_num,
-                player_id,
-                team_id,
-                maps_played,
-                rounds_played,
-                kills,
-                deaths,
-                assists,
-                adr,
-                kr,
-                kd,
-                rating,
-                hs_pct,
-                mvps,
-                sniper_kills,
-                utility_damage,
-                enemies_flashed,
-                flash_count,
-                flash_successes,
-                mk_2k,
-                mk_3k,
-                mk_4k,
-                mk_5k,
-                clutch_kills,
-                cl_1v1_attempts,
-                cl_1v1_wins,
-                cl_1v2_attempts,
-                cl_1v2_wins,
-                entry_count,
-                entry_wins,
-                pistol_kills,
-                damage,
-                snapshot_ts,
-                created_at
-            )
-            SELECT
-                season,
-                division_num,
-                player_id,
-                team_id,
-                maps_played,
-                rounds_played,
-                kills,
-                deaths,
-                assists,
-                adr,
-                kr,
-                kd,
-                rating,
-                hs_pct,
-                mvps,
-                sniper_kills,
-                utility_damage,
-                enemies_flashed,
-                flash_count,
-                flash_successes,
-                mk_2k,
-                mk_3k,
-                mk_4k,
-                mk_5k,
-                clutch_kills,
-                cl_1v1_attempts,
-                cl_1v1_wins,
-                cl_1v2_attempts,
-                cl_1v2_wins,
-                entry_count,
-                entry_wins,
-                pistol_kills,
-                damage,
-                UNIX_TIMESTAMP(updated_at) AS snapshot_ts,
-                CURRENT_TIMESTAMP
-            FROM player_season_totals
-            WHERE season = %s AND division_num = %s
-            """,
-            (season, division_num),
-        )
-        await cur.execute(
-            """
-            DELETE FROM player_season_totals
-            WHERE season = %s AND division_num = %s
-            """,
-            (season, division_num),
-        )
-        await cur.execute(
-            """
-            INSERT INTO player_season_totals (
-                season,
-                division_num,
-                player_id,
-                team_id,
-                maps_played,
-                rounds_played,
-                kills,
-                deaths,
-                assists,
-                adr,
-                kr,
-                kd,
-                rating,
-                hs_pct,
-                mvps,
-                sniper_kills,
-                utility_damage,
-                enemies_flashed,
-                flash_count,
-                flash_successes,
-                mk_2k,
-                mk_3k,
-                mk_4k,
-                mk_5k,
-                clutch_kills,
-                cl_1v1_attempts,
-                cl_1v1_wins,
-                cl_1v2_attempts,
-                cl_1v2_wins,
-                entry_count,
-                entry_wins,
-                pistol_kills,
-                damage
-            )
-            SELECT
-                season,
-                division_num,
-                player_id,
-                team_id,
-                maps_played,
-                rounds_played,
-                kills,
-                deaths,
-                assists,
-                adr_avg,
-                kr_avg,
-                CASE WHEN deaths > 0 THEN kills / deaths ELSE kills END AS kd,
-                ((kr_avg + (adr_avg / 100.0)) / 2.0) AS rating,
-                hs_pct_avg,
-                mvps,
-                sniper_kills,
-                utility_damage,
-                enemies_flashed,
-                flash_count,
-                flash_successes,
-                mk_2k,
-                mk_3k,
-                mk_4k,
-                mk_5k,
-                clutch_kills,
-                cl_1v1_attempts,
-                cl_1v1_wins,
-                cl_1v2_attempts,
-                cl_1v2_wins,
-                entry_count,
-                entry_wins,
-                pistol_kills,
-                damage
-            FROM (
-                SELECT
-                    ps.season AS season,
-                    ps.division_num AS division_num,
-                    ps.player_id AS player_id,
-                    MAX(ps.team_id) AS team_id,
-                    SUM(CASE WHEN ps.is_forfeit_map = 0 THEN 1 ELSE 0 END) AS maps_played,
-                    SUM(
-                        CASE
-                            WHEN ps.is_forfeit_map = 0 THEN COALESCE(mp.score_team1, 0) + COALESCE(mp.score_team2, 0)
-                            ELSE 0
-                        END
-                    ) AS rounds_played,
-                    SUM(ps.kills) AS kills,
-                    SUM(ps.deaths) AS deaths,
-                    SUM(ps.assists) AS assists,
-                    AVG(ps.adr) AS adr_avg,
-                    AVG(ps.kr) AS kr_avg,
-                    AVG(ps.hs_pct) AS hs_pct_avg,
-                    SUM(ps.mvps) AS mvps,
-                    SUM(ps.sniper_kills) AS sniper_kills,
-                    SUM(ps.utility_damage) AS utility_damage,
-                    SUM(ps.enemies_flashed) AS enemies_flashed,
-                    SUM(ps.flash_count) AS flash_count,
-                    SUM(ps.flash_successes) AS flash_successes,
-                    SUM(ps.mk_2k) AS mk_2k,
-                    SUM(ps.mk_3k) AS mk_3k,
-                    SUM(ps.mk_4k) AS mk_4k,
-                    SUM(ps.mk_5k) AS mk_5k,
-                    SUM(ps.clutch_kills) AS clutch_kills,
-                    SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
-                    SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
-                    SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
-                    SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
-                    SUM(ps.entry_count) AS entry_count,
-                    SUM(ps.entry_wins) AS entry_wins,
-                    SUM(ps.pistol_kills) AS pistol_kills,
-                    SUM(ps.damage) AS damage
-                FROM player_stats ps
-                JOIN matches mt ON mt.match_id = ps.match_id AND mt.ignored_due_ban = 0
-                LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                WHERE ps.season = %s AND ps.division_num = %s
-                GROUP BY ps.season, ps.division_num, ps.player_id
-            ) agg
-            """,
-            (season, division_num),
-        )
+        return await cur.fetchall()
 
 
-async def _refresh_player_map_season_totals_async(
-    conn: asyncmy.Connection,
-    season: int,
-    division_num: int,
-    snapshot_ts: int,
-) -> None:
-    async with conn.cursor() as cur:
+async def get_all_base_divisions_for_championship(conn: asyncmy.Connection, championship_id: str) -> List[Row]:
+    """Fetches all base divisions (not playoffs) for a given root championship ID."""
+    async with conn.cursor(cursors.DictCursor) as cur:
         await cur.execute(
             """
-            DELETE FROM player_map_season_totals_prev
-            WHERE season = %s AND division_num = %s
-            """,
-            (season, division_num),
-        )
-        await cur.execute(
-            """
-            INSERT INTO player_map_season_totals_prev (
-                season,
-                division_num,
-                player_id,
-                team_id,
-                map_name,
-                maps_played,
-                rounds_played,
-                kills,
-                deaths,
-                assists,
-                sniper_kills,
-                utility_damage,
-                enemies_flashed,
-                flash_count,
-                flash_successes,
-                mk_2k,
-                mk_3k,
-                mk_4k,
-                mk_5k,
-                entry_count,
-                entry_wins,
-                pistol_kills,
-                clutch_kills,
-                cl_1v1_attempts,
-                cl_1v1_wins,
-                cl_1v2_attempts,
-                cl_1v2_wins,
-                adr,
-                kr,
-                kd,
-                hs_pct,
-                mvps,
-                damage,
-                snapshot_ts,
-                created_at
-            )
             SELECT
-                season,
-                division_num,
-                player_id,
-                team_id,
-                map_name,
-                maps_played,
-                rounds_played,
-                kills,
-                deaths,
-                assists,
-                sniper_kills,
-                utility_damage,
-                enemies_flashed,
-                flash_count,
-                flash_successes,
-                mk_2k,
-                mk_3k,
-                mk_4k,
-                mk_5k,
-                entry_count,
-                entry_wins,
-                pistol_kills,
-                clutch_kills,
-                cl_1v1_attempts,
-                cl_1v1_wins,
-                cl_1v2_attempts,
-                cl_1v2_wins,
-                adr,
-                kr,
-                kd,
-                hs_pct,
-                mvps,
-                damage,
-                snapshot_ts,
-                CURRENT_TIMESTAMP
-            FROM player_map_season_totals
-            WHERE season = %s AND division_num = %s
+                c.championship_id as division_id,
+                c.division_num as tier,
+                c.name,
+                'waiting' as status -- Placeholder
+            FROM championships c
+            WHERE c.season = (SELECT season FROM championships WHERE championship_id = %s LIMIT 1)
+              AND c.is_playoffs = 0
+            ORDER BY c.division_num;
             """,
-            (season, division_num),
+            (championship_id,),
         )
+        return await cur.fetchall()
+
+
+async def get_all_base_divisions_for_season(conn: asyncmy.Connection, season: int) -> List[Row]:
+    """Fetches all base divisions (not playoffs) for a given season."""
+    async with conn.cursor(cursors.DictCursor) as cur:
         await cur.execute(
             """
-            DELETE FROM player_map_season_totals
-            WHERE season = %s AND division_num = %s
-            """,
-            (season, division_num),
-        )
-        await cur.execute(
-            """
-            INSERT INTO player_map_season_totals (
-                season,
-                division_num,
-                player_id,
-                team_id,
-                map_name,
-                maps_played,
-                rounds_played,
-                kills,
-                deaths,
-                assists,
-                sniper_kills,
-                utility_damage,
-                enemies_flashed,
-                flash_count,
-                flash_successes,
-                mk_2k,
-                mk_3k,
-                mk_4k,
-                mk_5k,
-                entry_count,
-                entry_wins,
-                pistol_kills,
-                clutch_kills,
-                cl_1v1_attempts,
-                cl_1v1_wins,
-                cl_1v2_attempts,
-                cl_1v2_wins,
-                adr,
-                kr,
-                kd,
-                hs_pct,
-                mvps,
-                damage,
-                snapshot_ts
-            )
             SELECT
-                season,
-                division_num,
-                player_id,
-                team_id,
-                map_name,
-                maps_played,
-                rounds_played,
-                kills,
-                deaths,
-                assists,
-                sniper_kills,
-                utility_damage,
-                enemies_flashed,
-                flash_count,
-                flash_successes,
-                mk_2k,
-                mk_3k,
-                mk_4k,
-                mk_5k,
-                entry_count,
-                entry_wins,
-                pistol_kills,
-                clutch_kills,
-                cl_1v1_attempts,
-                cl_1v1_wins,
-                cl_1v2_attempts,
-                cl_1v2_wins,
-                adr_avg,
-                kr_avg,
-                CASE WHEN deaths > 0 THEN kills / deaths ELSE kills END AS kd,
-                hs_pct_avg,
-                mvps,
-                damage,
-                %s AS snapshot_ts
-            FROM (
-                SELECT
-                    ps.season AS season,
-                    ps.division_num AS division_num,
-                    ps.player_id AS player_id,
-                    MAX(ps.team_id) AS team_id,
-                    COALESCE(
-                        NULLIF(TRIM(mp.map_name), ''),
-                        CONCAT('map_', COALESCE(mp.map_id, ps.map_id, ps.round_index))
-                    ) AS map_name,
-                    SUM(CASE WHEN ps.is_forfeit_map = 0 THEN 1 ELSE 0 END) AS maps_played,
-                    SUM(
-                        CASE
-                            WHEN ps.is_forfeit_map = 0 THEN COALESCE(mp.score_team1, 0) + COALESCE(mp.score_team2, 0)
-                            ELSE 0
-                        END
-                    ) AS rounds_played,
-                    SUM(ps.kills) AS kills,
-                    SUM(ps.deaths) AS deaths,
-                    SUM(ps.assists) AS assists,
-                    SUM(ps.sniper_kills) AS sniper_kills,
-                    SUM(ps.utility_damage) AS utility_damage,
-                    SUM(ps.enemies_flashed) AS enemies_flashed,
-                    SUM(ps.flash_count) AS flash_count,
-                    SUM(ps.flash_successes) AS flash_successes,
-                    SUM(ps.mk_2k) AS mk_2k,
-                    SUM(ps.mk_3k) AS mk_3k,
-                    SUM(ps.mk_4k) AS mk_4k,
-                    SUM(ps.mk_5k) AS mk_5k,
-                    SUM(ps.entry_count) AS entry_count,
-                    SUM(ps.entry_wins) AS entry_wins,
-                    SUM(ps.pistol_kills) AS pistol_kills,
-                    SUM(ps.clutch_kills) AS clutch_kills,
-                    SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
-                    SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
-                    SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
-                    SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
-                    AVG(ps.adr) AS adr_avg,
-                    AVG(ps.kr) AS kr_avg,
-                    AVG(ps.hs_pct) AS hs_pct_avg,
-                    SUM(ps.mvps) AS mvps,
-                    SUM(ps.damage) AS damage
-                FROM player_stats ps
-                JOIN matches mt ON mt.match_id = ps.match_id AND mt.ignored_due_ban = 0
-                LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                WHERE ps.season = %s AND ps.division_num = %s
-                GROUP BY ps.season, ps.division_num, ps.player_id, map_name
-            ) agg
+                c.championship_id as division_id,
+                c.division_num as tier,
+                c.name,
+                'waiting' as status -- Placeholder
+            FROM championships c
+            WHERE c.season = %s
+              AND c.is_playoffs = 0
+            ORDER BY c.division_num;
             """,
-            (snapshot_ts, season, division_num),
+            (season,),
         )
+        return await cur.fetchall()
+
+
+async def get_maps_for_division(conn: asyncmy.Connection, season: int, division_num: int) -> List[Row]:
+    async with conn.cursor(cursors.DictCursor) as cur:
+        await cur.execute(
+            "SELECT * FROM maps WHERE season = %s AND division_num = %s",
+            (season, division_num),
+        )
+        return await cur.fetchall()
+
+
+async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) -> Row:
+    """Fetches aggregated stats for a single division for the v3 API."""
+    async with conn.cursor(cursors.DictCursor) as cur:
+        await cur.execute(
+            """
+            SELECT
+                (SELECT COUNT(DISTINCT tst.team_id)
+                 FROM team_season_totals tst
+                 JOIN championships c ON tst.division_num = c.division_num AND tst.season = c.season
+                 WHERE c.championship_id = %(division_id)s) AS teams,
+                (SELECT COUNT(*)
+                 FROM matches m
+                 WHERE m.championship_id = %(division_id)s AND m.status = 'finished') AS matches_played,
+                (SELECT COUNT(*)
+                 FROM matches m
+                 WHERE m.championship_id = %(division_id)s) AS matches_total,
+                (SELECT status FROM matches WHERE championship_id = %(division_id)s ORDER BY finished_at DESC, scheduled_at DESC LIMIT 1) as division_status
+            """,
+            {"division_id": division_id},
+        )
+        season_stats = await cur.fetchone()
+
+        await cur.execute(
+            """
+            SELECT
+                (SELECT COUNT(*)
+                 FROM matches m
+                 JOIN championships c ON m.championship_id = c.championship_id
+                 WHERE c.parent_championship_id = %(division_id)s AND m.status = 'finished') AS matches_played,
+                (SELECT COUNT(*)
+                 FROM matches m
+                 JOIN championships c ON m.championship_id = c.championship_id
+                 WHERE c.parent_championship_id = %(division_id)s) AS matches_total,
+                (SELECT t.name
+                 FROM teams t
+                 JOIN championships c ON c.winner_team_id = t.team_id
+                 WHERE c.parent_championship_id = %(division_id)s LIMIT 1) AS winner_team
+            """,
+            {"division_id": division_id},
+        )
+        playoff_stats = await cur.fetchone()
+
+        return {
+            "season": season_stats,
+            "playoffs": playoff_stats,
+        }

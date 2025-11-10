@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Division Rendering Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #fff; }
+        .test { margin: 20px 0; padding: 15px; background: #2a2a2a; border-left: 4px solid #4CAF50; }
+        .error { border-left-color: #f44336; }
+        pre { background: #000; padding: 10px; overflow-x: auto; }
+        .pass { color: #4CAF50; }
+        .fail { color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>Division Card Rendering Debug Test</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = `test ${isError ? 'error' : ''}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        async function runTests() {
+            log('<h2>Step 1: Fetch API Data</h2>');
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/seasons/11/divisions');
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}`);
+                }
+                
+                const divisions = await response.json();
+                log(`<span class="pass">✓ API fetch successful</span>: Got ${divisions.length} divisions`);
+                
+                // Test first division
+                const firstDiv = divisions[0];
+                log(`<h3>First Division Data:</h3><pre>${JSON.stringify(firstDiv, null, 2)}</pre>`);
+                
+                // Check field names
+                log('<h2>Step 2: Check Field Naming</h2>');
+                const hasTeams = 'teams' in (firstDiv.season || {});
+                const hasMatchesPlayed = 'matchesPlayed' in (firstDiv.season || {});
+                const hasMatchesTotal = 'matchesTotal' in (firstDiv.season || {});
+                const hasBestPlayer = 'bestPlayer' in firstDiv;
+                const hasMvpTeam = 'mvpTeam' in firstDiv;
+                
+                log(`season.teams: <span class="${hasTeams ? 'pass' : 'fail'}">${hasTeams ? '✓ EXISTS' : '✗ MISSING'}</span> = ${firstDiv.season?.teams}`);
+                log(`season.matchesPlayed: <span class="${hasMatchesPlayed ? 'pass' : 'fail'}">${hasMatchesPlayed ? '✓ EXISTS' : '✗ MISSING'}</span> = ${firstDiv.season?.matchesPlayed}`);
+                log(`season.matchesTotal: <span class="${hasMatchesTotal ? 'pass' : 'fail'}">${hasMatchesTotal ? '✓ EXISTS' : '✗ MISSING'}</span> = ${firstDiv.season?.matchesTotal}`);
+                log(`bestPlayer: <span class="${hasBestPlayer ? 'pass' : 'fail'}">${hasBestPlayer ? '✓ EXISTS' : '✗ MISSING'}</span> = ${JSON.stringify(firstDiv.bestPlayer)}`);
+                log(`mvpTeam: <span class="${hasMvpTeam ? 'pass' : 'fail'}">${hasMvpTeam ? '✓ EXISTS' : '✗ MISSING'}</span> = ${firstDiv.mvpTeam}`);
+                
+                // Simulate seasonRows logic
+                log('<h2>Step 3: Simulate seasonRows() Logic</h2>');
+                const rows = [];
+                if (firstDiv.season?.teams > 0) {
+                    rows.push({ key: 'teams', label: 'Teams', value: firstDiv.season.teams });
+                    log(`<span class="pass">✓ Added teams row</span>: ${firstDiv.season.teams}`);
+                } else {
+                    log(`<span class="fail">✗ Skipped teams row</span>: teams = ${firstDiv.season?.teams}`);
+                }
+                
+                if (firstDiv.season?.matchesTotal > 0) {
+                    rows.push({ key: 'matches', label: 'Matches', value: `${firstDiv.season.matchesPlayed}/${firstDiv.season.matchesTotal}` });
+                    log(`<span class="pass">✓ Added matches row</span>: ${firstDiv.season.matchesPlayed}/${firstDiv.season.matchesTotal}`);
+                } else {
+                    log(`<span class="fail">✗ Skipped matches row</span>: matchesTotal = ${firstDiv.season?.matchesTotal}`);
+                }
+                
+                if (firstDiv.bestPlayer) {
+                    rows.push({ key: 'bestPlayer', label: 'Best Player', value: `${firstDiv.bestPlayer.name} (${firstDiv.bestPlayer.rating})` });
+                    log(`<span class="pass">✓ Added bestPlayer row</span>: ${firstDiv.bestPlayer.name}`);
+                } else {
+                    log(`<span class="fail">✗ Skipped bestPlayer row</span>: bestPlayer = ${firstDiv.bestPlayer}`);
+                }
+                
+                if (firstDiv.mvpTeam) {
+                    rows.push({ key: 'mvpTeam', label: 'MVP Team', value: firstDiv.mvpTeam });
+                    log(`<span class="pass">✓ Added mvpTeam row</span>: ${firstDiv.mvpTeam}`);
+                } else {
+                    log(`<span class="fail">✗ Skipped mvpTeam row</span>: mvpTeam = ${firstDiv.mvpTeam}`);
+                }
+                
+                log(`<h3>Final seasonRows result: ${rows.length} rows</h3><pre>${JSON.stringify(rows, null, 2)}</pre>`);
+                
+                if (rows.length > 0) {
+                    log(`<h2 class="pass">✓✓✓ SUCCESS: seasonRows would render ${rows.length} items</h2>`);
+                } else {
+                    log(`<h2 class="fail">✗✗✗ FAILURE: seasonRows is empty - cards will show no data!</h2>`, true);
+                }
+                
+            } catch (error) {
+                log(`<h2 class="fail">✗ ERROR: ${error.message}</h2><pre>${error.stack}</pre>`, true);
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

@@ -68,20 +68,44 @@
         if (!division) {
             return null;
         }
+        
+        // Debug logging in dev mode
+        if (isDevEnv && division.tier === 0) {
+            console.log('[buildCardModel] Processing division:', {
+                id: division.id || division.divisionId || division.division_id,
+                name: division.name,
+                season: division.season,
+                bestPlayer: division.bestPlayer || division.best_player,
+                mvpTeam: division.mvpTeam || division.mvp_team
+            });
+        }
+        
         const tierMeta = inferTierMeta(division);
+        
+        // Handle both camelCase and snake_case from API
+        const divisionId = division.divisionId || division.division_id || division.id;
+        const divisionNum = division.division_num || division.divisionNum || division.tier;
+        
         const seasonStatus = division.season?.status || 'waiting';
-        const seasonMatchesPlayed = Number(division.season?.matches_played) || 0;
-        const seasonMatchesTotal = Number(division.season?.matches_total) || 0;
-        const playoffsMatchesPlayed = Number(division.playoffs?.matches_played) || 0;
-        const playoffsMatchesTotal = Number(division.playoffs?.matches_total) || 7;
-        const hrefId = division.slug || division.id;
+        const seasonMatchesPlayed = Number(division.season?.matches_played || division.season?.matchesPlayed) || 0;
+        const seasonMatchesTotal = Number(division.season?.matches_total || division.season?.matchesTotal) || 0;
+        const playoffsMatchesPlayed = Number(division.playoffs?.matches_played || division.playoffs?.matchesPlayed) || 0;
+        const playoffsMatchesTotal = Number(division.playoffs?.matches_total || division.playoffs?.matchesTotal) || 7;
+        
+        const hrefId = division.slug || divisionId;
         const seasonLabel = division.seasonNumber ? `S${division.seasonNumber}` : '';
         const nameSuffix = seasonLabel ? ` ${seasonLabel}` : '';
-        const titleBase = division.name || (division.divisionId ? `Division ${division.divisionId}` : 'Division');
+        const titleBase = division.name || (divisionNum ? `Division ${divisionNum}` : 'Division');
         const title = `${titleBase}${nameSuffix}`;
+        
+        // Extract best player and MVP team info
+        const bestPlayer = division.best_player || division.bestPlayer;
+        const mvpTeam = division.mvp_team || division.mvpTeam;
+        const winners = division.winners || [];
+        
         return {
-            id: division.id,
-            divisionNumber: division.divisionId,
+            id: divisionId,
+            divisionNumber: divisionNum,
             title,
             tierMeta,
             tier: tierMeta.id,
@@ -104,6 +128,12 @@
                 progressLabel: formatProgressLabel(playoffsMatchesPlayed, playoffsMatchesTotal || 7),
                 winner: division.playoffs?.winner || null
             },
+            bestPlayer: bestPlayer ? {
+                name: bestPlayer.name,
+                rating: Number(bestPlayer.rating || 0).toFixed(2)
+            } : null,
+            mvpTeam: mvpTeam,
+            winners: winners,
             slug: hrefId,
             href: `/division/${hrefId}`,
             searchIndex: [division.name, division.id, division.divisionId].map(value => (value ? String(value).toLowerCase() : '')).join(' ')
@@ -247,11 +277,36 @@
             },
             seasonRows() {
                 const rows = [];
-                if (this.division.season.teams > 0) {
+                
+                // Debug: Check what data we're receiving
+                const hasTeams = this.division.season?.teams > 0;
+                const hasMatches = this.division.season?.matchesTotal > 0;
+                const hasBestPlayer = Boolean(this.division.bestPlayer);
+                const hasMvpTeam = Boolean(this.division.mvpTeam);
+                
+                if (!hasTeams && !hasMatches && !hasBestPlayer && !hasMvpTeam) {
+                    console.error('[seasonRows] NO DATA for division:', {
+                        id: this.division.id,
+                        name: this.division.title,
+                        tier: this.division.tier,
+                        season: this.division.season,
+                        bestPlayer: this.division.bestPlayer,
+                        mvpTeam: this.division.mvpTeam,
+                        fullDivision: this.division
+                    });
+                }
+                
+                if (hasTeams) {
                     rows.push({ key: 'teams', label: 'Teams', value: this.division.season.teams });
                 }
-                if (this.division.season.matchesTotal > 0) {
+                if (hasMatches) {
                     rows.push({ key: 'matches', label: 'Matches', value: `${this.division.season.matchesPlayed}/${this.division.season.matchesTotal}` });
+                }
+                if (hasBestPlayer) {
+                    rows.push({ key: 'bestPlayer', label: 'Best Player', value: `${this.division.bestPlayer.name} (${this.division.bestPlayer.rating})` });
+                }
+                if (hasMvpTeam) {
+                    rows.push({ key: 'mvpTeam', label: 'MVP Team', value: this.division.mvpTeam });
                 }
                 return rows;
             },

@@ -11,8 +11,8 @@
 
     const DEFAULT_PLAYOFFS = Object.freeze({
         teams: 8,
-        matches_played: 0,
-        matches_total: 7,
+        matchesPlayed: 0,
+        matchesTotal: 7,
         status: 'waiting',
         winner: null
     });
@@ -44,12 +44,13 @@
     }
 
     function clampMatches(block) {
-        const matchesTotal = Math.max(0, toNumber(block.matches_total, 0));
-        const matchesPlayed = clamp(block.matches_played, 0, matchesTotal || 0);
+        // Handle both camelCase and snake_case input, output camelCase
+        const matchesTotal = Math.max(0, toNumber(block.matchesTotal ?? block.matches_total, 0));
+        const matchesPlayed = clamp(block.matchesPlayed ?? block.matches_played, 0, matchesTotal || 0);
         return {
             ...block,
-            matches_played: matchesPlayed,
-            matches_total: matchesTotal
+            matchesPlayed: matchesPlayed,
+            matchesTotal: matchesTotal
         };
     }
 
@@ -72,21 +73,36 @@
 
         const seasonStatus = (seasonRaw.status || 'waiting').toLowerCase();
         const playoffsStatus = (playoffsRaw.status || DEFAULT_PLAYOFFS.status).toLowerCase();
+        
+        // Handle both camelCase (API) and snake_case (legacy) field names
+        // Output in camelCase for component compatibility
         const normalizedSeason = clampMatches({
             teams: toNumber(seasonRaw.teams, 0),
-            matches_played: toNumber(seasonRaw.matches_played, 0),
-            matches_total: toNumber(seasonRaw.matches_total, 0),
+            matchesPlayed: toNumber(seasonRaw.matches_played ?? seasonRaw.matchesPlayed, 0),
+            matchesTotal: toNumber(seasonRaw.matches_total ?? seasonRaw.matchesTotal, 0),
             status: ['waiting', 'active', 'finished'].includes(seasonStatus) ? seasonStatus : 'waiting',
-            winner: seasonRaw.winner ? String(seasonRaw.winner) : null
+            winner: seasonRaw.winner ?? seasonRaw.winner_team ? String(seasonRaw.winner ?? seasonRaw.winner_team) : null
         });
 
         const normalizedPlayoffs = clampMatches({
             teams: toNumber(playoffsRaw.teams, DEFAULT_PLAYOFFS.teams) || DEFAULT_PLAYOFFS.teams,
-            matches_played: toNumber(playoffsRaw.matches_played, DEFAULT_PLAYOFFS.matches_played),
-            matches_total: toNumber(playoffsRaw.matches_total, DEFAULT_PLAYOFFS.matches_total) || DEFAULT_PLAYOFFS.matches_total,
+            matchesPlayed: toNumber(playoffsRaw.matches_played ?? playoffsRaw.matchesPlayed, DEFAULT_PLAYOFFS.matches_played),
+            matchesTotal: toNumber(playoffsRaw.matches_total ?? playoffsRaw.matchesTotal, DEFAULT_PLAYOFFS.matches_total) || DEFAULT_PLAYOFFS.matches_total,
             status: ['waiting', 'active', 'finished'].includes(playoffsStatus) ? playoffsStatus : DEFAULT_PLAYOFFS.status,
-            winner: playoffsRaw.winner ? String(playoffsRaw.winner) : null
+            winner: playoffsRaw.winner ?? playoffsRaw.winner_team ? String(playoffsRaw.winner ?? playoffsRaw.winner_team) : null
         });
+
+        // Normalize best player and MVP team data (handle both camelCase and snake_case)
+        const metaData = raw.meta ?? raw.metadata ?? {};
+        const bestPlayer = metaData.mvp_player ?? metaData.best_player ?? raw.best_player ?? raw.bestPlayer;
+        const mvpTeam = metaData.winner_team ?? metaData.mvp_team ?? raw.mvp_team ?? raw.mvpTeam;
+        const winners = Array.isArray(raw.winners) ? raw.winners : [];
+
+        // Calculate overall division status based on season and playoff status
+        let overallStatus = raw.status ?? seasonStatus;
+        if (overallStatus === 'finished' && playoffsStatus === 'active') {
+            overallStatus = 'active'; // Season finished but playoffs ongoing
+        }
 
         return {
             ok: true,
@@ -97,8 +113,15 @@
                 name: String(name),
                 tier,
                 tierMeta: TIER_RANGES.find(entry => entry.id === tier) || TIER_RANGES[TIER_RANGES.length - 1],
+                status: overallStatus,
                 season: normalizedSeason,
                 playoffs: normalizedPlayoffs,
+                bestPlayer: bestPlayer ? {
+                    name: bestPlayer.name,
+                    rating: toNumber(bestPlayer.rating, 0)
+                } : null,
+                mvpTeam: mvpTeam ? String(mvpTeam) : null,
+                winners: winners,
                 slug: raw.slug || null,
                 seasonNumber: raw.season_number ?? raw.seasonNumber ?? null,
                 raw

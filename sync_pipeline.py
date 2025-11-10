@@ -910,18 +910,24 @@ async def sync_championship_async(
     parent_championship_id = await find_parent_championship_id(slug, season, division_num, is_playoffs)
 
     async with connection() as conn:
-        await upsert_championship_async(
-            conn,
-            {
-                "championship_id": championship_id,
-                "season": season,
-                "division_num": division_num,
-                "name": division_info.get("name") or slug,
-                "is_playoffs": 1 if is_playoffs else 0,
-                "slug": slug,
-                "parent_championship_id": parent_championship_id,
-            },
-        )
+        champ_row = {
+            "championship_id": championship_id,
+            "season": season,
+            "division_num": division_num,
+            "name": division_info.get("name") or slug,
+            "is_playoffs": 1 if is_playoffs else 0,
+            "slug": slug,
+            "parent_championship_id": parent_championship_id,
+        }
+        
+        # For playoff championships, check if there's a winner in the details
+        if is_playoffs:
+            details = await get_match_details_async(championship_id, silent=True)
+            if details and details.get("winner"):
+                champ_row["winner_team_id"] = details["winner"]
+
+        await upsert_championship_async(conn, champ_row)
+
         team_payloads = [
             {
                 "team_id": entry["team_id"],
@@ -1109,18 +1115,20 @@ async def update_single_match_async(match_id: str) -> Optional[str]:
     parent_championship_id = await find_parent_championship_id(slug, season, division_num, is_playoffs)
 
     async with connection() as conn:
-        await upsert_championship_async(
-            conn,
-            {
-                "championship_id": championship_id,
-                "season": season,
-                "division_num": division_num,
-                "name": division.get("name") or slug,
-                "is_playoffs": 1 if is_playoffs else 0,
-                "slug": slug,
-                "parent_championship_id": parent_championship_id,
-            },
-        )
+        champ_row = {
+            "championship_id": championship_id,
+            "season": season,
+            "division_num": division_num,
+            "name": division.get("name") or slug,
+            "is_playoffs": 1 if is_playoffs else 0,
+            "slug": slug,
+            "parent_championship_id": parent_championship_id,
+        }
+        if is_playoffs and details and details.get("winner"):
+            champ_row["winner_team_id"] = details["winner"]
+
+        await upsert_championship_async(conn, champ_row)
+
         team_payloads = [
             {
                 "team_id": entry["team_id"],

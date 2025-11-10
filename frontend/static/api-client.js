@@ -45,7 +45,33 @@
     }
 
     const ROUTE_MAP = Object.freeze({
+        seasons: () => [
+            `/api/seasons`,
+            `/api/v1/seasons`
+        ],
+        seasonSummary: seasonId => [
+            `/api/v3/summary/${seasonId}`,
+            `/api/seasons/${seasonId}/summary`,
+            `/api/v1/seasons/${seasonId}/summary`,
+            `/api/seasons/${seasonId}/stats/summary`
+        ],
+        seasonDivisions: seasonId => [
+            `/api/v3/divisions/${seasonId}`,
+            `/api/seasons/${seasonId}/divisions`,
+            `/api/v1/seasons/${seasonId}/divisions`,
+            `/api/divisions/season/${seasonId}`,
+            `/api/v1/divisions/season/${seasonId}`,
+            `/api/divisions?season=${seasonId}`,
+            `/api/v1/divisions?season=${seasonId}`
+        ],
+        divisionStats: (seasonId, divisionId) => [
+            `/api/seasons/${seasonId}/divisions/${divisionId}/stats`,
+            `/api/v1/seasons/${seasonId}/divisions/${divisionId}/stats`,
+            `/api/divisions/${divisionId}/stats`
+        ],
+        // Legacy compatibility
         divisions: seasonId => [
+            `/api/v3/divisions/${seasonId}`,
             `/api/divisions/season/${seasonId}`,
             `/api/seasons/${seasonId}/divisions`,
             `/api/v1/divisions/season/${seasonId}`,
@@ -54,6 +80,7 @@
             `/api/v1/divisions?season=${seasonId}`
         ],
         summary: seasonId => [
+            `/api/v3/summary/${seasonId}`,
             `/api/seasons/${seasonId}/summary`,
             `/api/v1/seasons/${seasonId}/summary`,
             `/api/seasons/${seasonId}/stats/summary`
@@ -89,12 +116,12 @@
         };
     }
 
-    function buildRouteCandidates(key, seasonId) {
+    function buildRouteCandidates(key, ...args) {
         const resolver = ROUTE_MAP[key];
         if (!resolver) {
             return [];
         }
-        const list = resolver(seasonId);
+        const list = resolver(...args);
         if (!Array.isArray(list)) {
             return [];
         }
@@ -723,8 +750,19 @@
         }
 
         async getSeasons() {
-            const result = await fetchJson('/divisions/seasons');
-            return result?.data ?? result;
+            const routes = buildRouteCandidates('seasons');
+            try {
+                const result = await fetchWithFallback(routes);
+                const payload = result?.data ?? result;
+                return Array.isArray(payload) ? payload : [];
+            } catch (error) {
+                if (isDev) {
+                    console.warn('[apiClient] seasons endpoint failed, falling back to legacy', error);
+                }
+                // Fallback to legacy endpoint
+                const legacyResult = await fetchJson('/divisions/seasons').catch(() => []);
+                return legacyResult?.data ?? legacyResult ?? [];
+            }
         }
 
         async getSeasonStats(seasonId) {
@@ -733,6 +771,21 @@
 
         async getDivisionsBySeason(seasonId) {
             return fetchJson(`/divisions/season/${encodeURIComponent(seasonId)}`);
+        }
+
+        async getDivisionDetailedStats(seasonId, divisionId) {
+            const encodedSeason = encodeURIComponent(seasonId);
+            const encodedDivision = encodeURIComponent(divisionId);
+            const routes = buildRouteCandidates('divisionStats', encodedSeason, encodedDivision);
+            try {
+                const result = await fetchWithFallback(routes);
+                return result?.data ?? result;
+            } catch (error) {
+                if (isDev) {
+                    console.warn('[apiClient] divisionStats endpoint failed', error);
+                }
+                throw error;
+            }
         }
     }
 
