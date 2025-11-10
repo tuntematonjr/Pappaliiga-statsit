@@ -3,7 +3,6 @@
 
     const FILTER_STATES = Object.freeze(['all', 'waiting', 'active', 'finished']);
     const FILTER_ORDER = Object.freeze(['all', 'active', 'finished', 'waiting']);
-    const SORT_OPTIONS = Object.freeze(['tier', 'progress', 'alphabetical']);
     const STATUS_LABELS = Object.freeze({ waiting: 'Waiting', active: 'Active', finished: 'Finished' });
     const CTA_LABELS = Object.freeze({ waiting: 'Open Division', active: 'Open Division', finished: 'View Results' });
     const STORAGE_KEY = 'pappaliiga:last-division';
@@ -118,10 +117,9 @@
             selectedSeason: { type: [String, Number], default: '' },
             seasonLoading: { type: Boolean, default: false },
             filterState: { type: String, default: 'all' },
-            searchQuery: { type: String, default: '' },
-            sortMode: { type: String, default: 'tier' }
+            searchQuery: { type: String, default: '' }
         },
-        emits: ['change-season', 'change-filter', 'change-search', 'change-sort', 'reset-filters'],
+        emits: ['change-season', 'change-filter', 'change-search', 'reset-filters'],
         data() {
             return {
                 filters: FILTER_ORDER
@@ -172,19 +170,6 @@
                         @input="$emit('change-search', $event.target.value)"
                     >
                 </label>
-                <div class="division-season-bar__section">
-                    <label class="division-season-bar__label" for="division-sort">Sort</label>
-                    <select
-                        id="division-sort"
-                        class="division-season-bar__select"
-                        :value="sortMode"
-                        @change="$emit('change-sort', $event.target.value)"
-                    >
-                        <option value="tier">By tier</option>
-                        <option value="progress">By progress</option>
-                        <option value="alphabetical">Alphabetical</option>
-                    </select>
-                </div>
                 <div class="division-season-bar__section division-season-bar__reset">
                     <button type="button" class="season-filter-reset" @click="$emit('reset-filters')">Reset</button>
                 </div>
@@ -239,14 +224,14 @@
         emits: ['remember'],
         data() {
             return {
-                playoffsOpen: this.division.playoffs.status !== 'waiting'
+                playoffsOpen: false
             };
         },
         watch: {
             division: {
                 deep: true,
-                handler(newValue) {
-                    this.playoffsOpen = newValue?.playoffs?.status !== 'waiting';
+                handler() {
+                    this.playoffsOpen = false;
                 }
             }
         },
@@ -255,7 +240,10 @@
                 return STATUS_LABELS[this.division.season.status] || STATUS_LABELS.waiting;
             },
             ctaLabel() {
-                return CTA_LABELS[this.division.season.status] || CTA_LABELS.waiting;
+                if (this.division.season.status === 'finished') {
+                    return CTA_LABELS.finished;
+                }
+                return CTA_LABELS.waiting;
             },
             seasonRows() {
                 const rows = [];
@@ -287,13 +275,16 @@
                 storeDivisionId(this.division.id);
                 this.$emit('remember', this.division.id);
             },
-            stateClass
+            stateClass,
+            statusText(value) {
+                return STATUS_LABELS[value] || STATUS_LABELS.waiting;
+            }
         },
         template: `
-            <article class="division-card" :class="'division-card--' + stateClass(division.season.status)">
+            <article class="division-card" role="listitem" :class="'division-card--' + stateClass(division.season.status)">
                 <header class="division-card__header">
                     <div>
-                        <p class="division-card__eyebrow">Division {{ division.divisionNumber || '–' }}</p>
+                        <p class="division-card__eyebrow">Division {{ division.divisionNumber || '0' }}</p>
                         <h3>{{ division.title }}</h3>
                         <p v-if="showWinnerStrip" class="division-card__winner-banner">Winner: {{ division.season.winner }}</p>
                     </div>
@@ -307,7 +298,7 @@
                         :label="division.season.progressLabel"
                         :aria-label="division.title + ' season progress'"
                     ></division-progress-bar>
-                    <ul class="division-card__facts" role="list">
+                    <ul v-if="seasonRows.length" class="division-card__facts" role="list">
                         <li v-for="row in seasonRows" :key="row.key">
                             <span class="division-card__fact-label">{{ row.label }}</span>
                             <span class="division-card__fact-value">{{ row.value }}</span>
@@ -321,7 +312,12 @@
                     <header class="division-card__playoffs-header">
                         <div>
                             <p class="division-card__playoffs-label">Playoffs</p>
-                            <p class="division-card__playoffs-sub">Playoffs · Teams: 8 · Matches: {{ division.playoffs.matchesPlayed }}/7</p>
+                            <p class="division-card__playoffs-sub">
+                                Teams: {{ division.playoffs.teams }} · Matches: {{ division.playoffs.matchesPlayed }}/{{ division.playoffs.matchesTotal }}
+                                <span class="division-card__playoffs-badge" :class="'division-card__playoffs-badge--' + stateClass(division.playoffs.status)">
+                                    {{ statusText(division.playoffs.status) }}
+                                </span>
+                            </p>
                         </div>
                         <button
                             type="button"
@@ -352,72 +348,23 @@
                         <div v-if="division.playoffs.status === 'finished' && division.playoffs.winner" class="playoffs-winner-card">
                             Winner: {{ division.playoffs.winner }}
                         </div>
-                        <p v-else class="division-card__playoffs-hint">{{ division.playoffs.status === 'active' ? 'Ongoing' : 'Awaiting start' }}</p>
+                        <p v-else class="division-card__playoffs-hint">
+                            {{ division.playoffs.status === 'active' ? 'Ongoing series' : 'Bracket announcement coming soon' }}
+                        </p>
                     </div>
                 </section>
             </article>
         `
     };
 
-    const TierSection = {
-        name: 'TierSection',
-        components: { DivisionCard },
-        props: {
-            tier: { type: Object, required: true },
-            expanded: { type: Boolean, default: true },
-            registerContentRef: { type: Function, default: null }
-        },
-        emits: ['toggle', 'remember'],
-        methods: {
-            setRef(el) {
-                if (typeof this.registerContentRef === 'function') {
-                    this.registerContentRef(el);
-                }
-            }
-        },
-        template: `
-            <section class="tier-section">
-                <button type="button" class="tier-section__toggle" :aria-expanded="expanded" @click="$emit('toggle')">
-                    <div class="tier-section__header">
-                        <div>
-                            <span class="tier-section__title">{{ tier.label }}</span>
-                            <span class="tier-section__subtitle">{{ tier.range }}</span>
-                        </div>
-                        <div class="tier-section__pills">
-                            <span class="tier-section__pill">Divisions {{ tier.finishedCount }} / {{ tier.totalCount }}<span class="tier-section__pill-track" :style="{ '--progress': tier.divisionPercent }"></span></span>
-                            <span class="tier-section__pill">Playoffs {{ tier.playoffsFinished }} / {{ tier.totalCount }}<span class="tier-section__pill-track" :style="{ '--progress': tier.playoffsPercent }"></span></span>
-                        </div>
-                    </div>
-                    <span class="tier-section__chevron" :class="{ 'is-open': expanded }" aria-hidden="true">
-                        <svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"></path></svg>
-                    </span>
-                </button>
-                <transition name="accordion">
-                    <div v-show="expanded" class="tier-section__body" :ref="setRef">
-                        <div v-if="tier.visibleDivisions.length" class="tier-section__grid">
-                            <division-card
-                                v-for="division in tier.visibleDivisions"
-                                :key="division.id"
-                                :division="division"
-                                @remember="$emit('remember', $event)"
-                            ></division-card>
-                        </div>
-                        <p v-else class="tier-section__empty">No matches for current filters.</p>
-                    </div>
-                </transition>
-            </section>
-        `
-    };
-
     window.DivisionCardList = {
         name: 'DivisionCardList',
-        components: { SeasonBar, TierSection, DivisionCard, DivisionProgressBar },
+        components: { SeasonBar, DivisionCard, DivisionProgressBar },
         props: {
             divisions: { type: Array, default: () => [] },
             emptyMessage: { type: String, default: 'Ei divisioonia saatavilla' },
             filterState: { type: String, default: 'all' },
             searchQuery: { type: String, default: '' },
-            sortMode: { type: String, default: 'tier' },
             seasonOptions: { type: Array, default: () => [] },
             selectedSeason: { type: [String, Number], default: '' },
             seasonLoading: { type: Boolean, default: false },
@@ -426,15 +373,13 @@
             warningMessage: { type: String, default: '' },
             isLoading: { type: Boolean, default: false }
         },
-        emits: ['change-season', 'change-filter', 'change-search', 'change-sort', 'reset-filters'],
+        emits: ['change-season', 'change-filter', 'change-search', 'reset-filters'],
         data() {
             return {
-                expandedTiers: {},
-                visibleTiers: {},
-                observer: null,
-                tierRefs: {},
                 preferredDivisionId: getStoredDivisionId(),
-                initializedExpansion: false
+                renderCount: 0,
+                renderBatchSize: 8,
+                sentinelObserver: null
             };
         },
         computed: {
@@ -491,81 +436,52 @@
             searchQueryNormalized() {
                 return String(this.searchQuery || '').trim().toLowerCase();
             },
-            sortModeNormalized() {
-                const mode = String(this.sortMode || 'tier').toLowerCase();
-                return SORT_OPTIONS.includes(mode) ? mode : 'tier';
-            },
-            tierBlueprints() {
-                const buckets = new Map();
-                this.cardModels.forEach(card => {
-                    const key = `tier-${card.tier}`;
-                    if (!buckets.has(key)) {
-                        buckets.set(key, {
-                            id: key,
-                            label: card.tierMeta?.label || `Tier ${card.tier}`,
-                            range: card.tierMeta?.range || '',
-                            order: card.tierMeta?.order || card.tier,
-                            allDivisions: [],
-                            finishedCount: 0,
-                            playoffsFinished: 0
-                        });
-                    }
-                    const bucket = buckets.get(key);
-                    bucket.allDivisions.push(card);
-                    if (card.season.status === 'finished') {
-                        bucket.finishedCount += 1;
-                    }
-                    if (card.playoffs.status === 'finished') {
-                        bucket.playoffsFinished += 1;
-                    }
-                });
-                return Array.from(buckets.values()).sort((a, b) => a.order - b.order);
-            },
-            filteredTierGroups() {
+            filteredCards() {
                 const filterState = this.filterStateNormalized;
                 const search = this.searchQueryNormalized;
-                const comparator = this.getSorter();
-                let visibleCount = 0;
-                const tierCount = this.tierBlueprints.length;
-                const groups = this.tierBlueprints.map(bucket => {
-                    const visible = bucket.allDivisions
-                        .filter(card => filterState === 'all' || card.season.status === filterState)
-                        .filter(card => {
-                            if (!search) return true;
-                            return card.searchIndex.includes(search);
-                        })
-                        .sort(comparator);
-                    visibleCount += visible.length;
-                    const totalCount = bucket.allDivisions.length;
-                    return {
-                        ...bucket,
-                        totalCount,
-                        divisionPercent: totalCount ? Math.round((bucket.finishedCount / totalCount) * 100) : 0,
-                        playoffsPercent: totalCount ? Math.round((bucket.playoffsFinished / totalCount) * 100) : 0,
-                        visibleDivisions: visible
-                    };
-                });
+                const sorted = this.cardModels
+                    .filter(card => filterState === 'all' || card.season.status === filterState)
+                    .filter(card => {
+                        if (!search) return true;
+                        return card.searchIndex.includes(search);
+                    })
+                    .sort((a, b) => {
+                        if (a.tier !== b.tier) {
+                            return a.tier - b.tier;
+                        }
+                        return (a.divisionNumber || 0) - (b.divisionNumber || 0);
+                    });
                 if (isDevEnv) {
-                    const rawCount = Array.isArray(this.divisions) ? this.divisions.length : 0;
                     console.info(
-                        `divisions raw ${rawCount} → normalized ${this.cardModels.length} → filtered ${visibleCount} ` +
-                            `(tiers=${tierCount}, status=${this.filterStateNormalized}, search="${this.searchQuery}", sort=${this.sortModeNormalized})`
+                        `[DivisionCardList] filtered ${sorted.length} cards (status=${filterState}, search="${this.searchQuery}")`
                     );
                 }
-                return groups;
+                return sorted;
+            },
+            visibleCards() {
+                const limit = this.renderCount || this.renderBatchSize;
+                return this.filteredCards.slice(0, limit);
+            },
+            hasMoreCards() {
+                return this.visibleCards.length < this.filteredCards.length;
             },
             hasVisibleDivisions() {
-                return this.filteredTierGroups.some(group => group.visibleDivisions.length > 0);
+                return this.filteredCards.length > 0;
             }
         },
-       watch: {
-           divisions: {
-               immediate: true,
-               handler() {
-                   this.initializedExpansion = false;
-                   this.$nextTick(() => this.ensureInitialExpansion(true));
-               }
-           },
+        watch: {
+            divisions: {
+                immediate: true,
+                handler() {
+                    this.resetVirtualWindow();
+                }
+            },
+            filterState() {
+                this.resetVirtualWindow();
+            },
+            searchQuery() {
+                this.resetVirtualWindow();
+            },
             cardModels(newValue) {
                 if (isDevEnv) {
                     console.info('[DivisionCardList] cardModels updated', {
@@ -573,28 +489,22 @@
                     });
                 }
             },
-            filteredTierGroups(newValue) {
+            filteredCards(newValue) {
                 if (isDevEnv) {
-                    const totalVisible = Array.isArray(newValue)
-                        ? newValue.reduce((sum, tier) => sum + tier.visibleDivisions.length, 0)
-                        : 0;
-                    console.info('[DivisionCardList] filteredTierGroups updated', {
-                        tiers: Array.isArray(newValue) ? newValue.length : 0,
+                    const totalVisible = Array.isArray(newValue) ? newValue.length : 0;
+                    console.info('[DivisionCardList] filteredCards updated', {
                         visibleDivisions: totalVisible
                     });
                 }
-                this.$nextTick(() => this.ensureAtLeastOneExpanded());
+                this.$nextTick(() => this.observeSentinel());
             }
-       },
+        },
         mounted() {
-            this.initObserver();
-            this.$nextTick(() => {
-                this.ensureInitialExpansion(true);
-                this.observeTiers();
-            });
+            this.initSentinelObserver();
+            this.$nextTick(() => this.resetVirtualWindow());
         },
         beforeUnmount() {
-            this.teardownObserver();
+            this.teardownSentinelObserver();
         },
         methods: {
             handleSeasonChange(value) {
@@ -606,134 +516,55 @@
             handleSearch(value) {
                 this.$emit('change-search', value);
             },
-            handleSort(value) {
-                this.$emit('change-sort', value);
-            },
             handleReset() {
                 this.$emit('reset-filters');
             },
-            getSorter() {
-                if (this.sortModeNormalized === 'progress') {
-                    return (a, b) => b.season.percent - a.season.percent;
-                }
-                if (this.sortModeNormalized === 'alphabetical') {
-                    return (a, b) => (a.title || '').localeCompare(b.title || '', 'fi');
-                }
-                return (a, b) => {
-                    if (a.tier !== b.tier) {
-                        return a.tier - b.tier;
-                    }
-                    return (a.divisionNumber || 0) - (b.divisionNumber || 0);
-                };
-            },
-            initObserver() {
-                if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
-                    this.observer = null;
+            resetVirtualWindow() {
+                if (!Array.isArray(this.filteredCards) || !this.filteredCards.length) {
+                    this.renderCount = this.renderBatchSize;
+                    this.$nextTick(() => this.observeSentinel());
                     return;
                 }
-                this.observer = new IntersectionObserver(entries => {
+                this.renderCount = Math.min(this.renderBatchSize, this.filteredCards.length);
+                this.$nextTick(() => this.observeSentinel());
+            },
+            increaseRenderCount() {
+                if (!this.hasMoreCards) {
+                    return;
+                }
+                const next = Math.min(this.renderCount + this.renderBatchSize, this.filteredCards.length);
+                if (next !== this.renderCount) {
+                    this.renderCount = next;
+                }
+            },
+            initSentinelObserver() {
+                if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+                    this.sentinelObserver = null;
+                    this.renderCount = this.filteredCards.length || this.renderBatchSize;
+                    return;
+                }
+                this.sentinelObserver = new IntersectionObserver(entries => {
                     entries.forEach(entry => {
                         if (entry.isIntersecting) {
-                            const tierId = entry.target?.dataset?.tierId;
-                            if (tierId) {
-                                this.markTierVisible(tierId);
-                                this.observer.unobserve(entry.target);
-                            }
+                            this.increaseRenderCount();
                         }
                     });
-                }, { rootMargin: '0px 0px 200px 0px', threshold: 0.2 });
+                }, { root: null, rootMargin: '0px 0px 200px 0px', threshold: 0 });
             },
-            teardownObserver() {
-                if (this.observer) {
-                    this.observer.disconnect();
-                    this.observer = null;
-                }
-            },
-            registerTierRef(id, el) {
-                if (!id) return;
-                if (!el) {
-                    delete this.tierRefs[id];
+            observeSentinel() {
+                if (!this.sentinelObserver) {
                     return;
                 }
-                this.tierRefs[id] = el;
-                el.dataset.tierId = id;
-                if (this.observer) {
-                    this.observer.observe(el);
-                } else {
-                    this.markTierVisible(id);
+                const el = this.$refs?.sentinel;
+                this.sentinelObserver.disconnect();
+                if (el) {
+                    this.sentinelObserver.observe(el);
                 }
             },
-            observeTiers() {
-                if (!this.observer) {
-                    Object.keys(this.tierRefs).forEach(id => this.markTierVisible(id));
-                    return;
-                }
-                Object.values(this.tierRefs).forEach(el => {
-                    if (el) {
-                        this.observer.observe(el);
-                    }
-                });
-            },
-            markTierVisible(id) {
-                if (!id || this.visibleTiers[id]) {
-                    return;
-                }
-                this.visibleTiers = { ...this.visibleTiers, [id]: true };
-            },
-            ensureInitialExpansion(force = false) {
-                if (this.initializedExpansion && !force) {
-                    this.ensureAtLeastOneExpanded();
-                    return;
-                }
-                const groups = this.filteredTierGroups;
-                if (!groups.length) {
-                    this.expandedTiers = {};
-                    return;
-                }
-                let target = null;
-                if (this.preferredDivisionId) {
-                    target = groups.find(group => group.allDivisions.some(div => div.id === this.preferredDivisionId)) || null;
-                }
-                if (!target) {
-                    target = groups[0];
-                }
-                if (target) {
-                    this.expandedTiers = { [target.id]: true };
-                    this.markTierVisible(target.id);
-                } else {
-                    this.expandedTiers = {};
-                }
-                this.initializedExpansion = true;
-            },
-            ensureAtLeastOneExpanded() {
-                const groups = this.filteredTierGroups;
-                if (!groups.length) {
-                    this.expandedTiers = {};
-                    return;
-                }
-                const allowed = new Set(groups.map(group => group.id));
-                const active = Object.keys(this.expandedTiers).filter(id => this.expandedTiers[id] && allowed.has(id));
-                if (active.length) {
-                    const nextState = {};
-                    active.forEach(id => {
-                        nextState[id] = true;
-                        this.markTierVisible(id);
-                    });
-                    this.expandedTiers = nextState;
-                    return;
-                }
-                const fallback = groups[0];
-                if (fallback) {
-                    this.expandedTiers = { [fallback.id]: true };
-                    this.markTierVisible(fallback.id);
-                }
-            },
-            toggleTier(id) {
-                if (!id) return;
-                const next = { ...this.expandedTiers, [id]: !this.expandedTiers[id] };
-                this.expandedTiers = next;
-                if (next[id]) {
-                    this.markTierVisible(id);
+            teardownSentinelObserver() {
+                if (this.sentinelObserver) {
+                    this.sentinelObserver.disconnect();
+                    this.sentinelObserver = null;
                 }
             },
             rememberDivision(id) {
@@ -750,11 +581,9 @@
                     :season-loading="seasonLoading"
                     :filter-state="filterState"
                     :search-query="searchQuery"
-                    :sort-mode="sortMode"
                     @change-season="handleSeasonChange"
                     @change-filter="handleFilterChange"
                     @change-search="handleSearch"
-                    @change-sort="handleSort"
                     @reset-filters="handleReset"
                 ></season-bar>
                 <div v-if="offlineMessage" class="offline-banner" role="status" aria-live="polite">{{ offlineMessage }}</div>
@@ -765,16 +594,21 @@
                         <article v-for="n in 3" :key="n" class="division-card division-card--skeleton"></article>
                     </div>
                 </template>
-                <template v-else-if="filteredTierGroups.length">
-                    <tier-section
-                        v-for="tier in filteredTierGroups"
-                        :key="tier.id"
-                        :tier="tier"
-                        :expanded="!!expandedTiers[tier.id]"
-                        :register-content-ref="el => registerTierRef(tier.id, el)"
-                        @toggle="toggleTier(tier.id)"
-                        @remember="rememberDivision"
-                    ></tier-section>
+                <template v-else-if="hasVisibleDivisions">
+                    <div class="division-list" role="list">
+                        <division-card
+                            v-for="division in visibleCards"
+                            :key="division.id"
+                            :division="division"
+                            @remember="rememberDivision"
+                        ></division-card>
+                    </div>
+                    <div
+                        v-if="hasMoreCards"
+                        ref="sentinel"
+                        class="division-list__sentinel"
+                        aria-hidden="true"
+                    ></div>
                 </template>
                 <p v-else class="division-hub__empty">{{ emptyMessage }}</p>
             </div>

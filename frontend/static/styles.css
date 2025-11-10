@@ -1277,6 +1277,18 @@ a {
     gap: 1.5rem;
 }
 
+.division-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.division-list__sentinel {
+    width: 100%;
+    height: 1px;
+}
+
 .tier-section__empty {
     margin: 0;
     padding: 1rem;
@@ -1296,13 +1308,35 @@ a {
     background: linear-gradient(150deg, rgba(10, 14, 26, 0.96), rgba(8, 12, 30, 0.92));
     border: 1px solid rgba(70, 110, 180, 0.35);
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-    min-height: 360px;
+    height: auto;
+    margin-bottom: 16px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    will-change: transform;
 }
 
 .division-card:hover {
-    transform: translateY(-4px);
+    transform: translateY(-4px) scale(1.02);
     border-color: rgba(120, 170, 255, 0.65);
-    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 26px 60px rgba(18, 32, 76, 0.55);
+}
+
+.division-card--active {
+    border-color: rgba(90, 150, 255, 0.7);
+    box-shadow: 0 20px 45px rgba(48, 96, 196, 0.35);
+}
+
+.division-card--active:hover {
+    box-shadow: 0 30px 65px rgba(80, 140, 255, 0.4);
+}
+
+.division-card--finished {
+    border-color: rgba(70, 200, 160, 0.6);
+    box-shadow: 0 22px 45px rgba(30, 90, 70, 0.4);
+}
+
+.division-card--waiting {
+    border-color: rgba(110, 120, 150, 0.45);
+    box-shadow: 0 16px 35px rgba(5, 10, 25, 0.6);
 }
 
 .division-card__header {
@@ -1448,6 +1482,10 @@ a {
 .division-card__playoffs-sub {
     color: rgba(185, 198, 228, 0.75);
     font-size: 0.9rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
 }
 
 .division-card__playoffs-toggle {
@@ -1510,6 +1548,35 @@ a {
     border: 1px solid rgba(90, 210, 150, 0.4);
     color: rgba(200, 240, 215, 0.95);
     font-weight: 600;
+}
+
+.division-card__playoffs-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid transparent;
+}
+
+.division-card__playoffs-badge--active {
+    color: rgba(150, 205, 255, 0.95);
+    border-color: rgba(90, 150, 255, 0.5);
+    background: rgba(50, 90, 180, 0.2);
+}
+
+.division-card__playoffs-badge--finished {
+    color: rgba(140, 230, 190, 0.95);
+    border-color: rgba(90, 210, 160, 0.5);
+    background: rgba(20, 80, 60, 0.2);
+}
+
+.division-card__playoffs-badge--waiting {
+    color: rgba(180, 190, 210, 0.85);
+    border-color: rgba(110, 120, 150, 0.4);
+    background: rgba(20, 24, 38, 0.4);
 }
 
 .division-card__playoffs-button {
@@ -1585,6 +1652,9 @@ a {
     .division-card__playoffs-header {
         flex-direction: column;
         align-items: flex-start;
+    }
+    .division-list {
+        grid-template-columns: 1fr;
     }
 }
 

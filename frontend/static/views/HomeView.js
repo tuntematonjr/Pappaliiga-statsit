@@ -137,7 +137,7 @@ function pickValue(obj, candidates) {
 
 function formatMetric(value, schema) {
     if (value === undefined || value === null) {
-        return '–';
+        return '0';
     }
     let numeric = Number(value);
     if (!Number.isFinite(numeric)) {
@@ -241,7 +241,6 @@ window.HomeView = {
             homeStore,
             progressGlowMeta: {},
             divisionFilter: 'all',
-            divisionSort: 'tier',
             divisionSearch: ''
         };
     },
@@ -584,7 +583,6 @@ window.HomeView = {
             console.info('[HomeView] resetDivisionFilters');
             this.divisionFilter = 'all';
             this.divisionSearch = '';
-            this.divisionSort = 'tier';
         }
     },
     template: `
@@ -753,12 +751,10 @@ window.HomeView = {
                             :is-loading="seasonLoading"
                             :empty-message="divisionEmptyMessage"
                             :filter-state="divisionFilter"
-                            :sort-mode="divisionSort"
                             :search-query="divisionSearch"
                             @change-season="value => (selectedSeasonKey = value)"
                             @change-filter="setDivisionFilter"
                             @change-search="divisionSearch = $event"
-                            @change-sort="divisionSort = $event"
                             @reset-filters="resetDivisionFilters"
                         ></division-card-list>
                     </section>
