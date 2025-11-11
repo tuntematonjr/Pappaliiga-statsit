@@ -1,204 +1,143 @@
-# Copilot Instructions for Pappaliiga-statsit
+# Pappaliiga Stats - AI Agent Instructions
 
 ## Project Overview
-
-This is a **Pappaliiga Statistics System** - a full-stack application that fetches, processes, and displays CS2 (Counter-Strike 2) competitive match data from FACEIT API. The system consists of:
-
-1. **Data Sync Pipeline** - Fetches championship, match, and player statistics from FACEIT API
-2. **REST API Backend** - FastAPI-based service providing data endpoints
-3. **Frontend SPA** - Vanilla JavaScript single-page application with component-based architecture
-4. **Database** - MariaDB/MySQL for persistent storage
-
-**Important**: This project does **NOT** use GitHub Actions, deployment automation, or any CI/CD pipelines. All operations are manual and local.
+CS2 tournament statistics platform for Finnish Pappaliiga league. Two-part system: **sync pipeline** (Python async) pulls data from Faceit API into MariaDB, **REST API + SPA** (FastAPI + Vue) serves statistics to users.
 
 ## Architecture
 
-### Backend (Python)
-- **API Framework**: FastAPI with async/await patterns
-- **Database**: asyncmy for async MariaDB/MySQL connections
-- **HTTP Client**: httpx for FACEIT API calls with retry logic (tenacity)
-- **Key Files**:
-  - `api/main.py` - FastAPI application entry point
-  - `sync_pipeline.py` - Main data synchronization logic
-  - `faceit_client_async.py` - FACEIT API client
-  - `db_async.py` - Database connection pool
-  - `db_ops_async.py` - Database operations
-
-### Frontend (Vanilla JavaScript)
-- **Architecture**: Component-based SPA with no framework dependencies
-- **Router**: History mode routing (handled by `spa_server.py`)
-- **State Management**: Store pattern (`stores/` directory)
-- **Components**: Reusable UI components in `frontend/static/components/`
-- **Key Files**:
-  - `frontend/index.html` - Application entry point
-  - `frontend/static/app-main.js` - Router and app initialization
-  - `frontend/static/api-client.js` - API communication layer
-  - `frontend/spa_server.py` - Development server with SPA fallback
-
-### Database Schema
-- Located in `mariadb_schema.sql`
-- Tables include: championships, divisions, teams, players, matches, maps, match_stats, player_stats, team_stats, etc.
-- Uses snapshot timestamps for data versioning
-
-## Development Workflow
-
-### Environment Setup
-1. Python virtual environment with dependencies from `requirements.txt`
-2. MariaDB/MySQL database (connection via `.env` file)
-3. FACEIT API credentials in environment variables
-
-### Starting Development Servers
-Use the PowerShell script for convenience:
-```powershell
-.\scripts\dev_start.ps1
-```
-
-Or manually:
-```powershell
-# Backend (default port 8000)
-python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
-
-# Frontend (default port 8001)
-python frontend\spa_server.py 8001
-```
-
-### Database Operations
-- **Apply schema**: `python tools\apply_schema.py`
-- **Check connection**: `python tools\check_db_connection.py`
-- **Drop tables**: `python drop_all_tables.py` (use with caution)
-
-### Data Synchronization
-Run the sync pipeline to fetch latest data from FACEIT:
-```powershell
-python sync.py
-```
-
-## Coding Standards
-
-### Python
-- **Async/await**: All database and API calls use async patterns
-- **Type hints**: Use `from __future__ import annotations` for forward references
-- **Docstrings**: Include module-level docstrings explaining purpose
-- **Error handling**: Use custom exceptions from `api/exceptions.py`
-- **Logging**: Use Python's logging module, not print statements (except for startup messages)
-- **Database**: Always use connection context managers, never leave connections open
-- **Import order**: Standard library → Third-party → Local modules
-
-### JavaScript (Frontend)
-- **ES6+ syntax**: Use modern JavaScript (const/let, arrow functions, async/await, destructuring)
-- **No framework dependencies**: Pure vanilla JS, no React/Vue/Angular
-- **Component pattern**: Self-contained components that return DOM elements
-- **Store pattern**: Centralized state management with reactivity
-- **API calls**: Use `api-client.js` for all backend communication
-- **Error handling**: Always handle promise rejections and display user-friendly errors
-- **CSS**: Scoped styles in `styles.css`, use CSS custom properties for theming
-
-### File Naming
-- Python: snake_case for files and functions
-- JavaScript: PascalCase for component files, camelCase for utilities
-- Directories: lowercase with hyphens if needed
-
-## Common Tasks
-
-### Adding a New API Endpoint
-1. Create route handler in `api/routers/`
-2. Add service logic in `api/services/` if needed
-3. Update models in `api/models.py` with Pydantic schemas
-4. Register router in `api/main.py`
-5. Test endpoint manually (no automated testing framework)
-
-### Adding a New Frontend Component
-1. Create component file in `frontend/static/components/`
-2. Export function that returns DOM element
-3. Import in relevant view (`frontend/static/views/`)
-4. Add to component examples if reusable (`component-examples.html`)
-
-### Adding a New Database Table
-1. Update `mariadb_schema.sql` with new table definition
-2. Add corresponding operations in `db_ops_async.py`
-3. Apply schema changes: `python tools\apply_schema.py`
-4. Update sync pipeline if data source is FACEIT API
-
-### Debugging
-- **Check database schema**: `python check_schema.py`
-- **Verify data integrity**: Scripts in `scripts/` directory (e.g., `check_team_totals.py`)
-- **Inspect API responses**: Check `[API] match_id=*.json` files in project root
-- **Database diagnostics**: `python scripts\db_diag.py`
-
-## Project-Specific Context
-
-### Division Management
-- Division overrides stored in `division_overrides.json`
-- Registry in `division_registry.py` and `divisions.json`
-- Team status managed via `manage_team_status.py`
+### Core Components
+- **sync.py / sync_pipeline.py**: Async ETL pipeline syncing Faceit championship/match/player data to MariaDB with concurrent workers (max 10 championships parallel)
+- **db_async.py**: Async MariaDB connection pool (asyncmy), explicit transactions via `connection()` context manager, no ORM
+- **db_ops_async.py**: Database write operations with automatic deadlock retry logic (3 attempts, exponential backoff)
+- **api/main.py**: FastAPI backend serving REST endpoints and SPA
+- **frontend/**: Vanilla Vue3 SPA with component-based architecture, no build step
 
 ### Data Flow
-1. **Fetch**: FACEIT API → `faceit_client_async.py`
-2. **Transform**: `sync_pipeline.py` processes raw data
-3. **Store**: `db_ops_async.py` writes to MariaDB
-4. **Serve**: FastAPI exposes via REST endpoints
-5. **Display**: Frontend fetches and renders data
+1. Sync pipeline: Faceit API → `faceit_client_async.py` (rate-limited) → `sync_pipeline.py` (transform) → `db_ops_async.py` (upsert) → MariaDB
+2. API requests: Client → FastAPI router → service layer (`api/services/`) → `db_async.py` (read-only) → response
 
-### Key Configuration Files
-- `.env` - Database credentials and API keys (not in git)
-- `faceit_config.py` - FACEIT API configuration
-- `division_overrides.json` - Manual division/team overrides
-- `mariadb_schema.sql` - Complete database schema
+## Critical Patterns
 
-## Important Constraints
+### Database Transactions
+**Always use explicit commits:**
+```python
+async with connection(label="my_operation") as conn:
+    # Your queries here
+    await conn.commit()  # REQUIRED - autocommit is disabled
+```
 
-### What NOT to suggest:
-- ❌ GitHub Actions or any CI/CD automation
-- ❌ Deployment scripts or production configurations
-- ❌ Docker/containerization (unless explicitly requested)
-- ❌ Testing frameworks (pytest, jest, etc.) - testing is manual
-- ❌ Build tools or bundlers for frontend (it's vanilla JS)
-- ❌ TypeScript migration
-- ❌ Framework migrations (React, Vue, etc.)
+**For operations that might deadlock (writes in concurrent context):**
+```python
+await _retry_on_deadlock(
+    lambda: upsert_teams_bulk_async(teams, conn=conn),
+    label="upsert_teams",
+    max_attempts=3
+)
+```
 
-### What to prefer:
-- ✅ Simple, direct solutions that work locally
-- ✅ PowerShell scripts for Windows automation
-- ✅ Manual verification and testing approaches
-- ✅ Async patterns for I/O operations
-- ✅ Clear, documented code over clever abstractions
-- ✅ Performance optimizations for database queries
-- ✅ Error handling and logging
+### Pool Size vs Concurrency
+- Pool max = 30 connections (3x max concurrency)
+- Each worker may hold multiple connections during retries
+- Never set pool < 3x your concurrent workers or deadlocks occur
 
-## Performance Considerations
+### Rate Limiting (Faceit API)
+- `AdaptiveLimiter` in `faceit_client_async.py` backs off on 429s
+- 10k requests/hour limit tracked internally
+- All Faceit calls use `httpx.AsyncClient` with retry logic via `tenacity`
 
-- Database queries should use proper indexes (see schema)
-- Batch operations for bulk inserts/updates
-- Cache frequently accessed data where appropriate (`api/utils/cache.py`)
-- Use async HTTP calls with connection pooling
-- Minimize frontend re-renders by checking state changes
+### Division Overrides
+- `division_overrides.json` defines banned/quit teams per championship
+- Matches with banned teams flagged `ignored_due_ban=1` in DB
+- Load overrides via `load_division_overrides()` before sync operations
 
-## Security Notes
+## Development Workflows
 
-- API keys and database credentials via environment variables only
-- No sensitive data in git repository
-- CORS configured in `api/main.py` for frontend access
-- Input validation using Pydantic models
-- SQL injection prevention via parameterized queries
+### Running Locally
+```powershell
+# Start backend + frontend (dev helper, opens separate terminals)
+.\scripts\dev_start.ps1
 
-## When Helping with Code
+# OR manually:
+# Backend: python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+# Frontend: python frontend/spa_server.py 8001
+```
 
-1. **Understand context first**: Check related files before suggesting changes
-2. **Respect existing patterns**: Follow the established architecture and style
-3. **Test implications**: Consider database state, API dependencies, and frontend impact
-4. **Provide complete solutions**: Include necessary imports, error handling, and documentation
-5. **Explain trade-offs**: Mention any performance or maintenance implications
-6. **Stay pragmatic**: Simple working code > complex elegant code
+### Sync Operations
+```powershell
+# Full sync (current season only)
+python sync.py --all-seasons
 
-## Questions to Ask When Uncertain
+# Specific season
+python sync.py --season 11
 
-- Does this change require database schema modifications?
-- Will this affect existing API contracts that the frontend depends on?
-- Should this be an async operation?
-- Does this need error handling and logging?
-- Is there an existing utility or pattern I should reuse?
-- What's the impact on existing data?
+# Reset DB and resync (DEV ONLY - destructive)
+python sync.py --reset-db --force-reset --all-seasons
 
----
+# Single match resync
+python sync.py --match-id <match_id>
 
-**Remember**: This is a local development project with manual deployment. Focus on code quality, maintainability, and local development experience.
+# Refresh divisions.json from Faceit
+python sync.py --refresh-divisions
+```
+
+### Environment Setup
+- `.env` file in repo root (use `env_loader.py`, no external deps)
+- Required: `FACEIT_API_KEY`, `DATABASE_URL=mariadb://user:pass@host:3306/database`
+- Optional: `DB_POOL_MAX_SIZE`, `MAX_DB_WRITER_CONCURRENCY`
+
+## Code Conventions
+
+### Naming & Style
+- **Python**: snake_case for functions/variables, PascalCase for classes, type hints everywhere (`from __future__ import annotations`)
+- **Database**: snake_case table/column names, explicit foreign keys with cascade rules
+- **API models**: Use `CamelModel` base class (auto snake_case → camelCase serialization via Pydantic)
+
+### Error Handling
+- Custom exceptions: `NotFoundError`, `BadRequestError` (inherit from `ServiceError` in `api/exceptions.py`)
+- FastAPI exception handlers convert service errors to proper HTTP status codes
+- Faceit client raises `RateLimitError` internally for retry logic only
+
+### Async Consistency
+- ALL database operations are async (asyncmy + asyncio)
+- Use `async with connection()` for read queries, never acquire raw pool connections
+- Service layer functions always async: `async def get_team_stats(...) -> dict`
+
+## Testing & Verification
+```powershell
+# Post-sync verification queries (checks row counts, forfeit consistency)
+python sync.py --verify
+
+# Check specific championship sync
+python sync.py --championship-id <champ_id> --full
+```
+
+## Gotchas
+
+1. **Frontend API base**: Runtime-injected via `window.__API_BASE__` by backend when serving SPA (see `api/main.py` lifespan). Dev fallback uses hostname heuristic.
+
+2. **Schema migrations**: No automated migrations. Apply changes manually via `mariadb_schema.sql`, then run `python sync.py --create-schema` (idempotent, creates missing tables only).
+
+3. **Concurrent writes**: Always wrap bulk upserts in `_retry_on_deadlock()` when syncing multiple championships in parallel. MariaDB row-level locks + high concurrency = deadlocks.
+
+4. **Division registry**: `divisions.json` is source of truth for championships. Update via `division_registry.py::refresh_divisions()` or CLI flag `--refresh-divisions`.
+
+5. **Season numbering**: Default current season in `faceit_config.py::DEFAULT_CURRENT_SEASON`. Update when new season starts.
+
+## File Reference
+
+| File | Purpose |
+|------|---------|
+| `sync_pipeline.py` | Championship sync orchestration, match/player/team aggregation |
+| `db_async.py` | Connection pool, transaction helpers, schema management |
+| `db_ops_async.py` | All database writes (upserts, deletes), retry logic |
+| `faceit_client_async.py` | Faceit API client with rate limiting & circuit breaker |
+| `faceit_config.py` | API keys, division list, environment config |
+| `api/services/*.py` | Business logic for API endpoints (thin layer over SQL) |
+| `api/routers/*.py` | FastAPI route handlers (validation, pagination) |
+| `mariadb_schema.sql` | Complete database schema (MariaDB 10.6+) |
+
+## When Adding Features
+
+1. **New API endpoint**: Add route in `api/routers/`, service function in `api/services/`, response model as `CamelModel` in `api/models.py`
+2. **New sync data**: Extend `sync_pipeline.py` fetch logic, add DB columns/tables in `mariadb_schema.sql`, create upsert helper in `db_ops_async.py`
+3. **Performance issues**: Check pool diagnostics via `db_async._POOL_DIAGNOSTICS.snapshot()`, verify concurrent worker count vs pool size
