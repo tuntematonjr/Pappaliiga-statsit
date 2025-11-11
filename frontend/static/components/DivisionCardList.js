@@ -147,7 +147,8 @@
             selectedSeason: { type: [String, Number], default: '' },
             seasonLoading: { type: Boolean, default: false },
             filterState: { type: String, default: 'all' },
-            searchQuery: { type: String, default: '' }
+            searchQuery: { type: String, default: '' },
+            showSeasonPicker: { type: Boolean, default: true }
         },
         emits: ['change-season', 'change-filter', 'change-search', 'reset-filters'],
         data() {
@@ -157,7 +158,10 @@
         },
         template: `
             <div class="division-season-bar" role="region" aria-label="Season controls">
-                <div class="division-season-bar__section">
+                <div
+                    v-if="showSeasonPicker"
+                    class="division-season-bar__section"
+                >
                     <label class="division-season-bar__label" for="season-filter">Season</label>
                     <select
                         id="season-filter"
@@ -426,7 +430,8 @@
             offlineMessage: { type: String, default: '' },
             dataBadge: { type: String, default: '' },
             warningMessage: { type: String, default: '' },
-            isLoading: { type: Boolean, default: false }
+            isLoading: { type: Boolean, default: false },
+            showSeasonPicker: { type: Boolean, default: true }
         },
         emits: ['change-season', 'change-filter', 'change-search', 'reset-filters'],
         data() {
@@ -636,6 +641,7 @@
                     :season-loading="seasonLoading"
                     :filter-state="filterState"
                     :search-query="searchQuery"
+                    :show-season-picker="showSeasonPicker"
                     @change-season="handleSeasonChange"
                     @change-filter="handleFilterChange"
                     @change-search="handleSearch"

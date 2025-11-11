@@ -4,6 +4,18 @@
     const STATUS_ARCHIVE_PATTERN = /(archive|finished|complete|closed|done|past|ended|final)/i;
     const STATUS_ACTIVE_PATTERN = /(active|ongoing|current|live|running|progress)/i;
 
+    function toNumber(value, fallback = null) {
+        if (value === null || value === undefined) {
+            return fallback;
+        }
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) {
+            return numeric;
+        }
+        const coerced = Number(String(value).replace(',', '.'));
+        return Number.isFinite(coerced) ? coerced : fallback;
+    }
+
     function normalizeSeason(raw, index) {
         if (!raw || typeof raw !== 'object') {
             return null;
@@ -43,16 +55,19 @@
         const isPlayoff = Boolean(raw.is_playoff || raw.phase === 'playoffs' || raw.stage === 'playoffs');
 
         const apiParam = raw.api_param ?? raw.apiParam ?? slug ?? identifier ?? numberish ?? key;
-
+        const seasonId = toNumber(raw.id ?? identifier ?? numberish, null);
         const seasonNumber =
             typeof numberish === 'number'
                 ? numberish
                 : Number(numberish != null ? String(numberish).replace(',', '.') : Number.NaN);
+        const shortLabelSource = raw.short_name || raw.abbreviation || raw.code;
+        const derivedShort = seasonNumber != null ? `S${seasonNumber}` : seasonId != null ? `S${seasonId}` : null;
 
         return {
             key,
             label,
-            shortLabel: raw.short_name || raw.abbreviation || label,
+            id: seasonId,
+            shortLabel: shortLabelSource || derivedShort || label,
             seasonNumber: Number.isFinite(seasonNumber) ? seasonNumber : null,
             status,
             category,
@@ -74,12 +89,16 @@
             loading: false,
             error: null,
             fetchedAt: null,
-            selectedSeasonKey: null,
-            selectedSegment: 'active'
+            selectedSeasonKey: null
         }),
         getters: {
             sortedSeasons(state) {
                 return [...state.seasons].sort((a, b) => {
+                    const aId = Number.isFinite(a.id) ? a.id : Number.NEGATIVE_INFINITY;
+                    const bId = Number.isFinite(b.id) ? b.id : Number.NEGATIVE_INFINITY;
+                    if (aId !== bId) {
+                        return bId - aId;
+                    }
                     const aVal = a.seasonNumber ?? Number.NEGATIVE_INFINITY;
                     const bVal = b.seasonNumber ?? Number.NEGATIVE_INFINITY;
                     if (Number.isFinite(aVal) && Number.isFinite(bVal) && aVal !== bVal) {
@@ -88,21 +107,46 @@
                     return a.label.localeCompare(b.label, 'fi');
                 });
             },
-            activeSeasons(state) {
-                return state.seasons.filter(
-                    season => season && (season.isCurrent || season.isActive || (!season.isArchived && !season.isPlayoff))
-                );
-            },
-            archivedSeasons(state) {
-                return state.seasons.filter(season => season && season.isArchived);
-            },
             currentSeason(state) {
                 return state.seasons.find(season => season.isCurrent) || null;
+            },
+            newestSeason(state) {
+                return state.seasons.reduce((latest, season) => {
+                    if (!season) return latest;
+                    if (!latest) return season;
+                    const latestId = Number.isFinite(latest.id) ? latest.id : Number.NEGATIVE_INFINITY;
+                    const currentId = Number.isFinite(season.id) ? season.id : Number.NEGATIVE_INFINITY;
+                    if (currentId !== latestId) {
+                        return currentId > latestId ? season : latest;
+                    }
+                    const latestNumber = Number.isFinite(latest.seasonNumber) ? latest.seasonNumber : Number.NEGATIVE_INFINITY;
+                    const currentNumber = Number.isFinite(season.seasonNumber) ? season.seasonNumber : Number.NEGATIVE_INFINITY;
+                    return currentNumber > latestNumber ? season : latest;
+                }, null);
+            },
+            latestSeasonKey(state) {
+                const newest = this.newestSeason;
+                return newest ? newest.key : null;
             },
             selectedSeason(state) {
                 return state.seasons.find(season => season.key === state.selectedSeasonKey) || null;
             },
             getSeasonByKey: state => key => state.seasons.find(season => season.key === key) || null,
+            getSeasonById: state => id => {
+                if (id === undefined || id === null) return null;
+                const numeric = Number(id);
+                const target = String(id);
+                return (
+                    state.seasons.find(season => {
+                        if (!season) return false;
+                        if (String(season.key) === target) return true;
+                        if (season.apiParam != null && String(season.apiParam) === target) return true;
+                        if (Number.isFinite(numeric) && Number.isFinite(season.id) && season.id === numeric) return true;
+                        if (Number.isFinite(numeric) && Number.isFinite(season.seasonNumber) && season.seasonNumber === numeric) return true;
+                        return false;
+                    }) || null
+                );
+            },
             hasData(state) {
                 return state.seasons.length > 0;
             }
@@ -133,6 +177,11 @@
                         : [];
 
                     normalized.sort((a, b) => {
+                        const aId = Number.isFinite(a.id) ? a.id : Number.NEGATIVE_INFINITY;
+                        const bId = Number.isFinite(b.id) ? b.id : Number.NEGATIVE_INFINITY;
+                        if (aId !== bId) {
+                            return bId - aId;
+                        }
                         const aVal = a.seasonNumber ?? Number.NEGATIVE_INFINITY;
                         const bVal = b.seasonNumber ?? Number.NEGATIVE_INFINITY;
                         if (Number.isFinite(aVal) && Number.isFinite(bVal) && aVal !== bVal) {
@@ -145,19 +194,11 @@
                     this.fetchedAt = Date.now();
 
                     if (!this.selectedSeasonKey && normalized.length) {
-                        const preferred =
-                            normalized.find(season => season.isCurrent) ||
-                            normalized.find(season => season.isActive) ||
-                            normalized[0];
-                        if (preferred) {
-                            this.selectedSeasonKey = preferred.key;
-                            this.selectedSegment = preferred.isArchived ? 'archived' : 'active';
-                        }
+                        this.selectedSeasonKey = normalized[0].key;
                     } else if (this.selectedSeasonKey) {
                         const found = normalized.some(season => season.key === this.selectedSeasonKey);
                         if (!found && normalized.length) {
                             this.selectedSeasonKey = normalized[0].key;
-                            this.selectedSegment = normalized[0].isArchived ? 'archived' : 'active';
                         }
                     }
 
@@ -179,28 +220,15 @@
             selectSeason(key) {
                 if (!key) return;
                 this.selectedSeasonKey = key;
-                const season = this.seasons.find(entry => entry.key === key);
-                if (season) {
-                    this.selectedSegment = season.isArchived ? 'archived' : 'active';
-                }
-            },
-            setSegment(segment) {
-                if (!segment) return;
-                const normalized = segment === 'archived' ? 'archived' : 'active';
-                this.selectedSegment = normalized;
             },
             ensureSelectedSeason() {
                 if (this.selectedSeasonKey && this.seasons.some(entry => entry.key === this.selectedSeasonKey)) {
                     return this.selectedSeasonKey;
                 }
-                const preferred =
-                    this.seasons.find(entry => entry.isCurrent) ||
-                    this.seasons.find(entry => entry.isActive) ||
-                    this.seasons[0];
-                if (preferred) {
-                    this.selectedSeasonKey = preferred.key;
-                    this.selectedSegment = preferred.isArchived ? 'archived' : 'active';
-                    return preferred.key;
+                const fallback = this.seasons[0];
+                if (fallback) {
+                    this.selectedSeasonKey = fallback.key;
+                    return fallback.key;
                 }
                 return null;
             },
@@ -210,7 +238,6 @@
                 this.error = null;
                 this.fetchedAt = null;
                 this.selectedSeasonKey = null;
-                this.selectedSegment = 'active';
             }
         }
     });

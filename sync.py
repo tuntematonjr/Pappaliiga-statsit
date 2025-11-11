@@ -5,6 +5,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from logging.handlers import RotatingFileHandler
+import os
+from datetime import datetime
+from pathlib import Path
 import sys
 import time
 from typing import Any, Sequence
@@ -17,12 +21,46 @@ from sync_pipeline import ChampionshipSyncResult, sync_championship_async, updat
 from db_ops_async import upsert_championships_async
 from utils import format_hms, log_stage
 from division_registry import refresh_divisions
+from runtime_diagnostics import SyncDiagnostics
 
 LOGGER = logging.getLogger("pappaliiga.sync")
+LOG_DIR = Path(os.environ.get("SYNC_LOG_DIR", Path(__file__).with_name("logs")))
+DEFAULT_LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MiB
+DEFAULT_LOG_BACKUPS = 5
+
 
 def _configure_logging(verbose: bool) -> None:
     level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(level=level, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+    root = logging.getLogger()
+    if getattr(_configure_logging, "_configured", False):
+        root.setLevel(level)
+        return
+
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
+    log_path = LOG_DIR / f"sync-{timestamp}.log"
+
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(level)
+
+    max_bytes = int(os.environ.get("SYNC_LOG_MAX_BYTES", DEFAULT_LOG_MAX_BYTES))
+    backup_count = int(os.environ.get("SYNC_LOG_BACKUPS", DEFAULT_LOG_BACKUPS))
+    file_handler = RotatingFileHandler(
+        log_path,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+    )
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(level)
+
+    root.setLevel(level)
+    root.handlers.clear()
+    root.addHandler(console_handler)
+    root.addHandler(file_handler)
+    _configure_logging._configured = True
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
@@ -52,6 +90,12 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=10,
         help="Maximum number of divisions to sync concurrently (default: 10)",
+    )
+    parser.add_argument(
+        "--max-db-concurrency",
+        type=int,
+        default=getattr(faceit_config, "MAX_DB_WRITER_CONCURRENCY", 6),
+        help="Maximum number of concurrent DB writer tasks (default: MAX_DB_WRITER_CONCURRENCY)",
     )
     return parser
 
@@ -135,9 +179,34 @@ def _resolve_targets(championship_id: str | None, all_seasons: bool = False, sea
 
 
 async def main_async(args: argparse.Namespace) -> int:
+    diagnostics = SyncDiagnostics()
+    await diagnostics.start()
+    try:
+        return await _main_async_impl(args, diagnostics)
+    finally:
+        await diagnostics.stop()
+
+
+async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostics) -> int:
     if args.force_reset and not args.reset_db:
         LOGGER.error("--force-reset must be used together with --reset-db")
         return 2
+
+    max_db_concurrency = max(1, args.max_db_concurrency)
+    db_semaphore = asyncio.Semaphore(max_db_concurrency)
+    expected_conn_per_worker = max(1, getattr(faceit_config, "DB_CONNECTIONS_PER_WORKER", 3))
+    concurrency_budget = max(max_db_concurrency, max(1, args.max_concurrency))
+    recommended_pool = concurrency_budget * expected_conn_per_worker
+    configured_pool_max = getattr(faceit_config, "DB_POOL_MAX_SIZE", recommended_pool)
+    if configured_pool_max < recommended_pool:
+        LOGGER.warning(
+            "Configured DB pool max (%d) is lower than recommended (%d) for concurrency (workers=%d, conn/worker=%d). "
+            "Consider lowering --max-db-concurrency or increasing DB_POOL_MAX_SIZE.",
+            configured_pool_max,
+            recommended_pool,
+            concurrency_budget,
+            expected_conn_per_worker,
+        )
 
     if args.reset_db:
         if not args.force_reset:
@@ -204,7 +273,7 @@ async def main_async(args: argparse.Namespace) -> int:
     if args.match_id:
         LOGGER.info("Refreshing single match %s", args.match_id)
         try:
-            championship_id = await update_single_match_async(args.match_id)
+            championship_id = await update_single_match_async(args.match_id, diagnostics=diagnostics)
             if championship_id:
                 LOGGER.info("Match %s refreshed (championship %s)", args.match_id, championship_id)
         except Exception as exc:
@@ -296,6 +365,8 @@ async def main_async(args: argparse.Namespace) -> int:
                             overrides=overrides,
                             division=division,
                             end_on_error=end_on_error,
+                            db_semaphore=db_semaphore,
+                            diagnostics=diagnostics,
                         )
                         LOGGER.info(
                             "Synced %s matches for %s (skipped %s)",
@@ -416,6 +487,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_argument_parser()
     args = parser.parse_args(argv)
     _configure_logging(args.verbose)
+    defaults = {
+        action.dest: action.default
+        for action in parser._actions
+        if action.option_strings and action.default is not argparse.SUPPRESS
+    }
+    provided_args = {
+        key: value
+        for key, value in vars(args).items()
+        if key in defaults and value != defaults[key]
+    }
+    if provided_args:
+        LOGGER.info("Invocation parameters: %s", provided_args)
     try:
         return asyncio.run(main_async(args))
     except KeyboardInterrupt:

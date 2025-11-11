@@ -1,25 +1,6 @@
 -- Legacy MariaDB schema for Pappaliiga statsit.
 -- Mirrors the HeidiSQL snapshot used by the live production database (MariaDB 10.6+ compatible).
 
--- Create base tables first (no dependencies)
-CREATE TABLE IF NOT EXISTS teams (
-    team_id VARCHAR(64) NOT NULL,
-    name VARCHAR(255) NULL,
-    avatar VARCHAR(512) NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (team_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS players (
-    player_id VARCHAR(64) NOT NULL,
-    nickname VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (player_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Championships table depends on teams
 CREATE TABLE IF NOT EXISTS championships (
     championship_id VARCHAR(64) NOT NULL,
     season SMALLINT NOT NULL,
@@ -41,6 +22,23 @@ CREATE TABLE IF NOT EXISTS championships (
         REFERENCES championships (championship_id) ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT fk_championships_winner FOREIGN KEY (winner_team_id)
         REFERENCES teams (team_id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS teams (
+    team_id VARCHAR(64) NOT NULL,
+    name VARCHAR(255) NULL,
+    avatar VARCHAR(512) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (team_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS players (
+    player_id VARCHAR(64) NOT NULL,
+    nickname VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (player_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS matches (

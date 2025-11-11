@@ -12,6 +12,25 @@ from env_loader import load_env
 load_env(Path(__file__).parent)
 API_KEY = os.environ.get("FACEIT_API_KEY", "").strip()
 
+
+def _int_env(key: str, default: int) -> int:
+    raw = os.environ.get(key)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        return int(raw.strip())
+    except ValueError:
+        return default
+
+
+# DB / concurrency tuning defaults (overridable via env)
+DEFAULT_DB_POOL_MIN_SIZE = 2
+DEFAULT_DB_POOL_MAX_SIZE = 30
+DB_POOL_MIN_SIZE = _int_env("DB_POOL_MIN_SIZE", DEFAULT_DB_POOL_MIN_SIZE)
+DB_POOL_MAX_SIZE = _int_env("DB_POOL_MAX_SIZE", DEFAULT_DB_POOL_MAX_SIZE)
+DB_CONNECTIONS_PER_WORKER = _int_env("DB_CONNECTIONS_PER_WORKER", 3)
+MAX_DB_WRITER_CONCURRENCY = _int_env("MAX_DB_WRITER_CONCURRENCY", 6)
+
 DEFAULT_CURRENT_SEASON = 11
 CURRENT_SEASON = DEFAULT_CURRENT_SEASON
 TOOL_VERSION = 0.6

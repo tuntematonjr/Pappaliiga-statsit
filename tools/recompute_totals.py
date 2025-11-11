@@ -131,11 +131,10 @@ async def recompute_for_championship(championship_id: str) -> None:
         for tid in sorted(team_ids):
             try:
                 await upsert_team_season_totals_async(
-                    conn,
                     season,
                     division_num,
                     tid,
-                    championship_id=championship_id,
+                    conn=conn,
                 )
                 updated_teams += 1
             except Exception as exc:
@@ -143,7 +142,12 @@ async def recompute_for_championship(championship_id: str) -> None:
 
         for pid in sorted(player_ids):
             try:
-                await upsert_player_season_totals_async(conn, season, division_num, pid)
+                await upsert_player_season_totals_async(
+                    season,
+                    division_num,
+                    pid,
+                    conn=conn,
+                )
                 updated_players += 1
             except Exception as exc:
                 print(f"Failed to update player totals {pid}: {exc}")

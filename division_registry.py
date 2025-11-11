@@ -141,33 +141,62 @@ async def discover_cs_divisions(
 
 
 def load_existing(path: Path) -> List[Dict[str, Any]]:
+    """Load existing divisions from disk with tolerant encoding handling.
+
+    The file may be saved with various encodings (UTF-8 with BOM, UTF-16, etc.).
+    Try a few decodings and fall back to a tolerant cleanup approach similar to
+    the prior implementation. Return an empty list when the file cannot be
+    decoded or parsed.
+    """
     if not path.exists():
         return []
-    with open(path, "r", encoding="utf-8") as handle:
-        try:
-            data = json.load(handle)
-        except Exception:
-            handle.seek(0)
-            raw = handle.read()
-            raw_clean = re.sub(r"/\*.*?\*/", "", raw, flags=re.DOTALL)
-            lines = [
-                line
-                for line in raw_clean.splitlines()
-                if not line.strip().startswith("...") and "Lines" not in line
-            ]
-            raw_clean = "\n".join(lines)
-            try:
-                data = json.loads(raw_clean)
-            except Exception as exc:
-                print(
-                    "Warning: divisions.json exists but could not be parsed after tolerant cleanup:"
-                    f" {exc}. Proceeding with empty existing list."
-                )
-                return []
-        if isinstance(data, list):
-            return data
-        print("Warning: divisions.json parsed but top-level is not a JSON array. Proceeding with empty list.")
+
+    try:
+        raw_bytes = path.read_bytes()
+    except Exception as exc:
+        print(f"Warning: failed to read {path}: {exc}. Proceeding with empty DIVISIONS.")
         return []
+
+    text: str | None = None
+    # Try common encodings in a sensible order
+    for enc in ("utf-8", "utf-8-sig", "utf-16", "latin-1"):
+        try:
+            text = raw_bytes.decode(enc)
+            if enc != "utf-8":
+                # Lightweight notice for unusual encodings; preserve prior print-based warnings
+                print(f"Note: decoded {path} using encoding {enc}.")
+            break
+        except Exception:
+            continue
+
+    if text is None:
+        print(f"Warning: could not decode {path} with known encodings. Proceeding with empty DIVISIONS.")
+        return []
+
+    try:
+        data = json.loads(text)
+    except Exception:
+        # Fallback: perform the same tolerant cleanup previously used but operate on the decoded text
+        raw_clean = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
+        lines = [
+            line
+            for line in raw_clean.splitlines()
+            if not line.strip().startswith("...") and "Lines" not in line
+        ]
+        raw_clean = "\n".join(lines)
+        try:
+            data = json.loads(raw_clean)
+        except Exception as exc:
+            print(
+                "Warning: divisions.json exists but could not be parsed after tolerant cleanup:"
+                f" {exc}. Proceeding with empty existing list."
+            )
+            return []
+
+    if isinstance(data, list):
+        return data
+    print("Warning: divisions.json parsed but top-level is not a JSON array. Proceeding with empty list.")
+    return []
 
 
 def _next_unique_division_id(existing: List[Dict[str, Any]]) -> int:

@@ -11,6 +11,13 @@ Key guarantees:
 - schema creation and reset helpers live here to keep bootstrapping in
   one place
 
+Connection Pool Sizing:
+- DEFAULT_POOL_MAX_SIZE = 30 (increased from 10 to prevent starvation)
+- Max concurrency in sync.py is 10 championships in parallel
+- Pool size must be >= 3x max concurrency to avoid deadlock during
+  complex nested transactions with retry logic
+- Each worker may hold multiple connections during transaction retries
+
 Environment:
   DATABASE_URL = mariadb://user:pass@host:3306/database?param=value
 Only secrets (user/password) are read from the environment; everything
@@ -22,6 +29,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
+import traceback
+from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,16 +42,167 @@ import asyncmy
 from asyncmy import auth as asyncmy_auth
 from asyncmy import errors as asyncmy_errors
 
-LOGGER = logging.getLogger(__name__)
+try:
+    import faceit_config
+except Exception:  # pragma: no cover - config import is optional for tooling
+    faceit_config = None
 
-DEFAULT_POOL_MIN_SIZE = 1
-DEFAULT_POOL_MAX_SIZE = 10
+LOGGER = logging.getLogger(__name__)
+POOL_LOGGER = logging.getLogger("pappaliiga.db.pool")
+
+
+def _coerce_int(value: Any, default: int) -> int:
+    try:
+        if value is None:
+            return default
+        if isinstance(value, int):
+            return value
+        raw = str(value).strip()
+        if not raw:
+            return default
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+DEFAULT_POOL_MIN_SIZE = 2
+DEFAULT_POOL_MAX_SIZE = 30
 DEFAULT_POOL_RECYCLE_SECONDS = 300
 
 SCHEMA_PATH = Path(__file__).with_name("mariadb_schema.sql")
 
 _pool: Optional[asyncmy.Pool] = None
 _pool_lock = asyncio.Lock()
+
+
+@dataclass(slots=True)
+class _PoolLease:
+    conn_id: int
+    label: str | None
+    task: str | None
+    acquired_at: float
+    stack: str
+
+
+class _PoolTracker:
+    """Track pool usage for temporary diagnostics."""
+
+    # TODO(pipeline-diagnostics): drop this tracker once hangs are resolved.
+
+    def __init__(self) -> None:
+        self.enabled = os.environ.get("DB_POOL_DEBUG", "1") != "0"
+        self.active: Dict[int, _PoolLease] = {}
+        self.events: deque[Dict[str, Any]] = deque(maxlen=500)
+        self.waiting = 0
+
+    def _task_name(self) -> str | None:
+        task = asyncio.current_task()
+        if not task:
+            return None
+        name = task.get_name()
+        return name or f"task-{id(task)}"
+
+    def _stack_snippet(self) -> str:
+        snippet = traceback.format_stack(limit=6)
+        return "".join(snippet[-5:]).strip()
+
+    def on_wait_start(self, label: str | None) -> None:
+        if not self.enabled:
+            return
+        self.waiting += 1
+        evt = {
+            "ts": time.time(),
+            "event": "wait",
+            "label": label,
+            "waiting": self.waiting,
+            "task": self._task_name(),
+        }
+        self.events.append(evt)
+        POOL_LOGGER.info("POOL wait label=%s waiting=%d task=%s", label, self.waiting, evt["task"])
+
+    def on_acquired(self, conn: asyncmy.Connection, label: str | None) -> None:
+        if not self.enabled:
+            return
+        conn_id = id(conn)
+        self.waiting = max(0, self.waiting - 1)
+        lease = _PoolLease(
+            conn_id=conn_id,
+            label=label,
+            task=self._task_name(),
+            acquired_at=time.time(),
+            stack=self._stack_snippet(),
+        )
+        self.active[conn_id] = lease
+        self.events.append(
+            {
+                "ts": lease.acquired_at,
+                "event": "acquire",
+                "conn_id": conn_id,
+                "label": label,
+                "task": lease.task,
+                "waiting": self.waiting,
+            }
+        )
+        POOL_LOGGER.info(
+            "POOL acquire conn=%s label=%s task=%s active=%d waiting=%d",
+            conn_id,
+            label,
+            lease.task,
+            len(self.active),
+            self.waiting,
+        )
+
+    def on_release(self, conn: asyncmy.Connection, label: str | None) -> None:
+        if not self.enabled:
+            return
+        conn_id = id(conn)
+        lease = self.active.pop(conn_id, None)
+        released_at = time.time()
+        held = released_at - (lease.acquired_at if lease else released_at)
+        self.events.append(
+            {
+                "ts": released_at,
+                "event": "release",
+                "conn_id": conn_id,
+                "label": label,
+                "task": lease.task if lease else None,
+                "held_seconds": round(held, 3),
+                "active": len(self.active),
+                "waiting": self.waiting,
+            }
+        )
+        POOL_LOGGER.info(
+            "POOL release conn=%s label=%s task=%s held=%.3fs active=%d waiting=%d",
+            conn_id,
+            label,
+            lease.task if lease else None,
+            held,
+            len(self.active),
+            self.waiting,
+        )
+
+    def snapshot(self) -> Dict[str, Any]:
+        if not self.enabled:
+            return {"enabled": False}
+        now = time.time()
+        active = [
+            {
+                "conn_id": lease.conn_id,
+                "label": lease.label,
+                "task": lease.task,
+                "held_seconds": round(now - lease.acquired_at, 3),
+                "stack": lease.stack,
+            }
+            for lease in self.active.values()
+        ]
+        return {
+            "enabled": True,
+            "active": active,
+            "waiting": self.waiting,
+            "recent_events": list(self.events),
+        }
+
+
+_POOL_TRACKER = _PoolTracker()
 
 
 @dataclass(slots=True)
@@ -88,8 +249,22 @@ class DBConfig:
 
         query = dict(parse_qsl(parsed.query, keep_blank_values=True))
         charset = query.get("charset", "utf8mb4")
-        minsize = int(query.get("minsize", DEFAULT_POOL_MIN_SIZE))
-        maxsize = int(query.get("maxsize", DEFAULT_POOL_MAX_SIZE))
+        config_minsize = _coerce_int(
+            getattr(faceit_config, "DB_POOL_MIN_SIZE", DEFAULT_POOL_MIN_SIZE)
+            if faceit_config
+            else DEFAULT_POOL_MIN_SIZE,
+            DEFAULT_POOL_MIN_SIZE,
+        )
+        config_maxsize = _coerce_int(
+            getattr(faceit_config, "DB_POOL_MAX_SIZE", DEFAULT_POOL_MAX_SIZE)
+            if faceit_config
+            else DEFAULT_POOL_MAX_SIZE,
+            DEFAULT_POOL_MAX_SIZE,
+        )
+        minsize = _coerce_int(query.get("minsize"), config_minsize)
+        maxsize = _coerce_int(query.get("maxsize"), config_maxsize)
+        minsize = _coerce_int(os.environ.get("DB_POOL_MIN_SIZE"), minsize)
+        maxsize = _coerce_int(os.environ.get("DB_POOL_MAX_SIZE"), maxsize)
         if minsize <= 0 or maxsize <= 0:
             raise ValueError("Pool sizes must be positive integers")
         if maxsize < minsize:
@@ -209,10 +384,29 @@ async def close_pool() -> None:
     _pool = None
 
 
+async def get_pool_snapshot() -> Dict[str, Any]:
+    """Return lightweight diagnostics about the asyncmy pool."""
+    snapshot = _POOL_TRACKER.snapshot()
+    pool = _pool
+    if pool:
+        snapshot["config"] = {
+            "minsize": getattr(pool, "minsize", None),
+            "maxsize": getattr(pool, "maxsize", None),
+            "size": getattr(pool, "size", None),
+            "free": getattr(pool, "free", None),
+        }
+    else:
+        snapshot["config"] = None
+    return snapshot
+
+
 @asynccontextmanager
-async def connection() -> AsyncIterator[asyncmy.Connection]:
+async def connection(*, label: str | None = None) -> AsyncIterator[asyncmy.Connection]:
+    """Acquire a transactional connection with temporary diagnostics logging."""
     pool = await get_pool()
+    _POOL_TRACKER.on_wait_start(label)
     conn = await pool.acquire()
+    _POOL_TRACKER.on_acquired(conn, label)
     try:
         await conn.begin()
         yield conn
@@ -223,16 +417,21 @@ async def connection() -> AsyncIterator[asyncmy.Connection]:
         await conn.commit()
     finally:
         pool.release(conn)
+        _POOL_TRACKER.on_release(conn, label)
 
 
 @asynccontextmanager
-async def readonly_connection() -> AsyncIterator[asyncmy.Connection]:
+async def readonly_connection(*, label: str | None = None) -> AsyncIterator[asyncmy.Connection]:
+    """Acquire a read-only connection (no implicit transaction)."""
     pool = await get_pool()
+    _POOL_TRACKER.on_wait_start(label)
     conn = await pool.acquire()
+    _POOL_TRACKER.on_acquired(conn, label)
     try:
         yield conn
     finally:
         pool.release(conn)
+        _POOL_TRACKER.on_release(conn, label)
 
 
 async def execute(sql: str, params: Sequence[Any] | Dict[str, Any] | None = None) -> int:
