@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
-from logging.handlers import RotatingFileHandler
 import os
 from datetime import datetime
 from pathlib import Path
@@ -25,8 +24,7 @@ from runtime_diagnostics import SyncDiagnostics
 
 LOGGER = logging.getLogger("pappaliiga.sync")
 LOG_DIR = Path(os.environ.get("SYNC_LOG_DIR", Path(__file__).with_name("logs")))
-DEFAULT_LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MiB
-DEFAULT_LOG_BACKUPS = 5
+DEFAULT_LOG_MAX_FILES = 10
 
 
 def _configure_logging(verbose: bool) -> None:
@@ -46,13 +44,24 @@ def _configure_logging(verbose: bool) -> None:
     console_handler.setFormatter(formatter)
     console_handler.setLevel(level)
 
-    max_bytes = int(os.environ.get("SYNC_LOG_MAX_BYTES", DEFAULT_LOG_MAX_BYTES))
-    backup_count = int(os.environ.get("SYNC_LOG_BACKUPS", DEFAULT_LOG_BACKUPS))
-    file_handler = RotatingFileHandler(
-        log_path,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
-    )
+    max_files = int(os.environ.get("SYNC_LOG_MAX_FILES", DEFAULT_LOG_MAX_FILES))
+    # Prune older logs (keep newest `max_files` files). If max_files <= 0, keep unlimited.
+    try:
+        if max_files > 0:
+            logs = sorted(LOG_DIR.glob("sync-*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for old in logs[max_files:]:
+                try:
+                    old.unlink()
+                except Exception:
+                    # Avoid failing startup due to pruning errors; just warn.
+                    logging.getLogger("pappaliiga.sync").warning("Failed to remove old log file %s", old)
+    except Exception:
+        # If pruning fails for some reason (permissions, NFS, etc), continue without blocking.
+        logging.getLogger("pappaliiga.sync").exception("Log pruning failed")
+
+    # Use a plain file handler so we don't split the log file by size.
+    from logging import FileHandler
+    file_handler = FileHandler(log_path, mode="a", encoding="utf-8")
     file_handler.setFormatter(formatter)
     file_handler.setLevel(level)
 
@@ -60,6 +69,22 @@ def _configure_logging(verbose: bool) -> None:
     root.handlers.clear()
     root.addHandler(console_handler)
     root.addHandler(file_handler)
+    # Ensure pruning runs after the new log file exists so the new file counts
+    try:
+        if max_files > 0:
+            # ensure file exists (FileHandler opened in append, but touch to be safe)
+            try:
+                log_path.touch(exist_ok=True)
+            except Exception:
+                pass
+            logs = sorted(LOG_DIR.glob("sync-*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+            for old in logs[max_files:]:
+                try:
+                    old.unlink()
+                except Exception:
+                    logging.getLogger("pappaliiga.sync").warning("Failed to remove old log file %s", old)
+    except Exception:
+        logging.getLogger("pappaliiga.sync").exception("Log pruning failed")
     _configure_logging._configured = True
 
 

@@ -965,7 +965,7 @@ async def sync_championship_async(
             if entry.get("team_id")
         ]
         if team_payloads:
-            await upsert_teams_bulk_async(conn, team_payloads)
+            await upsert_teams_bulk_async(team_payloads, conn=conn)
 
     fetch_start_time = time.perf_counter()
     matches = await get_championship_matches_async(championship_id, match_type="all")

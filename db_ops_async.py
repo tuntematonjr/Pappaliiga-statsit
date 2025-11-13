@@ -875,9 +875,9 @@ async def upsert_player_season_totals_async(
                       SUM(ps.kills) AS kills,
                       SUM(ps.deaths) AS deaths,
                       SUM(ps.assists) AS assists,
-                      AVG(ps.adr) AS adr,
-                      AVG(ps.kr) AS kr,
-                      AVG(ps.hs_pct) AS hs_pct,
+                      COALESCE(AVG(ps.adr), 0) AS adr,
+                      COALESCE(AVG(ps.kr), 0) AS kr,
+                      COALESCE(AVG(ps.hs_pct), 0) AS hs_pct,
                       SUM(ps.mvps) AS mvps,
                       SUM(ps.sniper_kills) AS sniper_kills,
                       SUM(ps.utility_damage) AS utility_damage,
@@ -1356,50 +1356,59 @@ async def upsert_player_map_season_totals_async(
                       damage
                     )
                     SELECT
-                      season,
-                      division_num,
-                      player_id,
-                      team_id,
-                      map_name,
+                      ps.season,
+                      ps.division_num,
+                      ps.player_id,
+                      ps.team_id,
+                      COALESCE(
+                        NULLIF(TRIM(mp.map_name), ''),
+                        CONCAT('map_', COALESCE(mp.round_index, ps.round_index))
+                      ) AS map_name,
                       COUNT(*) AS maps_played,
-                      SUM(rounds_played) AS rounds_played,
-                      SUM(kills) AS kills,
-                      SUM(deaths) AS deaths,
-                      SUM(assists) AS assists,
-                      SUM(sniper_kills) AS sniper_kills,
-                      SUM(utility_damage) AS utility_damage,
-                      SUM(enemies_flashed) AS enemies_flashed,
-                      SUM(flash_count) AS flash_count,
-                      SUM(flash_successes) AS flash_successes,
-                      SUM(mk_2k) AS mk_2k,
-                      SUM(mk_3k) AS mk_3k,
-                      SUM(mk_4k) AS mk_4k,
-                      SUM(mk_5k) AS mk_5k,
-                      SUM(entry_count) AS entry_count,
-                      SUM(entry_wins) AS entry_wins,
-                      SUM(pistol_kills) AS pistol_kills,
-                      SUM(clutch_kills) AS clutch_kills,
-                      SUM(cl_1v1_attempts) AS cl_1v1_attempts,
-                      SUM(cl_1v1_wins) AS cl_1v1_wins,
-                      SUM(cl_1v2_attempts) AS cl_1v2_attempts,
-                      SUM(cl_1v2_wins) AS cl_1v2_wins,
-                      AVG(adr) AS adr,
-                      AVG(kr) AS kr,
-                      AVG(kd) AS kd,
-                      AVG(hs_pct) AS hs_pct,
-                      AVG(mvps) AS mvps,
-                      SUM(damage) AS damage
-                    FROM player_stats
-                    WHERE season = %s
-                      AND division_num = %s
-                      AND player_id = %s
-                      AND is_forfeit_map = 0
+                      SUM(
+                        COALESCE(mp.score_team1 + mp.score_team2, 0)
+                      ) AS rounds_played,
+                      SUM(ps.kills) AS kills,
+                      SUM(ps.deaths) AS deaths,
+                      SUM(ps.assists) AS assists,
+                      SUM(ps.sniper_kills) AS sniper_kills,
+                      SUM(ps.utility_damage) AS utility_damage,
+                      SUM(ps.enemies_flashed) AS enemies_flashed,
+                      SUM(ps.flash_count) AS flash_count,
+                      SUM(ps.flash_successes) AS flash_successes,
+                      SUM(ps.mk_2k) AS mk_2k,
+                      SUM(ps.mk_3k) AS mk_3k,
+                      SUM(ps.mk_4k) AS mk_4k,
+                      SUM(ps.mk_5k) AS mk_5k,
+                      SUM(ps.entry_count) AS entry_count,
+                      SUM(ps.entry_wins) AS entry_wins,
+                      SUM(ps.pistol_kills) AS pistol_kills,
+                      SUM(ps.clutch_kills) AS clutch_kills,
+                      SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
+                      SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
+                      SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
+                      SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
+                      COALESCE(AVG(ps.adr), 0) AS adr,
+                      COALESCE(AVG(ps.kr), 0) AS kr,
+                      COALESCE(AVG(ps.kd), 0) AS kd,
+                      COALESCE(AVG(ps.hs_pct), 0) AS hs_pct,
+                      AVG(ps.mvps) AS mvps,
+                      SUM(ps.damage) AS damage
+                    FROM player_stats ps
+                    LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.map_id = ps.map_id
+                    WHERE ps.season = %s
+                      AND ps.division_num = %s
+                      AND ps.player_id = %s
+                      AND ps.is_forfeit_map = 0
                     GROUP BY
-                      season,
-                      division_num,
-                      player_id,
-                      team_id,
-                      map_name
+                      ps.season,
+                      ps.division_num,
+                      ps.player_id,
+                      ps.team_id,
+                      COALESCE(
+                        NULLIF(TRIM(mp.map_name), ''),
+                        CONCAT('map_', COALESCE(mp.round_index, ps.round_index))
+                      )
                     ON DUPLICATE KEY UPDATE
                       team_id = VALUES(team_id),
                       maps_played = VALUES(maps_played),
@@ -1879,59 +1888,59 @@ async def upsert_team_map_season_totals_async(
                             SUM(CASE
                                 WHEN mp.is_forfeit = 0
                                  AND m.ignored_due_ban = 0
-                                 AND m.team1_id = %s
-                                THEN COALESCE(ms.score_team1, 0)
-                                WHEN mp.is_forfeit = 0
-                                 AND m.ignored_due_ban = 0
-                                 AND m.team2_id = %s
-                                THEN COALESCE(ms.score_team2, 0)
+                                THEN COALESCE(ps.kills, 0)
                                 ELSE 0 END
                             ) AS kills,
                             SUM(CASE
                                 WHEN mp.is_forfeit = 0
                                  AND m.ignored_due_ban = 0
-                                 AND m.team1_id = %s
-                                THEN COALESCE(ms.score_team2, 0)
-                                WHEN mp.is_forfeit = 0
-                                 AND m.ignored_due_ban = 0
-                                 AND m.team2_id = %s
-                                THEN COALESCE(ms.score_team1, 0)
+                                THEN COALESCE(ps.deaths, 0)
                                 ELSE 0 END
                             ) AS deaths,
                             SUM(CASE
                                 WHEN mp.is_forfeit = 0
                                  AND m.ignored_due_ban = 0
-                                 AND (m.team1_id = %s OR m.team2_id = %s)
-                                THEN COALESCE(ms.mvps, 0)
+                                THEN COALESCE(ps.mvps, 0)
                                 ELSE 0 END
                             ) AS mvps,
                             0 AS rd,
                             0 AS kd,
-                            AVG(CASE
+                            COALESCE(AVG(CASE
                                 WHEN mp.is_forfeit = 0
                                  AND m.ignored_due_ban = 0
-                                 AND (m.team1_id = %s OR m.team2_id = %s)
-                                THEN COALESCE(ms.headshot_pct, 0)
+                                 AND ps.avg_adr IS NOT NULL
+                                THEN ps.avg_adr
                                 ELSE NULL END
-                            ) AS adr,
+                            ), 0) AS adr,
                             SUM(CASE
                                 WHEN mp.is_forfeit = 0
                                  AND m.ignored_due_ban = 0
-                                 AND (m.team1_id = %s OR m.team2_id = %s)
-                                THEN COALESCE(ms.damage, 0)
+                                THEN COALESCE(ps.damage, 0)
                                 ELSE 0 END
                             ) AS damage,
                             SUM(CASE
                                 WHEN mp.is_forfeit = 0
                                  AND m.ignored_due_ban = 0
-                                 AND (m.team1_id = %s OR m.team2_id = %s)
-                                THEN COALESCE(ms.utility_damage, 0)
+                                THEN COALESCE(ps.utility_damage, 0)
                                 ELSE 0 END
                             ) AS utility_damage
                         FROM matches m
                         JOIN maps mp ON mp.match_id = m.match_id
                         LEFT JOIN map_votes mv ON mv.match_id = m.match_id AND mv.map_name = mp.map_name
-                        LEFT JOIN team_stats ms ON ms.match_id = m.match_id AND ms.map_id = mp.map_id
+                        LEFT JOIN (
+                            SELECT
+                                match_id,
+                                map_id,
+                                SUM(kills) AS kills,
+                                SUM(deaths) AS deaths,
+                                SUM(mvps) AS mvps,
+                                AVG(adr) AS avg_adr,
+                                SUM(damage) AS damage,
+                                SUM(utility_damage) AS utility_damage
+                            FROM player_stats
+                            WHERE team_id = %s
+                            GROUP BY match_id, map_id
+                        ) ps ON ps.match_id = m.match_id AND ps.map_id = mp.map_id
                         WHERE m.season = %s
                           AND m.division_num = %s
                           AND COALESCE(NULLIF(TRIM(mp.map_name), ''), CONCAT('map_', mp.round_index)) = %s
@@ -1957,7 +1966,27 @@ async def upsert_team_map_season_totals_async(
                             damage = VALUES(damage),
                             utility_damage = VALUES(utility_damage)
                         """,
-                        [season, division_num, team_id, map_key, *([team_id] * 21), season, division_num, map_key, team_id, team_id],
+                        [
+                            season,
+                            division_num,
+                            team_id,
+                            map_key,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            season,
+                            division_num,
+                            map_key,
+                            team_id,
+                            team_id,
+                        ],
                     )
 
     await _retry_on_deadlock(_operation, label=op_label)
