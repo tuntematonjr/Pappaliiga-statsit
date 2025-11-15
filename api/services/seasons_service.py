@@ -94,7 +94,7 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
     )
     player_data = player_rows[0] if player_rows else {}
     
-    # Get division progress
+    # Get division progress and match counts
     progress_rows = await query_async(
         """
         SELECT
@@ -115,6 +115,22 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
     )
     progress_data = progress_rows[0] if progress_rows else {}
     
+    # Get match counts broken down by regular season and playoffs
+    match_progress_rows = await query_async(
+        """
+        SELECT
+            SUM(CASE WHEN c.is_playoffs = 0 THEN 1 ELSE 0 END) AS regular_total,
+            SUM(CASE WHEN c.is_playoffs = 0 AND m.finished_at IS NOT NULL THEN 1 ELSE 0 END) AS regular_played,
+            SUM(CASE WHEN c.is_playoffs = 1 THEN 1 ELSE 0 END) AS playoff_total,
+            SUM(CASE WHEN c.is_playoffs = 1 AND m.finished_at IS NOT NULL THEN 1 ELSE 0 END) AS playoff_played
+        FROM championships c
+        LEFT JOIN matches m ON m.championship_id = c.championship_id
+        WHERE c.season = :season
+        """,
+        {"season": season},
+    )
+    match_progress_data = match_progress_rows[0] if match_progress_rows else {}
+    
     teams = int(team_data.get("total_teams") or 0)
     players = int(player_data.get("total_players") or 0)
     matches = int(team_data.get("matches_played") or 0)
@@ -125,6 +141,16 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
     
     total_divisions = int(progress_data.get("total_divisions") or 0)
     finished_divisions = int(progress_data.get("finished_divisions") or 0)
+    
+    # Extract match progress data
+    regular_total = int(match_progress_data.get("regular_total") or 0)
+    regular_played = int(match_progress_data.get("regular_played") or 0)
+    playoff_total = int(match_progress_data.get("playoff_total") or 0)
+    playoff_played = int(match_progress_data.get("playoff_played") or 0)
+    
+    # Calculate overall
+    overall_total = regular_total + playoff_total
+    overall_played = regular_played + playoff_played
     
     return {
         "season_id": season,
@@ -144,6 +170,12 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
         "progress": {
             "divisions_finished": finished_divisions,
             "divisions_total": total_divisions,
+            "regular_matches_played": regular_played,
+            "regular_matches_total": regular_total,
+            "playoff_matches_played": playoff_played,
+            "playoff_matches_total": playoff_total,
+            "overall_matches_played": overall_played,
+            "overall_matches_total": overall_total,
         },
     }
 
@@ -226,8 +258,10 @@ async def get_season_divisions(season: int) -> List[Dict[str, Any]]:
         
         division_data = {
             "division_id": champ_id,
+            "division_num": division_num,
             "tier": tier,
             "name": row["name"],
+            "slug": row["slug"],
             "status": status,
             "is_playoff": False,
             "season": {

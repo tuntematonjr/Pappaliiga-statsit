@@ -1383,10 +1383,13 @@ a {
 
 .division-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
     gap: 1.5rem;
     width: 100%;
     max-width: 100%;
+    margin-top: 1.5rem;
+    padding: 0;
+    overflow: hidden;
 }
 
 .division-list__sentinel {
@@ -1415,6 +1418,8 @@ a {
     box-shadow: var(--shadow);
     height: auto;
     min-height: 320px;
+    max-width: 100%;
+    overflow: hidden;
     transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
     will-change: transform;
 }
@@ -1717,10 +1722,11 @@ a {
 
 .division-progress__track {
     position: relative;
-    height: 12px;
+    height: 24px;
     border-radius: 999px;
-    background: rgba(20, 26, 44, 0.8);
+    background: rgba(20, 26, 44, 0.9);
     overflow: hidden;
+    box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 .division-progress__fill {
@@ -1728,7 +1734,35 @@ a {
     inset: 0;
     border-radius: inherit;
     background: linear-gradient(120deg, rgba(90, 150, 255, 0.95), rgba(120, 210, 255, 0.9));
-    transition: width 0.3s ease;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+/* Animated shimmer effect */
+.division-progress__fill::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent
+    );
+    animation: shimmer 2.5s infinite;
+    animation-delay: var(--shimmer-delay, 0s);
+}
+
+@keyframes shimmer {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 200%;
+    }
 }
 
 .division-progress__label {
@@ -1737,9 +1771,12 @@ a {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: #051026;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.95);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    z-index: 1;
 }
 
 .division-progress--finished .division-progress__fill {
@@ -5527,7 +5564,7 @@ body.is-division .card.maps-section {
 
 .season-explorer__summary-grid {
     display: grid;
-    grid-template-columns: minmax(0, 3fr) minmax(240px, 1fr);
+    grid-template-columns: 1fr;
     gap: clamp(1rem, 2vw, 1.5rem);
     align-items: stretch;
 }
@@ -5572,6 +5609,92 @@ body.is-division .card.maps-section {
     min-width: 0;
 }
 
+/* Unified Control Bar - 2 Column Layout */
+.season-explorer__control-bar {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2rem;
+    align-items: center;
+    padding: 1.25rem 1.75rem;
+    border-radius: var(--radius);
+    background: rgba(10, 16, 34, 0.94);
+    border: 1px solid rgba(116, 152, 255, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 35px rgba(5, 9, 25, 0.45);
+    margin-bottom: 1.5rem;
+}
+
+.season-explorer__control-bar--disabled {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* LEFT SECTION: Filters + Reset + Search */
+.control-bar__left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: flex-start;
+}
+
+.control-bar__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.control-bar__search {
+    width: 100%;
+    max-width: 320px;
+}
+
+.control-bar__input {
+    width: 100%;
+    padding: 0.6rem 1.15rem;
+    border-radius: 999px;
+    border: 1px solid rgba(90, 120, 190, 0.45);
+    background: rgba(12, 18, 36, 0.85);
+    color: #f1f4ff;
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.control-bar__input:focus {
+    outline: none;
+    border-color: rgba(120, 170, 255, 0.85);
+    box-shadow: 0 0 0 2px rgba(90, 140, 255, 0.25);
+}
+
+.control-bar__input::placeholder {
+    color: rgba(180, 195, 230, 0.5);
+}
+
+/* RIGHT SECTION: Three Circular Progress Indicators */
+.control-bar__right {
+    display: flex;
+    gap: 1.25rem;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Compact circular progress for control bar */
+.control-bar__right .circular-progress {
+    --circle-size: 85px;
+}
+
+.control-bar__right .circular-progress__title {
+    font-size: 0.78rem;
+}
+
+.control-bar__right .circular-progress__subtitle {
+    font-size: 0.68rem;
+}
+
+.control-bar__right .circular-progress__percent {
+    font-size: 1.35rem;
+}
+
+/* Legacy filters styles (kept for compatibility) */
 .season-explorer__filters {
     gap: 1.25rem;
 }
@@ -5711,6 +5834,63 @@ body.is-division .card.maps-section {
         width: 100%;
         justify-self: stretch;
     }
+    
+    /* Control bar responsive - stack on mobile */
+    .season-explorer__control-bar {
+        grid-template-columns: 1fr;
+        padding: 1.25rem;
+        gap: 1.5rem;
+    }
+    
+    .control-bar__left {
+        align-items: stretch;
+    }
+    
+    .control-bar__search {
+        max-width: 100%;
+    }
+    
+    .control-bar__right {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+        padding-top: 0.5rem;
+    }
+    
+    .control-bar__right .circular-progress {
+        --circle-size: 100px;
+    }
+}
+
+@media (max-width: 1200px) and (min-width: 769px) {
+    .season-explorer__control-bar {
+        padding: 1.25rem 1.5rem;
+        gap: 1.5rem;
+    }
+    
+    .control-bar__right {
+        gap: 1rem;
+    }
+    
+    .control-bar__right .circular-progress {
+        --circle-size: 90px;
+    }
+    
+    .control-bar__right .circular-progress__percent {
+        font-size: 1.4rem;
+    }
+    
+    .control-bar__right .circular-progress__title {
+        font-size: 0.72rem;
+    }
+    
+    .control-bar__right .circular-progress__subtitle {
+        font-size: 0.62rem;
+    }
+    
+    .control-bar__search {
+        max-width: 280px;
+    }
 }
 
 /* ---- Season dashboard ---- */
@@ -5760,6 +5940,159 @@ body.is-division .card.maps-section {
     margin: 0;
     font-size: 0.85rem;
     color: rgba(200, 214, 242, 0.7);
+}
+
+/* Circular Progress Indicators */
+.circular-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    animation: fadeInUp 0.6s ease-out both;
+    animation-delay: var(--animation-delay, 0s);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes breathingGlow {
+    0%, 100% {
+        filter: drop-shadow(0 0 12px var(--glow-color)) 
+                drop-shadow(0 4px 16px rgba(0, 0, 0, 0.4));
+        transform: scale(1);
+    }
+    50% {
+        filter: drop-shadow(0 0 20px var(--glow-color)) 
+                drop-shadow(0 6px 20px rgba(0, 0, 0, 0.5));
+        transform: scale(1.02);
+    }
+}
+
+.circular-progress__circle-container {
+    position: relative;
+    width: var(--circle-size, 120px);
+    height: var(--circle-size, 120px);
+}
+
+.circular-progress__svg {
+    transform: rotate(-90deg);
+    animation: breathingGlow 3s ease-in-out infinite;
+}
+
+.circular-progress__ring {
+    transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.circular-progress__ring--bg {
+    stroke: rgba(30, 40, 70, 0.6);
+}
+
+.circular-progress__ring--progress {
+    transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Color variants */
+.circular-progress--regular .circular-progress__ring--progress {
+    stroke: url(#gradient-regular);
+}
+
+.circular-progress--playoff .circular-progress__ring--progress {
+    stroke: url(#gradient-playoff);
+}
+
+.circular-progress--overall .circular-progress__ring--progress {
+    stroke: url(#gradient-overall);
+}
+
+/* Fallback solid colors if gradients not defined */
+.circular-progress--regular .circular-progress__ring--progress {
+    stroke: rgba(90, 150, 255, 0.9);
+}
+
+.circular-progress--playoff .circular-progress__ring--progress {
+    stroke: rgba(150, 100, 255, 0.9);
+}
+
+.circular-progress--overall .circular-progress__ring--progress {
+    stroke: rgba(100, 220, 170, 0.9);
+}
+
+/* Glow effect */
+.circular-progress--regular .circular-progress__svg {
+    --glow-color: rgba(90, 150, 255, 0.5);
+}
+
+.circular-progress--playoff .circular-progress__svg {
+    --glow-color: rgba(150, 100, 255, 0.5);
+}
+
+.circular-progress--overall .circular-progress__svg {
+    --glow-color: rgba(100, 220, 170, 0.5);
+}
+
+.circular-progress__label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.circular-progress__percent {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.95);
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.circular-progress__text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    text-align: center;
+}
+
+.circular-progress__title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: rgba(220, 230, 255, 0.9);
+    letter-spacing: 0.02em;
+}
+
+.circular-progress__subtitle {
+    font-size: 0.8rem;
+    color: rgba(180, 195, 230, 0.7);
+}
+
+/* Container for circular progress indicators */
+.circular-progress-group {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    border: 1px solid rgba(116, 152, 255, 0.18);
+    background: rgba(8, 14, 32, 0.9);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 35px rgba(5, 9, 25, 0.45);
+    justify-items: center;
+}
+
+@media (max-width: 992px) {
+    .circular-progress-group {
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+        padding: 2rem 1.5rem;
+    }
 }
 
 .season-skeleton {

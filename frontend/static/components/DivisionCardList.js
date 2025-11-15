@@ -3,8 +3,8 @@
 
     const FILTER_STATES = Object.freeze(['all', 'waiting', 'active', 'finished']);
     const FILTER_ORDER = Object.freeze(['all', 'active', 'finished', 'waiting']);
-    const STATUS_LABELS = Object.freeze({ waiting: 'Waiting', active: 'Active', finished: 'Finished' });
-    const CTA_LABELS = Object.freeze({ waiting: 'Open Division', active: 'Open Division', finished: 'View Results' });
+    const STATUS_LABELS = Object.freeze({ waiting: 'Odottaa', active: 'Käynnissä', finished: 'Valmis' });
+    const CTA_LABELS = Object.freeze({ waiting: 'Avaa divisioona', active: 'Avaa divisioona', finished: 'Näytä tulokset' });
     const STORAGE_KEY = 'pappaliiga:last-division';
     const isDevEnv = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
@@ -93,13 +93,27 @@
         const divisionId = division.divisionId || division.division_id || division.id;
         const divisionNum = division.division_num || division.divisionNum || division.tier;
         
-        // Use the division's top-level status first, fallback to season.status
-        const seasonStatus = normalizeStatus(division.status || division.season?.status, 'waiting');
+        // Season data
         const seasonMatchesPlayed = Number(division.season?.matches_played || division.season?.matchesPlayed) || 0;
         const seasonMatchesTotal = Number(division.season?.matches_total || division.season?.matchesTotal) || 0;
         const playoffsMatchesPlayed = Number(division.playoffs?.matches_played || division.playoffs?.matchesPlayed) || 0;
         const playoffsMatchesTotal = Number(division.playoffs?.matches_total || division.playoffs?.matchesTotal) || 7;
+        
+        // Determine individual statuses
+        const seasonStatus = normalizeStatus(division.status || division.season?.status, 'waiting');
         const playoffsStatus = normalizeStatus(division.playoffs?.status, 'waiting');
+        
+        // Combined status logic: consider both base division and playoffs
+        let combinedStatus = 'waiting';
+        if (seasonStatus === 'active' || playoffsStatus === 'active') {
+            combinedStatus = 'active';
+        } else if (seasonStatus === 'finished' && (playoffsStatus === 'finished' || playoffsMatchesTotal === 0)) {
+            combinedStatus = 'finished';
+        } else if (seasonStatus === 'finished' && playoffsStatus === 'waiting') {
+            combinedStatus = 'active'; // Season done but playoffs pending
+        } else if (seasonMatchesPlayed > 0 || playoffsMatchesPlayed > 0) {
+            combinedStatus = 'active';
+        }
         
         const hrefId = division.slug || divisionId;
         // Clean the division name - remove season suffix
@@ -117,7 +131,7 @@
             title,
             tierMeta,
             tier: tierMeta.id,
-            state: seasonStatus,
+            state: combinedStatus,
             season: {
                 teams: Number(division.season?.teams) || 0,
                 matchesPlayed: seasonMatchesPlayed,
@@ -137,7 +151,7 @@
                 winner: division.playoffs?.winner_team || division.playoffs?.winner || null
             },
             bestPlayer: bestPlayer ? {
-                name: bestPlayer.name,
+                name: bestPlayer.name || bestPlayer.nickname,
                 rating: Number(bestPlayer.rating || 0).toFixed(2)
             } : null,
             mvpTeam: mvpTeam,
@@ -226,7 +240,8 @@
             max: { type: Number, default: 100 },
             state: { type: String, default: 'waiting' },
             label: { type: String, default: '' },
-            ariaLabel: { type: String, default: '' }
+            ariaLabel: { type: String, default: '' },
+            animationDelay: { type: Number, default: 0 }
         },
         computed: {
             percent() {
@@ -236,6 +251,12 @@
             },
             stateClass() {
                 return `division-progress--${stateClass(this.state)}`;
+            },
+            fillStyle() {
+                return {
+                    width: this.percent + '%',
+                    '--shimmer-delay': `${this.animationDelay}s`
+                };
             }
         },
         template: `
@@ -250,7 +271,7 @@
                 :title="label"
             >
                 <div class="division-progress__track">
-                    <div class="division-progress__fill" :style="{ width: percent + '%' }"></div>
+                    <div class="division-progress__fill" :style="fillStyle"></div>
                     <span class="division-progress__label">{{ label }}</span>
                 </div>
             </div>
@@ -279,10 +300,10 @@
         },
         computed: {
             statusLabel() {
-                return STATUS_LABELS[this.division.season.status] || STATUS_LABELS.waiting;
+                return STATUS_LABELS[this.division.state] || STATUS_LABELS.waiting;
             },
             ctaLabel() {
-                if (this.division.season.status === 'finished') {
+                if (this.division.state === 'finished') {
                     return CTA_LABELS.finished;
                 }
                 return CTA_LABELS.waiting;
@@ -309,16 +330,16 @@
                 }
                 
                 if (hasTeams) {
-                    rows.push({ key: 'teams', label: 'Teams', value: this.division.season.teams });
+                    rows.push({ key: 'teams', label: 'Joukkueet', value: this.division.season.teams });
                 }
                 if (hasMatches) {
-                    rows.push({ key: 'matches', label: 'Matches', value: `${this.division.season.matchesPlayed}/${this.division.season.matchesTotal}` });
+                    rows.push({ key: 'matches', label: 'Ottelut', value: `${this.division.season.matchesPlayed}/${this.division.season.matchesTotal}` });
                 }
                 if (hasBestPlayer) {
-                    rows.push({ key: 'bestPlayer', label: 'Best Player', value: `${this.division.bestPlayer.name} (${this.division.bestPlayer.rating})` });
+                    rows.push({ key: 'bestPlayer', label: 'Paras pelaaja', value: `${this.division.bestPlayer.name} (${this.division.bestPlayer.rating})` });
                 }
                 if (hasMvpTeam) {
-                    rows.push({ key: 'mvpTeam', label: 'MVP Team', value: this.division.mvpTeam });
+                    rows.push({ key: 'mvpTeam', label: 'MVP-joukkue', value: this.division.mvpTeam });
                 }
                 return rows;
             },
@@ -348,13 +369,13 @@
             }
         },
         template: `
-            <article class="division-card" role="listitem" :class="'division-card--' + stateClass(division.season.status)">
+            <article class="division-card" role="listitem" :class="'division-card--' + stateClass(division.state)">
                 <header class="division-card__header">
                     <div>
                         <h3 class="division-card__title">{{ division.title }}</h3>
-                        <p v-if="showWinnerStrip" class="division-card__winner-banner">Winner: {{ division.season.winner }}</p>
+                        <p v-if="showWinnerStrip" class="division-card__winner-banner">Voittaja: {{ division.season.winner }}</p>
                     </div>
-                    <span class="division-card__badge" :class="'division-card__badge--' + stateClass(division.season.status)">{{ statusLabel }}</span>
+                    <span class="division-card__badge" :class="'division-card__badge--' + stateClass(division.state)">{{ statusLabel }}</span>
                 </header>
                 <section class="division-card__section">
                     <division-progress-bar
@@ -363,6 +384,7 @@
                         :state="division.season.status"
                         :label="division.season.progressLabel"
                         :aria-label="division.title + ' season progress'"
+                        :animation-delay="(division.divisionNumber * 0.15) % 2"
                     ></division-progress-bar>
                     <ul v-if="seasonRows.length" class="division-card__facts" role="list">
                         <li v-for="row in seasonRows" :key="row.key">
@@ -377,9 +399,9 @@
                 <section class="division-card__playoffs">
                     <header class="division-card__playoffs-header">
                         <div>
-                            <p class="division-card__playoffs-label">Playoffs</p>
+                            <p class="division-card__playoffs-label">Playoffit</p>
                             <p class="division-card__playoffs-sub">
-                                Teams: {{ division.playoffs.teams }} · Matches: {{ division.playoffs.matchesPlayed }}/{{ division.playoffs.matchesTotal }}
+                                Joukkueet: {{ division.playoffs.teams }} · Ottelut: {{ division.playoffs.matchesPlayed }}/{{ division.playoffs.matchesTotal }}
                                 <span class="division-card__playoffs-badge" :class="'division-card__playoffs-badge--' + stateClass(division.playoffs.status)">
                                     {{ statusText(division.playoffs.status) }}
                                 </span>
@@ -392,10 +414,10 @@
                             :aria-expanded="playoffsOpen"
                             @click="togglePlayoffs"
                         >
-                            {{ playoffsOpen ? 'Hide' : 'Show' }}
+                            {{ playoffsOpen ? 'Piilota' : 'Näytä' }}
                         </button>
                         <span class="sr-only" aria-live="polite">
-                            {{ playoffsOpen ? 'Playoffs expanded' : 'Playoffs collapsed' }}
+                            {{ playoffsOpen ? 'Playoffit näkyvä' : 'Playoffit piilotettu' }}
                         </span>
                     </header>
                     <div
@@ -410,12 +432,13 @@
                             :state="division.playoffs.status"
                             :label="division.playoffs.progressLabel"
                             :aria-label="division.title + ' playoffs progress'"
+                            :animation-delay="(division.divisionNumber * 0.15 + 1) % 2"
                         ></division-progress-bar>
                         <div v-if="division.playoffs.status === 'finished' && division.playoffs.winner" class="playoffs-winner-card">
-                            Winner: {{ division.playoffs.winner }}
+                            Voittaja: {{ division.playoffs.winner }}
                         </div>
                         <p v-else class="division-card__playoffs-hint">
-                            {{ division.playoffs.status === 'active' ? 'Ongoing series' : 'Bracket announcement coming soon' }}
+                            {{ division.playoffs.status === 'active' ? 'Ottelu käynnissä' : 'Pudotuspeli-ilmoitus tulossa pian' }}
                         </p>
                     </div>
                 </section>
@@ -508,17 +531,13 @@
                 const filterState = this.filterStateNormalized;
                 const search = this.searchQueryNormalized;
                 const sorted = this.cardModels
-                    .filter(card => filterState === 'all' || card.season.status === filterState)
+                    .filter(card => filterState === 'all' || card.state === filterState)
                     .filter(card => {
                         if (!search) return true;
                         return card.searchIndex.includes(search);
                     })
                     .sort((a, b) => {
-                        // Sort by tier first
-                        if (a.tier !== b.tier) {
-                            return a.tier - b.tier;
-                        }
-                        // Then by division number (numeric sort)
+                        // Sort by division number (division_num from API)
                         const aNum = Number(a.divisionNumber) || 0;
                         const bNum = Number(b.divisionNumber) || 0;
                         return aNum - bNum;

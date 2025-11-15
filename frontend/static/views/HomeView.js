@@ -1,7 +1,7 @@
 const GLOBAL_METRIC_SCHEMA = [
     {
         id: 'matches',
-        label: 'Matches',
+        label: 'Otteluja',
         key: [
             'aggregates.matches_played_total',
             'aggregates.total_matches',
@@ -16,25 +16,25 @@ const GLOBAL_METRIC_SCHEMA = [
     },
     {
         id: 'divisions',
-        label: 'Divisions',
+        label: 'Divisioonia',
         key: ['aggregates.total_divisions', 'total_divisions', 'totalDivisions'],
         digits: 0
     },
     {
         id: 'teams',
-        label: 'Teams',
+        label: 'Joukkueita',
         key: ['aggregates.total_teams', 'team_count', 'teams', 'total_teams', 'totalTeams'],
         digits: 0
     },
     {
         id: 'players',
-        label: 'Players',
+        label: 'Pelaajia',
         key: ['aggregates.total_players', 'player_count', 'players', 'total_players', 'totalPlayers'],
         digits: 0
     },
     {
         id: 'maps',
-        label: 'Maps',
+        label: 'Karttoja',
         key: [
             'aggregates.total_maps_played',
             'total_maps_played',
@@ -46,19 +46,19 @@ const GLOBAL_METRIC_SCHEMA = [
     },
     {
         id: 'kills',
-        label: 'Kills',
+        label: 'Tappoja',
         key: ['aggregates.total_kills', 'kills_total', 'total_kills', 'totalKills'],
         digits: 0
     },
     {
         id: 'deaths',
-        label: 'Deaths',
+        label: 'Kuolemia',
         key: ['aggregates.total_deaths', 'deaths_total', 'total_deaths', 'totalDeaths'],
         digits: 0
     },
     {
         id: 'rounds',
-        label: 'Rounds',
+        label: 'Kierroksia',
         key: [
             'aggregates.rounds_played_total',
             'rounds_played_total',
@@ -74,7 +74,7 @@ const GLOBAL_METRIC_SCHEMA = [
 const SEASON_SUMMARY_SCHEMA = [
     {
         id: 'divisions',
-        label: 'Divisions',
+        label: 'Divisioonia',
         digits: 0,
         getter: (stats, context) => {
             if (stats && Object.prototype.hasOwnProperty.call(stats, '__divisionCount')) {
@@ -85,37 +85,37 @@ const SEASON_SUMMARY_SCHEMA = [
     },
     {
         id: 'teams',
-        label: 'Teams',
+        label: 'Joukkueita',
         digits: 0,
         key: ['aggregates.total_teams', 'team_count', 'teams', 'teams_count', 'total_teams']
     },
     {
         id: 'players',
-        label: 'Players',
+        label: 'Pelaajia',
         digits: 0,
         key: ['aggregates.total_players', 'player_count', 'players', 'total_players']
     },
     {
         id: 'matches',
-        label: 'Matches',
+        label: 'Otteluja',
         digits: 0,
         key: ['aggregates.matches_played_total', 'matches_played_total', 'matches_played', 'matches_total', 'matches']
     },
     {
         id: 'rounds',
-        label: 'Rounds',
+        label: 'Kierroksia',
         digits: 0,
         key: ['aggregates.rounds_played_total', 'rounds_played_total', 'rounds_played', 'rounds']
     },
     {
         id: 'kills',
-        label: 'Kills',
+        label: 'Tappoja',
         digits: 0,
         key: ['aggregates.total_kills', 'kills_total', 'kills', 'total_kills']
     },
     {
         id: 'deaths',
-        label: 'Deaths',
+        label: 'Kuolemia',
         digits: 0,
         key: ['aggregates.total_deaths', 'deaths_total', 'deaths', 'total_deaths']
     }
@@ -258,6 +258,9 @@ window.HomeView = {
         },
         get DivisionCardList() {
             return window.DivisionCardList;
+        },
+        get CircularProgress() {
+            return window.CircularProgress;
         }
     },
     data() {
@@ -317,7 +320,7 @@ window.HomeView = {
             return buildMetricCards(aggregates, GLOBAL_METRIC_SCHEMA);
         },
         globalSummaryEyebrow() {
-            return 'All Seasons Overview';
+            return 'Kaikki kaudet yhteensä';
         },
 
        seasonsLoading() {
@@ -340,7 +343,7 @@ window.HomeView = {
             return [
                 {
                     id: 'all',
-                    label: 'All Seasons',
+                    label: 'Kaikki kaudet',
                     options: this.sortedSeasons
                 }
             ];
@@ -420,12 +423,12 @@ window.HomeView = {
         seasonSummaryHeading() {
             const season = this.selectedSeason;
             if (!season) {
-                return 'Season Summary';
+                return 'Kausikohtaiset luvut';
             }
             if (season.seasonNumber) {
-                return `Season ${season.seasonNumber} Summary`;
+                return `Season ${season.seasonNumber} Yleiskatsaus`;
             }
-            return `${season.label || 'Season'} Summary`;
+            return `${season.label || 'Kausi'} Yleiskatsaus`;
         },
         seasonSummaryMeta() {
             if (!this.selectedSeason) {
@@ -464,6 +467,52 @@ window.HomeView = {
         },
         hasSeasonProgress() {
             return this.seasonProgressSummary.total > 0;
+        },
+        circularProgressData() {
+            const stats = this.seasonState?.stats || {};
+            const progress = stats.progress || {};
+            
+            // Debug logging
+            if (typeof console !== 'undefined' && console.log) {
+                console.log('[HomeView] circularProgressData - stats:', stats);
+                console.log('[HomeView] circularProgressData - progress:', progress);
+            }
+            
+            // Extract data from API
+            const regularPlayed = toNumber(progress.regular_matches_played, 0);
+            const regularTotal = toNumber(progress.regular_matches_total, 0);
+            const playoffPlayed = toNumber(progress.playoff_matches_played, 0);
+            const playoffTotal = toNumber(progress.playoff_matches_total, 0);
+            const overallPlayed = toNumber(progress.overall_matches_played, 0);
+            const overallTotal = toNumber(progress.overall_matches_total, 0);
+            
+            return {
+                regular: {
+                    played: regularPlayed,
+                    total: regularTotal || 1, // Avoid divide by zero
+                    label: 'Runkosarja',
+                    sublabel: `${regularPlayed} / ${regularTotal} pelattu`,
+                    color: 'regular'
+                },
+                playoff: {
+                    played: playoffPlayed,
+                    total: playoffTotal || 1, // Avoid divide by zero
+                    label: 'Playoffit',
+                    sublabel: `${playoffPlayed} / ${playoffTotal} pelattu`,
+                    color: 'playoff'
+                },
+                overall: {
+                    played: overallPlayed,
+                    total: overallTotal || 1, // Avoid divide by zero
+                    label: 'Kausi yhteensä',
+                    sublabel: `${overallPlayed} / ${overallTotal} pelattu`,
+                    color: 'overall'
+                }
+            };
+        },
+        hasCircularProgressData() {
+            const data = this.circularProgressData;
+            return data.overall.total > 0;
         },
         divisionCount() {
             const stats = this.seasonState?.stats || {};
@@ -530,10 +579,10 @@ window.HomeView = {
         },
         divisionFilterOptions() {
             return [
-                { id: 'all', label: 'All' },
-                { id: 'active', label: 'Active' },
-                { id: 'finished', label: 'Finished' },
-                { id: 'waiting', label: 'Waiting' }
+                { id: 'all', label: 'Kaikki' },
+                { id: 'active', label: 'Käynnissä' },
+                { id: 'finished', label: 'Valmis' },
+                { id: 'waiting', label: 'Odottaa' }
             ];
         }
     },
@@ -962,10 +1011,7 @@ window.HomeView = {
                                     </h3>
                                 </div>
                             </div>
-                            <div
-                                class="season-explorer__summary-grid"
-                                :class="{ 'season-explorer__summary-grid--single': !hasSeasonProgress }"
-                            >
+                            <div class="season-explorer__summary-grid">
                                 <div class="season-explorer__metrics" role="list">
                                     <div
                                         v-for="metric in seasonSummaryMetrics"
@@ -977,23 +1023,6 @@ window.HomeView = {
                                         <span class="season-explorer__metric-value">{{ metric.value }}</span>
                                     </div>
                                 </div>
-                                <div
-                                    v-if="hasSeasonProgress"
-                                    class="season-progress-card season-explorer__progress"
-                                >
-                                    <div class="season-progress-card__meta">
-                                        <span class="season-progress-card__label">{{ seasonProgressLabel }}</span>
-                                        <span class="season-progress-card__value">{{ seasonProgressSummary.played }} / {{ seasonProgressSummary.total }}</span>
-                                    </div>
-                                    <progress-bar
-                                        :value="seasonProgressSummary.played"
-                                        :max="seasonProgressSummary.total"
-                                        color="accent"
-                                        height="18px"
-                                        :show-percentage="true"
-                                    ></progress-bar>
-                                    <p class="season-progress-card__hint">Shows how many matches have been played versus scheduled this season.</p>
-                                </div>
                             </div>
                         </template>
                         <div
@@ -1003,59 +1032,82 @@ window.HomeView = {
                             aria-live="polite"
                         >
                             <p>Valitse kausi yläpuolisesta selectorista tai odota, että kausitiedot latautuvat.</p>
-                            <button class="btn-primary" type="button" @click="retrySeason">Retry now</button>
+                            <button class="btn-primary" type="button" @click="retrySeason">Yritä uudelleen</button>
                         </div>
                     </div>
                 </div>
 
                 <div
-                    class="season-explorer__section season-explorer__filters"
-                    :class="{ 'season-explorer__filters--disabled': !selectedSeasonKey }"
+                    class="season-explorer__section season-explorer__control-bar"
+                    :class="{ 'season-explorer__control-bar--disabled': !selectedSeasonKey }"
                 >
-                    <div class="season-explorer__filters-heading">
-                        <div>
-                            <span class="season-explorer__label">Divisions</span>
-                            <p class="season-explorer__toolbar-meta">{{ divisionHeaderMeta }}</p>
+                    <div class="control-bar__left">
+                        <div class="control-bar__filters">
+                            <button
+                                v-for="option in divisionFilterOptions"
+                                :key="option.id"
+                                type="button"
+                                class="season-filter-chip"
+                                :class="{ 'season-filter-chip--active': divisionFilter === option.id }"
+                                :aria-pressed="divisionFilter === option.id"
+                                @click="setDivisionFilter(option.id)"
+                            >
+                                {{ option.label }}
+                            </button>
+                            <button
+                                type="button"
+                                class="season-filter-reset"
+                                :disabled="divisionFilter === 'all' && !divisionSearch"
+                                @click="resetDivisionFilters"
+                            >
+                                Nollaa
+                            </button>
                         </div>
-                        <span class="season-explorer__toolbar-hint">Suodata ja selaa divisioonia nopeasti.</span>
+                        <div class="control-bar__search">
+                            <input
+                                type="search"
+                                class="control-bar__input"
+                                placeholder="Hae divisioonaa..."
+                                :value="divisionSearch"
+                                @input="divisionSearch = $event.target.value"
+                                aria-label="Hae divisioonaa"
+                            >
+                        </div>
                     </div>
-                    <div class="season-explorer__filter-grid">
-                        <div class="season-explorer__filter-group">
-                            <span class="season-explorer__label">Status</span>
-                            <div class="season-explorer__chips">
-                                <button
-                                    v-for="option in divisionFilterOptions"
-                                    :key="option.id"
-                                    type="button"
-                                    class="season-filter-chip"
-                                    :class="{ 'season-filter-chip--active': divisionFilter === option.id }"
-                                    :aria-pressed="divisionFilter === option.id"
-                                    @click="setDivisionFilter(option.id)"
-                                >
-                                    {{ option.label }}
-                                </button>
-                            </div>
-                        </div>
-                        <label class="season-explorer__search">
-                            <span class="season-explorer__label">Search</span>
-                            <div class="season-explorer__search-field">
-                                <input
-                                    type="search"
-                                    class="season-explorer__input"
-                                    placeholder="Search divisions"
-                                    :value="divisionSearch"
-                                    @input="divisionSearch = $event.target.value"
-                                >
-                            </div>
-                        </label>
-                        <button
-                            type="button"
-                            class="season-filter-reset"
-                            :disabled="divisionFilter === 'all' && !divisionSearch"
-                            @click="resetDivisionFilters"
-                        >
-                            Reset
-                        </button>
+                    <div
+                        v-if="hasCircularProgressData"
+                        class="control-bar__right"
+                    >
+                        <circular-progress
+                            :value="circularProgressData.regular.played"
+                            :max="circularProgressData.regular.total"
+                            :label="circularProgressData.regular.label"
+                            :sublabel="circularProgressData.regular.sublabel"
+                            :color="circularProgressData.regular.color"
+                            :size="120"
+                            :stroke-width="10"
+                            :animation-delay="0"
+                        ></circular-progress>
+                        <circular-progress
+                            :value="circularProgressData.playoff.played"
+                            :max="circularProgressData.playoff.total"
+                            :label="circularProgressData.playoff.label"
+                            :sublabel="circularProgressData.playoff.sublabel"
+                            :color="circularProgressData.playoff.color"
+                            :size="120"
+                            :stroke-width="10"
+                            :animation-delay="0.15"
+                        ></circular-progress>
+                        <circular-progress
+                            :value="circularProgressData.overall.played"
+                            :max="circularProgressData.overall.total"
+                            :label="circularProgressData.overall.label"
+                            :sublabel="circularProgressData.overall.sublabel"
+                            :color="circularProgressData.overall.color"
+                            :size="120"
+                            :stroke-width="10"
+                            :animation-delay="0.3"
+                        ></circular-progress>
                     </div>
                 </div>
 
