@@ -64,6 +64,12 @@
         return { id: 5, label: 'Tier 5 (Div 21-25)', range: 'Div 21-25', order: 5 };
     }
 
+    function cleanDivisionName(rawName) {
+        if (!rawName) return '';
+        // Remove season suffix like "S11", "S12", etc.
+        return String(rawName).replace(/\s+S\d+$/i, '').trim();
+    }
+
     function buildCardModel(division) {
         if (!division) {
             return null;
@@ -75,6 +81,7 @@
                 id: division.id || division.divisionId || division.division_id,
                 name: division.name,
                 season: division.season,
+                status: division.status,
                 bestPlayer: division.bestPlayer || division.best_player,
                 mvpTeam: division.mvpTeam || division.mvp_team
             });
@@ -86,7 +93,8 @@
         const divisionId = division.divisionId || division.division_id || division.id;
         const divisionNum = division.division_num || division.divisionNum || division.tier;
         
-        const seasonStatus = normalizeStatus(division.season?.status, 'waiting');
+        // Use the division's top-level status first, fallback to season.status
+        const seasonStatus = normalizeStatus(division.status || division.season?.status, 'waiting');
         const seasonMatchesPlayed = Number(division.season?.matches_played || division.season?.matchesPlayed) || 0;
         const seasonMatchesTotal = Number(division.season?.matches_total || division.season?.matchesTotal) || 0;
         const playoffsMatchesPlayed = Number(division.playoffs?.matches_played || division.playoffs?.matchesPlayed) || 0;
@@ -94,14 +102,13 @@
         const playoffsStatus = normalizeStatus(division.playoffs?.status, 'waiting');
         
         const hrefId = division.slug || divisionId;
-        const seasonLabel = division.seasonNumber ? `S${division.seasonNumber}` : '';
-        const nameSuffix = seasonLabel ? ` ${seasonLabel}` : '';
-        const titleBase = division.name || (divisionNum ? `Division ${divisionNum}` : 'Division');
-        const title = `${titleBase}${nameSuffix}`;
+        // Clean the division name - remove season suffix
+        const cleanName = cleanDivisionName(division.name);
+        const title = cleanName || (divisionNum ? `Division ${divisionNum}` : 'Division');
         
         // Extract best player and MVP team info
-        const bestPlayer = division.best_player || division.bestPlayer;
-        const mvpTeam = division.mvp_team || division.mvpTeam;
+        const bestPlayer = division.meta?.mvp_player || division.best_player || division.bestPlayer;
+        const mvpTeam = division.meta?.winner_team || division.mvp_team || division.mvpTeam;
         const winners = division.winners || [];
         
         return {
@@ -118,7 +125,7 @@
                 percent: seasonMatchesTotal > 0 ? Math.round((seasonMatchesPlayed / seasonMatchesTotal) * 100) : 0,
                 status: seasonStatus,
                 progressLabel: formatProgressLabel(seasonMatchesPlayed, seasonMatchesTotal),
-                winner: division.season?.winner || null
+                winner: division.season?.winner || division.meta?.winner_team || null
             },
             playoffs: {
                 teams: Number(division.playoffs?.teams) || 8,
@@ -127,7 +134,7 @@
                 percent: playoffsMatchesTotal > 0 ? Math.round((playoffsMatchesPlayed / playoffsMatchesTotal) * 100) : 0,
                 status: playoffsStatus,
                 progressLabel: formatProgressLabel(playoffsMatchesPlayed, playoffsMatchesTotal || 7),
-                winner: division.playoffs?.winner || null
+                winner: division.playoffs?.winner_team || division.playoffs?.winner || null
             },
             bestPlayer: bestPlayer ? {
                 name: bestPlayer.name,
@@ -344,8 +351,7 @@
             <article class="division-card" role="listitem" :class="'division-card--' + stateClass(division.season.status)">
                 <header class="division-card__header">
                     <div>
-                        <p class="division-card__eyebrow">Division {{ division.divisionNumber || '0' }}</p>
-                        <h3>{{ division.title }}</h3>
+                        <h3 class="division-card__title">{{ division.title }}</h3>
                         <p v-if="showWinnerStrip" class="division-card__winner-banner">Winner: {{ division.season.winner }}</p>
                     </div>
                     <span class="division-card__badge" :class="'division-card__badge--' + stateClass(division.season.status)">{{ statusLabel }}</span>
@@ -508,10 +514,14 @@
                         return card.searchIndex.includes(search);
                     })
                     .sort((a, b) => {
+                        // Sort by tier first
                         if (a.tier !== b.tier) {
                             return a.tier - b.tier;
                         }
-                        return (a.divisionNumber || 0) - (b.divisionNumber || 0);
+                        // Then by division number (numeric sort)
+                        const aNum = Number(a.divisionNumber) || 0;
+                        const bNum = Number(b.divisionNumber) || 0;
+                        return aNum - bNum;
                     });
                 if (isDevEnv) {
                     console.info(
