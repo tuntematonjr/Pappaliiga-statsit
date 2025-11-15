@@ -18,7 +18,7 @@ async def get_overview_stats() -> dict[str, int]:
     season_rows, div_rows, team_rows, match_rows, map_rows, totals_rows = await query_async(
         "SELECT COUNT(DISTINCT season) AS cnt FROM championships"
     ), await query_async(
-        "SELECT COUNT(*) AS cnt FROM championships"
+        "SELECT COUNT(*) AS cnt FROM championships WHERE is_playoffs = 0"
     ), await query_async(
         "SELECT COUNT(DISTINCT team_id) AS cnt FROM teams"
     ), await query_async(

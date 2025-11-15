@@ -86,11 +86,12 @@
         const divisionId = division.divisionId || division.division_id || division.id;
         const divisionNum = division.division_num || division.divisionNum || division.tier;
         
-        const seasonStatus = division.season?.status || 'waiting';
+        const seasonStatus = normalizeStatus(division.season?.status, 'waiting');
         const seasonMatchesPlayed = Number(division.season?.matches_played || division.season?.matchesPlayed) || 0;
         const seasonMatchesTotal = Number(division.season?.matches_total || division.season?.matchesTotal) || 0;
         const playoffsMatchesPlayed = Number(division.playoffs?.matches_played || division.playoffs?.matchesPlayed) || 0;
         const playoffsMatchesTotal = Number(division.playoffs?.matches_total || division.playoffs?.matchesTotal) || 7;
+        const playoffsStatus = normalizeStatus(division.playoffs?.status, 'waiting');
         
         const hrefId = division.slug || divisionId;
         const seasonLabel = division.seasonNumber ? `S${division.seasonNumber}` : '';
@@ -124,7 +125,7 @@
                 matchesPlayed: playoffsMatchesPlayed,
                 matchesTotal: playoffsMatchesTotal || 7,
                 percent: playoffsMatchesTotal > 0 ? Math.round((playoffsMatchesPlayed / playoffsMatchesTotal) * 100) : 0,
-                status: division.playoffs?.status || 'waiting',
+                status: playoffsStatus,
                 progressLabel: formatProgressLabel(playoffsMatchesPlayed, playoffsMatchesTotal || 7),
                 winner: division.playoffs?.winner || null
             },
@@ -431,7 +432,8 @@
             dataBadge: { type: String, default: '' },
             warningMessage: { type: String, default: '' },
             isLoading: { type: Boolean, default: false },
-            showSeasonPicker: { type: Boolean, default: true }
+            showSeasonPicker: { type: Boolean, default: true },
+            showControls: { type: Boolean, default: true }
         },
         emits: ['change-season', 'change-filter', 'change-search', 'reset-filters'],
         data() {
@@ -636,6 +638,7 @@
         template: `
             <div class="division-hub">
                 <season-bar
+                    v-if="showControls"
                     :season-options="seasonOptions"
                     :selected-season="selectedSeason"
                     :season-loading="seasonLoading"

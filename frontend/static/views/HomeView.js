@@ -2,51 +2,72 @@ const GLOBAL_METRIC_SCHEMA = [
     {
         id: 'matches',
         label: 'Matches',
-        key: ['aggregates.matches_played_total', 'aggregates.total_matches', 'matches_played_total', 'matches_played', 'matches'],
+        key: [
+            'aggregates.matches_played_total',
+            'aggregates.total_matches',
+            'matches_played_total',
+            'matches_played',
+            'matches',
+            'total_matches',
+            'totalMatches',
+            'matchesPlayedTotal'
+        ],
+        digits: 0
+    },
+    {
+        id: 'divisions',
+        label: 'Divisions',
+        key: ['aggregates.total_divisions', 'total_divisions', 'totalDivisions'],
         digits: 0
     },
     {
         id: 'teams',
         label: 'Teams',
-        key: ['aggregates.total_teams', 'team_count', 'teams', 'total_teams'],
+        key: ['aggregates.total_teams', 'team_count', 'teams', 'total_teams', 'totalTeams'],
         digits: 0
     },
     {
         id: 'players',
         label: 'Players',
-        key: ['aggregates.total_players', 'player_count', 'players', 'total_players'],
+        key: ['aggregates.total_players', 'player_count', 'players', 'total_players', 'totalPlayers'],
+        digits: 0
+    },
+    {
+        id: 'maps',
+        label: 'Maps',
+        key: [
+            'aggregates.total_maps_played',
+            'total_maps_played',
+            'maps_played_total',
+            'totalMapsPlayed',
+            'mapsPlayedTotal'
+        ],
         digits: 0
     },
     {
         id: 'kills',
         label: 'Kills',
-        key: ['aggregates.total_kills', 'kills_total', 'total_kills'],
+        key: ['aggregates.total_kills', 'kills_total', 'total_kills', 'totalKills'],
         digits: 0
     },
     {
         id: 'deaths',
         label: 'Deaths',
-        key: ['aggregates.total_deaths', 'deaths_total', 'total_deaths'],
+        key: ['aggregates.total_deaths', 'deaths_total', 'total_deaths', 'totalDeaths'],
         digits: 0
     },
     {
         id: 'rounds',
         label: 'Rounds',
-        key: ['aggregates.rounds_played_total', 'rounds_played_total', 'rounds_played', 'rounds'],
+        key: [
+            'aggregates.rounds_played_total',
+            'rounds_played_total',
+            'rounds_played',
+            'rounds',
+            'total_rounds',
+            'totalRounds'
+        ],
         digits: 0
-    },
-    {
-        id: 'adr',
-        label: 'ADR Avg',
-        key: ['aggregates.median_adr', 'aggregates.avg_adr', 'median_adr', 'adr_median'],
-        digits: 1
-    },
-    {
-        id: 'winrate',
-        label: 'Win Rate',
-        key: ['aggregates.win_percent', 'win_percent', 'win_pct', 'wins_percent'],
-        percent: true,
-        digits: 1
     }
 ];
 
@@ -55,7 +76,12 @@ const SEASON_SUMMARY_SCHEMA = [
         id: 'divisions',
         label: 'Divisions',
         digits: 0,
-        getter: (_, context) => context?.divisionCount ?? 0
+        getter: (stats, context) => {
+            if (stats && Object.prototype.hasOwnProperty.call(stats, '__divisionCount')) {
+                return stats.__divisionCount;
+            }
+            return context?.divisionCount ?? 0;
+        }
     },
     {
         id: 'teams',
@@ -92,19 +118,6 @@ const SEASON_SUMMARY_SCHEMA = [
         label: 'Deaths',
         digits: 0,
         key: ['aggregates.total_deaths', 'deaths_total', 'deaths', 'total_deaths']
-    },
-    {
-        id: 'adr',
-        label: 'ADR Avg',
-        digits: 1,
-        key: ['aggregates.median_adr', 'aggregates.avg_adr', 'median_adr', 'adr_median']
-    },
-    {
-        id: 'winrate',
-        label: 'Win Rate',
-        percent: true,
-        digits: 1,
-        key: ['aggregates.win_percent', 'win_percent', 'win_pct', 'wins_percent']
     }
 ];
 
@@ -184,6 +197,27 @@ function buildMetricCards(source, schema, context) {
             label: definition.label,
             value: formatMetric(rawValue, definition)
         };
+    });
+}
+
+function sortSeasonsDescending(seasons = []) {
+    if (!Array.isArray(seasons)) {
+        return [];
+    }
+    return [...seasons].sort((a, b) => {
+        const aId = Number.isFinite(a?.id) ? a.id : Number.NEGATIVE_INFINITY;
+        const bId = Number.isFinite(b?.id) ? b.id : Number.NEGATIVE_INFINITY;
+        if (aId !== bId) {
+            return bId - aId;
+        }
+        const aNum = Number.isFinite(a?.seasonNumber) ? a.seasonNumber : Number.NEGATIVE_INFINITY;
+        const bNum = Number.isFinite(b?.seasonNumber) ? b.seasonNumber : Number.NEGATIVE_INFINITY;
+        if (aNum !== bNum) {
+            return bNum - aNum;
+        }
+        const aLabel = a?.label || '';
+        const bLabel = b?.label || '';
+        return aLabel.localeCompare(bLabel, 'fi');
     });
 }
 
@@ -293,7 +327,11 @@ window.HomeView = {
             return this.seasonsStore?.error ?? null;
         },
         sortedSeasons() {
-            return this.seasonsStore?.sortedSeasons ?? [];
+            const source =
+                (Array.isArray(this.seasonsStore?.sortedSeasons) && this.seasonsStore.sortedSeasons.length
+                    ? this.seasonsStore.sortedSeasons
+                    : this.seasonsStore?.seasons) || [];
+            return sortSeasonsDescending(source);
         },
         seasonSelectGroups() {
             if (!this.sortedSeasons.length) {
@@ -333,7 +371,15 @@ window.HomeView = {
             return this.seasonState.error;
         },
         seasonSummaryMetrics() {
-            return buildMetricCards(this.seasonState.stats || {}, SEASON_SUMMARY_SCHEMA, this);
+            const stats = this.seasonState.stats || {};
+            const metrics = buildMetricCards(stats, SEASON_SUMMARY_SCHEMA, this);
+            const divisionValue = formatMetric(this.divisionCount, { digits: 0 });
+            return metrics.map(metric => {
+                if (metric.key === 'divisions') {
+                    return { ...metric, value: divisionValue };
+                }
+                return metric;
+            });
         },
         seasonDivisions() {
             const list = Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
@@ -391,9 +437,14 @@ window.HomeView = {
                 pickValue(stats, ['aggregates.total_players', 'player_count', 'players']),
                 { digits: 0 }
             );
-            return `Divisions: ${this.divisionCount} · Teams: ${teams} · Players: ${players}`;
+            return `Teams: ${teams} · Players: ${players}`;
         },
         seasonProgressSummary() {
+            const stats = this.seasonState?.stats || {};
+            const percentFromStats = toNumber(
+                pickValue(stats, ['progress.finished_percent', 'finished_percent']),
+                null
+            );
             const overall = this.seasonState?.progress?.overall || {};
             const played = toNumber(overall.played, 0);
             const total = toNumber(overall.total, 0);
@@ -401,7 +452,7 @@ window.HomeView = {
             return {
                 played,
                 total,
-                percent
+                percent: percentFromStats != null && percentFromStats > 0 ? percentFromStats : percent
             };
         },
         seasonProgressLabel() {
@@ -415,6 +466,18 @@ window.HomeView = {
             return this.seasonProgressSummary.total > 0;
         },
         divisionCount() {
+            const stats = this.seasonState?.stats || {};
+            const summaryCount = toNumber(
+                pickValue(stats, [
+                    'progress.divisions_total',
+                    'aggregates.divisions_total',
+                    'divisions_total'
+                ]),
+                0
+            );
+            if (summaryCount > 0) {
+                return summaryCount;
+            }
             return this.seasonDivisions.length;
         },
         divisionProgressPercent() {
@@ -464,25 +527,20 @@ window.HomeView = {
                 return 'Ei divisioonia valituilla suodattimilla.';
             }
             return 'Tälle kaudelle ei löytynyt divisioonia.';
+        },
+        divisionFilterOptions() {
+            return [
+                { id: 'all', label: 'All' },
+                { id: 'active', label: 'Active' },
+                { id: 'finished', label: 'Finished' },
+                { id: 'waiting', label: 'Waiting' }
+            ];
         }
     },
     async mounted() {
         await this.bootstrap();
     },
     watch: {
-        selectedSeasonKey: {
-            immediate: true,
-            handler(newKey, oldKey) {
-                if (typeof window !== 'undefined' && window.console) {
-                    console.info('[HomeView] selectedSeasonKey changed', { newKey, oldKey });
-                }
-                if (!newKey || newKey === oldKey) {
-                    return;
-                }
-                const season = this.selectedSeason;
-                this.loadSeason(newKey, { apiParam: season?.apiParam });
-            }
-        },
         '$route.query.season': {
             handler(newValue, oldValue) {
                 if (newValue === oldValue) {
@@ -521,7 +579,13 @@ window.HomeView = {
                 tasks.push(
                     this.seasonsStore
                         .fetchSeasons()
-                        .then(() => this.initializeSeasonSelection({ ensureRoute: true }))
+                        .then(() => {
+                            const season = this.initializeSeasonSelection({ ensureRoute: true });
+                            // Load initial season data
+                            if (season) {
+                                this.loadSeason(season.key, { apiParam: season.apiParam });
+                            }
+                        })
                         .catch(error => {
                             console.error('[HomeView] fetchSeasons failed', error);
                         })
@@ -529,7 +593,10 @@ window.HomeView = {
             }
             await Promise.allSettled(tasks);
             if (!this.selectedSeasonKey && this.sortedSeasons.length) {
-                this.initializeSeasonSelection({ ensureRoute: true });
+                const season = this.initializeSeasonSelection({ ensureRoute: true });
+                if (season) {
+                    this.loadSeason(season.key, { apiParam: season.apiParam });
+                }
             }
         },
         initializeSeasonSelection(options = {}) {
@@ -603,6 +670,9 @@ window.HomeView = {
             }
             if (targetSeason && targetSeason.key !== this.selectedSeasonKey) {
                 this.seasonsStore.selectSeason(targetSeason.key);
+                // Load season data when syncing from route
+                this.loadSeason(targetSeason.key, { apiParam: targetSeason.apiParam });
+                // Only scroll if explicitly requested (not on initial load)
                 if (options.scroll) {
                     this.scrollToSeasonSummary();
                 }
@@ -637,14 +707,28 @@ window.HomeView = {
         },
         handleSeasonSelect(value) {
             const season = this.findSeasonRecord(value);
-            if (!season || season.key === this.selectedSeasonKey) {
-                if (season) {
-                    this.scrollToSeasonSummary();
-                }
+            if (!season) {
                 return;
             }
+
+            // If same season selected, just scroll to it (user wants to see it again)
+            if (season.key === this.selectedSeasonKey) {
+                this.scrollToSeasonSummary();
+                return;
+            }
+
+            console.info('[HomeView] handleSeasonSelect', { selected: season.key });
+
+            // Update store selection (this triggers data load in bootstrap if needed)
             this.seasonsStore?.selectSeason(season.key);
-            this.syncRouteWithSelectedSeason({ replace: false });
+
+            // Load season data immediately without waiting for watchers
+            this.loadSeason(season.key, { apiParam: season?.apiParam });
+
+            // Update route silently (for sharing/refresh) without triggering navigation
+            this.syncRouteWithSelectedSeason({ replace: true });
+
+            // Scroll to season summary section
             this.scrollToSeasonSummary();
         },
         async loadSeason(key, options = {}) {
@@ -706,13 +790,35 @@ window.HomeView = {
             });
         },
         scrollToSeasonSummary() {
-            const target = this.$refs.seasonControls;
-            if (!target) return;
-            try {
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            } catch (error) {
-                window.scrollTo(0, target.offsetTop || 0);
-            }
+            this.$nextTick(() => {
+                const target = this.$refs.seasonControls;
+                if (!target) return;
+
+                try {
+                    const rect = target.getBoundingClientRect();
+                    const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+                    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+
+                    // Check if target is already well-positioned in viewport (with generous threshold)
+                    // Target is visible if it's within top 30% of viewport
+                    const visibleThreshold = vh * 0.3;
+                    const isWellPositioned = rect.top >= 0 && rect.top <= visibleThreshold;
+
+                    if (isWellPositioned) {
+                        console.info('[HomeView] scrollToSeasonSummary: already visible, skipping scroll');
+                        return;
+                    }
+
+                    // Scroll to position target near top of viewport with some padding
+                    const targetY = scrollY + rect.top - 80; // 80px padding from top
+                    window.scrollTo({
+                        top: Math.max(0, targetY),
+                        behavior: 'smooth'
+                    });
+                } catch (error) {
+                    console.warn('[HomeView] scrollToSeasonSummary failed', error);
+                }
+            });
         },
         setDivisionFilter(filter) {
             console.info('[HomeView] setDivisionFilter', filter);
@@ -734,7 +840,6 @@ window.HomeView = {
                 <template #actions>
                     <button class="btn-primary" type="button" @click="scrollToSeasonSummary">View Current Season</button>
                     <a class="btn-secondary" href="https://discord.gg/pappaliiga" target="_blank" rel="noopener">Join Discord</a>
-                    <router-link to="/seasons" class="btn-link">All Seasons</router-link>
                 </template>
             </hero-banner>
 
@@ -795,124 +900,189 @@ window.HomeView = {
                 ></stat-panel>
             </section>
 
-            <section class="stats-section stats-section--selector" aria-labelledby="season-selector-heading">
-                <header class="section-heading">
-                    <span class="section-eyebrow">Season Selector</span>
-                    <h2 id="season-selector-heading">Choose the season to explore</h2>
-                    <p class="section-subtext">Newest season is selected automatically. Tap a pill to refresh the summary and divisions.</p>
-                </header>
-                <season-toggle
-                    :seasons="sortedSeasons"
-                    :model-value="selectedSeasonKey"
-                    :loading="seasonsLoading"
-                    :error="seasonsError"
-                    @update:modelValue="handleSeasonSelect"
-                    @retry="retrySeasons"
-                ></season-toggle>
-            </section>
-
             <section
-                class="stats-section stats-section--season"
+                class="season-explorer glass-card"
                 ref="seasonControls"
-                aria-labelledby="season-summary-heading"
+                aria-labelledby="season-explorer-heading"
             >
-                <header class="section-heading">
+                <header class="season-explorer__intro section-heading">
                     <div>
-                        <span class="section-eyebrow">{{ seasonSubtitle || 'Active Season' }}</span>
-                        <h2
-                            id="season-summary-heading"
-                            aria-live="polite"
-                            aria-atomic="true"
-                        >
-                            {{ seasonSummaryHeading }}
-                        </h2>
-                        <p class="section-subtext">{{ seasonSummaryMeta }}</p>
+                        <span class="section-eyebrow">Season Explorer</span>
+                        <h2 id="season-explorer-heading">Season Explorer</h2>
+                        <p class="section-subtext">Select a season to refresh the summary and division list in one place.</p>
                     </div>
-                    <router-link to="/seasons" class="btn-link">All Seasons</router-link>
                 </header>
 
-                <div
-                    v-if="seasonLoading"
-                    class="season-skeleton"
-                    role="status"
-                    aria-live="polite"
-                >
-                    <div class="season-skeleton__header"></div>
-                    <div class="season-skeleton__grid">
-                        <div v-for="n in 3" :key="'skeleton-' + n" class="season-skeleton__card"></div>
+                <div class="season-explorer__section season-explorer__selection">
+                    <div class="season-explorer__selector">
+                        <season-toggle
+                            :seasons="sortedSeasons"
+                            :model-value="selectedSeasonKey"
+                            :loading="seasonsLoading"
+                            :error="seasonsError"
+                            :show-heading="false"
+                            :flat="true"
+                            @update:modelValue="handleSeasonSelect"
+                            @retry="retrySeasons"
+                        ></season-toggle>
                     </div>
-                </div>
 
-                <error-message
-                    v-else-if="seasonError"
-                    :message="seasonError"
-                    @retry="retrySeason"
-                ></error-message>
-
-                <template v-else-if="selectedSeasonKey">
-                    <div class="season-summary-grid">
-                        <stat-panel
-                            :items="seasonSummaryMetrics"
-                            :columns="3"
-                        ></stat-panel>
+                    <div
+                        class="season-explorer__summary"
+                        aria-live="polite"
+                        aria-atomic="true"
+                    >
                         <div
-                            v-if="hasSeasonProgress"
-                            class="season-progress-card"
+                            v-if="seasonLoading"
+                            class="season-skeleton"
+                            role="status"
                         >
-                            <div class="season-progress-card__meta">
-                                <span class="season-progress-card__label">{{ seasonProgressLabel }}</span>
+                            <div class="season-skeleton__header"></div>
+                            <div class="season-skeleton__grid">
+                                <div v-for="n in 5" :key="'skeleton-block-' + n" class="season-skeleton__card"></div>
                             </div>
-                            <progress-bar
-                                :value="seasonProgressSummary.played"
-                                :max="seasonProgressSummary.total"
-                                color="accent"
-                                height="18px"
-                                :show-percentage="true"
-                            ></progress-bar>
-                            <p class="season-progress-card__hint">Shows how many matches have been played versus scheduled this season.</p>
+                        </div>
+
+                        <error-message
+                            v-else-if="seasonError"
+                            :message="seasonError"
+                            @retry="retrySeason"
+                        ></error-message>
+
+                        <template v-else-if="selectedSeasonKey">
+                            <div class="season-explorer__summary-header">
+                                <div>
+                                    <span class="section-eyebrow">{{ seasonSubtitle || 'Active Season' }}</span>
+                                    <h3
+                                        id="season-summary-heading"
+                                        aria-live="polite"
+                                        aria-atomic="true"
+                                    >
+                                        {{ seasonSummaryHeading }}
+                                    </h3>
+                                </div>
+                            </div>
+                            <div
+                                class="season-explorer__summary-grid"
+                                :class="{ 'season-explorer__summary-grid--single': !hasSeasonProgress }"
+                            >
+                                <div class="season-explorer__metrics" role="list">
+                                    <div
+                                        v-for="metric in seasonSummaryMetrics"
+                                        :key="metric.key"
+                                        class="season-explorer__metric"
+                                        role="listitem"
+                                    >
+                                        <span class="season-explorer__metric-label">{{ metric.label }}</span>
+                                        <span class="season-explorer__metric-value">{{ metric.value }}</span>
+                                    </div>
+                                </div>
+                                <div
+                                    v-if="hasSeasonProgress"
+                                    class="season-progress-card season-explorer__progress"
+                                >
+                                    <div class="season-progress-card__meta">
+                                        <span class="season-progress-card__label">{{ seasonProgressLabel }}</span>
+                                        <span class="season-progress-card__value">{{ seasonProgressSummary.played }} / {{ seasonProgressSummary.total }}</span>
+                                    </div>
+                                    <progress-bar
+                                        :value="seasonProgressSummary.played"
+                                        :max="seasonProgressSummary.total"
+                                        color="accent"
+                                        height="18px"
+                                        :show-percentage="true"
+                                    ></progress-bar>
+                                    <p class="season-progress-card__hint">Shows how many matches have been played versus scheduled this season.</p>
+                                </div>
+                            </div>
+                        </template>
+                        <div
+                            v-else
+                            class="season-empty-state"
+                            role="status"
+                            aria-live="polite"
+                        >
+                            <p>Valitse kausi yläpuolisesta selectorista tai odota, että kausitiedot latautuvat.</p>
+                            <button class="btn-primary" type="button" @click="retrySeason">Retry now</button>
                         </div>
                     </div>
-                </template>
-                <div
-                    v-else
-                    class="season-empty-state"
-                    role="status"
-                    aria-live="polite"
-                >
-                    <p>Valitse kausi yläpuolisesta selectorista tai odota, että kausitiedot latautuvat.</p>
-                    <button class="btn-primary" type="button" @click="retrySeason">Retry now</button>
                 </div>
-            </section>
 
-            <section class="stats-section divisions-section" aria-labelledby="divisions-heading">
-                <header class="section-heading divisions-section__header">
-                    <div>
-                        <span class="section-eyebrow">Season {{ selectedSeason?.seasonNumber || seasonTitle }} Divisions</span>
-                        <h2 id="divisions-heading">Season {{ selectedSeason?.seasonNumber || seasonTitle }} Divisions</h2>
-                        <p class="section-subtext divisions-section__meta">{{ divisionHeaderMeta }}</p>
+                <div
+                    class="season-explorer__section season-explorer__filters"
+                    :class="{ 'season-explorer__filters--disabled': !selectedSeasonKey }"
+                >
+                    <div class="season-explorer__filters-heading">
+                        <div>
+                            <span class="season-explorer__label">Divisions</span>
+                            <p class="season-explorer__toolbar-meta">{{ divisionHeaderMeta }}</p>
+                        </div>
+                        <span class="season-explorer__toolbar-hint">Suodata ja selaa divisioonia nopeasti.</span>
                     </div>
-                    <span class="divisions-section__hint">Suodata ja selaa divisioonia nopeasti.</span>
-                </header>
-                <division-card-list
-                    :divisions="seasonDivisions"
-                    :season-label="seasonTitle"
-                    :season-subtitle="seasonSubtitle"
-                    :season-options="seasonSelectGroups"
-                    :season-loading="seasonsLoading"
-                    :selected-season="selectedSeasonKey"
-                    :offline-message="divisionOfflineMessage"
-                    :data-badge="divisionDataBadge"
-                    :warning-message="divisionWarningMessage"
-                    :is-loading="seasonLoading"
-                    :empty-message="divisionEmptyMessage"
-                    :filter-state="divisionFilter"
-                    :search-query="divisionSearch"
-                    :show-season-picker="false"
-                    @change-season="handleSeasonSelect"
-                    @change-filter="setDivisionFilter"
-                    @change-search="divisionSearch = $event"
-                    @reset-filters="resetDivisionFilters"
-                ></division-card-list>
+                    <div class="season-explorer__filter-grid">
+                        <div class="season-explorer__filter-group">
+                            <span class="season-explorer__label">Status</span>
+                            <div class="season-explorer__chips">
+                                <button
+                                    v-for="option in divisionFilterOptions"
+                                    :key="option.id"
+                                    type="button"
+                                    class="season-filter-chip"
+                                    :class="{ 'season-filter-chip--active': divisionFilter === option.id }"
+                                    :aria-pressed="divisionFilter === option.id"
+                                    @click="setDivisionFilter(option.id)"
+                                >
+                                    {{ option.label }}
+                                </button>
+                            </div>
+                        </div>
+                        <label class="season-explorer__search">
+                            <span class="season-explorer__label">Search</span>
+                            <div class="season-explorer__search-field">
+                                <input
+                                    type="search"
+                                    class="season-explorer__input"
+                                    placeholder="Search divisions"
+                                    :value="divisionSearch"
+                                    @input="divisionSearch = $event.target.value"
+                                >
+                            </div>
+                        </label>
+                        <button
+                            type="button"
+                            class="season-filter-reset"
+                            :disabled="divisionFilter === 'all' && !divisionSearch"
+                            @click="resetDivisionFilters"
+                        >
+                            Reset
+                        </button>
+                    </div>
+                </div>
+
+                <div class="season-explorer__section season-explorer__divisions">
+                    <division-card-list
+                        class="season-explorer__divisions-list"
+                        :divisions="seasonDivisions"
+                        :season-label="seasonTitle"
+                        :season-subtitle="seasonSubtitle"
+                        :season-options="seasonSelectGroups"
+                        :season-loading="seasonsLoading"
+                        :selected-season="selectedSeasonKey"
+                        :offline-message="divisionOfflineMessage"
+                        :data-badge="divisionDataBadge"
+                        :warning-message="divisionWarningMessage"
+                        :is-loading="seasonLoading"
+                        :empty-message="divisionEmptyMessage"
+                        :filter-state="divisionFilter"
+                        :search-query="divisionSearch"
+                        :show-season-picker="false"
+                        :show-controls="false"
+                        @change-season="handleSeasonSelect"
+                        @change-filter="setDivisionFilter"
+                        @change-search="divisionSearch = $event"
+                        @reset-filters="resetDivisionFilters"
+                    ></division-card-list>
+                </div>
             </section>
         </div>
     `

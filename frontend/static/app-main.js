@@ -45,9 +45,12 @@ const router = createRouter({
     scrollBehavior(to, from, savedPosition) {
         if (savedPosition) {
             return savedPosition;
-        } else {
-            return { top: 0 };
         }
+        // Keep scroll position when only query params change (e.g., swapping seasons)
+        if (to.path === from.path && to.hash === from.hash) {
+            return false;
+        }
+        return { top: 0 };
     }
 });
 

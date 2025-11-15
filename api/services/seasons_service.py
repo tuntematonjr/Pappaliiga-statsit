@@ -86,7 +86,7 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
             COALESCE(AVG(NULLIF(pst.adr, 0)), 0) AS avg_adr,
             COALESCE(SUM(pst.utility_damage), 0) AS utility_damage,
             COALESCE(SUM(pst.cl_1v1_wins + pst.cl_1v2_wins), 0) AS clutch_wins,
-            COALESCE(SUM(pst.entry_wins - (pst.entry_count - pst.entry_wins)), 0) AS entry_diff
+            COALESCE(SUM(CAST(pst.entry_wins AS SIGNED) * 2 - CAST(pst.entry_count AS SIGNED)), 0) AS entry_diff
         FROM player_season_totals pst
         WHERE pst.season = :season
         """,

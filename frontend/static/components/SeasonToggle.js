@@ -29,6 +29,14 @@ window.SeasonToggle = {
         showAllLink: {
             type: Boolean,
             default: true
+        },
+        showHeading: {
+            type: Boolean,
+            default: true
+        },
+        flat: {
+            type: Boolean,
+            default: false
         }
     },
     emits: ['update:modelValue', 'select', 'retry', 'focus-selector'],
@@ -63,12 +71,6 @@ window.SeasonToggle = {
         },
         selectedSeason() {
             return this.sortedSeasons.find(season => String(season.key) === String(this.modelValue)) || null;
-        },
-        selectedLabel() {
-            const season = this.selectedSeason;
-            if (!season) return 'Select season';
-            const fallback = season.seasonNumber ?? season.id ?? season.key;
-            return season.label || season.shortLabel || (fallback ? `Season ${fallback}` : 'Selected season');
         },
         showDropdown() {
             return this.useCompactDropdown && !this.hasSingleSeason;
@@ -119,14 +121,28 @@ window.SeasonToggle = {
         },
         focusSelector() {
             const container = this.$refs.selectorHeader;
+            // Focus the selector header without causing the page to scroll to top.
             if (container && typeof container.focus === 'function') {
-                container.focus({ preventScroll: false });
+                try {
+                    container.focus({ preventScroll: true });
+                } catch (e) {
+                    // Fallback for environments where focus options are not supported
+                    try { container.focus(); } catch (e2) { /* ignore */ }
+                }
             }
             const buttons = this.getPillButtons();
             if (buttons.length && typeof buttons[0].focus === 'function') {
-                buttons[0].focus();
+                try {
+                    buttons[0].focus({ preventScroll: true });
+                } catch (e) {
+                    try { buttons[0].focus(); } catch (e2) { /* ignore */ }
+                }
             } else if (this.$refs.selectorDropdown && typeof this.$refs.selectorDropdown.focus === 'function') {
-                this.$refs.selectorDropdown.focus();
+                try {
+                    this.$refs.selectorDropdown.focus({ preventScroll: true });
+                } catch (e) {
+                    try { this.$refs.selectorDropdown.focus(); } catch (e2) { /* ignore */ }
+                }
             }
             this.$emit('focus-selector');
         },
@@ -204,8 +220,14 @@ window.SeasonToggle = {
         }
     },
     template: `
-        <div class="season-selector glass-card" role="region" aria-label="Season selector">
+        <div
+            class="season-selector"
+            :class="{ 'glass-card': !flat, 'season-selector--flat': flat }"
+            role="region"
+            aria-label="Season selector"
+        >
             <header
+                v-if="showHeading"
                 class="season-selector__header"
                 ref="selectorHeader"
                 tabindex="-1"
@@ -311,9 +333,6 @@ window.SeasonToggle = {
                             &rsaquo;
                         </button>
                     </div>
-                    <p v-if="selectedSeason" class="season-selector__selection" aria-live="polite">
-                        Viewing {{ selectedLabel }}
-                    </p>
                 </div>
             </div>
         </div>
