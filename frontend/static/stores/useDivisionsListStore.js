@@ -21,6 +21,45 @@
         };
     }
 
+    function metricsToTotals(metrics) {
+        if (!Array.isArray(metrics) || !metrics.length) {
+            return null;
+        }
+        return metrics.reduce((acc, metric) => {
+            if (metric && metric.id) {
+                acc[metric.id] = Number(metric.value) || 0;
+            }
+            return acc;
+        }, {});
+    }
+
+    function normalizeSummaryPayload(raw) {
+        if (!raw || typeof raw !== 'object') {
+            return { raw: null, aggregates: {} };
+        }
+        const summaryTotals =
+            raw.summary_totals ||
+            raw.summaryTotals ||
+            raw.totals ||
+            metricsToTotals(raw.metrics);
+        if (summaryTotals) {
+            const aggregates = {
+                ...raw,
+                summary_totals: summaryTotals,
+                summaryTotals,
+                totals: raw.totals || summaryTotals
+            };
+            Object.entries(summaryTotals).forEach(([key, value]) => {
+                if (aggregates[key] === undefined) {
+                    aggregates[key] = value;
+                }
+            });
+            return { raw, aggregates };
+        }
+        const aggregates = raw.aggregates || raw.stats || raw.summary || raw.overview || raw;
+        return { raw, aggregates };
+    }
+
     /**
      * Normalizes division data using the existing divisionNormalizer utility.
      */
@@ -210,9 +249,10 @@
 
                 try {
                     const result = await window.apiClient.getSeasonSummary(seasonId);
-                    const data = result?.data || result;
-                    
-                    season.summary.data = data;
+                    const rawData = result?.data || result;
+                    const normalized = normalizeSummaryPayload(rawData);
+
+                    season.summary.data = normalized.aggregates;
                     season.summary.fetchedAt = now();
                     season.summary.fromCache = result?.fromCache || false;
                     

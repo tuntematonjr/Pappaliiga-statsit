@@ -1,7 +1,7 @@
 """Stats and overview API endpoints."""
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -10,6 +10,17 @@ from api.models import CamelModel
 from api.services import stats_service
 
 router = APIRouter()
+
+
+class SummaryTotals(CamelModel):
+    divisions: int
+    teams: int
+    players: int
+    matches: int
+    maps: int
+    rounds: int
+    kills: int
+    deaths: int
 
 
 class StatsOverview(CamelModel):
@@ -22,6 +33,22 @@ class StatsOverview(CamelModel):
     total_rounds: int
     total_kills: int
     total_deaths: int
+    totals: SummaryTotals
+
+
+class SummaryMetric(CamelModel):
+    id: str
+    label: str
+    value: int
+
+
+class StatsSummaryResponse(CamelModel):
+    scope: Literal["all", "season"]
+    season: int | None = None
+    label: str | None = None
+    summary_totals: SummaryTotals
+    metrics: List[SummaryMetric]
+    progress: dict | None = None
 
 
 class TopPlayer(CamelModel):
@@ -38,6 +65,18 @@ class TopPlayer(CamelModel):
 async def get_stats_overview():
     stats = await stats_service.get_overview_stats()
     return StatsOverview(**stats)
+
+
+@router.get("/summary/all", response_model=StatsSummaryResponse)
+async def get_lifetime_summary():
+    payload = await stats_service.get_stats_summary("all")
+    return StatsSummaryResponse(**payload)
+
+
+@router.get("/summary/season/{season_id}", response_model=StatsSummaryResponse)
+async def get_season_summary(season_id: int):
+    payload = await stats_service.get_stats_summary("season", season=season_id)
+    return StatsSummaryResponse(**payload)
 
 
 @router.get("/home")

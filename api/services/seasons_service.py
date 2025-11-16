@@ -7,8 +7,19 @@ from typing import Any, Dict, List, Optional
 
 from async_db import query_async
 from division_overrides import combined_status_teams
+from api.services.season_aggregates import get_season_summary_totals
 
 logger = logging.getLogger("pappaliiga.api.seasons")
+
+
+def _percent(part: int, total: int) -> float:
+    """Return a safe percentage with 2 decimals."""
+    if not total:
+        return 0.0
+    try:
+        return round((float(part) / float(total)) * 100, 2)
+    except ZeroDivisionError:
+        return 0.0
 
 async def get_seasons_list() -> List[Dict[str, Any]]:
     """Return list of all seasons with metadata."""
@@ -58,41 +69,10 @@ async def get_seasons_list() -> List[Dict[str, Any]]:
 
 async def get_season_summary(season: int) -> Dict[str, Any]:
     """Return comprehensive aggregated statistics for a season."""
-    
-    # Get team counts and match data
-    team_rows = await query_async(
-        """
-        SELECT
-            COUNT(DISTINCT tst.team_id) AS total_teams,
-            COALESCE(SUM(tst.matches_played), 0) AS matches_played,
-            COALESCE(SUM(tst.matches_won), 0) AS matches_won,
-            COALESCE(SUM(tst.maps_played), 0) AS maps_played,
-            COALESCE(SUM(tst.rounds_won), 0) AS rounds_won,
-            COALESCE(SUM(tst.rounds_lost), 0) AS rounds_lost
-        FROM team_season_totals tst
-        WHERE tst.season = :season
-        """,
-        {"season": season},
-    )
-    team_data = team_rows[0] if team_rows else {}
-    
-    # Get player counts and stats
-    player_rows = await query_async(
-        """
-        SELECT
-            COUNT(DISTINCT pst.player_id) AS total_players,
-            COALESCE(SUM(pst.kills), 0) AS total_kills,
-            COALESCE(SUM(pst.deaths), 0) AS total_deaths,
-            COALESCE(AVG(NULLIF(pst.adr, 0)), 0) AS avg_adr,
-            COALESCE(SUM(pst.utility_damage), 0) AS utility_damage,
-            COALESCE(SUM(pst.cl_1v1_wins + pst.cl_1v2_wins), 0) AS clutch_wins,
-            COALESCE(SUM(CAST(pst.entry_wins AS SIGNED) * 2 - CAST(pst.entry_count AS SIGNED)), 0) AS entry_diff
-        FROM player_season_totals pst
-        WHERE pst.season = :season
-        """,
-        {"season": season},
-    )
-    player_data = player_rows[0] if player_rows else {}
+    totals_payload = await get_season_summary_totals(season)
+    summary_totals = totals_payload["summary_totals"]
+    team_totals = totals_payload["team_totals"]
+    player_totals = totals_payload["player_totals"]
     
     # Get division progress and match counts
     progress_rows = await query_async(
@@ -104,25 +84,28 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
                     SELECT COUNT(*) 
                     FROM matches m2 
                     WHERE m2.championship_id = c.championship_id 
-                    AND m2.finished_at IS NULL
+                      AND m2.finished_at IS NULL
                 ) = 0 
                 THEN c.championship_id 
             END) AS finished_divisions
         FROM championships c
         WHERE c.season = :season
+          AND c.is_playoffs = 0
         """,
         {"season": season},
     )
     progress_data = progress_rows[0] if progress_rows else {}
     
     # Get match counts broken down by regular season and playoffs
+    # NOTE: Earlier versions used SUM(...) here which double-counted and made totals equal played,
+    # effectively forcing the UI rings to 100%. Count DISTINCT match IDs to reflect real progress.
     match_progress_rows = await query_async(
         """
         SELECT
-            SUM(CASE WHEN c.is_playoffs = 0 THEN 1 ELSE 0 END) AS regular_total,
-            SUM(CASE WHEN c.is_playoffs = 0 AND m.finished_at IS NOT NULL THEN 1 ELSE 0 END) AS regular_played,
-            SUM(CASE WHEN c.is_playoffs = 1 THEN 1 ELSE 0 END) AS playoff_total,
-            SUM(CASE WHEN c.is_playoffs = 1 AND m.finished_at IS NOT NULL THEN 1 ELSE 0 END) AS playoff_played
+            COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 THEN m.match_id END) AS regular_total,
+            COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 AND m.finished_at IS NOT NULL THEN m.match_id END) AS regular_played,
+            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 THEN m.match_id END) AS playoff_total,
+            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 AND m.finished_at IS NOT NULL THEN m.match_id END) AS playoff_played
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         WHERE c.season = :season
@@ -131,16 +114,22 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
     )
     match_progress_data = match_progress_rows[0] if match_progress_rows else {}
     
-    teams = int(team_data.get("total_teams") or 0)
-    players = int(player_data.get("total_players") or 0)
-    matches = int(team_data.get("matches_played") or 0)
-    matches_won = int(team_data.get("matches_won") or 0)
-    rounds = int(team_data.get("rounds_won") or 0) + int(team_data.get("rounds_lost") or 0)
-    kills = int(player_data.get("total_kills") or 0)
-    deaths = int(player_data.get("total_deaths") or 0)
+    teams = summary_totals["teams"]
+    players = summary_totals["players"]
+    matches = summary_totals["matches"]
+    matches_won = team_totals["matches_won_total"]
+    rounds = summary_totals["rounds"]
+    kills = summary_totals["kills"]
+    deaths = summary_totals["deaths"]
+    # Division count uses only base championships (is_playoffs = 0) so playoff-only brackets never inflate the total.
+    division_count = summary_totals["divisions"]
+    # Maps played are aggregated per map row for the entire season (regular + playoffs) with a deduped team fallback.
+    maps_played = summary_totals["maps"]
     
     total_divisions = int(progress_data.get("total_divisions") or 0)
     finished_divisions = int(progress_data.get("finished_divisions") or 0)
+    if division_count and total_divisions == 0:
+        total_divisions = division_count
     
     # Extract match progress data
     regular_total = int(match_progress_data.get("regular_total") or 0)
@@ -151,25 +140,41 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
     # Calculate overall totals
     overall_total = regular_total + playoff_total
     overall_played = regular_played + playoff_played
+    regular_percent = _percent(regular_played, regular_total)
+    playoff_percent = _percent(playoff_played, playoff_total)
+    overall_percent = _percent(overall_played, overall_total)
+
+    logger.info(
+        "[seasons_service] season=%s match_progress rows=%s percents=%s",
+        season,
+        match_progress_rows,
+        {
+            "regular": regular_percent,
+            "playoffs": playoff_percent,
+            "overall": overall_percent,
+        },
+    )
     
     return {
         "season_id": season,
+        "divisions": division_count,
         "teams": teams,
         "players": players,
         "matches": matches,
+        "maps": maps_played,
         "rounds": rounds,
         "kills": kills,
         "deaths": deaths,
         "win_rate": float(matches_won) / matches if matches > 0 else 0.0,
         "kd_ratio": float(kills) / deaths if deaths > 0 else 0.0,
-        "adr_avg": float(player_data.get("avg_adr") or 0.0),
-        "clutch_wins": int(player_data.get("clutch_wins") or 0),
-        "entry_diff": int(player_data.get("entry_diff") or 0),
-        "utility_damage": int(player_data.get("utility_damage") or 0),
+        "adr_avg": float(player_totals.get("avg_adr") or 0.0),
+        "clutch_wins": int(player_totals.get("total_clutch_wins") or 0),
+        "entry_diff": int(player_totals.get("total_entry_diff") or 0),
+        "utility_damage": int(player_totals.get("total_utility_damage") or 0),
         "finished_percent": (float(finished_divisions) / total_divisions * 100) if total_divisions > 0 else 0.0,
         "progress": {
             "divisions_finished": finished_divisions,
-            "divisions_total": total_divisions,
+            "divisions_total": division_count or total_divisions,
             "regular_matches_played": regular_played,
             "regular_matches_total": regular_total,
             "playoff_matches_played": playoff_played,

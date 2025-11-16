@@ -37,6 +37,20 @@ async def get_season_summary_v3(season_id: int) -> Dict[str, Any]:
 
     progress = summary.get("progress") or {}
 
+    # Expose detailed progress for the new frontend rings (v3 summary previously dropped this block which caused 0% UI).
+    progress_payload = {
+        "divisions_finished": _as_int(
+            progress.get("divisions_finished") or summary.get("divisions_finished")
+        ),
+        "divisions_total": _as_int(progress.get("divisions_total") or summary.get("divisions_total")),
+        "regular_matches_played": _as_int(progress.get("regular_matches_played")),
+        "regular_matches_total": _as_int(progress.get("regular_matches_total")),
+        "playoff_matches_played": _as_int(progress.get("playoff_matches_played")),
+        "playoff_matches_total": _as_int(progress.get("playoff_matches_total")),
+        "overall_matches_played": _as_int(progress.get("overall_matches_played")),
+        "overall_matches_total": _as_int(progress.get("overall_matches_total")),
+    }
+
     return {
         "season_id": _as_int(summary.get("season_id", season_id), season_id),
         "divisions_total": _as_int(progress.get("divisions_total") or summary.get("divisions_total")),
@@ -50,6 +64,7 @@ async def get_season_summary_v3(season_id: int) -> Dict[str, Any]:
         "adr_avg": _as_float(summary.get("adr_avg")),
         "kd_avg": _as_float(summary.get("kd_ratio") or summary.get("kd_avg")),
         "win_rate": _as_float(summary.get("win_rate")),
+        "progress": progress_payload,
     }
 
 

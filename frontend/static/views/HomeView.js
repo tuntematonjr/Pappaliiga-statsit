@@ -1,123 +1,136 @@
-const GLOBAL_METRIC_SCHEMA = [
-    {
-        id: 'matches',
-        label: 'Otteluja',
-        key: [
-            'aggregates.matches_played_total',
-            'aggregates.total_matches',
-            'matches_played_total',
-            'matches_played',
-            'matches',
-            'total_matches',
-            'totalMatches',
-            'matchesPlayedTotal'
-        ],
-        digits: 0
-    },
+/**
+ * The backend contract for these metrics is shared by:
+ *   - StatsSummaryResponse (/api/stats/summary/season/:id) for the selected season row
+ *   - StatsSummaryResponse (/api/stats/summary/all) for the global row
+ * Cards resolve their values via the following field priorities:
+ *   1. Divisioonia → summary_totals.divisions → divisions → total_divisions
+ *   2. Joukkueita → summary_totals.teams → teams → total_teams
+ *   3. Pelaajia → summary_totals.players → players → total_players
+ *   4. Otteluja → summary_totals.matches → matches → total_matches
+ *   5. Karttoja → summary_totals.maps → maps → maps_played_total
+ *   6. Kierroksia → summary_totals.rounds → rounds → total_rounds
+ *   7. Tappoja → summary_totals.kills → kills → total_kills
+ *   8. Kuolemia → summary_totals.deaths → deaths → total_deaths
+ */
+const SUMMARY_METRIC_SCHEMA = [
     {
         id: 'divisions',
         label: 'Divisioonia',
-        key: ['aggregates.total_divisions', 'total_divisions', 'totalDivisions'],
-        digits: 0
+        digits: 0,
+        key: [
+            'summary_totals.divisions',
+            'summaryTotals.divisions',
+            'totals.divisions',
+            'divisions',
+            'total_divisions',
+            'totalDivisions'
+        ]
     },
     {
         id: 'teams',
         label: 'Joukkueita',
-        key: ['aggregates.total_teams', 'team_count', 'teams', 'total_teams', 'totalTeams'],
-        digits: 0
+        digits: 0,
+        key: [
+            'summary_totals.teams',
+            'summaryTotals.teams',
+            'totals.teams',
+            'teams',
+            'total_teams',
+            'team_count',
+            'totalTeams'
+        ]
     },
     {
         id: 'players',
         label: 'Pelaajia',
-        key: ['aggregates.total_players', 'player_count', 'players', 'total_players', 'totalPlayers'],
-        digits: 0
+        digits: 0,
+        key: [
+            'summary_totals.players',
+            'summaryTotals.players',
+            'totals.players',
+            'players',
+            'total_players',
+            'player_count',
+            'totalPlayers'
+        ]
+    },
+    {
+        id: 'matches',
+        label: 'Otteluja',
+        digits: 0,
+        key: [
+            'summary_totals.matches',
+            'summaryTotals.matches',
+            'totals.matches',
+            'matches',
+            'matches_total',
+            'matches_played_total',
+            'matches_played',
+            'total_matches',
+            'matchesTotal',
+            'matchesPlayedTotal'
+        ]
     },
     {
         id: 'maps',
         label: 'Karttoja',
+        digits: 0,
         key: [
-            'aggregates.total_maps_played',
-            'total_maps_played',
+            'summary_totals.maps',
+            'summaryTotals.maps',
+            'totals.maps',
+            'maps',
             'maps_played_total',
-            'totalMapsPlayed',
-            'mapsPlayedTotal'
-        ],
-        digits: 0
-    },
-    {
-        id: 'kills',
-        label: 'Tappoja',
-        key: ['aggregates.total_kills', 'kills_total', 'total_kills', 'totalKills'],
-        digits: 0
-    },
-    {
-        id: 'deaths',
-        label: 'Kuolemia',
-        key: ['aggregates.total_deaths', 'deaths_total', 'total_deaths', 'totalDeaths'],
-        digits: 0
+            'total_maps_played',
+            'mapsPlayedTotal',
+            'totalMapsPlayed'
+        ]
     },
     {
         id: 'rounds',
         label: 'Kierroksia',
+        digits: 0,
         key: [
-            'aggregates.rounds_played_total',
+            'summary_totals.rounds',
+            'summaryTotals.rounds',
+            'totals.rounds',
+            'rounds',
             'rounds_played_total',
             'rounds_played',
-            'rounds',
             'total_rounds',
+            'roundsPlayedTotal',
             'totalRounds'
-        ],
-        digits: 0
-    }
-];
-
-const SEASON_SUMMARY_SCHEMA = [
-    {
-        id: 'divisions',
-        label: 'Divisioonia',
-        digits: 0,
-        getter: (stats, context) => {
-            if (stats && Object.prototype.hasOwnProperty.call(stats, '__divisionCount')) {
-                return stats.__divisionCount;
-            }
-            return context?.divisionCount ?? 0;
-        }
-    },
-    {
-        id: 'teams',
-        label: 'Joukkueita',
-        digits: 0,
-        key: ['aggregates.total_teams', 'team_count', 'teams', 'teams_count', 'total_teams']
-    },
-    {
-        id: 'players',
-        label: 'Pelaajia',
-        digits: 0,
-        key: ['aggregates.total_players', 'player_count', 'players', 'total_players']
-    },
-    {
-        id: 'matches',
-        label: 'Otteluja',
-        digits: 0,
-        key: ['aggregates.matches_played_total', 'matches_played_total', 'matches_played', 'matches_total', 'matches']
-    },
-    {
-        id: 'rounds',
-        label: 'Kierroksia',
-        digits: 0,
-        key: ['aggregates.rounds_played_total', 'rounds_played_total', 'rounds_played', 'rounds']
+        ]
     },
     {
         id: 'kills',
         label: 'Tappoja',
         digits: 0,
-        key: ['aggregates.total_kills', 'kills_total', 'kills', 'total_kills']
+        key: [
+            'summary_totals.kills',
+            'summaryTotals.kills',
+            'totals.kills',
+            'kills',
+            'kills_total',
+            'total_kills',
+            'killsTotal',
+            'totalKills'
+        ]
     },
     {
         id: 'deaths',
         label: 'Kuolemia',
         digits: 0,
-        key: ['aggregates.total_deaths', 'deaths_total', 'deaths', 'total_deaths']
+        key: [
+            'summary_totals.deaths',
+            'summaryTotals.deaths',
+            'totals.deaths',
+            'deaths',
+            'deaths_total',
+            'total_deaths',
+            'deathsTotal',
+            'totalDeaths'
+        ]
     }
 ];
 
@@ -317,7 +330,7 @@ window.HomeView = {
         },
         globalSummaryMetrics() {
             const aggregates = this.homeStore?.lifetimeSummary?.aggregates || {};
-            return buildMetricCards(aggregates, GLOBAL_METRIC_SCHEMA);
+            return buildMetricCards(aggregates, SUMMARY_METRIC_SCHEMA);
         },
 
        seasonsLoading() {
@@ -372,14 +385,7 @@ window.HomeView = {
         },
         seasonSummaryMetrics() {
             const stats = this.seasonState.stats || {};
-            const metrics = buildMetricCards(stats, SEASON_SUMMARY_SCHEMA, this);
-            const divisionValue = formatMetric(this.divisionCount, { digits: 0 });
-            return metrics.map(metric => {
-                if (metric.key === 'divisions') {
-                    return { ...metric, value: divisionValue };
-                }
-                return metric;
-            });
+            return buildMetricCards(stats, SUMMARY_METRIC_SCHEMA);
         },
         seasonDivisions() {
             const list = Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
@@ -450,49 +456,87 @@ window.HomeView = {
         },
         circularProgressData() {
             const stats = this.seasonState?.stats || {};
-            const progress = stats.progress || {};
-            
-            // Debug logging
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[HomeView] circularProgressData - stats:', stats);
-                console.log('[HomeView] circularProgressData - progress:', progress);
-            }
-            
-            // Extract data from API
-            const regularPlayed = toNumber(progress.regular_matches_played, 0);
-            const regularTotal = toNumber(progress.regular_matches_total, 0);
-            const playoffPlayed = toNumber(progress.playoff_matches_played, 0);
-            const playoffTotal = toNumber(progress.playoff_matches_total, 0);
-            const overallPlayed = toNumber(progress.overall_matches_played, 0);
-            const overallTotal = toNumber(progress.overall_matches_total, 0);
-            
-            return {
+            const statsProgress = stats.progress || {};
+            const computedProgress = this.seasonState?.progress || {};
+
+            // Root cause: v3 summary dropped progress.* stats so the UI saw zeros; fall back to store-computed progress.
+            const regularPlayed = toNumber(
+                statsProgress.regular_matches_played ?? computedProgress?.regular?.played,
+                0
+            );
+            const regularTotal = toNumber(
+                statsProgress.regular_matches_total ?? computedProgress?.regular?.total,
+                0
+            );
+            const playoffPlayed = toNumber(
+                statsProgress.playoff_matches_played ?? computedProgress?.playoffs?.played,
+                0
+            );
+            const playoffTotal = toNumber(
+                statsProgress.playoff_matches_total ?? computedProgress?.playoffs?.total,
+                0
+            );
+            const overallPlayed = toNumber(
+                statsProgress.overall_matches_played ??
+                    computedProgress?.overall?.played ??
+                    regularPlayed +
+                        playoffPlayed,
+                0
+            );
+            const overallTotal = toNumber(
+                statsProgress.overall_matches_total ??
+                    computedProgress?.overall?.total ??
+                    regularTotal + playoffTotal,
+                0
+            );
+
+            const payload = {
                 regular: {
                     played: regularPlayed,
-                    total: regularTotal || 1, // Avoid divide by zero
+                    total: regularTotal > 0 ? regularTotal : 1,
                     label: 'Runkosarja',
                     sublabel: `${regularPlayed} / ${regularTotal} pelattu`,
                     color: 'regular'
                 },
                 playoff: {
                     played: playoffPlayed,
-                    total: playoffTotal || 1, // Avoid divide by zero
+                    total: playoffTotal > 0 ? playoffTotal : 1,
                     label: 'Playoffit',
                     sublabel: `${playoffPlayed} / ${playoffTotal} pelattu`,
                     color: 'playoff'
                 },
                 overall: {
                     played: overallPlayed,
-                    total: overallTotal || 1, // Avoid divide by zero
+                    total: overallTotal > 0 ? overallTotal : 1,
                     label: 'Kausi yhteensä',
                     sublabel: `${overallPlayed} / ${overallTotal} pelattu`,
                     color: 'overall'
                 }
             };
+
+            // Debug logging required for validation in this task.
+            if (typeof console !== 'undefined' && console.log) {
+                console.log('[HomeView] circularProgressData resolved', {
+                    statsProgress,
+                    computedProgress,
+                    payload
+                });
+            }
+
+            return payload;
         },
         hasCircularProgressData() {
-            const data = this.circularProgressData;
-            return data.overall.total > 0;
+            const statsProgress = this.seasonState?.stats?.progress || {};
+            const computedProgress = this.seasonState?.progress || {};
+            const totals = [
+                statsProgress.regular_matches_total,
+                statsProgress.playoff_matches_total,
+                statsProgress.overall_matches_total,
+                computedProgress?.regular?.total,
+                computedProgress?.playoffs?.total,
+                computedProgress?.overall?.total
+            ];
+            return totals.some(value => Number.isFinite(toNumber(value, 0)) && toNumber(value, 0) > 0);
         },
         divisionCount() {
             const stats = this.seasonState?.stats || {};
@@ -824,6 +868,7 @@ window.HomeView = {
                 teams: '👥',
                 players: '👤',
                 matches: '⚔️',
+                maps: '🗺️',
                 rounds: '🔄',
                 kills: '💀',
                 deaths: '☠️'

@@ -80,6 +80,7 @@
             `/api/v1/divisions?season=${seasonId}`
         ],
         summary: seasonId => [
+            `/api/stats/summary/season/${seasonId}`,
             `/api/v3/summary/${seasonId}`,
             `/api/seasons/${seasonId}/summary`,
             `/api/v1/seasons/${seasonId}/summary`,
@@ -742,7 +743,14 @@
         }
 
         async fetchLifetimeSummary() {
-            return fetchJson('/home');
+            try {
+                return await fetchJson('/stats/summary/all');
+            } catch (error) {
+                if (error?.status === 404) {
+                    return fetchJson('/home');
+                }
+                throw error;
+            }
         }
 
         async getStatsOverview() {

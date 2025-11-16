@@ -229,9 +229,40 @@
         return { divisions: mapped, warnings };
     }
 
+    function metricsToTotals(metrics) {
+        if (!Array.isArray(metrics) || !metrics.length) {
+            return null;
+        }
+        return metrics.reduce((acc, metric) => {
+            if (metric && metric.id) {
+                acc[metric.id] = Number(metric.value) || 0;
+            }
+            return acc;
+        }, {});
+    }
+
     function normalizeSummary(raw) {
         if (!raw || typeof raw !== 'object') {
             return { raw: null, aggregates: {} };
+        }
+        const summaryTotals =
+            raw.summary_totals ||
+            raw.summaryTotals ||
+            raw.totals ||
+            metricsToTotals(raw.metrics);
+        if (summaryTotals) {
+            const aggregates = {
+                ...raw,
+                summary_totals: summaryTotals,
+                summaryTotals,
+                totals: raw.totals || summaryTotals
+            };
+            Object.entries(summaryTotals).forEach(([key, value]) => {
+                if (aggregates[key] === undefined) {
+                    aggregates[key] = value;
+                }
+            });
+            return { raw, aggregates };
         }
         const aggregates =
             raw.aggregates ||
@@ -388,6 +419,12 @@
                             .then(res => res.data || res)
                             .catch(() => ({}));
                     }
+                    const normalizedSummary = normalizeSummary(summaryData);
+                    const normalizedStats = normalizedSummary.aggregates || {};
+                    const normalizedRaw = normalizedSummary.raw;
+                    if (typeof console !== 'undefined' && console.log) {
+                        console.log('seasonSummary', identifier, normalizedRaw);
+                    }
 
                     let divisionsData = [];
                     let divisionsMeta = null;
@@ -463,7 +500,7 @@
                     }
 
                     const finalCount = finalDivisions.length;
-                    const stats = summaryData?.aggregates || summaryData?.stats || summaryData || {};
+                    const stats = normalizedStats;
                     const progress = computeProgress(stats, finalDivisions);
                     const offline = !healthOk || usingCache || Boolean(bannerMessage);
                     divisionsMeta = { ...(divisionsMeta || {}), resolvedPath: resolvedPathLabel };
@@ -478,7 +515,7 @@
                         apiParam: identifier,
                         fetchedAt: Date.now(),
                         stats,
-                        rawStats: summaryData,
+                        rawStats: normalizedRaw,
                         rawDivisions: finalRawDivisions,
                         divisionsMeta,
                         divisions: finalDivisions,
