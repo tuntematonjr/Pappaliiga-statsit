@@ -319,9 +319,6 @@ window.HomeView = {
             const aggregates = this.homeStore?.lifetimeSummary?.aggregates || {};
             return buildMetricCards(aggregates, GLOBAL_METRIC_SCHEMA);
         },
-        globalSummaryEyebrow() {
-            return 'Kaikki kaudet yhteensä';
-        },
 
        seasonsLoading() {
             return this.seasonsStore?.loading ?? false;
@@ -402,23 +399,6 @@ window.HomeView = {
                 return 'Valitse kausi';
             }
             return season.label || `Kausi ${season.seasonNumber ?? ''}`.trim();
-        },
-        seasonSubtitle() {
-            const season = this.selectedSeason;
-            if (!season) {
-                return '';
-            }
-            const segments = [];
-            if (season.seasonNumber) {
-                segments.push(`Kausi ${season.seasonNumber}`);
-            }
-            if (season.phase) {
-                segments.push(season.phase);
-            }
-            if (season.isCurrent) {
-                segments.push('Käynnissä');
-            }
-            return segments.join(' · ');
         },
         seasonSummaryHeading() {
             const season = this.selectedSeason;
@@ -838,6 +818,18 @@ window.HomeView = {
                 force: true
             });
         },
+        getMetricIcon(key) {
+            const icons = {
+                divisions: '🏆',
+                teams: '👥',
+                players: '👤',
+                matches: '⚔️',
+                rounds: '🔄',
+                kills: '💀',
+                deaths: '☠️'
+            };
+            return icons[key] || '📊';
+        },
         scrollToSeasonSummary() {
             this.$nextTick(() => {
                 const target = this.$refs.seasonControls;
@@ -929,9 +921,7 @@ window.HomeView = {
 
             <section class="stats-section stats-section--global" aria-labelledby="global-summary-heading">
                 <header class="section-heading">
-                    <span class="section-eyebrow">{{ globalSummaryEyebrow }}</span>
-                    <h2 id="global-summary-heading">Global Totals</h2>
-                    <p class="section-subtext">Combined performance across every recorded season.</p>
+                    <h2 id="global-summary-heading">Kaikki kaudet yhteensä</h2>
                 </header>
                 <loading-spinner
                     v-if="summaryLoading"
@@ -956,9 +946,7 @@ window.HomeView = {
             >
                 <header class="season-explorer__intro section-heading">
                     <div>
-                        <span class="section-eyebrow">Season Explorer</span>
-                        <h2 id="season-explorer-heading">Season Explorer</h2>
-                        <p class="section-subtext">Select a season to refresh the summary and division list in one place.</p>
+                        <h2 id="season-explorer-heading">Kausiselain</h2>
                     </div>
                 </header>
 
@@ -1001,7 +989,6 @@ window.HomeView = {
                         <template v-else-if="selectedSeasonKey">
                             <div class="season-explorer__summary-header">
                                 <div>
-                                    <span class="section-eyebrow">{{ seasonSubtitle || 'Active Season' }}</span>
                                     <h3
                                         id="season-summary-heading"
                                         aria-live="polite"
@@ -1011,17 +998,11 @@ window.HomeView = {
                                     </h3>
                                 </div>
                             </div>
-                            <div class="season-explorer__summary-grid">
-                                <div class="season-explorer__metrics" role="list">
-                                    <div
-                                        v-for="metric in seasonSummaryMetrics"
-                                        :key="metric.key"
-                                        class="season-explorer__metric"
-                                        role="listitem"
-                                    >
-                                        <span class="season-explorer__metric-label">{{ metric.label }}</span>
-                                        <span class="season-explorer__metric-value">{{ metric.value }}</span>
-                                    </div>
+                            <div class="season-kausikooste">
+                                <div class="kausikooste-card" v-for="metric in seasonSummaryMetrics" :key="metric.key">
+                                    <div class="kausikooste-card__icon">{{ getMetricIcon(metric.key) }}</div>
+                                    <div class="kausikooste-card__value">{{ metric.value }}</div>
+                                    <div class="kausikooste-card__label">{{ metric.label }}</div>
                                 </div>
                             </div>
                         </template>
@@ -1078,36 +1059,42 @@ window.HomeView = {
                         v-if="hasCircularProgressData"
                         class="control-bar__right"
                     >
-                        <circular-progress
-                            :value="circularProgressData.regular.played"
-                            :max="circularProgressData.regular.total"
-                            :label="circularProgressData.regular.label"
-                            :sublabel="circularProgressData.regular.sublabel"
-                            :color="circularProgressData.regular.color"
-                            :size="120"
-                            :stroke-width="10"
-                            :animation-delay="0"
-                        ></circular-progress>
-                        <circular-progress
-                            :value="circularProgressData.playoff.played"
-                            :max="circularProgressData.playoff.total"
-                            :label="circularProgressData.playoff.label"
-                            :sublabel="circularProgressData.playoff.sublabel"
-                            :color="circularProgressData.playoff.color"
-                            :size="120"
-                            :stroke-width="10"
-                            :animation-delay="0.15"
-                        ></circular-progress>
-                        <circular-progress
-                            :value="circularProgressData.overall.played"
-                            :max="circularProgressData.overall.total"
-                            :label="circularProgressData.overall.label"
-                            :sublabel="circularProgressData.overall.sublabel"
-                            :color="circularProgressData.overall.color"
-                            :size="120"
-                            :stroke-width="10"
-                            :animation-delay="0.3"
-                        ></circular-progress>
+                        <div class="progress-circle-card">
+                            <circular-progress
+                                :value="circularProgressData.regular.played"
+                                :max="circularProgressData.regular.total"
+                                :label="circularProgressData.regular.label"
+                                :sublabel="circularProgressData.regular.sublabel"
+                                :color="circularProgressData.regular.color"
+                                :size="140"
+                                :stroke-width="12"
+                                :animation-delay="0"
+                            ></circular-progress>
+                        </div>
+                        <div class="progress-circle-card">
+                            <circular-progress
+                                :value="circularProgressData.playoff.played"
+                                :max="circularProgressData.playoff.total"
+                                :label="circularProgressData.playoff.label"
+                                :sublabel="circularProgressData.playoff.sublabel"
+                                :color="circularProgressData.playoff.color"
+                                :size="140"
+                                :stroke-width="12"
+                                :animation-delay="0.15"
+                            ></circular-progress>
+                        </div>
+                        <div class="progress-circle-card">
+                            <circular-progress
+                                :value="circularProgressData.overall.played"
+                                :max="circularProgressData.overall.total"
+                                :label="circularProgressData.overall.label"
+                                :sublabel="circularProgressData.overall.sublabel"
+                                :color="circularProgressData.overall.color"
+                                :size="140"
+                                :stroke-width="12"
+                                :animation-delay="0.3"
+                            ></circular-progress>
+                        </div>
                     </div>
                 </div>
 
@@ -1116,7 +1103,6 @@ window.HomeView = {
                         class="season-explorer__divisions-list"
                         :divisions="seasonDivisions"
                         :season-label="seasonTitle"
-                        :season-subtitle="seasonSubtitle"
                         :season-options="seasonSelectGroups"
                         :season-loading="seasonsLoading"
                         :selected-season="selectedSeasonKey"

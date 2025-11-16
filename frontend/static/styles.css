@@ -5482,7 +5482,7 @@ body.is-division .card.maps-section {
 .season-explorer.glass-card {
     display: flex;
     flex-direction: column;
-    gap: clamp(1rem, 2.5vw, 1.5rem);
+    gap: clamp(1.5rem, 3vw, 2rem);
     padding: clamp(1.25rem, 3vw, 2.5rem);
 }
 
@@ -5498,7 +5498,7 @@ body.is-division .card.maps-section {
     display: flex;
     flex-direction: column;
     gap: clamp(0.75rem, 1.5vw, 1.25rem);
-    padding-top: clamp(1rem, 2vw, 1.35rem);
+    padding-top: clamp(1.25rem, 2.5vw, 1.75rem);
     border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -5573,6 +5573,63 @@ body.is-division .card.maps-section {
     grid-template-columns: minmax(0, 1fr);
 }
 
+/* New Kausikooste Card Layout */
+.season-kausikooste {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+
+.kausikooste-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    border-radius: var(--radius);
+    border: 1px solid rgba(116, 152, 255, 0.2);
+    background: rgba(8, 14, 32, 0.95);
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 4px 20px rgba(5, 9, 25, 0.4);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    gap: 0.5rem;
+}
+
+.kausikooste-card:hover {
+    border-color: rgba(116, 152, 255, 0.35);
+    transform: translateY(-2px);
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 8px 28px rgba(5, 9, 25, 0.5),
+        0 0 20px rgba(90, 150, 255, 0.15);
+}
+
+.kausikooste-card__icon {
+    font-size: 2rem;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+    filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.4));
+}
+
+.kausikooste-card__value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.95);
+    line-height: 1;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+
+.kausikooste-card__label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: rgba(200, 214, 242, 0.75);
+    text-align: center;
+}
+
+/* Old metrics styles (kept for backwards compatibility) */
 .season-explorer__metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -5672,26 +5729,52 @@ body.is-division .card.maps-section {
 /* RIGHT SECTION: Three Circular Progress Indicators */
 .control-bar__right {
     display: flex;
-    gap: 1.25rem;
+    gap: 1rem;
     align-items: center;
     justify-content: flex-end;
 }
 
+/* Progress Circle Cards */
+.progress-circle-card {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    border-radius: var(--radius);
+    background: rgba(8, 14, 32, 0.95);
+    border: 1px solid rgba(116, 152, 255, 0.22);
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 6px 24px rgba(5, 9, 25, 0.45);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-circle-card:hover {
+    border-color: rgba(116, 152, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 10px 32px rgba(5, 9, 25, 0.55),
+        0 0 24px rgba(90, 150, 255, 0.18);
+}
+
 /* Compact circular progress for control bar */
 .control-bar__right .circular-progress {
-    --circle-size: 85px;
+    --circle-size: 140px;
 }
 
 .control-bar__right .circular-progress__title {
-    font-size: 0.78rem;
+    font-size: 0.85rem;
+    font-weight: 600;
 }
 
 .control-bar__right .circular-progress__subtitle {
-    font-size: 0.68rem;
+    font-size: 0.72rem;
 }
 
 .control-bar__right .circular-progress__percent {
-    font-size: 1.35rem;
+    font-size: 1.6rem;
+    font-weight: 700;
 }
 
 /* Legacy filters styles (kept for compatibility) */
@@ -5817,6 +5900,23 @@ body.is-division .card.maps-section {
     .season-explorer__summary-grid {
         grid-template-columns: minmax(0, 1fr);
     }
+    
+    .season-kausikooste {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.75rem;
+    }
+    
+    .kausikooste-card {
+        padding: 1.25rem 0.75rem;
+    }
+    
+    .kausikooste-card__icon {
+        font-size: 1.75rem;
+    }
+    
+    .kausikooste-card__value {
+        font-size: 1.85rem;
+    }
 
     .season-explorer__metrics {
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -5853,12 +5953,20 @@ body.is-division .card.maps-section {
     .control-bar__right {
         flex-wrap: wrap;
         justify-content: center;
-        gap: 1rem;
+        gap: 0.75rem;
         padding-top: 0.5rem;
     }
     
+    .progress-circle-card {
+        padding: 1rem;
+    }
+    
     .control-bar__right .circular-progress {
-        --circle-size: 100px;
+        --circle-size: 110px;
+    }
+    
+    .control-bar__right .circular-progress__percent {
+        font-size: 1.4rem;
     }
 }
 
@@ -5869,11 +5977,15 @@ body.is-division .card.maps-section {
     }
     
     .control-bar__right {
-        gap: 1rem;
+        gap: 0.75rem;
+    }
+    
+    .progress-circle-card {
+        padding: 1rem;
     }
     
     .control-bar__right .circular-progress {
-        --circle-size: 90px;
+        --circle-size: 110px;
     }
     
     .control-bar__right .circular-progress__percent {

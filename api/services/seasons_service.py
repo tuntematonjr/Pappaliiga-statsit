@@ -148,7 +148,7 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
     playoff_total = int(match_progress_data.get("playoff_total") or 0)
     playoff_played = int(match_progress_data.get("playoff_played") or 0)
     
-    # Calculate overall
+    # Calculate overall totals
     overall_total = regular_total + playoff_total
     overall_played = regular_played + playoff_played
     
@@ -694,4 +694,5 @@ async def _get_playoff_bracket(championship_id: str) -> Dict[str, Any]:
         "matches_total": total,
         "bracket": bracket,
     }
+
 
