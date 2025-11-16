@@ -150,7 +150,7 @@ window.TeamView = {
                             <img :src="crestUrl" :alt="teamName" loading="lazy" />
                         </div>
                         <div class="team-header__meta">
-                            <h1>{{ teamName }}</h1>
+                            <h1 class="title-accent titleUnderlineMain title-delay-0">{{ teamName }}</h1>
                             <div class="team-header__actions">
                                 <a v-if="faceitLink" :href="faceitLink" target="_blank" rel="noopener" class="btn-primary">Faceit</a>
                                 <copy-link label="Jaa joukkue"></copy-link>
@@ -194,7 +194,7 @@ window.TeamView = {
                 <div class="team-overview">
                     <stat-panel :items="metrics" :columns="3"></stat-panel>
                     <div class="team-overview__sparkline glass-card">
-                        <h3>Viime ottelut</h3>
+                        <h3 class="title-accent titleUnderlineCard title-delay-1">Viime ottelut</h3>
                         <sparkline-chart
                             v-if="Array.isArray(sparkline) && sparkline.length"
                             :points="sparkline"
@@ -213,8 +213,8 @@ window.TeamView = {
                             :message="mapStatsError"
                             @retry="emitRefresh"
                         ></error-message>
-                        <article v-else v-for="map in mapHighlights" :key="map.id" class="team-map-card glass-card">
-                            <h4>{{ map.name }}</h4>
+                        <article v-else v-for="(map, idx) in mapHighlights" :key="map.id" class="team-map-card glass-card">
+                            <h4 class="title-accent titleUnderlineCard" :class="'title-delay-' + (idx % 4)">{{ map.name }}</h4>
                             <p class="team-map-card__stat">{{ map.played }} karttaa</p>
                             <p class="team-map-card__metric">{{ map.winRate.toFixed(1) }} %</p>
                             <p class="team-map-card__meta">ADR {{ map.adr.toFixed(1) }} · Rating {{ map.rating.toFixed(2) }}</p>

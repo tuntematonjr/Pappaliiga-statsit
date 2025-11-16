@@ -27,6 +27,11 @@ const router = createRouter({
             component: window.DivisionView
         },
         {
+            path: '/division/:championshipId/playoffs',
+            name: 'division-playoffs',
+            component: window.DivisionView
+        },
+        {
             path: '/team/:teamId',
             name: 'team',
             component: window.TeamDetailView

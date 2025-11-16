@@ -10,7 +10,7 @@ const DIVISION_METRIC_SCHEMA = [
 
 const DIVISION_MAP_COLUMNS = [
     { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name' },
-    { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true },
+    { key: 'maps_played', label: 'Ottelut', sortable: true, numeric: true },
     { key: 'banned', label: 'Bannattu', sortable: true, numeric: true },
     { key: 'rounds_played', label: 'Erät', sortable: true, numeric: true },
     { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2 },
@@ -325,7 +325,7 @@ window.DivisionView = {
                 <div class="division-header__meta">
                     <div>
                         <p class="section-eyebrow">Divisioona</p>
-                        <h1 class="division-header__title">{{ divisionTitle }}</h1>
+                        <h1 class="division-header__title title-accent titleUnderlineMain title-delay-0">{{ divisionTitle }}</h1>
                         <p v-if="divisionSubtitle" class="division-header__subtitle">{{ divisionSubtitle }}</p>
                     </div>
                     <copy-link v-if="championshipId" :url="shareUrl" label="Jaa divisioona"></copy-link>
@@ -364,7 +364,7 @@ window.DivisionView = {
             <template v-else>
                 <section id="overview" class="division-section">
                     <div class="division-section__header">
-                        <h2>Katsaus</h2>
+                        <h2 class="title-accent titleUnderlineMain title-delay-1">Katsaus</h2>
                     </div>
                     <stat-panel
                         :items="statMetrics"
@@ -374,7 +374,7 @@ window.DivisionView = {
 
                 <section id="standings" class="division-section">
                     <div class="division-section__header">
-                        <h2>Sarjataulukko</h2>
+                        <h2 class="title-accent titleUnderlineMain title-delay-2">Sarjataulukko</h2>
                     </div>
                     <team-comparison-chart
                         :teams="standings"
@@ -393,7 +393,7 @@ window.DivisionView = {
 
                 <section id="maps" class="division-section">
                     <div class="division-section__header">
-                        <h2>Karttanäkymä</h2>
+                        <h2 class="title-accent titleUnderlineMain title-delay-3">Karttanäkymä</h2>
                     </div>
                     <maps-stats
                         title="Karttatilastot"
@@ -407,7 +407,7 @@ window.DivisionView = {
 
                 <section id="highlights" class="division-section">
                     <div class="division-section__header">
-                        <h2>Nostot</h2>
+                        <h2 class="title-accent titleUnderlineMain title-delay-0 title-duration-fast">Nostot</h2>
                     </div>
 
                     <loading-spinner
@@ -422,12 +422,17 @@ window.DivisionView = {
 
                     <div v-else class="division-highlights">
                         <article
-                            v-for="highlight in highlights"
+                            v-for="(highlight, idx) in highlights"
                             :key="highlight.id"
                             class="division-highlight glass-card"
                         >
                             <p class="division-highlight__eyebrow">{{ highlight.title }}</p>
-                            <h3 class="division-highlight__title">{{ highlight.description }}</h3>
+                            <h3
+                                class="division-highlight__title title-accent titleUnderlineCard"
+                                :class="'title-delay-' + (idx % 4)"
+                            >
+                                {{ highlight.description }}
+                            </h3>
                             <p class="division-highlight__metric">{{ highlight.metric }}</p>
                             <p v-if="highlight.tooltip" class="division-highlight__meta">{{ highlight.tooltip }}</p>
                             <router-link
@@ -451,7 +456,7 @@ window.DivisionView = {
 
                 <section id="teams" class="division-section">
                     <div class="division-section__header">
-                        <h2>Joukkueet</h2>
+                        <h2 class="title-accent titleUnderlineMain title-delay-1">Joukkueet</h2>
                     </div>
                     <team-nav
                         v-if="hasTeams"

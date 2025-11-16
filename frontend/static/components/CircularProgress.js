@@ -29,9 +29,9 @@
         },
         computed: {
             percent() {
-                const safeMax = this.max || 1;
-                const safeValue = this.value || 0;
-                if (safeMax === 0) return 0;
+                const safeMax = Number.isFinite(this.max) ? this.max : 0;
+                const safeValue = Number.isFinite(this.value) ? this.value : 0;
+                if (safeMax <= 0) return 0;
                 return Math.min(100, Math.max(0, Math.round((safeValue / safeMax) * 100)));
             },
             percentText() {
@@ -68,6 +68,37 @@
                     strokeDashoffset: this.strokeDashoffset,
                     strokeWidth: this.strokeWidth
                 };
+            },
+            playedText() {
+                const safeMax = Number.isFinite(this.max) ? Math.round(this.max) : 0;
+                const safeValue = Number.isFinite(this.value) ? Math.round(this.value) : 0;
+                if (safeMax <= 0) {
+                    return `${safeValue} Ottelut`;
+                }
+                const clamped = Math.min(safeValue, safeMax);
+                return `${clamped} / ${safeMax} Ottelut`;
+            },
+            remainingValue() {
+                const total = Number.isFinite(this.max) ? this.max : 0;
+                const played = Number.isFinite(this.value) ? this.value : 0;
+                const remaining = total - played;
+                if (!Number.isFinite(remaining)) {
+                    return 0;
+                }
+                return remaining > 0 ? Math.round(remaining) : 0;
+            },
+            remainingText() {
+                return `${this.remainingValue} jäljellä`;
+            },
+            titleClassList() {
+                const base = ['circular-progress__title', 'title-accent', 'titleUnderlineCard'];
+                const delayMap = {
+                    regular: 'title-delay-0',
+                    playoff: 'title-delay-1',
+                    overall: 'title-delay-2'
+                };
+                base.push(delayMap[this.color] || 'title-delay-3');
+                return base;
             }
         },
         template: `
@@ -117,11 +148,12 @@
                     </svg>
                     <div class="circular-progress__label">
                         <span class="circular-progress__percent">{{ percentText }}</span>
+                        <span class="circular-progress__played">{{ playedText }}</span>
+                        <span class="circular-progress__remaining">{{ remainingText }}</span>
                     </div>
                 </div>
                 <div class="circular-progress__text">
-                    <div class="circular-progress__title">{{ label }}</div>
-                    <div v-if="sublabel" class="circular-progress__subtitle">{{ sublabel }}</div>
+                    <div :class="titleClassList">{{ label }}</div>
                 </div>
             </div>
         `

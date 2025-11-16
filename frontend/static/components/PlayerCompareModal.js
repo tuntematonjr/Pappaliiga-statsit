@@ -50,7 +50,7 @@ window.PlayerCompareModal = {
                 <div class="compare-modal__backdrop" @click="handleClose"></div>
                 <div class="compare-modal__content glass-card">
                     <header class="compare-modal__header">
-                        <h3>Vertaa pelaajaa</h3>
+                        <h3 class="title-accent titleUnderlineMain title-delay-1">Vertaa pelaajaa</h3>
                         <button type="button" class="compare-modal__close" @click="handleClose">×</button>
                     </header>
 

@@ -348,9 +348,9 @@
 
     function normalizePlayoffs(playoffs, index) {
         const fallback = {
-            teams: 8,
+            teams: 0,
             matches_played: 0,
-            matches_total: 7,
+            matches_total: 0,
             status: 'waiting',
             winner: null
         };
@@ -361,10 +361,16 @@
         if (!['waiting', 'active', 'finished'].includes(status)) {
             throw new ApiValidationError('playoffs.status invalid', `divisions[${index}].playoffs.status`, playoffs.status);
         }
-        const matchesTotal = Number(playoffs.matches_total ?? 7) || 7;
-        const matchesPlayed = clampNumber(playoffs.matches_played, 0, matchesTotal);
+        const rawTotal = Number(playoffs.matches_total);
+        const matchesTotal = Number.isFinite(rawTotal) && rawTotal >= 0 ? rawTotal : 0;
+        const rawPlayed = Number(playoffs.matches_played);
+        const matchesPlayed =
+            Number.isFinite(rawPlayed) && rawPlayed >= 0
+                ? (matchesTotal > 0 ? Math.min(rawPlayed, matchesTotal) : rawPlayed)
+                : 0;
+        const teamCount = Number(playoffs.teams);
         return {
-            teams: Number(playoffs.teams) || 8,
+            teams: Number.isFinite(teamCount) && teamCount >= 0 ? teamCount : 0,
             matches_played: matchesPlayed,
             matches_total: matchesTotal,
             status,

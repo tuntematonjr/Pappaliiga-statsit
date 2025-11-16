@@ -234,7 +234,7 @@ window.SeasonToggle = {
             >
                 <div>
                     <span class="section-eyebrow">Season Selector</span>
-                    <h3>Select Season</h3>
+                    <h3 class="title-accent titleUnderlineCard title-delay-2">Select Season</h3>
                 </div>
                 <button
                     v-if="showAllLink && !loading && seasons.length > 1"

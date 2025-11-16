@@ -53,7 +53,7 @@ window.HeroBanner = {
             <div class="hero-banner__overlay"></div>
             <div class="hero-banner__content">
                 <p v-if="eyebrow" class="hero-banner__eyebrow">{{ eyebrow }}</p>
-                <h1 class="hero-banner__title" id="hero-title">{{ title }}</h1>
+                <h1 class="hero-banner__title title-accent titleUnderlineMain title-delay-0" id="hero-title">{{ title }}</h1>
                 <p v-if="subtitle" class="hero-banner__subtitle">{{ subtitle }}</p>
 
                 <div v-if="$slots.actions" class="hero-banner__actions">

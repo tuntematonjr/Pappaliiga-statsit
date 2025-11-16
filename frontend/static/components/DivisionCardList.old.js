@@ -848,7 +848,7 @@
                     return `${played} / ${total} ottelua`;
                 }
                 if (played > 0) {
-                    return `${played} ottelua pelattu`;
+                    return `${played} ottelua Ottelut`;
                 }
                 return 'Seuranta käynnissä';
             },
@@ -857,9 +857,9 @@
                 const played = this.card.matchesPlayed ?? 0;
                 const total = this.card.matchesTotal ?? 0;
                 if (total > 0) {
-                    return `${played} / ${total} ottelua pelattu`;
+                    return `${played} / ${total} ottelua Ottelut`;
                 }
-                return `${played} ottelua pelattu`;
+                return `${played} ottelua Ottelut`;
             },
             progressPercentText() {
                 const percent = Math.max(0, Math.min(100, Math.round(this.card.progressPercent || 0)));

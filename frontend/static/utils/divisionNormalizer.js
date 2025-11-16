@@ -10,9 +10,9 @@
     ];
 
     const DEFAULT_PLAYOFFS = Object.freeze({
-        teams: 8,
+        teams: 0,
         matchesPlayed: 0,
-        matchesTotal: 7,
+        matchesTotal: 0,
         status: 'waiting',
         winner: null
     });
@@ -46,7 +46,9 @@
     function clampMatches(block) {
         // Handle both camelCase and snake_case input, output camelCase
         const matchesTotal = Math.max(0, toNumber(block.matchesTotal ?? block.matches_total, 0));
-        const matchesPlayed = clamp(block.matchesPlayed ?? block.matches_played, 0, matchesTotal || 0);
+        const rawPlayed = toNumber(block.matchesPlayed ?? block.matches_played, 0);
+        const playedCap = matchesTotal > 0 ? matchesTotal : Math.max(rawPlayed, 0);
+        const matchesPlayed = clamp(rawPlayed, 0, playedCap);
         return {
             ...block,
             matchesPlayed: matchesPlayed,
@@ -86,8 +88,8 @@
 
         const normalizedPlayoffs = clampMatches({
             teams: toNumber(playoffsRaw.teams, DEFAULT_PLAYOFFS.teams) || DEFAULT_PLAYOFFS.teams,
-            matchesPlayed: toNumber(playoffsRaw.matches_played ?? playoffsRaw.matchesPlayed, DEFAULT_PLAYOFFS.matches_played),
-            matchesTotal: toNumber(playoffsRaw.matches_total ?? playoffsRaw.matchesTotal, DEFAULT_PLAYOFFS.matches_total) || DEFAULT_PLAYOFFS.matches_total,
+            matchesPlayed: toNumber(playoffsRaw.matches_played ?? playoffsRaw.matchesPlayed, DEFAULT_PLAYOFFS.matchesPlayed),
+            matchesTotal: toNumber(playoffsRaw.matches_total ?? playoffsRaw.matchesTotal, DEFAULT_PLAYOFFS.matchesTotal) || DEFAULT_PLAYOFFS.matchesTotal,
             status: ['waiting', 'active', 'finished'].includes(playoffsStatus) ? playoffsStatus : DEFAULT_PLAYOFFS.status,
             winner: playoffsRaw.winner ?? playoffsRaw.winner_team ? String(playoffsRaw.winner ?? playoffsRaw.winner_team) : null
         });

@@ -56,6 +56,71 @@
         return undefined;
     }
 
+    function pickNumeric(obj, candidates) {
+        if (!obj) return null;
+        const raw = pickValue(obj, candidates);
+        const numeric = toNumber(raw, null);
+        return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    const PLAYOFF_SERIES_MATCH_TOTAL = 7;
+
+    function normalizeMatchPair(playedInput, totalInput, options = {}) {
+        const { fallbackTotal = null, forceTotal = null } = options;
+        const providedTotal = Math.max(0, toNumber(totalInput, 0));
+        let total = providedTotal;
+        let estimated = false;
+        if (Number.isFinite(forceTotal) && forceTotal >= 0) {
+            total = forceTotal;
+            estimated = true;
+        } else {
+            const fallbackNumeric = Math.max(0, toNumber(fallbackTotal, 0));
+            if (total <= 0 && fallbackNumeric > 0) {
+                total = fallbackNumeric;
+                estimated = true;
+            }
+        }
+        const playedRaw = Math.max(0, toNumber(playedInput, 0));
+        const cap = total > 0 ? total : playedRaw;
+        const played = cap > 0 ? Math.min(playedRaw, cap) : playedRaw;
+        return {
+            played,
+            total,
+            effectiveTotal: total > 0 ? total : played,
+            estimated
+        };
+    }
+
+    function aggregateDivisionMatches(divisions, blockKey, options = {}) {
+        const { estimateTotal, forceTotal } = options;
+        if (!Array.isArray(divisions) || !divisions.length) {
+            return { played: 0, total: 0, effectiveTotal: 0, estimatedTotal: 0 };
+        }
+        return divisions.reduce(
+            (acc, division) => {
+                const block = division?.[blockKey];
+                if (!block) {
+                    return acc;
+                }
+                const matches = normalizeMatchPair(
+                    block.matches_played ?? block.matchesPlayed,
+                    block.matches_total ?? block.matchesTotal,
+                    {
+                        fallbackTotal:
+                            typeof estimateTotal === 'function' ? estimateTotal(block, division) : null,
+                        forceTotal: forceTotal
+                    }
+                );
+                acc.played += matches.played;
+                acc.total += matches.total;
+                acc.effectiveTotal += matches.effectiveTotal;
+                acc.estimatedTotal += matches.estimated ? matches.total : 0;
+                return acc;
+            },
+            { played: 0, total: 0, effectiveTotal: 0, estimatedTotal: 0 }
+        );
+    }
+
     function computePercent(part, total) {
         const played = toNumber(part);
         const max = toNumber(total);
@@ -63,54 +128,125 @@
         return Math.min(100, Math.round((played / max) * 1000) / 10);
     }
 
+    function createProgressSection() {
+        return { played: 0, total: 0, percent: 0, source: 'unknown' };
+    }
+
     function defaultProgress() {
         return {
-            overall: { played: 0, total: 0, percent: 0 },
-            regular: { played: 0, total: 0, percent: 0 },
-            playoffs: { played: 0, total: 0, percent: 0 }
+            overall: createProgressSection(),
+            regular: createProgressSection(),
+            playoffs: createProgressSection()
         };
     }
 
     function computeProgress(stats, divisions) {
-        const progress = defaultProgress();
         const source = stats || {};
+        const regularAggregate = aggregateDivisionMatches(divisions, 'season');
+        const playoffAggregate = aggregateDivisionMatches(divisions, 'playoffs', {
+            forceTotal: PLAYOFF_SERIES_MATCH_TOTAL
+        });
+        const forcedPlayoffTotal = divisions.length * PLAYOFF_SERIES_MATCH_TOTAL;
+        if (forcedPlayoffTotal > 0) {
+            playoffAggregate.total = forcedPlayoffTotal;
+            if (playoffAggregate.effectiveTotal < forcedPlayoffTotal) {
+                playoffAggregate.effectiveTotal = forcedPlayoffTotal;
+            }
+            playoffAggregate.estimatedTotal = forcedPlayoffTotal;
+        }
 
-        const overallPlayed =
-            pickValue(source, ['progress.overall.played', 'matches_played', 'played_matches']) ??
-            divisions.reduce((sum, division) => sum + toNumber(division?.season?.matches_played), 0);
-        const overallTotal =
-            pickValue(source, ['progress.overall.total', 'matches_total', 'scheduled_matches']) ??
-            divisions.reduce((sum, division) => sum + toNumber(division?.season?.matches_total), 0);
-
-        progress.overall = {
-            played: toNumber(overallPlayed),
-            total: toNumber(overallTotal),
-            percent: computePercent(overallPlayed, overallTotal)
+        const overallAggregate = {
+            played: regularAggregate.played + playoffAggregate.played,
+            total: regularAggregate.total + playoffAggregate.total,
+            effectiveTotal: regularAggregate.effectiveTotal + playoffAggregate.effectiveTotal,
+            estimatedTotal: (regularAggregate.estimatedTotal || 0) + (playoffAggregate.estimatedTotal || 0)
         };
 
-        const regularPlayed =
-            pickValue(source, ['progress.regular.played', 'progress.runkosarja.played']) ?? overallPlayed;
-        const regularTotal =
-            pickValue(source, ['progress.regular.total', 'progress.runkosarja.total']) ?? overallTotal;
-        progress.regular = {
-            played: toNumber(regularPlayed, overallPlayed),
-            total: toNumber(regularTotal, overallTotal),
-            percent: computePercent(regularPlayed, regularTotal)
+        const statsRegular = {
+            played: pickNumeric(source, [
+                'progress.regular_matches_played',
+                'progress.regular.played',
+                'progress.runkosarja.played',
+                'progress.regular_played'
+            ]),
+            total: pickNumeric(source, [
+                'progress.regular_matches_total',
+                'progress.regular.total',
+                'progress.runkosarja.total',
+                'progress.regular_total'
+            ])
         };
-
-        const playoffPlayed =
-            pickValue(source, ['progress.playoffs.played', 'progress.playoff.played']) ??
-            divisions.reduce((sum, division) => sum + toNumber(division?.playoffs?.matches_played), 0);
-        const playoffTotal =
-            pickValue(source, ['progress.playoffs.total', 'progress.playoff.total']) ??
-            divisions.reduce((sum, division) => sum + toNumber(division?.playoffs?.matches_total), 0);
-        progress.playoffs = {
-            played: toNumber(playoffPlayed),
-            total: toNumber(playoffTotal),
-            percent: computePercent(playoffPlayed, playoffTotal)
+        const statsPlayoffs = {
+            played: pickNumeric(source, [
+                'progress.playoff_matches_played',
+                'progress.playoffs.played',
+                'progress.playoff.played'
+            ]),
+            total: pickNumeric(source, [
+                'progress.playoff_matches_total',
+                'progress.playoffs.total',
+                'progress.playoff.total'
+            ])
         };
+        if (forcedPlayoffTotal > 0) {
+            statsPlayoffs.total = forcedPlayoffTotal;
+        }
+        const statsOverall = {
+            played: pickNumeric(source, [
+                'progress.overall_matches_played',
+                'progress.overall.played',
+                'matches_played',
+                'played_matches'
+            ]),
+            total: pickNumeric(source, [
+                'progress.overall_matches_total',
+                'progress.overall.total',
+                'matches_total',
+                'scheduled_matches'
+            ])
+        };
+        const regularTargetTotal = Number.isFinite(statsRegular.total)
+            ? statsRegular.total
+            : regularAggregate.total;
+        const forcedOverallTotal = Math.max(0, regularTargetTotal) + Math.max(0, forcedPlayoffTotal);
+        if (forcedOverallTotal > 0) {
+            statsOverall.total = forcedOverallTotal;
+        }
 
-        return progress;
+        function finalizeSection(statsSection, aggregateSection) {
+            const hasStatsPlayed = Number.isFinite(statsSection.played);
+            const hasStatsTotal = Number.isFinite(statsSection.total);
+            const played = hasStatsPlayed ? statsSection.played : aggregateSection.played;
+            const rawTotal = hasStatsTotal ? statsSection.total : aggregateSection.total;
+            const fallbackTotal =
+                rawTotal > 0
+                    ? rawTotal
+                    : hasStatsPlayed
+                        ? played
+                        : aggregateSection.effectiveTotal;
+            const total = Math.max(0, fallbackTotal);
+            const usedEstimate = aggregateSection.estimatedTotal > 0;
+            let sourceLabel = 'derived';
+            if (hasStatsPlayed && hasStatsTotal) {
+                sourceLabel = 'stats';
+            } else if (hasStatsPlayed || hasStatsTotal) {
+                sourceLabel = 'mixed';
+            } else if (usedEstimate) {
+                sourceLabel = 'estimated';
+            }
+            return {
+                played,
+                total,
+                percent: computePercent(played, total),
+                source: sourceLabel
+            };
+        }
+
+        return {
+            regular: finalizeSection(statsRegular, regularAggregate),
+            playoffs: finalizeSection(statsPlayoffs, playoffAggregate),
+            overall: finalizeSection(statsOverall, overallAggregate)
+        };
     }
 
     function inferTierValue(divisionId) {
@@ -120,38 +256,6 @@
         if (numeric >= 11 && numeric <= 15) return 3;
         if (numeric >= 16 && numeric <= 20) return 4;
         return 5;
-    }
-
-    function legacyNormalizeDivision(raw, index) {
-        if (!raw || typeof raw !== 'object') {
-            return null;
-        }
-        const fallbackId = raw.division_id ?? raw.id ?? raw.slug ?? index;
-        const seasonData = raw.season && typeof raw.season === 'object' ? raw.season : {};
-        const playoffsData = raw.playoffs && typeof raw.playoffs === 'object' ? raw.playoffs : {};
-        return {
-            id: String(fallbackId),
-            divisionId: toNumber(fallbackId, index),
-            name: raw.name || `Division ${fallbackId}`,
-            tier: toNumber(raw.tier, inferTierValue(fallbackId)),
-            season: {
-                teams: toNumber(seasonData.teams, 0),
-                matches_played: toNumber(seasonData.matches_played, 0),
-                matches_total: toNumber(seasonData.matches_total, 0),
-                status: (seasonData.status || raw.status || 'waiting').toLowerCase(),
-                winner: seasonData.winner || null
-            },
-            playoffs: {
-                teams: toNumber(playoffsData.teams, 8),
-                matches_played: toNumber(playoffsData.matches_played, 0),
-                matches_total: toNumber(playoffsData.matches_total, 7),
-                status: (playoffsData.status || 'waiting').toLowerCase(),
-                winner: playoffsData.winner || null
-            },
-            slug: raw.slug || null,
-            seasonNumber: raw.season_number ?? raw.seasonNumber ?? null,
-            raw
-        };
     }
 
     const normalizerRef = typeof window !== 'undefined' ? window.divisionNormalizer : null;
@@ -176,28 +280,25 @@
 
     function normalizeDivisionEntry(raw, index) {
         const warnings = [];
-        if (normalizerRef && typeof normalizerRef.normalizeDivision === 'function') {
-            try {
-                const result = normalizerRef.normalizeDivision(raw);
-                if (Array.isArray(result?.warnings) && result.warnings.length) {
-                    warnings.push(...result.warnings);
-                }
-                if (result && result.division) {
-                    return { ok: result.ok !== false, division: result.division, warnings };
-                }
-                if (result?.error) {
-                    warnings.push(result.error);
-                }
-            } catch (error) {
-                warnings.push(error?.message || 'Normalization error');
-            }
+        if (!normalizerRef || typeof normalizerRef.normalizeDivision !== 'function') {
+            warnings.push('Division normalizer unavailable.');
+            return { ok: false, division: null, warnings };
         }
-        const fallback = legacyNormalizeDivision(raw, index);
-        if (fallback) {
-            if (!warnings.length) {
-                warnings.push('Used legacy normalization fallback.');
+        try {
+            const result = normalizerRef.normalizeDivision(raw);
+            if (Array.isArray(result?.warnings) && result.warnings.length) {
+                warnings.push(...result.warnings);
             }
-            return { ok: true, division: fallback, warnings };
+            if (result && result.division) {
+                return { ok: result.ok !== false, division: result.division, warnings };
+            }
+            if (result?.error) {
+                warnings.push(result.error);
+            } else {
+                warnings.push('Division normalizer returned no data.');
+            }
+        } catch (error) {
+            warnings.push(error?.message || 'Normalization error');
         }
         warnings.push('Normalization failed');
         return { ok: false, division: null, warnings };
@@ -217,15 +318,6 @@
                 return result.division;
             })
             .filter(Boolean);
-        if (!mapped.length) {
-            const fallback = source
-                .map((entry, index) => legacyNormalizeDivision(entry, index))
-                .filter(Boolean);
-            if (fallback.length) {
-                warnings.push('Normalized set empty; falling back to legacy mapping.');
-                return { divisions: fallback, warnings };
-            }
-        }
         return { divisions: mapped, warnings };
     }
 

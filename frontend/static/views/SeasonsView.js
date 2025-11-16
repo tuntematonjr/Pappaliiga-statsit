@@ -8,14 +8,19 @@ window.SeasonsView = {
     template: `
         <div class="seasons-view">
             <masthead></masthead>
-            <h1>Seasons & Divisions</h1>
+            <h1 class="title-accent titleUnderlineMain title-delay-0">Seasons & Divisions</h1>
             
             <loading-spinner v-if="loading" message="Kausia ladataan..."></loading-spinner>
             <error-message v-else-if="error" :message="error" @retry="loadSeasons"></error-message>
             
             <div v-else class="seasons-grid home-section">
-                <div v-for="season in seasons" :key="season.season" class="season-card home-section">
-                    <h2 class="section-title">Season {{ season.season }}</h2>
+                <div v-for="(season, idx) in seasons" :key="season.season" class="season-card home-section">
+                    <h2
+                        class="section-title title-accent titleUnderlineCard"
+                        :class="'title-delay-' + (idx % 4)"
+                    >
+                        Season {{ season.season }}
+                    </h2>
                     <p class="season-meta">{{ season.divisions.length }} divisions</p>
                     
                     <div class="divisions-list">

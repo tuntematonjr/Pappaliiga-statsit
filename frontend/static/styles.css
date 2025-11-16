@@ -44,7 +44,6 @@
     --warning: var(--warn);
     --state-active: #4f82ff;
     --state-finished: #37d499;
-    --state-waiting: #7f86a5;
 
     /* Effects */
     --radius: 18px;
@@ -143,6 +142,149 @@ a {
     font-size: 0.85em;
     color: var(--muted);
     margin-top: 4px;
+}
+
+/* ---- Title Accent Utility ---- */
+.title-accent {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    padding-bottom: var(--title-accent-underline-gap, 0.4rem);
+    font-size: var(--title-accent-font-size, clamp(1.2rem, 2vw, 1.65rem));
+    font-weight: var(--title-accent-font-weight, 600);
+    letter-spacing: var(--title-accent-letter-spacing, 0.015em);
+    line-height: var(--title-accent-line-height, 1.2);
+    color: var(--title-accent-color, inherit);
+    text-transform: var(--title-accent-transform, none);
+    text-shadow: 0 8px 22px rgba(14, 32, 66, 0.45), 0 0 14px rgba(106, 186, 255, 0.25);
+    text-wrap: balance;
+    text-align: center;
+}
+
+.title-accent:not(.titleUnderlineMain):not(.titleUnderlineCard)::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: var(--title-accent-underline-offset, -0.15rem);
+    width: clamp(0.5rem, calc(var(--title-accent-underline-scale, 0.6) * 100%), var(--title-accent-underline-max, 18rem));
+    height: var(--title-accent-underline-thickness, 2.5px);
+    transform: translateX(-50%);
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(106, 186, 255, 0.15), rgba(124, 215, 243, 0.9), rgba(106, 186, 255, 0.15));
+    opacity: var(--title-accent-underline-opacity, 0.85);
+    box-shadow: 0 0 12px rgba(106, 186, 255, 0.35);
+    pointer-events: none;
+}
+
+/* ---- Animated Title Underlines ---- */
+.titleUnderlineMain,
+.titleUnderlineCard {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: max-content;
+    max-width: 100%;
+    text-wrap: balance;
+    margin-left: auto;
+    margin-right: auto;
+    font-weight: 700;
+    text-align: center;
+    --title-underline-delay: 0s;
+    --title-underline-duration: 5s;
+}
+
+.titleUnderlineMain {
+    font-size: clamp(1.6rem, 2.8vw, 2.6rem);
+    letter-spacing: 0.03em;
+}
+
+.titleUnderlineMain {
+    padding-bottom: 0.85rem;
+    --title-underline-max: 26rem;
+}
+
+.titleUnderlineCard {
+    font-size: clamp(1.15rem, 2vw, 1.55rem);
+    letter-spacing: 0.02em;
+    font-weight: 600;
+    padding-bottom: 0.6rem;
+    --title-underline-max: 18rem;
+}
+
+.titleUnderlineMain::after {
+    content: '';
+    position: absolute;
+    bottom: -0.1rem;
+    left: 50%;
+    width: clamp(100%, 125%, var(--title-underline-max, 24rem));
+    height: 3.5px;
+    border-radius: 999px;
+    transform: translateX(-50%);
+    background: linear-gradient(120deg, rgba(90, 160, 255, 0.3), rgba(124, 215, 243, 0.95), rgba(90, 160, 255, 0.3));
+    background-size: 220% auto;
+    animation: underlineSlide var(--title-underline-duration, 5s) ease-in-out infinite;
+    animation-delay: var(--title-underline-delay, 0s);
+    opacity: 0.95;
+    pointer-events: none;
+}
+
+.titleUnderlineCard {
+    padding-bottom: 0.55rem;
+    --title-underline-duration: 4.5s;
+}
+
+.titleUnderlineCard::after {
+    content: '';
+    position: absolute;
+    bottom: -0.05rem;
+    left: 50%;
+    width: clamp(100%, 112%, var(--title-underline-max, 16rem));
+    height: 2px;
+    border-radius: 999px;
+    transform: translateX(-50%);
+    background: linear-gradient(120deg, rgba(80, 140, 255, 0.2), rgba(120, 210, 235, 0.55), rgba(80, 140, 255, 0.2));
+    background-size: 220% auto;
+    animation: underlineSlide var(--title-underline-duration, 4.5s) ease-in-out infinite;
+    animation-delay: var(--title-underline-delay, 0s);
+    opacity: 0.9;
+    pointer-events: none;
+}
+
+@keyframes underlineSlide {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+.title-delay-0 { --title-underline-delay: 0s; }
+.title-delay-1 { --title-underline-delay: 0.35s; }
+.title-delay-2 { --title-underline-delay: 0.7s; }
+.title-delay-3 { --title-underline-delay: 1.05s; }
+.title-duration-slow { --title-underline-duration: 6s; }
+.title-duration-fast { --title-underline-duration: 4.25s; }
+
+.division-list > .division-card:nth-child(3n + 1) .titleUnderlineCard::after {
+    animation-delay: 0s;
+    animation-duration: 4.2s;
+}
+
+.division-list > .division-card:nth-child(3n + 2) .titleUnderlineCard::after {
+    animation-delay: 0.2s;
+    animation-duration: 4.8s;
+}
+
+.division-list > .division-card:nth-child(3n) .titleUnderlineCard::after {
+    animation-delay: 0.45s;
+    animation-duration: 5.2s;
 }
 
 .sr-only {
@@ -562,10 +704,13 @@ a {
 }
 
 .partner-callout__titles h2 {
-    font-size: clamp(1.4rem, 2.4vw, 1.85rem);
-    font-weight: 700;
+    --title-accent-font-size: clamp(1.45rem, 2.6vw, 1.95rem);
+    --title-accent-font-weight: 700;
+    --title-accent-letter-spacing: 0.01em;
+    --title-accent-underline-scale: 0.55;
+    --title-accent-underline-gap: 0.3rem;
+    --title-accent-underline-thickness: 2.5px;
     color: #f5f8ff;
-    letter-spacing: 0.01em;
 }
 
 .partner-callout__body {
@@ -630,12 +775,28 @@ a {
 }
 
 .section-heading h2 {
-    font-size: clamp(1.5rem, 2.5vw, 2.1rem);
-    font-weight: 700;
+    --title-accent-font-size: clamp(1.6rem, 2.6vw, 2.2rem);
+    --title-accent-font-weight: 700;
+    --title-accent-letter-spacing: 0.02em;
+    --title-accent-underline-scale: 0.6;
+    --title-accent-underline-thickness: 3px;
+    --title-accent-underline-gap: 0.35rem;
 }
 
 .section-heading .section-subtext {
     max-width: 640px;
+}
+
+.section-heading--centered {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.section-heading--centered > * {
+    text-align: center;
+    align-self: center !important;
+    width: 100%;
 }
 
 @media (min-width: 768px) {
@@ -643,6 +804,10 @@ a {
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
+    }
+
+    .section-heading--centered {
+        justify-content: center;
     }
 }
 
@@ -711,10 +876,16 @@ a {
 }
 
 .hero-banner__title {
-    font-size: var(--font-size-xl);
-    font-weight: 800;
-    line-height: 1.1;
+    --title-accent-font-size: var(--font-size-xl);
+    --title-accent-font-weight: 800;
+    --title-accent-letter-spacing: 0.01em;
+    --title-accent-line-height: 1.1;
+    --title-accent-underline-scale: 0.55;
+    --title-accent-underline-gap: 0.5rem;
+    --title-accent-underline-thickness: 3px;
+    --title-accent-color: #ffffff;
     color: #ffffff;
+    line-height: 1.1;
     text-shadow: 0 10px 20px rgba(5, 14, 40, 0.65);
 }
 
@@ -769,9 +940,15 @@ a {
 }
 
 .stat-panel__label {
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    --title-accent-font-size: clamp(0.9rem, 1.4vw, 1.05rem);
+    --title-accent-font-weight: 600;
+    --title-accent-letter-spacing: 0.12em;
+    --title-accent-transform: uppercase;
+    --title-accent-underline-scale: 0.5;
+    --title-accent-underline-gap: 0.18rem;
+    --title-accent-underline-thickness: 2px;
+    --title-accent-underline-opacity: 0.5;
+    --title-accent-underline-max: 6rem;
     color: rgba(210, 225, 255, 0.75);
 }
 
@@ -1235,24 +1412,88 @@ a {
 }
 
 .season-filter-chip {
+    --chip-bg: rgba(20, 30, 60, 0.8);
+    --chip-border: rgba(70, 100, 160, 0.45);
+    --chip-text: rgba(200, 215, 245, 0.85);
+    --chip-active-bg: rgba(90, 150, 255, 0.25);
+    --chip-shadow: rgba(85, 130, 210, 0.3);
+    --chip-active-color: rgba(240, 248, 255, 0.95);
     appearance: none;
-    border: none;
-    padding: 0.45rem 0.95rem;
+    border: 1px solid var(--chip-border);
+    padding: 0.4rem 0.95rem;
     border-radius: 999px;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    color: rgba(200, 215, 245, 0.8);
-    background: rgba(20, 30, 60, 0.8);
-    border: 1px solid rgba(70, 100, 160, 0.45);
+    color: var(--chip-text);
+    background: var(--chip-bg);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     cursor: pointer;
-    transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .season-filter-chip--active {
-    background: rgba(90, 150, 255, 0.25);
-    color: rgba(240, 248, 255, 0.95);
-    border-color: rgba(120, 170, 255, 0.7);
-    box-shadow: 0 6px 18px rgba(85, 130, 210, 0.3);
+    background: var(--chip-active-bg);
+    color: var(--chip-active-color);
+    border-color: transparent;
+    box-shadow: 0 6px 18px var(--chip-shadow);
+}
+
+.season-filter-chip:not(.season-filter-chip--active):hover,
+.season-filter-chip:not(.season-filter-chip--active):focus-visible {
+    border-color: rgba(150, 190, 255, 0.55);
+    transform: translateY(-1px);
+}
+
+.season-filter-chip__icon {
+    display: inline-flex;
+    width: 0.95rem;
+    height: 0.95rem;
+    line-height: 0;
+}
+
+.season-filter-chip__icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.season-filter-chip__label {
+    line-height: 1.1;
+}
+
+.season-filter-chip[data-status="ei-alkanut"] {
+    --chip-border: rgba(120, 130, 150, 0.55);
+    --chip-bg: rgba(30, 38, 60, 0.85);
+    --chip-text: rgba(190, 200, 220, 0.85);
+    --chip-active-bg: rgba(150, 160, 185, 0.35);
+    --chip-shadow: rgba(100, 120, 160, 0.35);
+}
+
+.season-filter-chip[data-status="runkosarja-kaynnissa"] {
+    --chip-border: rgba(90, 140, 230, 0.45);
+    --chip-bg: rgba(18, 34, 64, 0.85);
+    --chip-text: rgba(185, 210, 255, 0.9);
+    --chip-active-bg: rgba(70, 130, 255, 0.3);
+    --chip-shadow: rgba(80, 140, 255, 0.45);
+}
+
+.season-filter-chip[data-status="playoffit-kaynnissa"] {
+    --chip-border: rgba(170, 120, 255, 0.45);
+    --chip-bg: rgba(26, 16, 48, 0.85);
+    --chip-text: rgba(225, 200, 255, 0.9);
+    --chip-active-bg: rgba(160, 120, 255, 0.35);
+    --chip-shadow: rgba(165, 110, 255, 0.45);
+    --chip-active-color: rgba(250, 240, 255, 0.95);
+}
+
+.season-filter-chip[data-status="taputeltu-loppuun"] {
+    --chip-border: rgba(100, 200, 165, 0.45);
+    --chip-bg: rgba(10, 40, 34, 0.85);
+    --chip-text: rgba(190, 238, 210, 0.9);
+    --chip-active-bg: rgba(90, 210, 170, 0.3);
+    --chip-shadow: rgba(90, 210, 170, 0.45);
+    --chip-active-color: rgba(225, 255, 240, 0.95);
 }
 
 .division-season-bar__reset {
@@ -1260,7 +1501,7 @@ a {
 }
 
 .season-filter-reset {
-    padding: 0.55rem 1.1rem;
+    padding: 0.5rem 1rem;
     border-radius: 999px;
     border: 1px solid rgba(110, 140, 200, 0.45);
     background: rgba(12, 18, 36, 0.7);
@@ -1430,37 +1671,81 @@ a {
     box-shadow: 0 26px 60px rgba(18, 32, 76, 0.55);
 }
 
-.division-card--active {
+.division-card--runkosarja-kaynnissa {
     border-color: rgba(90, 150, 255, 0.7);
     box-shadow: 0 22px 50px rgba(48, 96, 196, 0.35);
 }
 
-.division-card--active:hover {
+.division-card--runkosarja-kaynnissa:hover,
+.division-card--playoffit-kaynnissa:hover {
     box-shadow: 0 30px 65px rgba(80, 140, 255, 0.4);
 }
 
-.division-card--finished {
+.division-card--playoffit-kaynnissa {
+    border-color: rgba(176, 132, 255, 0.6);
+    box-shadow: 0 22px 55px rgba(82, 56, 148, 0.5);
+}
+
+.division-card--taputeltu-loppuun {
     border-color: rgba(70, 200, 160, 0.6);
     box-shadow: 0 22px 45px rgba(30, 90, 70, 0.4);
 }
 
-.division-card--waiting {
+.division-card--ei-alkanut {
     border-color: rgba(110, 120, 150, 0.45);
     box-shadow: 0 16px 35px rgba(5, 10, 25, 0.6);
 }
 
 .division-card__header {
     display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+    text-align: center;
+}
+
+.division-card__title-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    width: 100%;
 }
 
 .division-card__title {
     margin: 0;
-    font-size: 1.25rem;
-    font-weight: 700;
-    line-height: 1.3;
+    --title-accent-font-size: clamp(1.35rem, 2vw, 1.6rem);
+    --title-accent-font-weight: 800;
+    --title-accent-letter-spacing: 0.02em;
+    --title-accent-line-height: 1.25;
+    --title-accent-underline-scale: 0.55;
+    --title-accent-underline-gap: 0.2rem;
+    --title-accent-underline-thickness: 2px;
+    --title-accent-underline-opacity: 0.75;
+    --title-accent-underline-max: 12rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(238, 244, 255, 0.95);
+    text-shadow: 0 6px 20px rgba(70, 140, 255, 0.25);
+}
+
+.division-card__title--hero {
+    --title-accent-font-size: clamp(1.4rem, 2.2vw, 1.75rem);
+}
+
+.division-card__header--centered {
+    align-items: center;
+    text-align: center;
+}
+
+.division-card__status-row--centered {
+    justify-content: center;
+}
+
+.division-card__status-row {
+    display: flex;
+    justify-content: center;
 }
 
 .division-card__eyebrow {
@@ -1472,49 +1757,146 @@ a {
 }
 
 .division-card__badge {
-    padding: 0.35rem 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.95rem;
     border-radius: 999px;
     font-size: 0.85rem;
     font-weight: 600;
     border: 1px solid transparent;
+    line-height: 1.1;
 }
 
-.division-card__badge--active {
+.status-pill__icon {
+    display: inline-flex;
+    width: 1.05rem;
+    height: 1.05rem;
+    line-height: 0;
+}
+
+.status-pill__icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.status-pill__label {
+    white-space: nowrap;
+}
+
+.division-card__badge--runkosarja-kaynnissa {
     color: rgba(160, 214, 255, 0.95);
     border-color: rgba(80, 160, 255, 0.6);
     background: rgba(50, 110, 190, 0.2);
 }
 
-.division-card__badge--finished {
+.division-card__badge--playoffit-kaynnissa {
+    color: rgba(222, 201, 255, 0.95);
+    border-color: rgba(176, 132, 255, 0.7);
+    background: rgba(120, 70, 190, 0.25);
+}
+
+.division-card__badge--taputeltu-loppuun {
     color: rgba(120, 220, 180, 0.95);
     border-color: rgba(90, 210, 160, 0.6);
     background: rgba(20, 90, 60, 0.25);
 }
 
-.division-card__badge--waiting {
+.division-card__badge--ei-alkanut {
     color: rgba(190, 200, 220, 0.85);
     border-color: rgba(120, 130, 150, 0.5);
     background: rgba(30, 38, 60, 0.4);
 }
 
-.division-card__section {
+.division-card__body {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    align-items: center;
+    gap: 1.25rem;
+    text-align: center;
+    width: 100%;
 }
 
-.division-card__activity {
-    color: rgba(185, 198, 228, 0.78);
-    font-size: 0.9rem;
+.division-card__block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    width: 100%;
+}
+
+.division-card__block .division-progress {
+    width: 100%;
+}
+
+.division-card__block-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.division-card__block-label {
+    margin: 0;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.85rem;
+    color: rgba(200, 208, 240, 0.85);
+}
+
+.division-card__stat-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    width: 100%;
+}
+
+.division-card__stat-line {
+    margin: 0;
+    font-size: 0.95rem;
+    color: rgba(215, 228, 255, 0.9);
+}
+
+.division-card__stat-line--muted {
+    color: rgba(160, 175, 210, 0.75);
+}
+
+.division-card__metric-meta {
+    margin: 0;
+    font-size: 0.85rem;
+    color: rgba(170, 188, 220, 0.85);
+    text-align: center;
+}
+
+.division-card__metric-meta--centered {
+    text-align: center;
+}
+
+.division-card__note {
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+    color: rgba(170, 188, 220, 0.9);
+    text-align: center;
+}
+
+.division-card__note--muted {
+    color: rgba(160, 175, 210, 0.7);
 }
 
 .division-card__facts {
     list-style: none;
     padding: 0;
-    margin: 0;
+    margin: 0.25rem 0 0;
     display: flex;
     flex-wrap: wrap;
     gap: 0.8rem 1.2rem;
+    justify-content: center;
+}
+
+.division-card__facts--centered {
+    justify-content: center;
+    text-align: center;
 }
 
 .division-card__facts li {
@@ -1543,27 +1925,36 @@ a {
     border: 1px solid rgba(80, 200, 140, 0.4);
     color: rgba(185, 235, 205, 0.95);
     font-weight: 600;
+    text-align: center;
+}
 }
 
-.division-card__actions {
+.division-card__action-row {
+    width: 100%;
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
+    justify-content: center;
     margin-top: 0.5rem;
 }
 
 .division-card__action {
-    width: 100%;
+    flex: 1 1 220px;
+    max-width: 260px;
+    min-height: 42px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0.55rem 1rem;
     border-radius: 12px;
     border: 1px solid rgba(90, 130, 210, 0.4);
+    background: rgba(12, 18, 36, 0.8);
     color: rgba(215, 228, 255, 0.9);
     font-weight: 600;
     text-decoration: none;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    appearance: none;
+    font: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    text-align: center;
 }
 
 .division-card__action--primary {
@@ -1572,144 +1963,38 @@ a {
     border: none;
 }
 
+.division-card__action--ghost {
+    background: rgba(6, 12, 26, 0.85);
+    border: 1px solid rgba(120, 150, 220, 0.35);
+}
+
 .division-card__action:hover,
 .division-card__action:focus-visible {
     border-color: rgba(130, 170, 255, 0.6);
-    background: rgba(70, 110, 190, 0.25);
+    transform: translateY(-1px);
 }
 
-.division-card__playoffs {
-    margin-top: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+.division-card__action--primary:hover,
+.division-card__action--primary:focus-visible {
+    box-shadow: 0 12px 26px rgba(48, 96, 196, 0.35);
 }
 
-.division-card__playoffs-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
+.division-card__action--ghost:hover,
+.division-card__action--ghost:focus-visible {
+    box-shadow: 0 8px 18px rgba(16, 24, 46, 0.5);
 }
 
-.division-card__playoffs-label {
-    font-weight: 700;
+.division-card__action--disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    border-style: dashed;
+    transform: none;
 }
 
-.division-card__playoffs-sub {
-    color: rgba(185, 198, 228, 0.75);
-    font-size: 0.9rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem;
-}
-
-.division-card__playoffs-toggle {
-    appearance: none;
-    border: none;
-    padding: 0.35rem 0.85rem;
-    border-radius: 999px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    background: rgba(30, 45, 80, 0.7);
-    color: rgba(215, 228, 255, 0.9);
-    border: 1px solid rgba(90, 130, 210, 0.5);
-}
-
-.division-card__playoffs-disabled {
-    font-size: 0.85rem;
-    color: rgba(180, 190, 210, 0.7);
-}
-
-.division-card__playoffs-content {
-    border-radius: 14px;
-    padding: 1rem;
-    border: 1px solid rgba(80, 110, 180, 0.35);
-    background: rgba(10, 18, 36, 0.85);
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.division-card__playoffs-status--active {
-    border-color: rgba(80, 150, 255, 0.5);
-    background: rgba(18, 28, 55, 0.9);
-}
-
-.division-card__playoffs-status--finished {
-    border-color: rgba(60, 180, 140, 0.5);
-    background: rgba(16, 40, 30, 0.85);
-}
-
-.division-card__playoffs-status--waiting {
-    border-color: rgba(90, 110, 150, 0.4);
-}
-
-.division-card__playoffs-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.division-card__playoffs-hint {
-    margin: 0;
-    color: rgba(190, 204, 235, 0.8);
-    font-size: 0.9rem;
-}
-
-.playoffs-winner-card {
-    padding: 0.6rem 0.85rem;
-    border-radius: 10px;
-    background: rgba(20, 80, 40, 0.35);
-    border: 1px solid rgba(90, 210, 150, 0.4);
-    color: rgba(200, 240, 215, 0.95);
-    font-weight: 600;
-}
-
-.division-card__playoffs-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.15rem 0.6rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1px solid transparent;
-}
-
-.division-card__playoffs-badge--active {
-    color: rgba(150, 205, 255, 0.95);
-    border-color: rgba(90, 150, 255, 0.5);
-    background: rgba(50, 90, 180, 0.2);
-}
-
-.division-card__playoffs-badge--finished {
-    color: rgba(140, 230, 190, 0.95);
-    border-color: rgba(90, 210, 160, 0.5);
-    background: rgba(20, 80, 60, 0.2);
-}
-
-.division-card__playoffs-badge--waiting {
-    color: rgba(180, 190, 210, 0.85);
-    border-color: rgba(110, 120, 150, 0.4);
-    background: rgba(20, 24, 38, 0.4);
-}
-
-.division-card__playoffs-button {
-    flex: 1 1 120px;
-    text-align: center;
-    padding: 0.5rem 0.85rem;
-    border-radius: 10px;
-    border: 1px solid rgba(120, 150, 220, 0.4);
-    color: rgba(215, 228, 255, 0.9);
-    font-weight: 600;
-    text-decoration: none;
-}
-
-.division-card__playoffs-button--primary {
-    background: rgba(90, 150, 255, 0.2);
-    border-color: rgba(120, 170, 255, 0.6);
+.division-card__action--disabled:hover,
+.division-card__action--disabled:focus-visible {
+    box-shadow: none;
+    border-color: rgba(120, 130, 155, 0.5);
 }
 
 .division-progress {
@@ -1718,6 +2003,32 @@ a {
     padding: 0.85rem 1rem;
     border: 1px solid rgba(70, 100, 160, 0.4);
     background: rgba(8, 14, 28, 0.8);
+    overflow: visible;
+}
+
+.division-progress[data-tooltip]:not([data-tooltip=""])::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: -0.35rem;
+    left: 50%;
+    transform: translate(-50%, -120%);
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(4, 8, 18, 0.94);
+    border: 1px solid rgba(120, 160, 255, 0.25);
+    color: rgba(230, 236, 255, 0.95);
+    font-size: 0.78rem;
+    white-space: nowrap;
+    box-shadow: 0 10px 28px rgba(3, 6, 16, 0.75);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 2;
+}
+
+.division-progress[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translate(-50%, -150%);
 }
 
 .division-progress__track {
@@ -1735,6 +2046,7 @@ a {
     border-radius: inherit;
     background: linear-gradient(120deg, rgba(90, 150, 255, 0.95), rgba(120, 210, 255, 0.9));
     transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 18px rgba(86, 168, 255, 0.22);
     overflow: hidden;
 }
 
@@ -1781,10 +2093,16 @@ a {
 
 .division-progress--finished .division-progress__fill {
     background: linear-gradient(120deg, rgba(60, 180, 140, 0.95), rgba(100, 220, 170, 0.85));
+    box-shadow: 0 0 18px rgba(80, 210, 170, 0.22);
 }
 
-.division-progress--waiting .division-progress__fill {
+.division-progress--not-started .division-progress__fill {
     background: linear-gradient(120deg, rgba(120, 130, 155, 0.6), rgba(160, 170, 190, 0.6));
+    box-shadow: 0 0 16px rgba(140, 150, 175, 0.18);
+}
+
+.division-progress--active .division-progress__fill {
+    background: linear-gradient(120deg, rgba(90, 150, 255, 0.95), rgba(120, 210, 255, 0.9));
 }
 
 @media (max-width: 768px) {
@@ -1794,13 +2112,6 @@ a {
     }
     .division-season-bar {
         position: static;
-    }
-    .division-card__actions {
-        flex-direction: column;
-    }
-    .division-card__playoffs-header {
-        flex-direction: column;
-        align-items: flex-start;
     }
     .division-list {
         grid-template-columns: 1fr;
@@ -5482,8 +5793,8 @@ body.is-division .card.maps-section {
 .season-explorer.glass-card {
     display: flex;
     flex-direction: column;
-    gap: clamp(1.5rem, 3vw, 2rem);
-    padding: clamp(1.25rem, 3vw, 2.5rem);
+    gap: clamp(1rem, 2.5vw, 1.5rem);
+    padding: clamp(1rem, 2.5vw, 2rem);
 }
 
 .season-explorer__intro {
@@ -5497,8 +5808,8 @@ body.is-division .card.maps-section {
 .season-explorer__section {
     display: flex;
     flex-direction: column;
-    gap: clamp(0.75rem, 1.5vw, 1.25rem);
-    padding-top: clamp(1.25rem, 2.5vw, 1.75rem);
+    gap: clamp(0.5rem, 1.25vw, 1rem);
+    padding-top: clamp(0.75rem, 1.5vw, 1.1rem);
     border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -5508,7 +5819,7 @@ body.is-division .card.maps-section {
 }
 
 .season-explorer__selection {
-    gap: clamp(0.75rem, 1.5vw, 1.1rem);
+    gap: clamp(0.5rem, 1vw, 0.85rem);
 }
 
 .season-selector--flat {
@@ -5558,8 +5869,9 @@ body.is-division .card.maps-section {
 .season-explorer__summary-header {
     display: flex;
     flex-wrap: wrap;
-    justify-content: space-between;
+    justify-content: center;
     gap: 1rem;
+    text-align: center;
 }
 
 .season-explorer__summary-grid {
@@ -5669,15 +5981,16 @@ body.is-division .card.maps-section {
 /* Unified Control Bar - 2 Column Layout */
 .season-explorer__control-bar {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 2rem;
-    align-items: center;
-    padding: 1.25rem 1.75rem;
-    border-radius: var(--radius);
-    background: rgba(10, 16, 34, 0.94);
-    border: 1px solid rgba(116, 152, 255, 0.18);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 35px rgba(5, 9, 25, 0.45);
-    margin-bottom: 1.5rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1.25rem;
+    align-items: stretch;
+    padding: 1rem 1.25rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(120, 160, 255, 0.12);
+    box-shadow: 0 18px 45px rgba(5, 12, 28, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    margin-bottom: 0.85rem;
+    position: relative;
 }
 
 .season-explorer__control-bar--disabled {
@@ -5689,27 +6002,27 @@ body.is-division .card.maps-section {
 .control-bar__left {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
     align-items: flex-start;
 }
 
 .control-bar__filters {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.4rem;
     align-items: center;
 }
 
 .control-bar__search {
     width: 100%;
-    max-width: 320px;
+    max-width: 300px;
 }
 
 .control-bar__input {
     width: 100%;
-    padding: 0.6rem 1.15rem;
+    padding: 0.55rem 1rem;
     border-radius: 999px;
-    border: 1px solid rgba(90, 120, 190, 0.45);
+    border: 1px solid rgba(90, 130, 205, 0.35);
     background: rgba(12, 18, 36, 0.85);
     color: #f1f4ff;
     font-size: 0.9rem;
@@ -5729,8 +6042,8 @@ body.is-division .card.maps-section {
 /* RIGHT SECTION: Three Circular Progress Indicators */
 .control-bar__right {
     display: flex;
-    gap: 1rem;
-    align-items: center;
+    gap: 0.85rem;
+    align-items: stretch;
     justify-content: flex-end;
 }
 
@@ -5739,13 +6052,13 @@ body.is-division .card.maps-section {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1.25rem;
-    border-radius: var(--radius);
-    background: rgba(8, 14, 32, 0.95);
+    padding: 1rem;
+    border-radius: 14px;
+    background: rgba(6, 10, 22, 0.95);
     border: 1px solid rgba(116, 152, 255, 0.22);
     box-shadow: 
-        inset 0 1px 0 rgba(255, 255, 255, 0.06),
-        0 6px 24px rgba(5, 9, 25, 0.45);
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 10px 28px rgba(4, 8, 18, 0.65);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -5754,13 +6067,13 @@ body.is-division .card.maps-section {
     transform: translateY(-2px);
     box-shadow: 
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        0 10px 32px rgba(5, 9, 25, 0.55),
+        0 16px 34px rgba(6, 10, 22, 0.55),
         0 0 24px rgba(90, 150, 255, 0.18);
 }
 
 /* Compact circular progress for control bar */
 .control-bar__right .circular-progress {
-    --circle-size: 140px;
+    --circle-size: 160px;
 }
 
 .control-bar__right .circular-progress__title {
@@ -5775,6 +6088,14 @@ body.is-division .card.maps-section {
 .control-bar__right .circular-progress__percent {
     font-size: 1.6rem;
     font-weight: 700;
+}
+
+.control-bar__right .circular-progress__played {
+    font-size: 0.72rem;
+}
+
+.control-bar__right .circular-progress__label .circular-progress__remaining {
+    font-size: 0.65rem;
 }
 
 /* Legacy filters styles (kept for compatibility) */
@@ -5875,7 +6196,7 @@ body.is-division .card.maps-section {
 }
 
 .season-explorer__divisions {
-    padding-top: clamp(1rem, 2vw, 1.5rem);
+    padding-top: clamp(0.5rem, 1.25vw, 1rem);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
@@ -5962,11 +6283,19 @@ body.is-division .card.maps-section {
     }
     
     .control-bar__right .circular-progress {
-        --circle-size: 110px;
+        --circle-size: 130px;
     }
     
     .control-bar__right .circular-progress__percent {
         font-size: 1.4rem;
+    }
+
+    .control-bar__right .circular-progress__played {
+        font-size: 0.68rem;
+    }
+
+    .control-bar__right .circular-progress__label .circular-progress__remaining {
+        font-size: 0.6rem;
     }
 }
 
@@ -5985,7 +6314,7 @@ body.is-division .card.maps-section {
     }
     
     .control-bar__right .circular-progress {
-        --circle-size: 110px;
+        --circle-size: 130px;
     }
     
     .control-bar__right .circular-progress__percent {
@@ -5998,6 +6327,14 @@ body.is-division .card.maps-section {
     
     .control-bar__right .circular-progress__subtitle {
         font-size: 0.62rem;
+    }
+
+    .control-bar__right .circular-progress__played {
+        font-size: 0.68rem;
+    }
+
+    .control-bar__right .circular-progress__label .circular-progress__remaining {
+        font-size: 0.6rem;
     }
     
     .control-bar__search {
@@ -6154,9 +6491,12 @@ body.is-division .card.maps-section {
     position: absolute;
     inset: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 0.2rem;
     pointer-events: none;
+    text-align: center;
 }
 
 .circular-progress__percent {
@@ -6164,6 +6504,19 @@ body.is-division .card.maps-section {
     font-weight: 700;
     color: rgba(255, 255, 255, 0.95);
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.circular-progress__played {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: rgba(215, 225, 250, 0.95);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.circular-progress__label .circular-progress__remaining {
+    font-size: 0.72rem;
+    color: rgba(200, 215, 255, 0.88);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
 .circular-progress__text {
@@ -6175,15 +6528,25 @@ body.is-division .card.maps-section {
 }
 
 .circular-progress__title {
-    font-size: 0.95rem;
-    font-weight: 600;
+    --title-accent-font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+    --title-accent-font-weight: 600;
+    --title-accent-letter-spacing: 0.08em;
+    --title-accent-underline-scale: 0.45;
+    --title-accent-underline-gap: 0.2rem;
+    --title-accent-underline-thickness: 2px;
+    --title-accent-underline-opacity: 0.45;
+    --title-accent-underline-max: 8rem;
     color: rgba(220, 230, 255, 0.9);
-    letter-spacing: 0.02em;
 }
 
 .circular-progress__subtitle {
     font-size: 0.8rem;
     color: rgba(180, 195, 230, 0.7);
+}
+
+.circular-progress__remaining {
+    font-size: 0.72rem;
+    color: rgba(200, 215, 255, 0.85);
 }
 
 /* Container for circular progress indicators */
@@ -6314,39 +6677,6 @@ body.is-division .card.maps-section {
 .season-control-bar__search {
     display: flex;
     flex-direction: column;
-}
-
-.filter-chip {
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    background: rgba(255, 255, 255, 0.04);
-    border-radius: 999px;
-    padding: 0.4rem 0.9rem;
-    font-size: 0.85rem;
-    text-transform: capitalize;
-    color: var(--muted);
-    cursor: pointer;
-    transition: border 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-
-.filter-chip--active {
-    color: var(--fg);
-    border-color: rgba(255, 255, 255, 0.4);
-    background: rgba(255, 255, 255, 0.12);
-}
-
-.filter-chip--active[data-state="active"] {
-    border-color: var(--state-active);
-    background: rgba(79, 130, 255, 0.18);
-}
-
-.filter-chip--active[data-state="finished"] {
-    border-color: var(--state-finished);
-    background: rgba(55, 212, 153, 0.2);
-}
-
-.filter-chip--active[data-state="waiting"] {
-    border-color: var(--state-waiting);
-    background: rgba(127, 134, 165, 0.2);
 }
 
 .season-summary-row {
@@ -6544,159 +6874,6 @@ body.is-division .card.maps-section {
     gap: 1rem;
     cursor: pointer;
     transition: transform 0.2s ease, border 0.2s ease, box-shadow 0.2s ease;
-}
-
-.division-hub-card:hover {
-    transform: translateY(-2px);
-    border-color: rgba(255, 255, 255, 0.35);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
-}
-
-.division-hub-card--active {
-    border-color: rgba(79, 130, 255, 0.35);
-}
-
-.division-hub-card--finished {
-    border-color: rgba(55, 212, 153, 0.35);
-}
-
-.division-hub-card--waiting {
-    border-color: rgba(127, 134, 165, 0.3);
-}
-
-.division-hub-card__header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-.division-hub-card__eyebrow {
-    font-size: 0.85rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
-.division-hub-card__badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.2rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.8rem;
-    font-weight: 600;
-}
-
-.division-hub-card__badge--active {
-    background: rgba(79, 130, 255, 0.17);
-    color: var(--state-active);
-}
-
-.division-hub-card__badge--finished {
-    background: rgba(55, 212, 153, 0.2);
-    color: var(--state-finished);
-}
-
-.division-hub-card__badge--waiting {
-    background: rgba(127, 134, 165, 0.2);
-    color: var(--state-waiting);
-}
-
-.division-hub-card__progress {
-    position: relative;
-    height: 38px;
-    border-radius: var(--radius-sm);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(5, 8, 20, 0.85);
-    overflow: hidden;
-}
-
-.division-hub-card__progress-fill {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, var(--state-active), #6bc3ff);
-}
-
-.division-hub-card__progress--waiting .division-hub-card__progress-fill {
-    background: rgba(127, 134, 165, 0.35);
-}
-
-.division-hub-card__progress-marker {
-    position: absolute;
-    left: 50%;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: rgba(255, 255, 255, 0.25);
-}
-
-.division-hub-card__progress-text {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--fg);
-}
-
-.division-hub-card__activity {
-    font-size: 0.9rem;
-    color: var(--muted);
-}
-
-.division-hub-card__facts {
-    list-style: none;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 0.75rem;
-}
-
-.division-hub-card__fact {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.4rem 0.5rem;
-    align-items: center;
-}
-
-.division-hub-card__fact-icon svg {
-    width: 20px;
-    height: 20px;
-    fill: var(--muted);
-}
-
-.division-hub-card__fact-label {
-    font-size: 0.78rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.division-hub-card__fact-value {
-    grid-column: span 2;
-    font-weight: 600;
-}
-
-.division-hub-card__finished {
-    border-radius: var(--radius-sm);
-    background: rgba(55, 212, 153, 0.15);
-    padding: 0.9rem;
-    text-align: center;
-    color: var(--state-finished);
-    font-weight: 600;
-}
-
-.division-hub-card__winner {
-    margin-top: 0.2rem;
-    color: var(--fg);
-}
-
-.division-hub-card__actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
 }
 
 .division-hub__empty {

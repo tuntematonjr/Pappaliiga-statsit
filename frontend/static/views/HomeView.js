@@ -213,6 +213,21 @@ function buildMetricCards(source, schema, context) {
     });
 }
 
+const DEFAULT_DIVISION_STATUS_LABELS = Object.freeze({
+    'ei-alkanut': 'Ei alkanut',
+    'runkosarja-kaynnissa': 'Runkosarja käynnissä',
+    'playoffit-kaynnissa': 'Playoffit käynnissä',
+    'taputeltu-loppuun': 'Taputeltu loppuun'
+});
+
+const DIVISION_STATUS_META =
+    (typeof window !== 'undefined' && window.PAPPALIIGA_DIVISION_STATUS_META) || {};
+const DIVISION_STATUS_ORDER = Array.isArray(
+    typeof window !== 'undefined' && window.PAPPALIIGA_DIVISION_STATUS_ORDER
+)
+    ? window.PAPPALIIGA_DIVISION_STATUS_ORDER
+    : ['ei-alkanut', 'runkosarja-kaynnissa', 'playoffit-kaynnissa', 'taputeltu-loppuun'];
+
 function sortSeasonsDescending(seasons = []) {
     if (!Array.isArray(seasons)) {
         return [];
@@ -429,114 +444,92 @@ window.HomeView = {
             return `Teams: ${teams} · Players: ${players}`;
         },
         seasonProgressSummary() {
-            const stats = this.seasonState?.stats || {};
-            const percentFromStats = toNumber(
-                pickValue(stats, ['progress.finished_percent', 'finished_percent']),
+            const statsPercent = toNumber(
+                pickValue(this.seasonState?.stats, ['progress.finished_percent', 'finished_percent']),
                 null
             );
             const overall = this.seasonState?.progress?.overall || {};
             const played = toNumber(overall.played, 0);
             const total = toNumber(overall.total, 0);
-            const percent = total > 0 ? Math.min(100, Math.round((played / total) * 100)) : 0;
+            const computedPercent = Number.isFinite(overall.percent)
+                ? Math.round(overall.percent)
+                : total > 0
+                    ? Math.min(100, Math.round((played / total) * 100))
+                    : 0;
             return {
                 played,
                 total,
-                percent: percentFromStats != null && percentFromStats > 0 ? percentFromStats : percent
+                percent:
+                    statsPercent != null && statsPercent > 0
+                        ? Math.round(statsPercent)
+                        : computedPercent
             };
         },
         seasonProgressLabel() {
             const { played, total, percent } = this.seasonProgressSummary;
             if (!total) {
-                return '';
+                return played > 0 ? `Matches played: ${played}` : '';
             }
             return `Matches: ${played}/${total} · ${percent}%`;
         },
         hasSeasonProgress() {
-            return this.seasonProgressSummary.total > 0;
+            const summary = this.seasonProgressSummary;
+            return summary.total > 0 || summary.played > 0;
         },
         circularProgressData() {
-            const stats = this.seasonState?.stats || {};
-            const statsProgress = stats.progress || {};
-            const computedProgress = this.seasonState?.progress || {};
+            const progress = this.seasonState?.progress || {};
+            const sections = [
+                { key: 'regular', progressKey: 'regular', label: 'Runkosarja', color: 'regular' },
+                { key: 'playoff', progressKey: 'playoffs', label: 'Playoffit', color: 'playoff' },
+                { key: 'overall', progressKey: 'overall', label: 'Kausi yhteensä', color: 'overall' }
+            ];
+            const payload = {};
+            sections.forEach(section => {
+                const block = progress[section.progressKey] || {};
+                const played = toNumber(block.played, 0);
+                const total = toNumber(block.total, 0);
+                const percent = Number.isFinite(block.percent)
+                    ? Math.round(block.percent)
+                    : total > 0
+                        ? Math.min(100, Math.round((played / total) * 100))
+                        : 0;
+                payload[section.key] = {
+                    played,
+                    total,
+                    label: section.label,
+                    sublabel:
+                        total > 0
+                            ? `${played} / ${total} Ottelut`
+                            : played > 0
+                                ? `${played} ottelua`
+                                : 'Ei otteluita',
+                    color: section.color,
+                    percent,
+                    source: block.source || 'unknown'
+                };
+            });
 
-            // Root cause: v3 summary dropped progress.* stats so the UI saw zeros; fall back to store-computed progress.
-            const regularPlayed = toNumber(
-                statsProgress.regular_matches_played ?? computedProgress?.regular?.played,
-                0
-            );
-            const regularTotal = toNumber(
-                statsProgress.regular_matches_total ?? computedProgress?.regular?.total,
-                0
-            );
-            const playoffPlayed = toNumber(
-                statsProgress.playoff_matches_played ?? computedProgress?.playoffs?.played,
-                0
-            );
-            const playoffTotal = toNumber(
-                statsProgress.playoff_matches_total ?? computedProgress?.playoffs?.total,
-                0
-            );
-            const overallPlayed = toNumber(
-                statsProgress.overall_matches_played ??
-                    computedProgress?.overall?.played ??
-                    regularPlayed +
-                        playoffPlayed,
-                0
-            );
-            const overallTotal = toNumber(
-                statsProgress.overall_matches_total ??
-                    computedProgress?.overall?.total ??
-                    regularTotal + playoffTotal,
-                0
-            );
-
-            const payload = {
-                regular: {
-                    played: regularPlayed,
-                    total: regularTotal > 0 ? regularTotal : 1,
-                    label: 'Runkosarja',
-                    sublabel: `${regularPlayed} / ${regularTotal} pelattu`,
-                    color: 'regular'
-                },
-                playoff: {
-                    played: playoffPlayed,
-                    total: playoffTotal > 0 ? playoffTotal : 1,
-                    label: 'Playoffit',
-                    sublabel: `${playoffPlayed} / ${playoffTotal} pelattu`,
-                    color: 'playoff'
-                },
-                overall: {
-                    played: overallPlayed,
-                    total: overallTotal > 0 ? overallTotal : 1,
-                    label: 'Kausi yhteensä',
-                    sublabel: `${overallPlayed} / ${overallTotal} pelattu`,
-                    color: 'overall'
-                }
-            };
-
-            // Debug logging required for validation in this task.
             if (typeof console !== 'undefined' && console.log) {
                 console.log('[HomeView] circularProgressData resolved', {
-                    statsProgress,
-                    computedProgress,
-                    payload
+                    payload,
+                    progressSources: {
+                        regular: progress?.regular?.source || 'unknown',
+                        playoffs: progress?.playoffs?.source || 'unknown',
+                        overall: progress?.overall?.source || 'unknown'
+                    }
                 });
             }
 
             return payload;
         },
         hasCircularProgressData() {
-            const statsProgress = this.seasonState?.stats?.progress || {};
-            const computedProgress = this.seasonState?.progress || {};
-            const totals = [
-                statsProgress.regular_matches_total,
-                statsProgress.playoff_matches_total,
-                statsProgress.overall_matches_total,
-                computedProgress?.regular?.total,
-                computedProgress?.playoffs?.total,
-                computedProgress?.overall?.total
-            ];
-            return totals.some(value => Number.isFinite(toNumber(value, 0)) && toNumber(value, 0) > 0);
+            const payload = this.circularProgressData;
+            const keys = ['regular', 'playoff', 'overall'];
+            return keys.some(key => {
+                const block = payload[key];
+                if (!block) return false;
+                return block.total > 0 || block.played > 0;
+            });
         },
         divisionCount() {
             const stats = this.seasonState?.stats || {};
@@ -590,7 +583,7 @@ window.HomeView = {
         divisionHeaderMeta() {
             if (!this.selectedSeason) return '';
             const percent = this.divisionProgressPercent.toFixed(0);
-            return `${this.divisionCount} divisioonaa · ${percent}% pelattu`;
+            return `${this.divisionCount} divisioonaa · ${percent}% Ottelut`;
         },
         divisionEmptyMessage() {
             if (!this.selectedSeasonKey) {
@@ -602,12 +595,16 @@ window.HomeView = {
             return 'Tälle kaudelle ei löytynyt divisioonia.';
         },
         divisionFilterOptions() {
-            return [
-                { id: 'all', label: 'Kaikki' },
-                { id: 'active', label: 'Käynnissä' },
-                { id: 'finished', label: 'Valmis' },
-                { id: 'waiting', label: 'Odottaa' }
-            ];
+            const options = [{ id: 'all', label: 'Kaikki', icon: null }];
+            DIVISION_STATUS_ORDER.forEach(state => {
+                const meta = DIVISION_STATUS_META[state];
+                options.push({
+                    id: state,
+                    label: meta?.label || DEFAULT_DIVISION_STATUS_LABELS[state] || state,
+                    icon: meta?.icon || null
+                });
+            });
+            return options;
         }
     },
     async mounted() {
@@ -931,7 +928,7 @@ window.HomeView = {
 
             <section class="home-partners" aria-label="Kumppanikuvaukset">
                 <article
-                    v-for="callout in partnerCallouts"
+                    v-for="(callout, idx) in partnerCallouts"
                     :key="callout.id"
                     class="partner-callout"
                 >
@@ -949,7 +946,7 @@ window.HomeView = {
                         </div>
                         <div class="partner-callout__titles">
                             <span class="partner-callout__eyebrow">{{ callout.eyebrow }}</span>
-                            <h2>{{ callout.name }}</h2>
+                            <h2 :class="['title-accent', 'titleUnderlineMain', 'title-delay-' + (idx % 4)]">{{ callout.name }}</h2>
                         </div>
                     </header>
                     <p class="partner-callout__body">{{ callout.description }}</p>
@@ -965,8 +962,13 @@ window.HomeView = {
             </section>
 
             <section class="stats-section stats-section--global" aria-labelledby="global-summary-heading">
-                <header class="section-heading">
-                    <h2 id="global-summary-heading">Kaikki kaudet yhteensä</h2>
+                <header class="section-heading section-heading--centered">
+                    <h2
+                        id="global-summary-heading"
+                        class="title-accent titleUnderlineMain title-delay-0 title-duration-fast"
+                    >
+                        Kaikki kaudet yhteensä
+                    </h2>
                 </header>
                 <loading-spinner
                     v-if="summaryLoading"
@@ -989,9 +991,14 @@ window.HomeView = {
                 ref="seasonControls"
                 aria-labelledby="season-explorer-heading"
             >
-                <header class="season-explorer__intro section-heading">
+                <header class="season-explorer__intro section-heading section-heading--centered">
                     <div>
-                        <h2 id="season-explorer-heading">Kausiselain</h2>
+                        <h2
+                            id="season-explorer-heading"
+                            class="title-accent titleUnderlineMain title-delay-1"
+                        >
+                            Kausiselain
+                        </h2>
                     </div>
                 </header>
 
@@ -1035,6 +1042,7 @@ window.HomeView = {
                             <div class="season-explorer__summary-header">
                                 <div>
                                     <h3
+                                        class="title-accent titleUnderlineMain title-delay-2 title-duration-slow"
                                         id="season-summary-heading"
                                         aria-live="polite"
                                         aria-atomic="true"
@@ -1075,10 +1083,29 @@ window.HomeView = {
                                 type="button"
                                 class="season-filter-chip"
                                 :class="{ 'season-filter-chip--active': divisionFilter === option.id }"
+                                :data-status="option.id !== 'all' ? option.id : null"
                                 :aria-pressed="divisionFilter === option.id"
                                 @click="setDivisionFilter(option.id)"
                             >
-                                {{ option.label }}
+                                <span
+                                    v-if="option.icon"
+                                    class="season-filter-chip__icon"
+                                    aria-hidden="true"
+                                >
+                                    <svg
+                                        :viewBox="option.icon.viewBox"
+                                        role="presentation"
+                                        focusable="false"
+                                    >
+                                        <path
+                                            v-for="(path, idx) in option.icon.paths"
+                                            :key="idx"
+                                            :d="path.d"
+                                            fill="currentColor"
+                                        ></path>
+                                    </svg>
+                                </span>
+                                <span class="season-filter-chip__label">{{ option.label }}</span>
                             </button>
                             <button
                                 type="button"

@@ -36,7 +36,7 @@ window.MapsStats = {
         <section class="maps-stats card">
             <header class="card-head">
                 <div>
-                    <h2 class="title">{{ title }}</h2>
+                    <h2 class="title title-accent titleUnderlineCard title-delay-0">{{ title }}</h2>
                     <p v-if="subtitle" class="subtitle muted">{{ subtitle }}</p>
                 </div>
             </header>

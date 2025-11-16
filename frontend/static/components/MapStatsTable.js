@@ -7,7 +7,7 @@ window.MapStatsTable = {
     },
     template: `
         <div class="map-stats-table">
-            <h3>Divisioonan Kartta Tilastot</h3>
+            <h3 class="title-accent titleUnderlineCard title-delay-1">Divisioonan Kartta Tilastot</h3>
             <div v-if="loading" class="loading">Loading map stats...</div>
             <div v-else-if="error" class="error">{{ error }}</div>
             <div v-else>
@@ -121,7 +121,7 @@ window.MapStatsTable = {
         return {
             defaultColumns: [
                 { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name' },
-                { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true },
+                { key: 'maps_played', label: 'Ottelut', sortable: true, numeric: true },
                 { key: 'banned', label: 'Bannattu', sortable: true, numeric: true },
                 { key: 'rounds_played', label: 'Erät', sortable: true, numeric: true },
                 { key: 'rounds_per_map', label: 'Erää / kartta', sortable: true, numeric: true, format: v => Number(v).toFixed(2) },

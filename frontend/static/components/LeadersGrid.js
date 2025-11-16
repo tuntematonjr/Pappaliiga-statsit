@@ -9,11 +9,21 @@ window.LeadersGrid = {
         <section class="leaders-section" aria-label="Top players by category">
             <h2 class="sr-only">Top Players</h2>
             <div v-for="(category, catIdx) in categories" :key="category.id || category.categoryTitle || catIdx" class="leader-category">
-                <h3 class="category-title">{{ category.categoryTitle }}</h3>
+                <h3
+                    class="category-title title-accent titleUnderlineMain"
+                    :class="'title-delay-' + (catIdx % 4)"
+                >
+                    {{ category.categoryTitle }}
+                </h3>
                 <div class="leaders-row" role="list">
                     <article v-for="(leader, idx) in safeLeaders(category.leaders)" :key="leaderKey(leader, idx)" class="leader-card" role="listitem">
                         <header class="leader-header">
-                            <h4 class="leader-title">{{ leader.title || leader.playerName || '—' }}</h4>
+                            <h4
+                                class="leader-title title-accent titleUnderlineCard"
+                                :class="'title-delay-' + (idx % 4)"
+                            >
+                                {{ leader.title || leader.playerName || '—' }}
+                            </h4>
                             <span v-if="leader.subtitle" class="leader-subtitle">{{ leader.subtitle }}</span>
                         </header>
                         <div class="leader-info">

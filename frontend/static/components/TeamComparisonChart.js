@@ -64,7 +64,7 @@ window.TeamComparisonChart = {
             <header class="team-comparison-chart__header">
                 <div>
                     <p class="section-eyebrow">Sarjatilanne</p>
-                    <h3>{{ title }}</h3>
+                    <h3 class="title-accent titleUnderlineCard title-delay-0">{{ title }}</h3>
                 </div>
             </header>
 
