@@ -193,7 +193,8 @@ a {
     font-weight: 700;
     text-align: center;
     --title-underline-delay: 0s;
-    --title-underline-duration: 5s;
+    --title-underline-duration: 6.25s;
+    --title-underline-stretch: 1.2;
 }
 
 .titleUnderlineMain {
@@ -203,11 +204,11 @@ a {
 
 .titleUnderlineMain {
     padding-bottom: 0.85rem;
-    --title-underline-max: 26rem;
+    --title-underline-max: 30rem;
 }
 
 .titleUnderlineCard {
-    font-size: clamp(1.15rem, 2vw, 1.55rem);
+    font-size: clamp(1.18rem, 2vw, 1.62rem);
     letter-spacing: 0.02em;
     font-weight: 600;
     padding-bottom: 0.6rem;
@@ -219,13 +220,13 @@ a {
     position: absolute;
     bottom: -0.1rem;
     left: 50%;
-    width: clamp(100%, 125%, var(--title-underline-max, 24rem));
-    height: 3.5px;
+    width: min(calc(var(--title-underline-stretch, 1.2) * 100%), var(--title-underline-max, 30rem));
+    height: 4.5px;
     border-radius: 999px;
     transform: translateX(-50%);
     background: linear-gradient(120deg, rgba(90, 160, 255, 0.3), rgba(124, 215, 243, 0.95), rgba(90, 160, 255, 0.3));
-    background-size: 220% auto;
-    animation: underlineSlide var(--title-underline-duration, 5s) ease-in-out infinite;
+    background-size: 260% auto;
+    animation: underlineSlide var(--title-underline-duration, 6.25s) ease-in-out infinite;
     animation-delay: var(--title-underline-delay, 0s);
     opacity: 0.95;
     pointer-events: none;
@@ -233,7 +234,7 @@ a {
 
 .titleUnderlineCard {
     padding-bottom: 0.55rem;
-    --title-underline-duration: 4.5s;
+    --title-underline-duration: 6.5s;
 }
 
 .titleUnderlineCard::after {
@@ -241,16 +242,23 @@ a {
     position: absolute;
     bottom: -0.05rem;
     left: 50%;
-    width: clamp(100%, 112%, var(--title-underline-max, 16rem));
-    height: 2px;
+    width: min(calc(1.08 * 100%), var(--title-underline-max, 16rem));
+    height: 2.75px;
     border-radius: 999px;
     transform: translateX(-50%);
     background: linear-gradient(120deg, rgba(80, 140, 255, 0.2), rgba(120, 210, 235, 0.55), rgba(80, 140, 255, 0.2));
-    background-size: 220% auto;
-    animation: underlineSlide var(--title-underline-duration, 4.5s) ease-in-out infinite;
+    background-size: 240% auto;
+    animation: underlineSlide var(--title-underline-duration, 6.5s) ease-in-out infinite;
     animation-delay: var(--title-underline-delay, 0s);
     opacity: 0.9;
     pointer-events: none;
+}
+
+@media (max-width: 640px) {
+    .titleUnderlineMain::after,
+    .titleUnderlineCard::after {
+        width: min(100%, var(--title-underline-max, 24rem));
+    }
 }
 
 @keyframes underlineSlide {
@@ -266,25 +274,25 @@ a {
 }
 
 .title-delay-0 { --title-underline-delay: 0s; }
-.title-delay-1 { --title-underline-delay: 0.35s; }
-.title-delay-2 { --title-underline-delay: 0.7s; }
-.title-delay-3 { --title-underline-delay: 1.05s; }
+.title-delay-1 { --title-underline-delay: 0.4s; }
+.title-delay-2 { --title-underline-delay: 0.9s; }
+.title-delay-3 { --title-underline-delay: 1.3s; }
 .title-duration-slow { --title-underline-duration: 6s; }
 .title-duration-fast { --title-underline-duration: 4.25s; }
 
 .division-list > .division-card:nth-child(3n + 1) .titleUnderlineCard::after {
-    animation-delay: 0s;
-    animation-duration: 4.2s;
+    animation-delay: 0.1s;
+    animation-duration: 6.6s;
 }
 
 .division-list > .division-card:nth-child(3n + 2) .titleUnderlineCard::after {
-    animation-delay: 0.2s;
-    animation-duration: 4.8s;
+    animation-delay: 0.45s;
+    animation-duration: 7.1s;
 }
 
 .division-list > .division-card:nth-child(3n) .titleUnderlineCard::after {
-    animation-delay: 0.45s;
-    animation-duration: 5.2s;
+    animation-delay: 0.85s;
+    animation-duration: 7.5s;
 }
 
 .sr-only {
@@ -462,6 +470,14 @@ a {
     box-shadow: var(--shadow);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+.stats-section--global {
+    gap: clamp(0.5rem, 1.5vw, 1.1rem);
+}
+
+.stats-section--global .section-heading {
+    margin-bottom: 0.2rem;
 }
 
 .stats-section--selector {
@@ -1714,7 +1730,7 @@ a {
 
 .division-card__title {
     margin: 0;
-    --title-accent-font-size: clamp(1.35rem, 2vw, 1.6rem);
+    --title-accent-font-size: clamp(1.4rem, 2.1vw, 1.68rem);
     --title-accent-font-weight: 800;
     --title-accent-letter-spacing: 0.02em;
     --title-accent-line-height: 1.25;
@@ -1731,7 +1747,7 @@ a {
 }
 
 .division-card__title--hero {
-    --title-accent-font-size: clamp(1.4rem, 2.2vw, 1.75rem);
+    --title-accent-font-size: clamp(1.47rem, 2.3vw, 1.85rem);
 }
 
 .division-card__header--centered {
@@ -6515,16 +6531,19 @@ body.is-division .card.maps-section {
 }
 
 .circular-progress__played {
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     font-weight: 600;
-    color: rgba(215, 225, 250, 0.95);
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.02em;
+    color: rgba(248, 251, 255, 0.95);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
 }
 
 .circular-progress__label .circular-progress__remaining {
-    font-size: 0.72rem;
-    color: rgba(200, 215, 255, 0.88);
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    font-size: 0.76rem;
+    font-weight: 500;
+    letter-spacing: 0.015em;
+    color: rgba(235, 244, 255, 0.9);
+    text-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
 }
 
 .circular-progress__text {
@@ -6536,7 +6555,7 @@ body.is-division .card.maps-section {
 }
 
 .circular-progress__title {
-    --title-accent-font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+    --title-accent-font-size: clamp(1.05rem, 1.7vw, 1.25rem);
     --title-accent-font-weight: 600;
     --title-accent-letter-spacing: 0.08em;
     --title-accent-underline-scale: 0.45;
@@ -6544,7 +6563,7 @@ body.is-division .card.maps-section {
     --title-accent-underline-thickness: 2px;
     --title-accent-underline-opacity: 0.45;
     --title-accent-underline-max: 8rem;
-    color: rgba(220, 230, 255, 0.9);
+    color: rgba(238, 244, 255, 0.95);
 }
 
 .circular-progress__subtitle {

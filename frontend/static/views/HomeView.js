@@ -306,14 +306,8 @@ window.HomeView = {
     },
     computed: {
         heroTitle() {
-            return 'AFI × Pappaliiga Stats Hub';
+            return 'AFI - Unofficial Pappaliiga CS Statsit';
         },
-        heroSubtitle() {
-            return 'Nopea näkymä Pappaliigan kausien divisiooniin, tuloksiin ja seuraaviin askeliin.';
-        },
-        // heroEyebrow() {
-        //     return 'AFI · Faceit API DATA';
-        // },
         partnerCallouts() {
             return [
                 {
@@ -322,8 +316,8 @@ window.HomeView = {
                     name: 'Armafinland',
                     description: 'Yhteisö on avoin kaikille pelaajille ja ryhmille, jotka haluavat kokeilla taktista pelaamista myös Arma-sarjan peleissä. Pelaamme Arma 3 ja Arma Reforger, sekä järjestämme kansainvälisiä TvT-tehtäviä, joissa painotetaan realismia, joukkuepeliä ja yhteistoimintaa. Pelien ulkopuolella meno on rentoa ja mutkatonta, mutta pelissä otetaan tehtävät tosissaan. ',
                     primaryLabel: 'Liity AFI Discord',
-                    primaryHref: 'https://discord.gg/armafinland',
-                    secondaryLabel: 'Tutustu sivustoon',
+                    primaryHref: 'https://www.armafinland.fi/discord',
+                    secondaryLabel: 'Lue lisää',
                     secondaryHref: 'https://armafinland.fi',
                     logo: 'https://armafinland.fi/logot/images/armafin-logo-400px.png'
                 },
@@ -920,7 +914,6 @@ window.HomeView = {
         <div class="home-view">
             <hero-banner
                 :title="heroTitle"
-                :subtitle="heroSubtitle"
                 :eyebrow="heroEyebrow"
             >
                 <template #actions>
@@ -968,7 +961,7 @@ window.HomeView = {
                 <header class="section-heading section-heading--centered">
                     <h2
                         id="global-summary-heading"
-                        class="title-accent titleUnderlineMain title-delay-0 title-duration-fast"
+                        class="title-accent titleUnderlineMain title-delay-0"
                     >
                         Kaikki kaudet yhteensä
                     </h2>
@@ -1053,7 +1046,7 @@ window.HomeView = {
                             <div class="season-explorer__summary-header">
                                 <div>
                                     <h3
-                                        class="title-accent titleUnderlineMain title-delay-2 title-duration-slow"
+                                        class="title-accent titleUnderlineMain title-delay-3 title-duration-slow"
                                         id="season-summary-heading"
                                         aria-live="polite"
                                         aria-atomic="true"
