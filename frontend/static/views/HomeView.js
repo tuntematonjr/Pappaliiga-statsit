@@ -289,6 +289,9 @@ window.HomeView = {
         },
         get CircularProgress() {
             return window.CircularProgress;
+        },
+        get SummaryStatCard() {
+            return window.SummaryStatCard;
         }
     },
     data() {
@@ -979,11 +982,19 @@ window.HomeView = {
                     :message="summaryError"
                     @retry="retrySummary"
                 ></error-message>
-                <stat-panel
+                <div
                     v-else
-                    :items="globalSummaryMetrics"
-                    :columns="4"
-                ></stat-panel>
+                    class="summary-card-grid"
+                    role="list"
+                >
+                    <summary-stat-card
+                        v-for="metric in globalSummaryMetrics"
+                        :key="'global-' + metric.key"
+                        :icon="getMetricIcon(metric.key)"
+                        :label="metric.label"
+                        :value="metric.value"
+                    ></summary-stat-card>
+                </div>
             </section>
 
             <section
@@ -1051,12 +1062,14 @@ window.HomeView = {
                                     </h3>
                                 </div>
                             </div>
-                            <div class="season-kausikooste">
-                                <div class="kausikooste-card" v-for="metric in seasonSummaryMetrics" :key="metric.key">
-                                    <div class="kausikooste-card__icon">{{ getMetricIcon(metric.key) }}</div>
-                                    <div class="kausikooste-card__value">{{ metric.value }}</div>
-                                    <div class="kausikooste-card__label">{{ metric.label }}</div>
-                                </div>
+                            <div class="summary-card-grid" role="list">
+                                <summary-stat-card
+                                    v-for="metric in seasonSummaryMetrics"
+                                    :key="'season-' + metric.key"
+                                    :icon="getMetricIcon(metric.key)"
+                                    :label="metric.label"
+                                    :value="metric.value"
+                                ></summary-stat-card>
                             </div>
                         </template>
                         <div
