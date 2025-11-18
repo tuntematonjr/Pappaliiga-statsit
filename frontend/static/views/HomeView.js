@@ -914,13 +914,8 @@ window.HomeView = {
         <div class="home-view">
             <hero-banner
                 :title="heroTitle"
-                :eyebrow="heroEyebrow"
-            >
-                <template #actions>
-                    <button class="btn-primary" type="button" @click="scrollToSeasonSummary">View Current Season</button>
-                    <a class="btn-secondary" href="https://discord.gg/pappaliiga" target="_blank" rel="noopener">Join Discord</a>
-                </template>
-            </hero-banner>
+                align="center"
+            ></hero-banner>
 
             <section class="home-partners" aria-label="Kumppanikuvaukset">
                 <article
@@ -942,7 +937,7 @@ window.HomeView = {
                         </div>
                         <div class="partner-callout__titles">
                             <span class="partner-callout__eyebrow">{{ callout.eyebrow }}</span>
-                            <h2 :class="['title-accent', 'titleUnderlineMain', 'title-delay-' + (idx % 4)]">{{ callout.name }}</h2>
+                            <h2 class="title-accent titleUnderlineMain">{{ callout.name }}</h2>
                         </div>
                     </header>
                     <p class="partner-callout__body">{{ callout.description }}</p>
@@ -961,7 +956,7 @@ window.HomeView = {
                 <header class="section-heading section-heading--centered">
                     <h2
                         id="global-summary-heading"
-                        class="title-accent titleUnderlineMain title-delay-0"
+                        class="title-accent titleUnderlineMain"
                     >
                         Kaikki kaudet yhteensä
                     </h2>
@@ -999,7 +994,7 @@ window.HomeView = {
                     <div>
                         <h2
                             id="season-explorer-heading"
-                            class="title-accent titleUnderlineMain title-delay-1"
+                            class="title-accent titleUnderlineMain"
                         >
                             Kausiselain
                         </h2>
@@ -1046,7 +1041,7 @@ window.HomeView = {
                             <div class="season-explorer__summary-header">
                                 <div>
                                     <h3
-                                        class="title-accent titleUnderlineMain title-delay-3 title-duration-slow"
+                                        class="title-accent titleUnderlineMain title-duration-slow"
                                         id="season-summary-heading"
                                         aria-live="polite"
                                         aria-atomic="true"

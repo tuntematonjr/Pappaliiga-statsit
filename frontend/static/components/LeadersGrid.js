@@ -11,7 +11,6 @@ window.LeadersGrid = {
             <div v-for="(category, catIdx) in categories" :key="category.id || category.categoryTitle || catIdx" class="leader-category">
                 <h3
                     class="category-title title-accent titleUnderlineMain"
-                    :class="'title-delay-' + (catIdx % 4)"
                 >
                     {{ category.categoryTitle }}
                 </h3>
@@ -20,7 +19,6 @@ window.LeadersGrid = {
                         <header class="leader-header">
                             <h4
                                 class="leader-title title-accent titleUnderlineCard"
-                                :class="'title-delay-' + (idx % 4)"
                             >
                                 {{ leader.title || leader.playerName || '—' }}
                             </h4>

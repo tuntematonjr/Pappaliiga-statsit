@@ -185,7 +185,7 @@ a {
     align-items: center;
     justify-content: center;
     text-align: center;
-    width: max-content;
+    width: fit-content;
     max-width: 100%;
     text-wrap: balance;
     margin-left: auto;
@@ -194,7 +194,11 @@ a {
     text-align: center;
     --title-underline-delay: 0s;
     --title-underline-duration: 6.25s;
-    --title-underline-stretch: 1.2;
+    --title-underline-absolute: 0px;
+    --title-underline-min: 4rem;
+    --title-underline-max: 28rem;
+    --title-underline-thickness: 3px;
+    --title-underline-gradient: linear-gradient(120deg, rgba(90, 160, 255, 0.3), rgba(124, 215, 243, 0.95), rgba(90, 160, 255, 0.3));
 }
 
 .titleUnderlineMain {
@@ -204,7 +208,10 @@ a {
 
 .titleUnderlineMain {
     padding-bottom: 0.85rem;
-    --title-underline-max: 30rem;
+    --title-underline-min: 6rem;
+    --title-underline-max: 32rem;
+    --title-underline-thickness: 3.6px;
+    --title-underline-gradient: linear-gradient(115deg, rgba(68, 142, 255, 0.2), rgba(132, 222, 255, 0.95), rgba(68, 142, 255, 0.2));
 }
 
 .titleUnderlineCard {
@@ -212,7 +219,11 @@ a {
     letter-spacing: 0.02em;
     font-weight: 600;
     padding-bottom: 0.6rem;
+    --title-underline-min: 3.5rem;
     --title-underline-max: 18rem;
+    --title-underline-duration: 7.5s;
+    --title-underline-thickness: 2.2px;
+    --title-underline-gradient: linear-gradient(120deg, rgba(64, 110, 210, 0.25), rgba(150, 220, 255, 0.7), rgba(64, 110, 210, 0.25));
 }
 
 .titleUnderlineMain::after {
@@ -220,21 +231,16 @@ a {
     position: absolute;
     bottom: -0.1rem;
     left: 50%;
-    width: min(calc(var(--title-underline-stretch, 1.2) * 100%), var(--title-underline-max, 30rem));
-    height: 4.5px;
+    width: var(--title-underline-absolute, var(--title-underline-min, 4rem));
+    height: var(--title-underline-thickness, 3px);
     border-radius: 999px;
     transform: translateX(-50%);
-    background: linear-gradient(120deg, rgba(90, 160, 255, 0.3), rgba(124, 215, 243, 0.95), rgba(90, 160, 255, 0.3));
-    background-size: 260% auto;
-    animation: underlineSlide var(--title-underline-duration, 6.25s) ease-in-out infinite;
+    background: var(--title-underline-gradient);
+    background-size: 320% 100%;
+    animation: underlineShimmer var(--title-underline-duration, 6.25s) ease-in-out infinite;
     animation-delay: var(--title-underline-delay, 0s);
     opacity: 0.95;
     pointer-events: none;
-}
-
-.titleUnderlineCard {
-    padding-bottom: 0.55rem;
-    --title-underline-duration: 6.5s;
 }
 
 .titleUnderlineCard::after {
@@ -242,58 +248,34 @@ a {
     position: absolute;
     bottom: -0.05rem;
     left: 50%;
-    width: min(calc(1.08 * 100%), var(--title-underline-max, 16rem));
-    height: 2.75px;
+    width: var(--title-underline-absolute, var(--title-underline-min, 3.5rem));
+    height: var(--title-underline-thickness, 2px);
     border-radius: 999px;
     transform: translateX(-50%);
-    background: linear-gradient(120deg, rgba(80, 140, 255, 0.2), rgba(120, 210, 235, 0.55), rgba(80, 140, 255, 0.2));
-    background-size: 240% auto;
-    animation: underlineSlide var(--title-underline-duration, 6.5s) ease-in-out infinite;
+    background: var(--title-underline-gradient);
+    background-size: 300% 100%;
+    animation: underlineShimmer var(--title-underline-duration, 7.5s) ease-in-out infinite;
     animation-delay: var(--title-underline-delay, 0s);
     opacity: 0.9;
     pointer-events: none;
 }
 
-@media (max-width: 640px) {
-    .titleUnderlineMain::after,
-    .titleUnderlineCard::after {
-        width: min(100%, var(--title-underline-max, 24rem));
-    }
-}
-
-@keyframes underlineSlide {
+@keyframes underlineShimmer {
     0% {
         background-position: 0% 50%;
+        opacity: 0.55;
     }
-    50% {
-        background-position: 100% 50%;
+    45% {
+        opacity: 1;
     }
     100% {
-        background-position: 0% 50%;
+        background-position: 100% 50%;
+        opacity: 0.7;
     }
 }
 
-.title-delay-0 { --title-underline-delay: 0s; }
-.title-delay-1 { --title-underline-delay: 0.4s; }
-.title-delay-2 { --title-underline-delay: 0.9s; }
-.title-delay-3 { --title-underline-delay: 1.3s; }
-.title-duration-slow { --title-underline-duration: 6s; }
-.title-duration-fast { --title-underline-duration: 4.25s; }
-
-.division-list > .division-card:nth-child(3n + 1) .titleUnderlineCard::after {
-    animation-delay: 0.1s;
-    animation-duration: 6.6s;
-}
-
-.division-list > .division-card:nth-child(3n + 2) .titleUnderlineCard::after {
-    animation-delay: 0.45s;
-    animation-duration: 7.1s;
-}
-
-.division-list > .division-card:nth-child(3n) .titleUnderlineCard::after {
-    animation-delay: 0.85s;
-    animation-duration: 7.5s;
-}
+.title-duration-slow { --title-underline-duration: 7.25s; }
+.title-duration-fast { --title-underline-duration: 5s; }
 
 .sr-only {
     position: absolute;
@@ -813,6 +795,14 @@ a {
     text-align: center;
     align-self: center !important;
     width: 100%;
+}
+
+.section-heading--centered .titleUnderlineMain,
+.section-heading--centered .titleUnderlineCard {
+    width: fit-content;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 @media (min-width: 768px) {

@@ -7,7 +7,7 @@ window.MapStatsTable = {
     },
     template: `
         <div class="map-stats-table">
-            <h3 class="title-accent titleUnderlineCard title-delay-1">Divisioonan Kartta Tilastot</h3>
+            <h3 class="title-accent titleUnderlineCard">Divisioonan Kartta Tilastot</h3>
             <div v-if="loading" class="loading">Loading map stats...</div>
             <div v-else-if="error" class="error">{{ error }}</div>
             <div v-else>

@@ -325,7 +325,7 @@ window.DivisionView = {
                 <div class="division-header__meta">
                     <div>
                         <p class="section-eyebrow">Divisioona</p>
-                        <h1 class="division-header__title title-accent titleUnderlineMain title-delay-0">{{ divisionTitle }}</h1>
+                        <h1 class="division-header__title title-accent titleUnderlineMain">{{ divisionTitle }}</h1>
                         <p v-if="divisionSubtitle" class="division-header__subtitle">{{ divisionSubtitle }}</p>
                     </div>
                     <copy-link v-if="championshipId" :url="shareUrl" label="Jaa divisioona"></copy-link>
@@ -364,7 +364,7 @@ window.DivisionView = {
             <template v-else>
                 <section id="overview" class="division-section">
                     <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain title-delay-1">Katsaus</h2>
+                        <h2 class="title-accent titleUnderlineMain">Katsaus</h2>
                     </div>
                     <stat-panel
                         :items="statMetrics"
@@ -374,7 +374,7 @@ window.DivisionView = {
 
                 <section id="standings" class="division-section">
                     <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain title-delay-2">Sarjataulukko</h2>
+                        <h2 class="title-accent titleUnderlineMain">Sarjataulukko</h2>
                     </div>
                     <team-comparison-chart
                         :teams="standings"
@@ -393,7 +393,7 @@ window.DivisionView = {
 
                 <section id="maps" class="division-section">
                     <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain title-delay-3">Karttanäkymä</h2>
+                        <h2 class="title-accent titleUnderlineMain">Karttanäkymä</h2>
                     </div>
                     <maps-stats
                         title="Karttatilastot"
@@ -407,7 +407,7 @@ window.DivisionView = {
 
                 <section id="highlights" class="division-section">
                     <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain title-delay-0 title-duration-fast">Nostot</h2>
+                        <h2 class="title-accent titleUnderlineMain title-duration-fast">Nostot</h2>
                     </div>
 
                     <loading-spinner
@@ -429,7 +429,6 @@ window.DivisionView = {
                             <p class="division-highlight__eyebrow">{{ highlight.title }}</p>
                             <h3
                                 class="division-highlight__title title-accent titleUnderlineCard"
-                                :class="'title-delay-' + (idx % 4)"
                             >
                                 {{ highlight.description }}
                             </h3>
@@ -456,7 +455,7 @@ window.DivisionView = {
 
                 <section id="teams" class="division-section">
                     <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain title-delay-1">Joukkueet</h2>
+                        <h2 class="title-accent titleUnderlineMain">Joukkueet</h2>
                     </div>
                     <team-nav
                         v-if="hasTeams"

@@ -316,7 +316,7 @@ window.PlayerView = {
                             <span v-else>{{ (profile?.nickname || '?').charAt(0).toUpperCase() }}</span>
                         </div>
                         <div class="player-hero__meta">
-                            <h1 class="title-accent titleUnderlineMain title-delay-2">{{ profile?.nickname || 'Pelaaja' }}</h1>
+                            <h1 class="title-accent titleUnderlineMain">{{ profile?.nickname || 'Pelaaja' }}</h1>
                             <p v-if="heroTeam" class="player-hero__team">{{ heroTeam }}</p>
                             <div class="player-hero__actions">
                                 <a v-if="profile?.faceit_url" :href="profile.faceit_url" target="_blank" rel="noopener" class="btn-primary">Faceit</a>
@@ -368,7 +368,7 @@ window.PlayerView = {
 
                 <section class="player-charts">
                     <article class="player-chart glass-card">
-                        <h3 class="title-accent titleUnderlineCard title-delay-0">Rating trendi</h3>
+                        <h3 class="title-accent titleUnderlineCard">Rating trendi</h3>
                         <sparkline-chart
                             v-if="sparklinePoints.length"
                             :points="sparklinePoints"
@@ -378,7 +378,7 @@ window.PlayerView = {
                         <p v-else class="player-empty">Riittävästi kausia ei löytynyt.</p>
                     </article>
                     <article class="player-chart glass-card">
-                        <h3 class="title-accent titleUnderlineCard title-delay-1">Pelityylin profiili</h3>
+                        <h3 class="title-accent titleUnderlineCard">Pelityylin profiili</h3>
                         <radar-chart
                             v-if="radarMetrics.length"
                             :metrics="radarMetrics"

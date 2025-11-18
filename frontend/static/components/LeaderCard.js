@@ -17,10 +17,6 @@ window.LeaderCard = {
     computed: {
         visibleLeaders() {
             return Array.isArray(this.leaders) ? this.leaders.slice(0, 4) : [];
-        },
-        titleDelayClass() {
-            const seed = (this.title || '').length;
-            return `title-delay-${seed % 4}`;
         }
     },
     methods: {
@@ -68,7 +64,7 @@ window.LeaderCard = {
         <article class="card leader-card" role="region">
             <header class="card-head">
                 <div>
-                    <h3 :class="['title', 'title-accent', 'titleUnderlineCard', titleDelayClass]">{{ title }}</h3>
+                    <h3 class="title title-accent titleUnderlineCard">{{ title }}</h3>
                     <p v-if="subtitle" class="subtitle muted">{{ subtitle }}</p>
                 </div>
             </header>

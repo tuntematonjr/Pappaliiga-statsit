@@ -8,7 +8,7 @@ window.SeasonsView = {
     template: `
         <div class="seasons-view">
             <masthead></masthead>
-            <h1 class="title-accent titleUnderlineMain title-delay-0">Seasons & Divisions</h1>
+            <h1 class="title-accent titleUnderlineMain">Seasons & Divisions</h1>
             
             <loading-spinner v-if="loading" message="Kausia ladataan..."></loading-spinner>
             <error-message v-else-if="error" :message="error" @retry="loadSeasons"></error-message>
@@ -17,7 +17,6 @@ window.SeasonsView = {
                 <div v-for="(season, idx) in seasons" :key="season.season" class="season-card home-section">
                     <h2
                         class="section-title title-accent titleUnderlineCard"
-                        :class="'title-delay-' + (idx % 4)"
                     >
                         Season {{ season.season }}
                     </h2>

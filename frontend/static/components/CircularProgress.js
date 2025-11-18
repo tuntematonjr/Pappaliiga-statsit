@@ -89,16 +89,6 @@
             },
             remainingText() {
                 return `${this.remainingValue} jäljellä`;
-            },
-            titleClassList() {
-                const base = ['circular-progress__title', 'title-accent', 'titleUnderlineCard'];
-                const delayMap = {
-                    regular: 'title-delay-0',
-                    playoff: 'title-delay-1',
-                    overall: 'title-delay-2'
-                };
-                base.push(delayMap[this.color] || 'title-delay-3');
-                return base;
             }
         },
         template: `
@@ -153,7 +143,7 @@
                     </div>
                 </div>
                 <div class="circular-progress__text">
-                    <div :class="titleClassList">{{ label }}</div>
+                    <div class="circular-progress__title title-accent titleUnderlineCard">{{ label }}</div>
                 </div>
             </div>
         `

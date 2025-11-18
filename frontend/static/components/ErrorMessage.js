@@ -4,7 +4,7 @@ window.ErrorMessage = {
     template: `
         <div class="error-message">
             <div class="error-icon">⚠️</div>
-            <h3 class="title-accent titleUnderlineCard title-delay-2">{{ title }}</h3>
+            <h3 class="title-accent titleUnderlineCard">{{ title }}</h3>
             <p>{{ message }}</p>
             <button v-if="retry" @click="$emit('retry')" class="btn-retry">
                 Try Again
