@@ -149,7 +149,7 @@ a {
     position: relative;
     display: inline-block;
     max-width: 100%;
-    padding-bottom: var(--title-accent-underline-gap, 0.4rem);
+    padding-bottom: var(--title-accent-underline-gap, var(--title-underline-gap, 0.4rem));
     font-size: var(--title-accent-font-size, clamp(1.2rem, 2vw, 1.65rem));
     font-weight: var(--title-accent-font-weight, 600);
     letter-spacing: var(--title-accent-letter-spacing, 0.015em);
@@ -161,116 +161,118 @@ a {
     text-align: center;
 }
 
-.title-accent:not(.titleUnderlineMain):not(.titleUnderlineCard)::after {
+/* ---- Animated Title Underlines ---- */
+.title-accent {
+    --title-underline-delay: 0s;
+    --title-underline-duration: 0s;
+    --title-underline-gap: 0.35rem;
+    --title-underline-thickness: 2px;
+    --title-underline-gradient: linear-gradient(90deg, rgba(106, 186, 255, 0.15), rgba(124, 215, 243, 0.9), rgba(106, 186, 255, 0.15));
+    --title-underline-blur: 10px;
+    --title-underline-amp: 0px;
+    --title-underline-opacity: 0.85;
+    --title-underline-min: 2.5rem;
+    --title-underline-max: 18rem;
+    --title-underline-absolute: var(--title-underline-min);
+    --title-underline-animation-name: none;
+}
+
+.title-accent::after {
     content: '';
     position: absolute;
     left: 50%;
-    bottom: var(--title-accent-underline-offset, -0.15rem);
-    width: clamp(0.5rem, calc(var(--title-accent-underline-scale, 0.6) * 100%), var(--title-accent-underline-max, 18rem));
-    height: var(--title-accent-underline-thickness, 2.5px);
+    bottom: calc(var(--title-underline-gap, 0.35rem) * -1);
+    width: clamp(
+        var(--title-underline-min, 2.5rem),
+        max(100%, var(--title-underline-absolute, 8rem)),
+        var(--title-underline-max, 18rem)
+    );
+    height: var(--title-underline-thickness, 2px);
     transform: translateX(-50%);
     border-radius: 999px;
-    background: linear-gradient(90deg, rgba(106, 186, 255, 0.15), rgba(124, 215, 243, 0.9), rgba(106, 186, 255, 0.15));
-    opacity: var(--title-accent-underline-opacity, 0.85);
-    box-shadow: 0 0 12px rgba(106, 186, 255, 0.35);
+    background: var(--title-underline-gradient);
+    background-size: 220% 100%;
+    opacity: var(--title-underline-opacity, 0.85);
     pointer-events: none;
+    box-shadow: 0 0 var(--title-underline-blur, 10px) rgba(120, 190, 255, 0.4);
+    animation-name: var(--title-underline-animation-name, none);
+    animation-duration: var(--title-underline-duration, 0s);
+    animation-delay: var(--title-underline-delay, 0s);
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+    animation-fill-mode: both;
+    transform-origin: center;
+    will-change: transform;
 }
 
-/* ---- Animated Title Underlines ---- */
 .titleUnderlineMain,
 .titleUnderlineCard {
     position: relative;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
+    display: inline-block;
     width: fit-content;
     max-width: 100%;
     text-wrap: balance;
     margin-left: auto;
     margin-right: auto;
-    font-weight: 700;
     text-align: center;
-    --title-underline-delay: 0s;
-    --title-underline-duration: 6.25s;
-    --title-underline-absolute: 0px;
-    --title-underline-min: 4rem;
-    --title-underline-max: 28rem;
-    --title-underline-thickness: 3px;
-    --title-underline-gradient: linear-gradient(120deg, rgba(90, 160, 255, 0.3), rgba(124, 215, 243, 0.95), rgba(90, 160, 255, 0.3));
+    font-weight: 700;
+    --title-underline-animation-name: titleUnderlineShimmer;
 }
 
 .titleUnderlineMain {
     font-size: clamp(1.6rem, 2.8vw, 2.6rem);
     letter-spacing: 0.03em;
-}
-
-.titleUnderlineMain {
-    padding-bottom: 0.85rem;
+    padding-bottom: clamp(0.5rem, 1.5vw, 0.8rem);
+    --title-underline-gap: clamp(0.6rem, 1vw, 0.7rem);
+    --title-underline-thickness: 6px;
     --title-underline-min: 6rem;
-    --title-underline-max: 32rem;
-    --title-underline-thickness: 3.6px;
-    --title-underline-gradient: linear-gradient(115deg, rgba(68, 142, 255, 0.2), rgba(132, 222, 255, 0.95), rgba(68, 142, 255, 0.2));
+    --title-underline-max: 64rem;
+    --title-underline-gradient: linear-gradient(110deg, rgba(50, 130, 255, 0.2), rgba(177, 246, 255, 0.95), rgba(60, 150, 255, 0.85));
+    --title-underline-blur: 16px;
+    --title-underline-opacity: 0.98;
+    --title-underline-amp: 9px;
+    --title-underline-duration: 4s;
 }
 
 .titleUnderlineCard {
     font-size: clamp(1.18rem, 2vw, 1.62rem);
     letter-spacing: 0.02em;
     font-weight: 600;
-    padding-bottom: 0.6rem;
-    --title-underline-min: 3.5rem;
+    padding-bottom: clamp(0.35rem, 1vw, 0.6rem);
+    --title-underline-gap: clamp(0.4rem, 0.9vw, 0.55rem);
+    --title-underline-thickness: 2.4px;
+    --title-underline-min: 3rem;
     --title-underline-max: 18rem;
-    --title-underline-duration: 7.5s;
-    --title-underline-thickness: 2.2px;
-    --title-underline-gradient: linear-gradient(120deg, rgba(64, 110, 210, 0.25), rgba(150, 220, 255, 0.7), rgba(64, 110, 210, 0.25));
+    --title-underline-gradient: linear-gradient(120deg, rgba(70, 105, 200, 0.2), rgba(148, 202, 255, 0.7), rgba(62, 100, 190, 0.3));
+    --title-underline-blur: 7px;
+    --title-underline-opacity: 0.75;
+    --title-underline-amp: 3px;
+    --title-underline-duration: 6.4s;
 }
 
-.titleUnderlineMain::after {
-    content: '';
-    position: absolute;
-    bottom: -0.1rem;
-    left: 50%;
-    width: var(--title-underline-absolute, var(--title-underline-min, 4rem));
-    height: var(--title-underline-thickness, 3px);
-    border-radius: 999px;
-    transform: translateX(-50%);
-    background: var(--title-underline-gradient);
-    background-size: 320% 100%;
-    animation: underlineShimmer var(--title-underline-duration, 6.25s) ease-in-out infinite;
-    animation-delay: var(--title-underline-delay, 0s);
-    opacity: 0.95;
-    pointer-events: none;
-}
-
-.titleUnderlineCard::after {
-    content: '';
-    position: absolute;
-    bottom: -0.05rem;
-    left: 50%;
-    width: var(--title-underline-absolute, var(--title-underline-min, 3.5rem));
-    height: var(--title-underline-thickness, 2px);
-    border-radius: 999px;
-    transform: translateX(-50%);
-    background: var(--title-underline-gradient);
-    background-size: 300% 100%;
-    animation: underlineShimmer var(--title-underline-duration, 7.5s) ease-in-out infinite;
-    animation-delay: var(--title-underline-delay, 0s);
-    opacity: 0.9;
-    pointer-events: none;
-}
-
-@keyframes underlineShimmer {
-    0% {
-        background-position: 0% 50%;
-        opacity: 0.55;
+@media (max-width: 520px) {
+    .titleUnderlineCard {
+        --title-underline-gap: 0.35rem;
+        --title-underline-thickness: 2px;
+        --title-underline-amp: 1.6px;
+        --title-underline-opacity: 0.68;
     }
-    45% {
+}
+
+@keyframes titleUnderlineShimmer {
+    0% {
+        transform: translateX(calc(-50% - var(--title-underline-amp, 0px)));
+        background-position: 0% 50%;
+        opacity: 0.9;
+    }
+    50% {
         opacity: 1;
     }
     100% {
+        transform: translateX(calc(-50% + var(--title-underline-amp, 0px)));
         background-position: 100% 50%;
-        opacity: 0.7;
+        opacity: 0.92;
     }
 }
 
