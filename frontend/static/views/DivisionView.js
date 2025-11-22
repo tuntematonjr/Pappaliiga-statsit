@@ -205,6 +205,14 @@ const SANKARI_CARD_GROUPS = [
                 metricKey: 'enemiesFlashed',
                 sortDirection: 'desc',
                 maxEntries: 4
+            },
+            {
+                id: 'avustava-konkari',
+                title: 'Avustava konkari',
+                description: 'Elää tiimille, vähiten frägejä, eniten syöttöjä.<br>Assisteja enemmän kuin tappoja.',
+                metricKey: 'assistSupport',
+                sortDirection: 'desc',
+                maxEntries: 4
             }
         ]
     }
@@ -230,7 +238,8 @@ const SANKARI_METRIC_META = {
     utilityDamage: { decimals: 0 },
     survivalPercent: { decimals: 1, percent: true },
     flashbangsThrown: { decimals: 0 },
-    enemiesFlashed: { decimals: 0 }
+    enemiesFlashed: { decimals: 0 },
+    assistSupport: { decimals: 0 }
 };
 
 const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
@@ -667,18 +676,44 @@ window.DivisionView = {
             if (Number.isFinite(numeric)) return numeric;
             return fallback;
         },
+        findTeam(teamId, teamName) {
+            if (!Array.isArray(this.teams) || !this.teams.length) return null;
+            const normalizedId = teamId != null ? String(teamId) : null;
+            if (normalizedId) {
+                const byId = this.teams.find(team => String(team.team_id ?? team.id) === normalizedId);
+                if (byId) return byId;
+            }
+            const normalizedName = teamName ? String(teamName).toLowerCase() : null;
+            if (normalizedName) {
+                return this.teams.find(team => String(team.name || team.display_name || team.team_name || '').toLowerCase() === normalizedName) || null;
+            }
+            return null;
+        },
+        playerTeamLogo(row) {
+            if (!row) return null;
+            const teamId = row.team_id ?? row.teamId ?? row.teamid;
+            const teamName = row.team_name ?? row.teamName ?? row.team;
+            const team = this.findTeam(teamId, teamName);
+            if (!team) return null;
+            const src = team.logo || team.avatar || team.team_logo || team.raw?.avatar || team.raw?.logo;
+            if (!src) return null;
+            return this.resolveAvatar(src);
+        },
         normalizeSankariPlayer(row) {
             if (!row) return null;
             const safe = (value, fallback = 0) => this.toNumber(value, fallback);
             const rounds = safe(row.rounds_played ?? row.rounds);
             const kills = safe(row.kills);
             const deaths = safe(row.deaths);
+            const teamLogo = this.playerTeamLogo(row) || DEFAULT_TEAM_LOGO;
             return {
                 id: row.player_id || row.id,
                 playerId: row.player_id || row.id,
+                teamId: row.team_id ?? row.teamId ?? row.teamid,
                 nickname: row.nickname || row.name,
                 teamName: row.team_name || row.teamName || '',
-                avatar: this.resolveAvatar(row.avatar || row.photo),
+                avatar: teamLogo,
+                logo: teamLogo,
                 maps: safe(row.maps_played ?? row.maps),
                 rounds,
                 kills,
@@ -717,11 +752,14 @@ window.DivisionView = {
                         id: player.id || player.playerId,
                         nickname: player.nickname || 'Tuntematon',
                         teamName: player.teamName || '',
-                        avatar: player.avatar,
+                        avatar: player.logo || DEFAULT_TEAM_LOGO,
+                        logo: player.logo || DEFAULT_TEAM_LOGO,
                         maps: player.maps,
                         rounds: player.rounds,
                         rawValue: value,
-                        displayValue: this.formatSankariValue(value, card.metricKey)
+                        displayValue: card.metricKey === 'assistSupport'
+                            ? `${player.assists ?? 0} A / ${player.kills ?? 0} K`
+                            : this.formatSankariValue(value, card.metricKey)
                     };
                 })
                 .filter(Boolean)
@@ -779,6 +817,12 @@ window.DivisionView = {
                     return player.flashCount;
                 case 'enemiesFlashed':
                     return player.enemiesFlashed;
+                case 'assistSupport': {
+                    const assists = this.toNumber(player.assists, null);
+                    const kills = this.toNumber(player.kills, null);
+                    if (assists === null || kills === null) return null;
+                    return assists - kills;
+                }
                 default:
                     return null;
             }

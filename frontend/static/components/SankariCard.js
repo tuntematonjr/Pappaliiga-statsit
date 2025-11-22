@@ -67,8 +67,8 @@ window.SankariCard = {
                             <div class="sankari-card__player">
                                 <img
                                     class="sankari-card__avatar"
-                                    :src="avatarUrl(entry?.avatar)"
-                                    :alt="(entry?.nickname || 'Pelaaja') + ' avatar'"
+                                    :src="avatarUrl(entry?.logo || entry?.avatar)"
+                                    :alt="(entry?.teamName || entry?.nickname || 'Pelaaja') + ' logo'"
                                     loading="lazy"
                                 />
                                 <div>
