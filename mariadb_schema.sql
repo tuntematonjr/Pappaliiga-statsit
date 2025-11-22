@@ -1,5 +1,3 @@
--- Legacy MariaDB schema for Pappaliiga statsit.
--- Mirrors the HeidiSQL snapshot used by the live production database (MariaDB 10.6+ compatible).
 
 -- Create base tables first (no dependencies)
 CREATE TABLE IF NOT EXISTS teams (
