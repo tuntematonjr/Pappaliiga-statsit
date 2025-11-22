@@ -32,6 +32,14 @@ window.SortableTable = {
         sortReady: {
             type: Boolean,
             default: true
+        },
+        highlightRowId: {
+            type: [String, Number],
+            default: null
+        },
+        highlightRowClass: {
+            type: String,
+            default: 'table-row--highlighted'
         }
     },
     setup(props) {
@@ -215,6 +223,25 @@ window.SortableTable = {
                 return column.decimals != null ? value.toFixed(column.decimals) : value;
             }
             return value;
+        },
+        resolveRowId(row, idx) {
+            if (!row) return String(idx);
+            if (row.id != null) return String(row.id);
+            if (row.key != null) return String(row.key);
+            if (row.team_id != null) return String(row.team_id);
+            return String(idx);
+        },
+        isRowHighlighted(rowId) {
+            if (this.highlightRowId == null) return false;
+            return String(rowId) === String(this.highlightRowId);
+        },
+        getRowClass(row, idx) {
+            const rowId = this.resolveRowId(row, idx);
+            const classes = [];
+            if (this.isRowHighlighted(rowId)) {
+                classes.push(this.highlightRowClass);
+            }
+            return classes.join(' ');
         }
     },
     template: `
@@ -239,7 +266,12 @@ window.SortableTable = {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="(row, idx) in sortedRows" :key="row.id || idx">
+                    <tr
+                        v-for="(row, idx) in sortedRows"
+                        :key="row.id || idx"
+                        :class="getRowClass(row, idx)"
+                        :data-row-id="resolveRowId(row, idx)"
+                    >
                         <td 
                             v-for="column in columns" 
                             :key="column.key"

@@ -9,18 +9,31 @@ const DIVISION_METRIC_SCHEMA = [
 ];
 
 const DIVISION_MAP_COLUMNS = [
-    { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name' },
-    { key: 'maps_played', label: 'Ottelut', sortable: true, numeric: true },
-    { key: 'banned', label: 'Bannattu', sortable: true, numeric: true },
-    { key: 'rounds_played', label: 'Erät', sortable: true, numeric: true },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2 },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1 },
-    { key: 'clutches', label: 'Clutchit', sortable: true, numeric: true },
-    { key: 'sniper_kills', label: 'AWP tap.', sortable: true, numeric: true },
-    { key: 'pistol_kills', label: 'Pistoolitap.', sortable: true, numeric: true }
+    { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name', width: '220px' },
+    { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '90px' },
+    { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '90px' },
+    { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '90px' },
+    { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 2, width: '90px' },
+    { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '90px' },
+    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '90px' },
+    { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '90px' },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'right', decimals: 1, width: '90px' },
+    { key: 'kr', label: 'K/R', sortable: true, numeric: true, align: 'right', decimals: 2, width: '80px' },
+    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, align: 'right', decimals: 2, width: '90px' },
+    { key: 'enemy_flash', label: 'Enemy/Flash', sortable: true, numeric: true, align: 'right', decimals: 2, width: '110px' },
+    { key: 'k2', label: '2K', sortable: true, numeric: true, align: 'right', width: '70px' },
+    { key: 'k3', label: '3K', sortable: true, numeric: true, align: 'right', width: '70px' },
+    { key: 'k4', label: '4K', sortable: true, numeric: true, align: 'right', width: '70px' },
+    { key: 'ace', label: 'Ace', sortable: true, numeric: true, align: 'right', width: '70px' },
+    { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '110px' },
+    { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '110px' }
 ];
 
 const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
+const TEAM_VIEW_TABS = [
+    { id: 'standings', label: 'Standings' },
+    { id: 'stats', label: 'Tilastot' }
+];
 
 function pickValue(obj, keys) {
     if (!obj) return undefined;
@@ -101,9 +114,8 @@ window.DivisionView = {
         get TeamComparisonBoard() { return window.TeamComparisonBoard; },
         get MapsStats() { return window.MapsStats; },
         get TeamComparisonChart() { return window.TeamComparisonChart; },
-        get StatPanel() { return window.StatPanel; },
         get CopyLink() { return window.CopyLink; },
-        get SortableTable() { return window.SortableTable; }
+        get SummaryStatCard() { return window.SummaryStatCard; }
     },
     data() {
         const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
@@ -113,12 +125,15 @@ window.DivisionView = {
             seasonsStore,
             mapColumns: DIVISION_MAP_COLUMNS,
             quickLinks: [
-                { id: 'overview', label: 'Katsaus' },
-                { id: 'standings', label: 'Sarjataulukko' },
+                { id: 'standings', label: 'Joukkuavertailu' },
+                { id: 'summary', label: 'Tilastot' },
                 { id: 'maps', label: 'Kartat' },
-                { id: 'highlights', label: 'Nostot' },
+                { id: 'heroes', label: 'Sankarit' },
                 { id: 'teams', label: 'Joukkueet' }
-            ]
+            ],
+            teamViewTabs: TEAM_VIEW_TABS,
+            teamViewTab: TEAM_VIEW_TABS[0].id,
+            activeTeamChipId: null
         };
     },
     computed: {
@@ -194,15 +209,15 @@ window.DivisionView = {
             if (!this.divisionDetails) return '';
             const pieces = [];
             if (this.divisionDetails.season) {
-                pieces.push(`Kausi ${this.divisionDetails.season}`);
+                pieces.push(`Season ${this.divisionDetails.season}`);
             }
             if (this.divisionDetails.division_num != null) {
-                pieces.push(`Div ${this.divisionDetails.division_num}`);
+                pieces.push(`${this.divisionDetails.division_num} Divisioona`);
             }
             if (this.divisionDetails.is_playoff) {
                 pieces.push('Playoffs');
             }
-            return pieces.join(' · ');
+            return pieces.join(' | ');
         },
         statMetrics() {
             if (!this.divisionDetails) {
@@ -215,11 +230,92 @@ window.DivisionView = {
             };
             return buildMetricCards(source, DIVISION_METRIC_SCHEMA);
         },
+        divisionBadgeLabel() {
+            if (!this.divisionDetails) return 'Divisioona';
+            if (this.divisionDetails.division_num != null) {
+                return `${this.divisionDetails.division_num} Divisioona`;
+            }
+            return this.divisionDetails.name || this.divisionTitle;
+        },
+        divisionSeasonLabel() {
+            return this.divisionSubtitle || this.divisionTitle;
+        },
+        divisionHeaderStats() {
+            if (!this.statMetrics.length) return [];
+            const lookup = this.statMetrics.reduce((acc, metric) => {
+                acc[metric.key] = metric;
+                return acc;
+            }, {});
+            const priority = ['teams', 'matches', 'maps'];
+            return priority.map(key => lookup[key]).filter(Boolean);
+        },
+        divisionStatusLabel() {
+            return this.divisionDetails?.status_fi || this.divisionDetails?.status_label || this.divisionDetails?.status || null;
+        },
+        divisionStatusTone() {
+            const label = String(this.divisionStatusLabel || '').toLowerCase();
+            if (!label) return 'idle';
+            if (label.includes('loppu') || label.includes('valmis')) return 'finished';
+            if (label.includes('playoff')) return 'playoff';
+            if (label.includes('käynn') || label.includes('kaynn')) return 'active';
+            return 'idle';
+        },
+        divisionSummaryMetrics() {
+            if (!this.statMetrics.length) return [];
+            return this.statMetrics.map(metric => ({
+                ...metric,
+                icon: this.getMetricIcon(metric.key)
+            }));
+        },
         teams() {
             return Array.isArray(this.divisionDetails?.teams) ? this.divisionDetails.teams : [];
         },
         hasTeams() {
             return this.teams.length > 0;
+        },
+        teamChipItems() {
+            const source = this.standings.length ? this.standings : this.teams;
+            if (!Array.isArray(source)) {
+                return [];
+            }
+            return source.map((team, idx) => {
+                const wins = Number(team.wins ?? team.maps_won ?? 0);
+                const losses = Number(team.losses ?? team.maps_lost ?? 0);
+                const matches = Number(team.matches ?? team.matches_played ?? wins + losses);
+                const roundDiff = Number(team.round_diff ?? team.rounds_diff ?? 0);
+                const id = team.team_id || team.id || `team-${idx}`;
+                return {
+                    id,
+                    label: team.name || team.display_name || team.team_name || `Joukkue ${idx + 1}`,
+                    rank: team.rank ?? idx + 1,
+                    record: wins || losses ? `${wins}-${losses}` : `${matches} ottelua`,
+                    roundDiff,
+                    logo: this.teamLogo(team)
+                };
+            });
+        },
+        heroCards() {
+            if (!Array.isArray(this.highlights) || !this.highlights.length) {
+                return [];
+            }
+            return this.highlights
+                .map((highlight, idx) => {
+                    const entries = this.normalizeHighlightEntries(highlight);
+                    if (!entries.length) {
+                        return null;
+                    }
+                    return {
+                        id: highlight.id || `highlight-${idx}`,
+                        title: highlight.title || 'Sankari',
+                        subtitle: highlight.description || '',
+                        metric: highlight.metric || '',
+                        entries
+                    };
+                })
+                .filter(Boolean);
+        },
+        hasHeroCards() {
+            return this.heroCards.length > 0;
         },
         breadcrumbSeason() {
             if (!this.divisionDetails || !this.seasonsStore) {
@@ -261,6 +357,16 @@ window.DivisionView = {
                 if (!id) return;
                 await this.loadDivision(id);
             }
+        },
+        teamChipItems: {
+            immediate: true,
+            handler(newItems) {
+                this.ensureActiveTeamChip(newItems);
+            }
+        },
+        teamViewTab(newTab) {
+            if (!this.activeTeamChipId) return;
+            this.$nextTick(() => this.scrollTeamRow(this.activeTeamChipId, { instant: true }));
         }
     },
     methods: {
@@ -303,52 +409,203 @@ window.DivisionView = {
         },
         highlightAvatar(highlight) {
             if (!highlight?.team) return null;
-            const src = highlight.team.logo || highlight.team.avatar || highlight.team.raw?.avatar;
-            if (!src) return DEFAULT_TEAM_LOGO;
-            try {
-                const resolved = window.apiClient.proxyAvatar(src);
-                return resolved || DEFAULT_TEAM_LOGO;
-            } catch (error) {
-                return src || DEFAULT_TEAM_LOGO;
-            }
+            return this.teamLogo(highlight.team);
         },
         retryHighlights() {
             if (!this.divisionStore || !this.championshipId) return;
             this.divisionStore.fetchDivisionHighlights(this.championshipId, { force: true }).catch(err => {
                 console.error('Highlight refresh failed', err);
             });
+        },
+        resolveAvatar(src) {
+            if (!src) return DEFAULT_TEAM_LOGO;
+            try {
+                if (window.apiClient && typeof window.apiClient.proxyAvatar === 'function') {
+                    const resolved = window.apiClient.proxyAvatar(src);
+                    return resolved || DEFAULT_TEAM_LOGO;
+                }
+                return src || DEFAULT_TEAM_LOGO;
+            } catch (error) {
+                return src || DEFAULT_TEAM_LOGO;
+            }
+        },
+        teamLogo(team) {
+            if (!team) return DEFAULT_TEAM_LOGO;
+            const src = team.logo || team.avatar || team.team_logo || team.raw?.avatar || team.raw?.logo;
+            return this.resolveAvatar(src);
+        },
+        ensureActiveTeamChip(items) {
+            if (!Array.isArray(items) || !items.length) {
+                this.activeTeamChipId = null;
+                return;
+            }
+            const normalized = this.activeTeamChipId != null ? String(this.activeTeamChipId) : null;
+            const hasCurrent = normalized && items.some(item => String(item.id) === normalized);
+            if (hasCurrent) {
+                return;
+            }
+            this.activeTeamChipId = String(items[0].id);
+        },
+        handleTeamChipSelect(teamId) {
+            if (teamId == null) return;
+            const normalized = String(teamId);
+            const sameSelection = this.activeTeamChipId === normalized;
+            this.activeTeamChipId = normalized;
+            this.$nextTick(() => this.scrollTeamRow(normalized, { instant: sameSelection }));
+        },
+        scrollTeamRow(teamId, options = {}) {
+            if (teamId == null) return;
+            const normalized = String(teamId);
+            const order = this.teamViewTab === 'standings'
+                ? ['chart', 'table']
+                : ['table', 'chart'];
+            for (const target of order) {
+                const handled = target === 'chart'
+                    ? this.scrollTeamChart(normalized, options)
+                    : this.scrollTeamTable(normalized, options);
+                if (handled) break;
+            }
+        },
+        scrollTeamTable(teamId, options = {}) {
+            const board = this.$refs.teamBoard;
+            if (board && typeof board.scrollToTeam === 'function') {
+                board.scrollToTeam(teamId, options);
+                return true;
+            }
+            return false;
+        },
+        scrollTeamChart(teamId, options = {}) {
+            const chart = this.$refs.teamChart;
+            if (chart && typeof chart.scrollToTeam === 'function') {
+                chart.scrollToTeam(teamId, options);
+                return true;
+            }
+            return false;
+        },
+        setTeamViewTab(tabId) {
+            if (!tabId || this.teamViewTab === tabId) {
+                return;
+            }
+            this.teamViewTab = tabId;
+        },
+        teamTabPanelId(tabId) {
+            return `team-panel-${tabId}`;
+        },
+        teamTabButtonId(tabId) {
+            return `team-tab-btn-${tabId}`;
+        },
+        getMetricIcon(key) {
+            const icons = {
+                teams: '👥',
+                players: '👤',
+                matches: '⚔️',
+                maps: '🗺️',
+                adr: '💥',
+                kd: '⚖️',
+                survival: '🛡️',
+                rounds: '🔄'
+            };
+            return icons[key] || '📊';
+        },
+        normalizeHighlightEntries(highlight) {
+            if (!highlight) return [];
+            const entries = [];
+            if (Array.isArray(highlight.players) && highlight.players.length) {
+                entries.push(
+                    ...highlight.players.slice(0, 3).map(player => this.buildHeroEntry({
+                        id: player.id || player.player_id,
+                        name: player.nickname || player.name,
+                        team: player.team || player.team_name,
+                        avatar: player.avatar,
+                        value: player.value ?? player.metric ?? player.stat
+                    }, highlight.description))
+                );
+            } else if (Array.isArray(highlight.entries) && highlight.entries.length) {
+                entries.push(
+                    ...highlight.entries.slice(0, 3).map(entry => this.buildHeroEntry(entry, highlight.description))
+                );
+            } else if (highlight.team) {
+                const teamSource = highlight.team.logo || highlight.team.avatar || highlight.team.raw?.avatar;
+                entries.push(this.buildHeroEntry({
+                    id: highlight.team.team_id,
+                    name: highlight.team.name,
+                    team: highlight.team.name,
+                    avatar: teamSource,
+                    value: highlight.metric
+                }, highlight.description));
+            }
+            return entries.filter(Boolean);
+        },
+        buildHeroEntry(entry, fallbackLabel = '') {
+            if (!entry) return null;
+            const name = entry.name || entry.nickname || fallbackLabel || 'Nimetön';
+            const team = entry.team || entry.team_name || fallbackLabel || '';
+            const avatarSource = entry.avatar || entry.logo || entry.image || null;
+            const value = entry.value ?? entry.metric ?? entry.stat ?? '';
+            const id = entry.id || entry.player_id || entry.team_id || `${name}-${team}`;
+            return {
+                id,
+                name,
+                team,
+                value,
+                avatar: this.resolveAvatar(avatarSource)
+            };
         }
     },
     template: `
         <div class="division-view">
-            <header class="division-header glass-card">
-                <div class="division-header__meta">
-                    <div>
-                        <p class="section-eyebrow">Divisioona</p>
-                        <h1 class="division-header__title title-accent titleUnderlineMain">{{ divisionTitle }}</h1>
-                        <p v-if="divisionSubtitle" class="division-header__subtitle">{{ divisionSubtitle }}</p>
+            <section class="division-hero glass-card" aria-labelledby="division-title">
+                <div class="division-hero__grid">
+                    <div class="division-hero__identity">
+                        <div class="division-hero__badge">{{ divisionBadgeLabel }}</div>
+                        <div>
+                            <p class="section-eyebrow">Divisioona</p>
+                            <h1 id="division-title" class="title-accent titleUnderlineMain">{{ divisionTitle }}</h1>
+                            <p v-if="divisionSubtitle" class="division-hero__subtitle">{{ divisionSubtitle }}</p>
+                        </div>
                     </div>
-                    <copy-link v-if="championshipId" :url="shareUrl" label="Jaa divisioona"></copy-link>
+                    <div class="division-hero__meta">
+                        <p v-if="divisionSeasonLabel" class="division-hero__season">{{ divisionSeasonLabel }}</p>
+                        <div v-if="divisionHeaderStats.length" class="division-hero__stats">
+                            <div v-for="stat in divisionHeaderStats" :key="stat.key" class="division-hero__stat">
+                                <span class="division-hero__stat-label">{{ stat.label }}</span>
+                                <span class="division-hero__stat-value">{{ stat.value }}</span>
+                            </div>
+                        </div>
+                        <span
+                            v-if="divisionStatusLabel"
+                            class="division-hero__status"
+                            :class="'division-hero__status--' + divisionStatusTone"
+                        >
+                            {{ divisionStatusLabel }}
+                        </span>
+                        <copy-link
+                            v-if="championshipId"
+                            :url="shareUrl"
+                            label="Kopioi divisioona linkki"
+                            variant="primary"
+                        ></copy-link>
+                    </div>
                 </div>
-                <nav class="division-header__nav" aria-label="Pikalinkit divisioonalle">
+                <nav class="division-hero__nav" aria-label="Pikalinkit divisioonalle">
                     <button
                         v-for="link in quickLinks"
                         :key="link.id"
                         type="button"
-                        class="division-header__nav-link"
+                        class="division-hero__nav-link"
                         @click="scrollToSection(link.id)"
                     >
                         {{ link.label }}
                     </button>
                     <router-link
                         v-if="breadcrumbSeason"
-                        class="division-header__nav-link division-header__nav-link--subtle"
+                        class="division-hero__nav-link division-hero__nav-link--subtle"
                         :to="{ name: 'seasons' }"
                     >
                         {{ breadcrumbSeason.label || ('Kausi ' + breadcrumbSeason.seasonNumber) }}
                     </router-link>
                 </nav>
-            </header>
+            </section>
 
             <loading-spinner
                 v-if="divisionLoading && !divisionDetails"
@@ -362,106 +619,185 @@ window.DivisionView = {
             ></error-message>
 
             <template v-else>
-                <section id="overview" class="division-section">
-                    <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain">Katsaus</h2>
+                <section id="standings" class="division-section division-section--stacked">
+                    <header class="division-section__heading division-team-heading">
+                        <p class="section-eyebrow">Joukkuavertailu</p>
+                        <h2 class="title-accent titleUnderlineMain">Joukkuavertailu</h2>
+                        <p class="division-section__lede division-section__lede--balanced">Visualisoitu katsaus joukkueiden sijoituksiin, voittoprosentteihin ja suorituskykyyn.</p>
+                    </header>
+                    <div class="division-team-module">
+                        <div
+                            class="division-team-tabs"
+                            role="tablist"
+                            aria-label="Joukkuavertailu näkymät"
+                        >
+                            <button
+                                v-for="tab in teamViewTabs"
+                                :key="tab.id"
+                                type="button"
+                                class="season-pill division-team-tab"
+                                :class="{ 'season-pill--active': teamViewTab === tab.id }"
+                                role="tab"
+                                :id="teamTabButtonId(tab.id)"
+                                :aria-selected="teamViewTab === tab.id"
+                                :aria-controls="teamTabPanelId(tab.id)"
+                                @click="setTeamViewTab(tab.id)"
+                            >
+                                {{ tab.label }}
+                            </button>
+                        </div>
+                        <div class="division-team-panels">
+                            <transition name="division-tab-fade">
+                                <team-comparison-chart
+                                    ref="teamChart"
+                                    v-show="teamViewTab === 'standings'"
+                                    class="division-team-panel"
+                                    :id="teamTabPanelId('standings')"
+                                    role="tabpanel"
+                                    :aria-labelledby="teamTabButtonId('standings')"
+                                    :aria-hidden="teamViewTab !== 'standings'"
+                                    :teams="standings"
+                                    :limit="12"
+                                    title="Sarjataulukko"
+                                    subtitle="Sijoitukset, voittoprosentit ja eräero"
+                                    :highlight-team-id="activeTeamChipId"
+                                ></team-comparison-chart>
+                            </transition>
+                            <transition name="division-tab-fade">
+                                <team-comparison-board
+                                    v-show="teamViewTab === 'stats'"
+                                    ref="teamBoard"
+                                    class="division-team-panel division-team-panel--table"
+                                    :id="teamTabPanelId('stats')"
+                                    role="tabpanel"
+                                    :aria-labelledby="teamTabButtonId('stats')"
+                                    :aria-hidden="teamViewTab !== 'stats'"
+                                    :teams="teams"
+                                    :loading="standingsLoading"
+                                    :error="standingsError"
+                                    title="Joukkuevertailu"
+                                    subtitle="Kokonaiskuva joukkueiden suorituskyvystä"
+                                    :sticky-header="true"
+                                    :highlight-team-id="activeTeamChipId"
+                                ></team-comparison-board>
+                            </transition>
+                        </div>
                     </div>
-                    <stat-panel
-                        :items="statMetrics"
-                        :columns="3"
-                    ></stat-panel>
+                    <div v-if="teamChipItems.length" class="division-team-chips" role="tablist" aria-label="Joukkuepikalinkit">
+                        <button
+                            v-for="team in teamChipItems"
+                            :key="team.id"
+                            type="button"
+                            class="season-pill division-chip"
+                            :class="{ 'division-chip--active': String(activeTeamChipId) === String(team.id) }"
+                            :aria-pressed="String(activeTeamChipId) === String(team.id)"
+                            @click="handleTeamChipSelect(team.id)"
+                        >
+                            <span class="division-chip__rank">#{{ team.rank }}</span>
+                            <img
+                                v-if="team.logo"
+                                :src="team.logo"
+                                :alt="team.label + ' logo'"
+                                class="division-chip__logo"
+                                loading="lazy"
+                            >
+                            <span class="division-chip__label">{{ team.label }}</span>
+                            <span class="division-chip__meta">{{ team.record }}</span>
+                            <span class="division-chip__delta" :class="{ positive: team.roundDiff > 0, negative: team.roundDiff < 0 }">
+                                {{ team.roundDiff > 0 ? '+' : '' }}{{ team.roundDiff }}
+                            </span>
+                        </button>
+                    </div>
                 </section>
 
-                <section id="standings" class="division-section">
-                    <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain">Sarjataulukko</h2>
+                <section id="summary" class="division-section">
+                    <header class="division-section__heading">
+                        <p class="section-eyebrow">Divisioonan tilastot</p>
+                        <h2 class="title-accent titleUnderlineMain">Divisioonan tilastot</h2>
+                    </header>
+                    <div class="summary-card-grid division-summary-grid" role="list">
+                        <summary-stat-card
+                            v-for="metric in divisionSummaryMetrics"
+                            :key="metric.key"
+                            :icon="metric.icon"
+                            :label="metric.label"
+                            :value="metric.value"
+                        ></summary-stat-card>
                     </div>
-                    <team-comparison-chart
-                        :teams="standings"
-                        :limit="12"
-                        :title="divisionTitle + ' standings'"
-                    ></team-comparison-chart>
-
-                    <team-comparison-board
-                        :teams="teams"
-                        :loading="standingsLoading"
-                        :error="standingsError"
-                        title="Joukkuevertailu"
-                        subtitle="Kokonaiskuva joukkueiden suorituskyvystä"
-                    ></team-comparison-board>
                 </section>
 
                 <section id="maps" class="division-section">
-                    <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain">Karttanäkymä</h2>
-                    </div>
+                    <header class="division-section__heading">
+                        <p class="section-eyebrow">Karttatilastot</p>
+                        <h2 class="title-accent titleUnderlineMain">Karttatilastot</h2>
+                    </header>
+                    <p class="division-section__lede division-section__lede--compact">Kokonaiskuva divisioonan suosituimmista kartoista ja niiden suorituskyvystä.</p>
                     <maps-stats
+                        class="division-surface glass-card"
                         title="Karttatilastot"
-                        subtitle="Kokonaiskuva divisioonan suosituimmista kartoista"
+                        subtitle=""
                         :loading="mapsLoading"
                         :error="mapsError"
                         :map-stats="mapStats"
                         :columns="mapColumns"
+                        heading-variant="main"
+                        :show-header="false"
+                        :sticky-header="true"
                     ></maps-stats>
                 </section>
 
-                <section id="highlights" class="division-section">
-                    <div class="division-section__header">
-                        <h2 class="title-accent titleUnderlineMain title-duration-fast">Nostot</h2>
-                    </div>
-
+                <section id="heroes" class="division-section">
+                    <header class="division-section__heading">
+                        <p class="section-eyebrow">Divarin Sankarit</p>
+                        <h2 class="title-accent titleUnderlineMain">Divarin Sankarit</h2>
+                    </header>
                     <loading-spinner
-                        v-if="highlightsLoading && !highlights.length"
+                        v-if="highlightsLoading && !hasHeroCards"
                         message="Nostoja kootaan..."
                     ></loading-spinner>
                     <error-message
-                        v-else-if="highlightsError && !highlights.length"
+                        v-else-if="highlightsError && !hasHeroCards"
                         :message="highlightsError"
                         @retry="retryHighlights"
                     ></error-message>
-
-                    <div v-else class="division-highlights">
-                        <article
-                            v-for="(highlight, idx) in highlights"
-                            :key="highlight.id"
-                            class="division-highlight glass-card"
-                        >
-                            <p class="division-highlight__eyebrow">{{ highlight.title }}</p>
-                            <h3
-                                class="division-highlight__title title-accent titleUnderlineCard"
+                    <div v-else>
+                        <div v-if="hasHeroCards" class="division-hero-grid">
+                            <article
+                                v-for="card in heroCards"
+                                :key="card.id"
+                                class="division-hero-card glass-card division-surface"
                             >
-                                {{ highlight.description }}
-                            </h3>
-                            <p class="division-highlight__metric">{{ highlight.metric }}</p>
-                            <p v-if="highlight.tooltip" class="division-highlight__meta">{{ highlight.tooltip }}</p>
-                            <router-link
-                                v-if="highlightTeamRoute(highlight)"
-                                class="division-highlight__link"
-                                :to="highlightTeamRoute(highlight)"
-                            >
-                                <img
-                                    v-if="highlightAvatar(highlight)"
-                                    :src="highlightAvatar(highlight)"
-                                    :alt="highlight.team.name + ' logo'"
-                                >
-                                <span>{{ highlight.team.name }}</span>
-                            </router-link>
-                        </article>
-                        <p v-if="!highlights.length" class="division-highlights__empty">
-                            Ei merkittäviä nostoja tälle divisioonalle.
-                        </p>
+                                <header class="division-hero-card__head">
+                                    <h3 class="title-accent titleUnderlineCard">{{ card.title }}</h3>
+                                    <p v-if="card.subtitle" class="division-hero-card__subtitle">{{ card.subtitle }}</p>
+                                </header>
+                                <ul class="division-hero-card__list">
+                                    <li v-for="(entry, idx) in card.entries" :key="entry.id || idx">
+                                        <img :src="entry.avatar" :alt="entry.name + ' avatar'" loading="lazy">
+                                        <div class="division-hero-card__text">
+                                            <p class="division-hero-card__name">{{ entry.name }}</p>
+                                            <p v-if="entry.team" class="division-hero-card__team">{{ entry.team }}</p>
+                                        </div>
+                                        <span class="division-hero-card__value">{{ entry.value }}</span>
+                                    </li>
+                                </ul>
+                            </article>
+                        </div>
+                        <p v-else class="division-section__empty">Ei merkittäviä nostoja tälle divisioonalle.</p>
                     </div>
                 </section>
 
                 <section id="teams" class="division-section">
-                    <div class="division-section__header">
+                    <header class="division-section__heading">
+                        <p class="section-eyebrow">Joukkuelista</p>
                         <h2 class="title-accent titleUnderlineMain">Joukkueet</h2>
+                    </header>
+                    <div v-if="hasTeams" class="glass-card division-surface division-team-list">
+                        <team-nav
+                            :teams="teams"
+                            :championship-id="championshipId"
+                        ></team-nav>
                     </div>
-                    <team-nav
-                        v-if="hasTeams"
-                        :teams="teams"
-                        :championship-id="championshipId"
-                    ></team-nav>
                     <p v-else class="division-section__empty">
                         Joukkueita ei löytynyt.
                     </p>

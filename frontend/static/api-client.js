@@ -17,6 +17,7 @@
     const CONSECUTIVE_FAILURE_LIMIT = 3;
     const FAILURE_WINDOW_MS = 60000;
     const BREAKER_COOLDOWN_MS = 30000;
+    const DIVISION_CACHE_TTL_MS = 2 * 60 * 1000;
     const isDev = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
     const API_ROOT = (() => {
         if (typeof window === 'undefined') {
@@ -68,6 +69,12 @@
             `/api/seasons/${seasonId}/divisions/${divisionId}/stats`,
             `/api/v1/seasons/${seasonId}/divisions/${divisionId}/stats`,
             `/api/divisions/${divisionId}/stats`
+        ],
+        divisionDetails: divisionId => [
+            `/api/divisions/${divisionId}`,
+            `/api/divisions/${divisionId}/details`,
+            `/api/championships/${divisionId}`,
+            `/api/championships/${divisionId}/details`
         ],
         // Legacy compatibility
         divisions: seasonId => [
@@ -127,6 +134,34 @@
             return [];
         }
         return list.map(normalizeRouteCandidate).filter(Boolean);
+    }
+
+    function toSnakeCaseKey(key) {
+        if (!key || typeof key !== 'string') {
+            return key;
+        }
+        return key.replace(/([A-Z])/g, '_$1').toLowerCase();
+    }
+
+    function ensureSnakeCaseDeep(value) {
+        if (Array.isArray(value)) {
+            return value.map(item => ensureSnakeCaseDeep(item));
+        }
+        if (!value || typeof value !== 'object') {
+            return value;
+        }
+        const result = {};
+        for (const [key, nested] of Object.entries(value)) {
+            const normalizedValue = ensureSnakeCaseDeep(nested);
+            result[key] = normalizedValue;
+            if (/[A-Z]/.test(key)) {
+                const snakeKey = toSnakeCaseKey(key);
+                if (!(snakeKey in result)) {
+                    result[snakeKey] = normalizedValue;
+                }
+            }
+        }
+        return result;
     }
 
     function now() {
@@ -698,6 +733,8 @@
         constructor() {
             this.fetchJson = fetchJson;
             this.healthCheck = healthCheck;
+            this._divisionDetailsCache = new Map();
+            this._divisionCacheTtlMs = DIVISION_CACHE_TTL_MS;
         }
 
         proxyAvatar(url) {
@@ -800,6 +837,84 @@
                 }
                 throw error;
             }
+        }
+
+        async getDivisionById(championshipId, options = {}) {
+            if (!championshipId) {
+                throw new Error('championshipId is required');
+            }
+            const cacheKey = String(championshipId);
+            const {
+                force = false,
+                noCache = false,
+                cacheTtlMs = this._divisionCacheTtlMs,
+                ...requestOptions
+            } = options || {};
+            const skipCache = force === true || noCache === true;
+            if (!skipCache) {
+                const cached = this._divisionDetailsCache.get(cacheKey);
+                if (cached) {
+                    if (cached.promise) {
+                        return cached.promise;
+                    }
+                    if (cached.data && now() - cached.timestamp < cacheTtlMs) {
+                        return cached.data;
+                    }
+                    this._divisionDetailsCache.delete(cacheKey);
+                }
+            }
+            const fetchPromise = this._fetchDivisionDetails(cacheKey, requestOptions);
+            if (!skipCache) {
+                this._divisionDetailsCache.set(cacheKey, { promise: fetchPromise });
+            }
+            try {
+                const data = await fetchPromise;
+                if (!skipCache) {
+                    this._divisionDetailsCache.set(cacheKey, { data, timestamp: now() });
+                }
+                return data;
+            } catch (error) {
+                if (!skipCache) {
+                    const tracked = this._divisionDetailsCache.get(cacheKey);
+                    if (tracked && tracked.promise === fetchPromise) {
+                        this._divisionDetailsCache.delete(cacheKey);
+                    }
+                }
+                throw error;
+            }
+        }
+
+        async _fetchDivisionDetails(championshipId, requestOptions = {}) {
+            const encodedId = encodeURIComponent(championshipId);
+            const routes = buildRouteCandidates('divisionDetails', encodedId);
+            const result = await fetchWithFallback(routes, requestOptions);
+            const payload = result?.data ?? result ?? {};
+            const normalized = ensureSnakeCaseDeep(payload) || {};
+            if (!normalized.championship_id && normalized.championshipId) {
+                normalized.championship_id = normalized.championshipId;
+            }
+            if (!normalized.championship_id) {
+                normalized.championship_id = championshipId;
+            }
+            if (!Array.isArray(normalized.teams)) {
+                normalized.teams = [];
+            }
+            if (!Array.isArray(normalized.map_stats)) {
+                const fallbackStats = normalized.mapStats;
+                normalized.map_stats = Array.isArray(fallbackStats) ? fallbackStats : [];
+            }
+            if (!Array.isArray(normalized.excluded_team_ids)) {
+                const fallbackExcluded = normalized.excludedTeamIds;
+                normalized.excluded_team_ids = Array.isArray(fallbackExcluded) ? fallbackExcluded : [];
+            }
+            normalized._meta = result?.meta || {};
+            return normalized;
+        }
+
+        async getDivisionMapStats(championshipId, options = {}) {
+            const details = await this.getDivisionById(championshipId, options);
+            const stats = details?.map_stats ?? [];
+            return Array.isArray(stats) ? stats : [];
         }
     }
 

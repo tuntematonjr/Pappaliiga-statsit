@@ -30,24 +30,45 @@ window.MapsStats = {
         columns: {
             type: Array,
             default: null
+        },
+        headingVariant: {
+            type: String,
+            default: 'card'
+        },
+        stickyHeader: {
+            type: Boolean,
+            default: false
+        },
+        showHeader: {
+            type: Boolean,
+            default: true
+        }
+    },
+    computed: {
+        headingClass() {
+            return this.headingVariant === 'main' ? 'titleUnderlineMain' : 'titleUnderlineCard';
         }
     },
     template: `
         <section class="maps-stats card">
-            <header class="card-head">
+            <header v-if="showHeader" class="card-head">
                 <div>
-                    <h2 class="title title-accent titleUnderlineCard">{{ title }}</h2>
+                    <h2 :class="['title', 'title-accent', headingClass]">{{ title }}</h2>
                     <p v-if="subtitle" class="subtitle muted">{{ subtitle }}</p>
                 </div>
             </header>
             <div class="card-content">
                 <loading-spinner v-if="loading" message="Karttatilastoja ladataan..."></loading-spinner>
                 <error-message v-else-if="error" :message="error"></error-message>
-                <map-stats-table
-                    v-else
-                    :map-stats="mapStats"
-                    :columns-config="columns"
-                ></map-stats-table>
+                <template v-else>
+                    <map-stats-table
+                        v-if="mapStats && mapStats.length"
+                        :map-stats="mapStats"
+                        :columns-config="columns"
+                        :sticky-header="stickyHeader"
+                    ></map-stats-table>
+                    <p v-else class="muted empty">Ei karttatilastoja saatavilla</p>
+                </template>
             </div>
         </section>
     `

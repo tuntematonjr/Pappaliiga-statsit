@@ -41,6 +41,16 @@ window.SplitBar = {
             default: true
         }
     },
+    data() {
+        return {
+            segmentWidths: {
+                win: '0%',
+                loss: '0%'
+            },
+            initialised: false,
+            isAnimating: false
+        };
+    },
     computed: {
         total() {
             return this.wins + this.losses;
@@ -53,20 +63,29 @@ window.SplitBar = {
             if (this.total === 0) return 50;
             return (this.losses / this.total) * 100;
         },
+        winTargetWidth() {
+            if (this.total === 0) return '50%';
+            if (this.wins === this.total) return '100%';
+            if (this.wins === 0) return '0%';
+            return `${Math.round(this.winPercentage)}%`;
+        },
+        lossTargetWidth() {
+            if (this.total === 0) return '50%';
+            if (this.losses === this.total) return '100%';
+            if (this.losses === 0) return '0%';
+            return `${Math.round(this.lossPercentage)}%`;
+        },
+        segmentTargets() {
+            return {
+                win: this.winTargetWidth,
+                loss: this.lossTargetWidth
+            };
+        },
         winStyle() {
-            // If no data, keep balanced visual
-            if (this.total === 0) return { width: '50%' };
-            // If all wins, force full width
-            if (this.wins === this.total) return { width: '100%' };
-            // If no wins, zero width
-            if (this.wins === 0) return { width: '0%' };
-            return { width: `${Math.round(this.winPercentage)}%` };
+            return { width: this.segmentWidths.win };
         },
         lossStyle() {
-            if (this.total === 0) return { width: '50%' };
-            if (this.losses === this.total) return { width: '100%' };
-            if (this.losses === 0) return { width: '0%' };
-            return { width: `${Math.round(this.lossPercentage)}%` };
+            return { width: this.segmentWidths.loss };
         },
         winClass() {
             // Only apply tiny helper when there is a small but non-zero win portion
@@ -82,7 +101,45 @@ window.SplitBar = {
         barClass() {
             const classes = ['bar-split'];
             if (this.showShimmer && this.total > 0) classes.push('bar-shimmer');
+            if (this.isAnimating) classes.push('bar-split--animating');
             return classes.join(' ');
+        }
+    },
+    watch: {
+        segmentTargets: {
+            immediate: true,
+            deep: true,
+            handler(newTargets) {
+                this.updateSegmentWidths(newTargets);
+            }
+        }
+    },
+    methods: {
+        updateSegmentWidths(targets) {
+            const nextTargets = {
+                win: targets?.win ?? '0%',
+                loss: targets?.loss ?? '0%'
+            };
+
+            if (this.initialised) {
+                this.segmentWidths = nextTargets;
+                return;
+            }
+
+            this.segmentWidths = { win: '0%', loss: '0%' };
+            this.$nextTick(() => {
+                const queue = (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function')
+                    ? window.requestAnimationFrame
+                    : (cb) => setTimeout(cb, 16);
+                queue(() => {
+                    this.isAnimating = true;
+                    this.segmentWidths = nextTargets;
+                    setTimeout(() => {
+                        this.isAnimating = false;
+                        this.initialised = true;
+                    }, 900);
+                });
+            });
         }
     },
     template: `

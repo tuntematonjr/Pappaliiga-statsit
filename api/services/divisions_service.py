@@ -291,6 +291,16 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
         leaders_task,
     )
 
+    # Ensure aggregate fields the frontend expects are present
+    if aggregates is None:
+        aggregates = {}
+    if map_stats and not aggregates.get("maps_played_total"):
+        aggregates["maps_played_total"] = sum(int(item.get("maps_played") or 0) for item in map_stats)
+    if aggregates.get("played_matches") is not None and aggregates.get("matches_played") is None:
+        aggregates["matches_played"] = aggregates["played_matches"]
+    if aggregates.get("total_matches") is None and aggregates.get("matches_played") is not None:
+        aggregates["total_matches"] = aggregates["matches_played"]
+
     return {
         "championship_id": championship_id,
         "slug": champ["slug"],
@@ -310,14 +320,12 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _get_division_map_stats(championship_id: str, season: int, division_num: int) -> List[Dict[str, Any]]:
-    rows = await query_async(
+    primary_rows = await query_async(
         """
         WITH division_matches AS (
             SELECT match_id
-            FROM matches
-            WHERE championship_id = :champ_id
-              AND season = :season
-              AND division_num = :division
+        FROM matches
+        WHERE championship_id = :champ_id
         ),
         division_maps AS (
             SELECT
@@ -328,8 +336,6 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
             FROM maps m
             JOIN division_matches dm ON dm.match_id = m.match_id
             WHERE m.map_name IS NOT NULL
-              AND m.season = :season
-              AND m.division_num = :division
               AND m.is_forfeit = 0
         ),
         player_totals AS (
@@ -356,8 +362,6 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
             LEFT JOIN player_stats ps ON (
                 ps.map_id = dm.map_id
                 AND ps.is_forfeit_map = 0
-                AND ps.season = :season
-                AND ps.division_num = :division
             )
             GROUP BY LOWER(dm.map_name), dm.map_name
         ),
@@ -375,8 +379,6 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
             FROM map_votes v
             JOIN division_matches dm ON dm.match_id = v.match_id
             WHERE v.map_name IS NOT NULL
-              AND v.season = :season
-              AND v.division_num = :division
               AND LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto')
             GROUP BY LOWER(v.map_name)
         )
@@ -407,40 +409,116 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
         LEFT JOIN maps_catalog mc ON mc.map_id = pt.map_name
         ORDER BY pt.maps_played DESC, pt.map_name
         """,
-        {"champ_id": championship_id, "season": season, "division": division_num},
+        {"champ_id": championship_id},
     )
 
-    result = []
-    for r in rows:
-        maps_played = int(r.get("maps_played") or 0)
-        rounds_played = int(r.get("rounds_played") or 0)
+    def _build_result(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for r in rows:
+            maps_played = int(r.get("maps_played") or 0)
+            rounds_played = int(r.get("rounds_played") or 0)
+            kills = int(r.get("kills") or 0)
+            deaths = int(r.get("deaths") or 0)
+            damage = int(r.get("damage") or 0)
+            adr = float(r.get("adr") or 0.0)
+            kr = float(r.get("kr") or 0.0)
+            utility_damage = float(r.get("utility_damage") or 0.0)
+            snipers = int(r.get("sniper_kills") or 0)
+            assists = int(r.get("assists") or 0)
+            bans = int(r.get("banned") or 0)
+            result.append(
+                {
+                    "map_name": r.get("map_name") or r.get("map_id") or "Unknown",
+                    "pretty_name": r.get("pretty_name") or r.get("map_name") or r.get("map_id") or "Kartta",
+                    "image_sm": r.get("image_sm"),
+                    "maps_played": maps_played,
+                    "banned": bans,
+                    "kills": kills,
+                    "deaths": deaths,
+                    "damage": damage,
+                    "rounds_played": rounds_played,
+                    "adr": adr,
+                    "kr": kr,
+                    "udpr": float(r.get("udpr") or (utility_damage / max(deaths, 1))),
+                    "enemy_flash": float(r.get("enemy_flash") or 0.0),
+                    "sniper_kills": snipers,
+                    "assists": assists,
+                    "k2": int(r.get("k2") or 0),
+                    "k3": int(r.get("k3") or 0),
+                    "k4": int(r.get("k4") or 0),
+                    "ace": int(r.get("ace") or 0),
+                    "pistol_kills": int(r.get("pistol_kills") or 0),
+                    "pick_rate": round((maps_played / max(rounds_played, 1)) * 100, 1) if rounds_played else 0.0,
+                }
+            )
+        return result
 
-        result.append(
+    if primary_rows:
+        return _build_result(primary_rows)
+
+    # Fallback: aggregate from team_map_season_totals when detailed map rows are missing
+    fallback_rows = await query_async(
+        """
+        SELECT
+            tm.map_name AS map_name,
+            mc.pretty_name,
+            mc.image_sm,
+            SUM(tm.games) AS maps_played,
+            SUM(tm.wins) AS wins,
+            SUM(tm.total_own_ban + tm.opp_ban + tm.ban1 + tm.ban2) AS banned,
+            SUM(tm.kills) AS kills,
+            SUM(tm.deaths) AS deaths,
+            SUM(tm.damage) AS damage,
+            SUM(tm.utility_damage) AS utility_damage,
+            SUM(tm.adr * tm.games) AS adr_weighted,
+            SUM(tm.games) AS adr_weight,
+            SUM(tm.rd) AS rounds_played
+        FROM team_map_season_totals tm
+        LEFT JOIN maps_catalog mc ON mc.map_id = tm.map_name
+        WHERE tm.season = :season
+          AND tm.division_num = :division
+        GROUP BY tm.map_name, mc.pretty_name, mc.image_sm
+        ORDER BY maps_played DESC, tm.map_name
+        """,
+        {"season": season, "division": division_num},
+    )
+
+    normalized_rows: list[dict[str, Any]] = []
+    for r in fallback_rows or []:
+        maps_played = int(r.get("maps_played") or 0)
+        wins = int(r.get("wins") or 0)
+        deaths = int(r.get("deaths") or 0)
+        weight = float(r.get("adr_weight") or 0.0)
+        adr_weighted = float(r.get("adr_weighted") or 0.0)
+        normalized_rows.append(
             {
                 "map_name": r.get("map_name"),
-                "pretty_name": r.get("pretty_name") or r.get("map_name"),
+                "pretty_name": r.get("pretty_name"),
                 "image_sm": r.get("image_sm"),
                 "maps_played": maps_played,
+                "wins": wins,
+                "losses": max(maps_played - wins, 0),
                 "banned": int(r.get("banned") or 0),
                 "kills": int(r.get("kills") or 0),
-                "deaths": int(r.get("deaths") or 0),
+                "deaths": deaths,
                 "damage": int(r.get("damage") or 0),
-                "rounds_played": rounds_played,
-                "adr": float(r.get("adr") or 0.0),
-                "kr": float(r.get("kr") or 0.0),
-                "udpr": float(r.get("udpr") or 0.0),
-                "enemy_flash": float(r.get("enemy_flash") or 0.0),
-                "sniper_kills": int(r.get("sniper_kills") or 0),
-                "assists": int(r.get("assists") or 0),
-                "k2": int(r.get("k2") or 0),
-                "k3": int(r.get("k3") or 0),
-                "k4": int(r.get("k4") or 0),
-                "ace": int(r.get("ace") or 0),
-                "pistol_kills": int(r.get("pistol_kills") or 0),
-                "pick_rate": round((maps_played / max(rounds_played, 1)) * 100, 1) if rounds_played else 0.0,
+                "rounds_played": int(r.get("rounds_played") or 0),
+                "adr": (adr_weighted / weight) if weight else 0.0,
+                "kr": 0.0,
+                "udpr": float(r.get("utility_damage") or 0.0) / max(deaths, 1),
+                "enemy_flash": 0.0,
+                "sniper_kills": 0,
+                "assists": 0,
+                "k2": 0,
+                "k3": 0,
+                "k4": 0,
+                "ace": 0,
+                "pistol_kills": 0,
+                "pick_rate": 0.0,
             }
         )
-    return result
+
+    return _build_result(normalized_rows)
 
 
 async def _get_division_aggregates(championship_id: str, season: int, division_num: int) -> dict[str, Any]:
@@ -452,16 +530,32 @@ async def _get_division_aggregates(championship_id: str, season: int, division_n
             SUM(CASE WHEN m.is_forfeit = 1 THEN 1 ELSE 0 END) AS forfeits
         FROM matches m
         WHERE m.championship_id = :champ_id
-          AND m.season = :season
-          AND m.division_num = :division
         """,
-        {"champ_id": championship_id, "season": season, "division": division_num},
+        {"champ_id": championship_id},
     )
     row = rows[0] if rows else {}
+
+    map_totals = await query_async(
+        """
+        SELECT SUM(tm.games) AS maps_played_total
+        FROM team_map_season_totals tm
+        WHERE tm.season = :season
+          AND tm.division_num = :division
+        """,
+        {"season": season, "division": division_num},
+    )
+    maps_played_total = int((map_totals[0] or {}).get("maps_played_total") or 0) if map_totals else 0
+
+    played = int(row.get("played_matches") or 0)
+    total = int(row.get("total_matches") or 0)
+    forfeits = int(row.get("forfeits") or 0)
+
     return {
-        "played_matches": int(row.get("played_matches") or 0),
-        "total_matches": int(row.get("total_matches") or 0),
-        "forfeits": int(row.get("forfeits") or 0),
+        "played_matches": played,
+        "matches_played": played,
+        "total_matches": total,
+        "forfeits": forfeits,
+        "maps_played_total": maps_played_total,
     }
 
 

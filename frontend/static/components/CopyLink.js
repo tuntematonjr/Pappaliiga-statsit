@@ -13,6 +13,10 @@ window.CopyLink = {
         compact: {
             type: Boolean,
             default: false
+        },
+        variant: {
+            type: String,
+            default: 'ghost'
         }
     },
     data() {
@@ -26,7 +30,14 @@ window.CopyLink = {
             return this.url || window.location.href;
         },
         buttonClass() {
-            const classes = ['btn', 'btn-ghost', 'copy-link-btn'];
+            const classes = ['copy-link-btn'];
+            if (this.variant === 'primary') {
+                classes.push('btn-primary');
+            } else if (this.variant === 'secondary') {
+                classes.push('btn-secondary');
+            } else {
+                classes.push('btn', 'btn-ghost');
+            }
             if (this.compact) classes.push('btn-compact');
             if (this.copied) classes.push('copied');
             return classes.join(' ');
@@ -64,7 +75,7 @@ window.CopyLink = {
         }
     },
     template: `
-        <button :class="buttonClass" @click="copyLink" :title="'Copy link: ' + linkUrl">
+        <button :class="buttonClass" type="button" @click="copyLink" :title="'Copy link: ' + linkUrl">
             <span class="copy-icon">🔗</span>
             <span class="copy-text">{{ buttonText }}</span>
         </button>
