@@ -7,7 +7,8 @@ window.SankariCard = {
         entries: {
             type: Array,
             default: () => []
-        }
+        },
+        tooltip: { type: String, default: '' }
     },
     computed: {
         visibleEntries() {
@@ -49,7 +50,7 @@ window.SankariCard = {
         }
     },
     template: `
-        <article class="sankari-card glass-card division-surface">
+        <article class="sankari-card glass-card division-surface" :title="tooltip || null">
             <div class="sankari-card__content">
                 <header class="sankari-card__head">
                     <h3 class="title-accent titleUnderlineCard">{{ title }}</h3>

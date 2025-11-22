@@ -409,10 +409,15 @@ window.DivisionView = {
             if (!this.sankariPlayers.length) return [];
             return SANKARI_CARD_GROUPS.map(group => {
                 const cards = group.cards
-                    .map(card => ({
-                        ...card,
-                        entries: this.buildSankariEntries(this.sankariPlayers, card)
-                    }))
+                    .map(card => {
+                        const thresholds = this.sankariThreshold(card, this.sankariPlayers);
+                        return {
+                            ...card,
+                            thresholds,
+                            entries: this.buildSankariEntries(this.sankariPlayers, card, thresholds),
+                            tooltip: this.cardThresholdTooltip(card, thresholds)
+                        };
+                    })
                     .filter(card => card.entries.length);
                 if (!cards.length) return null;
                 return {
@@ -443,20 +448,6 @@ window.DivisionView = {
             if (!this.divisionDetails) return 'Divisioona';
             return this.divisionDetails.name || `Divisioona ${this.divisionDetails.division_num}`;
         },
-        divisionSubtitle() {
-            if (!this.divisionDetails) return '';
-            const pieces = [];
-            if (this.divisionDetails.season) {
-                pieces.push(`Season ${this.divisionDetails.season}`);
-            }
-            if (this.divisionDetails.division_num != null) {
-                pieces.push(`${this.divisionDetails.division_num} Divisioona`);
-            }
-            if (this.divisionDetails.is_playoff) {
-                pieces.push('Playoffs');
-            }
-            return pieces.join(' | ');
-        },
         statMetrics() {
             if (!this.divisionDetails) {
                 return [];
@@ -474,9 +465,6 @@ window.DivisionView = {
                 return `${this.divisionDetails.division_num} Divisioona`;
             }
             return this.divisionDetails.name || this.divisionTitle;
-        },
-        divisionSeasonLabel() {
-            return this.divisionSubtitle || this.divisionTitle;
         },
         divisionHeaderStats() {
             if (!this.statMetrics.length) return [];
@@ -552,7 +540,6 @@ window.DivisionView = {
                     return {
                         id: highlight.id || `highlight-${idx}`,
                         title: highlight.title || 'Sankari',
-                        subtitle: highlight.description || '',
                         metric: highlight.metric || '',
                         entries
                     };
@@ -676,6 +663,15 @@ window.DivisionView = {
             if (Number.isFinite(numeric)) return numeric;
             return fallback;
         },
+        median(values) {
+            if (!Array.isArray(values) || !values.length) return null;
+            const sorted = [...values].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            if (sorted.length % 2 === 0) {
+                return (sorted[mid - 1] + sorted[mid]) / 2;
+            }
+            return sorted[mid];
+        },
         findTeam(teamId, teamName) {
             if (!Array.isArray(this.teams) || !this.teams.length) return null;
             const normalizedId = teamId != null ? String(teamId) : null;
@@ -739,11 +735,45 @@ window.DivisionView = {
                 damage: safe(row.damage)
             };
         },
-        buildSankariEntries(players, card) {
+        sankariThreshold(card, players) {
+            const minValue = (value) => {
+                const numeric = this.toNumber(value, null);
+                return numeric != null && numeric > 0 ? numeric : null;
+            };
+            const roundsList = Array.isArray(players) ? players.map(p => minValue(p.rounds)).filter(v => v != null) : [];
+            const mapsList = Array.isArray(players) ? players.map(p => minValue(p.maps)).filter(v => v != null) : [];
+            const medianRounds = this.median(roundsList);
+            const medianMaps = this.median(mapsList);
+            const baseRounds = medianRounds != null ? Math.floor(medianRounds * 0.25) : 0;
+            const baseMaps = medianMaps != null ? Math.floor(medianMaps * 0.25) : 0;
+            const derivedRounds = Math.max(3, baseRounds);
+            const derivedMaps = Math.max(1, baseMaps);
+            const minRounds = minValue(card?.minRounds) ?? (derivedRounds > 0 ? derivedRounds : null);
+            const minMaps = minValue(card?.minMaps) ?? (derivedMaps > 0 ? derivedMaps : null);
+            return {
+                minRounds,
+                minMaps
+            };
+        },
+        cardThresholdTooltip(card, thresholds) {
+            if (!card) return '';
+            const limits = thresholds || this.sankariThreshold(card, this.sankariPlayers);
+            if (!limits?.minRounds && !limits?.minMaps) {
+                return '';
+            }
+            const parts = [];
+            if (limits.minRounds) parts.push(`Vähintään ${limits.minRounds} kierrosta`);
+            if (limits.minMaps) parts.push(`Vähintään ${limits.minMaps} karttaa`);
+            return parts.join(' / ');
+        },
+        buildSankariEntries(players, card, thresholds) {
             if (!Array.isArray(players) || !card || !card.metricKey) return [];
             const direction = (card.sortDirection || 'desc').toLowerCase();
+            const limits = thresholds || this.sankariThreshold(card, players);
             const sorted = players
                 .map(player => {
+                    if (limits?.minRounds && (!player.rounds || player.rounds < limits.minRounds)) return null;
+                    if (limits?.minMaps && (!player.maps || player.maps < limits.minMaps)) return null;
                     const value = this.sankariMetricValue(player, card.metricKey);
                     if (value === null || value === undefined || Number.isNaN(value)) {
                         return null;
@@ -958,11 +988,8 @@ window.DivisionView = {
             <section class="division-hero glass-card" aria-labelledby="division-title">
                 <div class="division-hero__grid">
                     <div class="division-hero__identity">
-                        <div class="division-hero__badge">{{ divisionBadgeLabel }}</div>
                         <div>
-                            <p class="section-eyebrow">Divisioona</p>
                             <h1 id="division-title" class="title-accent titleUnderlineMain">{{ divisionTitle }}</h1>
-                            <p v-if="divisionSubtitle" class="division-hero__subtitle">{{ divisionSubtitle }}</p>
                         </div>
                     </div>
                     <div class="division-hero__meta">
@@ -1022,10 +1049,8 @@ window.DivisionView = {
             <template v-else>
                 <section id="standings" class="division-section division-section--stacked">
                     <header class="division-section__heading division-team-heading">
-                        <p class="section-eyebrow">Joukkuavertailu</p>
                         <h2 class="title-accent titleUnderlineMain">Joukkuavertailu</h2>
-                        <p class="division-section__lede division-section__lede--balanced">Visualisoitu katsaus joukkueiden sijoituksiin, voittoprosentteihin ja suorituskykyyn.</p>
-                    </header>
+                        </header>
                     <div class="division-team-module">
                         <div class="division-team-panels">
                             <team-comparison-board
@@ -1035,7 +1060,6 @@ window.DivisionView = {
                                 :loading="standingsLoading"
                                 :error="standingsError"
                                 title="Joukkuevertailu"
-                                subtitle="Kokonaiskuva joukkueiden suorituskyvystä"
                                 :sticky-header="true"
                                 :highlight-team-id="activeTeamChipId"
                             ></team-comparison-board>
@@ -1070,7 +1094,6 @@ window.DivisionView = {
 
                 <section id="summary" class="division-section">
                     <header class="division-section__heading">
-                        <p class="section-eyebrow">Divisioonan tilastot</p>
                         <h2 class="title-accent titleUnderlineMain">Divisioonan tilastot</h2>
                     </header>
                     <div class="summary-card-grid division-summary-grid" role="list">
@@ -1086,14 +1109,11 @@ window.DivisionView = {
 
                 <section id="maps" class="division-section">
                     <header class="division-section__heading">
-                        <p class="section-eyebrow">Karttatilastot</p>
                         <h2 class="title-accent titleUnderlineMain">Karttatilastot</h2>
                     </header>
-                    <p class="division-section__lede division-section__lede--compact">Kokonaiskuva divisioonan suosituimmista kartoista ja niiden suorituskyvystä.</p>
                     <maps-stats
                         class="division-surface glass-card"
                         title="Karttatilastot"
-                        subtitle=""
                         :loading="mapsLoading"
                         :error="mapsError"
                         :map-stats="mapStats"
@@ -1124,6 +1144,7 @@ window.DivisionView = {
                                     :key="card.id"
                                     :title="card.title"
                                     :description="card.description"
+                                    :tooltip="card.tooltip"
                                     :entries="card.entries"
                                 ></sankari-card>
                             </div>
