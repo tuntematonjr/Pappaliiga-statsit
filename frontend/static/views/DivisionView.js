@@ -30,10 +30,6 @@ const DIVISION_MAP_COLUMNS = [
 ];
 
 const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
-const TEAM_VIEW_TABS = [
-    { id: 'standings', label: 'Standings' },
-    { id: 'stats', label: 'Tilastot' }
-];
 
 function pickValue(obj, keys) {
     if (!obj) return undefined;
@@ -113,7 +109,6 @@ window.DivisionView = {
         get TeamNav() { return window.TeamNav; },
         get TeamComparisonBoard() { return window.TeamComparisonBoard; },
         get MapsStats() { return window.MapsStats; },
-        get TeamComparisonChart() { return window.TeamComparisonChart; },
         get CopyLink() { return window.CopyLink; },
         get SummaryStatCard() { return window.SummaryStatCard; }
     },
@@ -131,8 +126,6 @@ window.DivisionView = {
                 { id: 'heroes', label: 'Sankarit' },
                 { id: 'teams', label: 'Joukkueet' }
             ],
-            teamViewTabs: TEAM_VIEW_TABS,
-            teamViewTab: TEAM_VIEW_TABS[0].id,
             activeTeamChipId: null
         };
     },
@@ -279,9 +272,16 @@ window.DivisionView = {
                 return [];
             }
             return source.map((team, idx) => {
-                const wins = Number(team.wins ?? team.maps_won ?? 0);
-                const losses = Number(team.losses ?? team.maps_lost ?? 0);
-                const matches = Number(team.matches ?? team.matches_played ?? wins + losses);
+                const wins = Number(team.maps_won ?? team.wins ?? 0);
+                const losses = Number(team.maps_lost ?? team.losses ?? 0);
+                const matches = Number(
+                    team.matches_played
+                    ?? team.matches
+                    ?? team.series_played
+                    ?? team.match_count
+                    ?? team.series_count
+                    ?? 0
+                );
                 const roundDiff = Number(team.round_diff ?? team.rounds_diff ?? 0);
                 const id = team.team_id || team.id || `team-${idx}`;
                 return {
@@ -363,10 +363,6 @@ window.DivisionView = {
             handler(newItems) {
                 this.ensureActiveTeamChip(newItems);
             }
-        },
-        teamViewTab(newTab) {
-            if (!this.activeTeamChipId) return;
-            this.$nextTick(() => this.scrollTeamRow(this.activeTeamChipId, { instant: true }));
         }
     },
     methods: {
@@ -449,22 +445,13 @@ window.DivisionView = {
         handleTeamChipSelect(teamId) {
             if (teamId == null) return;
             const normalized = String(teamId);
-            const sameSelection = this.activeTeamChipId === normalized;
             this.activeTeamChipId = normalized;
-            this.$nextTick(() => this.scrollTeamRow(normalized, { instant: sameSelection }));
+            this.$nextTick(() => this.scrollTeamRow(normalized, { instant: true }));
         },
         scrollTeamRow(teamId, options = {}) {
             if (teamId == null) return;
             const normalized = String(teamId);
-            const order = this.teamViewTab === 'standings'
-                ? ['chart', 'table']
-                : ['table', 'chart'];
-            for (const target of order) {
-                const handled = target === 'chart'
-                    ? this.scrollTeamChart(normalized, options)
-                    : this.scrollTeamTable(normalized, options);
-                if (handled) break;
-            }
+            this.scrollTeamTable(normalized, options);
         },
         scrollTeamTable(teamId, options = {}) {
             const board = this.$refs.teamBoard;
@@ -473,26 +460,6 @@ window.DivisionView = {
                 return true;
             }
             return false;
-        },
-        scrollTeamChart(teamId, options = {}) {
-            const chart = this.$refs.teamChart;
-            if (chart && typeof chart.scrollToTeam === 'function') {
-                chart.scrollToTeam(teamId, options);
-                return true;
-            }
-            return false;
-        },
-        setTeamViewTab(tabId) {
-            if (!tabId || this.teamViewTab === tabId) {
-                return;
-            }
-            this.teamViewTab = tabId;
-        },
-        teamTabPanelId(tabId) {
-            return `team-panel-${tabId}`;
-        },
-        teamTabButtonId(tabId) {
-            return `team-tab-btn-${tabId}`;
         },
         getMetricIcon(key) {
             const icons = {
@@ -626,61 +593,18 @@ window.DivisionView = {
                         <p class="division-section__lede division-section__lede--balanced">Visualisoitu katsaus joukkueiden sijoituksiin, voittoprosentteihin ja suorituskykyyn.</p>
                     </header>
                     <div class="division-team-module">
-                        <div
-                            class="division-team-tabs"
-                            role="tablist"
-                            aria-label="Joukkuavertailu näkymät"
-                        >
-                            <button
-                                v-for="tab in teamViewTabs"
-                                :key="tab.id"
-                                type="button"
-                                class="season-pill division-team-tab"
-                                :class="{ 'season-pill--active': teamViewTab === tab.id }"
-                                role="tab"
-                                :id="teamTabButtonId(tab.id)"
-                                :aria-selected="teamViewTab === tab.id"
-                                :aria-controls="teamTabPanelId(tab.id)"
-                                @click="setTeamViewTab(tab.id)"
-                            >
-                                {{ tab.label }}
-                            </button>
-                        </div>
                         <div class="division-team-panels">
-                            <transition name="division-tab-fade">
-                                <team-comparison-chart
-                                    ref="teamChart"
-                                    v-show="teamViewTab === 'standings'"
-                                    class="division-team-panel"
-                                    :id="teamTabPanelId('standings')"
-                                    role="tabpanel"
-                                    :aria-labelledby="teamTabButtonId('standings')"
-                                    :aria-hidden="teamViewTab !== 'standings'"
-                                    :teams="standings"
-                                    :limit="12"
-                                    title="Sarjataulukko"
-                                    subtitle="Sijoitukset, voittoprosentit ja eräero"
-                                    :highlight-team-id="activeTeamChipId"
-                                ></team-comparison-chart>
-                            </transition>
-                            <transition name="division-tab-fade">
-                                <team-comparison-board
-                                    v-show="teamViewTab === 'stats'"
-                                    ref="teamBoard"
-                                    class="division-team-panel division-team-panel--table"
-                                    :id="teamTabPanelId('stats')"
-                                    role="tabpanel"
-                                    :aria-labelledby="teamTabButtonId('stats')"
-                                    :aria-hidden="teamViewTab !== 'stats'"
-                                    :teams="teams"
-                                    :loading="standingsLoading"
-                                    :error="standingsError"
-                                    title="Joukkuevertailu"
-                                    subtitle="Kokonaiskuva joukkueiden suorituskyvystä"
-                                    :sticky-header="true"
-                                    :highlight-team-id="activeTeamChipId"
-                                ></team-comparison-board>
-                            </transition>
+                            <team-comparison-board
+                                ref="teamBoard"
+                                class="division-team-panel division-team-panel--table"
+                                :teams="teams"
+                                :loading="standingsLoading"
+                                :error="standingsError"
+                                title="Joukkuevertailu"
+                                subtitle="Kokonaiskuva joukkueiden suorituskyvystä"
+                                :sticky-header="true"
+                                :highlight-team-id="activeTeamChipId"
+                            ></team-comparison-board>
                         </div>
                     </div>
                     <div v-if="teamChipItems.length" class="division-team-chips" role="tablist" aria-label="Joukkuepikalinkit">

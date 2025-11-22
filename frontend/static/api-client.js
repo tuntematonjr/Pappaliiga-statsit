@@ -76,6 +76,10 @@
             `/api/championships/${divisionId}`,
             `/api/championships/${divisionId}/details`
         ],
+        divisionMatches: divisionId => [
+            `/api/matches/division/${divisionId}`,
+            `/api/v1/matches/division/${divisionId}`
+        ],
         // Legacy compatibility
         divisions: seasonId => [
             `/api/v3/divisions/${seasonId}`,
@@ -890,22 +894,14 @@
             const result = await fetchWithFallback(routes, requestOptions);
             const payload = result?.data ?? result ?? {};
             const normalized = ensureSnakeCaseDeep(payload) || {};
-            if (!normalized.championship_id && normalized.championshipId) {
-                normalized.championship_id = normalized.championshipId;
-            }
-            if (!normalized.championship_id) {
-                normalized.championship_id = championshipId;
-            }
             if (!Array.isArray(normalized.teams)) {
                 normalized.teams = [];
             }
             if (!Array.isArray(normalized.map_stats)) {
-                const fallbackStats = normalized.mapStats;
-                normalized.map_stats = Array.isArray(fallbackStats) ? fallbackStats : [];
+                normalized.map_stats = [];
             }
             if (!Array.isArray(normalized.excluded_team_ids)) {
-                const fallbackExcluded = normalized.excludedTeamIds;
-                normalized.excluded_team_ids = Array.isArray(fallbackExcluded) ? fallbackExcluded : [];
+                normalized.excluded_team_ids = [];
             }
             normalized._meta = result?.meta || {};
             return normalized;
@@ -915,6 +911,19 @@
             const details = await this.getDivisionById(championshipId, options);
             const stats = details?.map_stats ?? [];
             return Array.isArray(stats) ? stats : [];
+        }
+
+        async getDivisionMatches(championshipId, options = {}) {
+            if (!championshipId) {
+                throw new Error('championshipId is required');
+            }
+            const encodedId = encodeURIComponent(championshipId);
+            const routes = buildRouteCandidates('divisionMatches', encodedId);
+            const result = await fetchWithFallback(routes, options);
+            const payload = result?.data ?? result ?? {};
+            const items = Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload) ? payload : []);
+            const targetId = String(championshipId);
+            return items.filter(match => String(match?.championship_id ?? match?.championshipId ?? '') === targetId);
         }
     }
 

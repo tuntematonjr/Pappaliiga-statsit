@@ -45,13 +45,19 @@ window.TeamComparisonChart = {
                 return [];
             }
             const rows = this.teams.slice(0, this.limit).map((team, idx) => {
-                const wins = Number(team.wins ?? team.maps_won ?? 0);
-                const losses = Number(team.losses ?? team.maps_lost ?? 0);
+                const wins = Number(team.maps_won ?? team.wins ?? 0);
+                const losses = Number(team.maps_lost ?? team.losses ?? 0);
                 const matchesPlayed = Number(
-                    team.matchesPlayed ?? team.matches_played ?? team.matches ?? (wins + losses)
+                    team.matchesPlayed
+                    ?? team.matches_played
+                    ?? team.matches
+                    ?? team.series_played
+                    ?? team.match_count
+                    ?? team.series_count
+                    ?? 0
                 );
                 const roundDiff = Number(team.roundDiff ?? team.rounds_diff ?? team.round_diff ?? 0);
-                const winPctRaw = Number(team.winPct ?? team.winRate ?? team.win_rate ?? 0);
+                const winPctRaw = Number(team.winPct ?? team.winRate ?? team.map_win_rate ?? team.win_rate ?? 0);
                 return {
                     id: this.resolveTeamId(team, idx),
                     name: team.name || team.team_name || team.display_name || `Joukkue ${idx + 1}`,

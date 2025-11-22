@@ -44,15 +44,14 @@
     }
 
     function clampMatches(block) {
-        // Handle both camelCase and snake_case input, output camelCase
-        const matchesTotal = Math.max(0, toNumber(block.matchesTotal ?? block.matches_total, 0));
-        const rawPlayed = toNumber(block.matchesPlayed ?? block.matches_played, 0);
+        const matchesTotal = Math.max(0, toNumber(block.matches_played_total ?? block.matches_total, 0));
+        const rawPlayed = toNumber(block.matches_played, 0);
         const playedCap = matchesTotal > 0 ? matchesTotal : Math.max(rawPlayed, 0);
         const matchesPlayed = clamp(rawPlayed, 0, playedCap);
         return {
             ...block,
-            matchesPlayed: matchesPlayed,
-            matchesTotal: matchesTotal
+            matchesPlayed,
+            matchesTotal
         };
     }
 
@@ -61,7 +60,7 @@
         if (!raw || typeof raw !== 'object') {
             return { ok: false, error: 'Division payload missing', warnings };
         }
-        const divisionId = raw.division_id ?? raw.divisionId ?? raw.id ?? raw.slug;
+        const divisionId = raw.division_id;
         if (divisionId === undefined || divisionId === null) {
             warnings.push('division_id missing');
             return { ok: false, error: 'division_id missing', warnings };
@@ -76,28 +75,25 @@
         const seasonStatus = (seasonRaw.status || 'waiting').toLowerCase();
         const playoffsStatus = (playoffsRaw.status || DEFAULT_PLAYOFFS.status).toLowerCase();
         
-        // Handle both camelCase (API) and snake_case (legacy) field names
-        // Output in camelCase for component compatibility
         const normalizedSeason = clampMatches({
             teams: toNumber(seasonRaw.teams, 0),
-            matchesPlayed: toNumber(seasonRaw.matches_played ?? seasonRaw.matchesPlayed, 0),
-            matchesTotal: toNumber(seasonRaw.matches_total ?? seasonRaw.matchesTotal, 0),
+            matches_played: toNumber(seasonRaw.matches_played, 0),
+            matches_total: toNumber(seasonRaw.matches_total, 0),
             status: ['waiting', 'active', 'finished'].includes(seasonStatus) ? seasonStatus : 'waiting',
-            winner: seasonRaw.winner ?? seasonRaw.winner_team ? String(seasonRaw.winner ?? seasonRaw.winner_team) : null
+            winner: seasonRaw.winner_team ? String(seasonRaw.winner_team) : null
         });
 
         const normalizedPlayoffs = clampMatches({
             teams: toNumber(playoffsRaw.teams, DEFAULT_PLAYOFFS.teams) || DEFAULT_PLAYOFFS.teams,
-            matchesPlayed: toNumber(playoffsRaw.matches_played ?? playoffsRaw.matchesPlayed, DEFAULT_PLAYOFFS.matchesPlayed),
-            matchesTotal: toNumber(playoffsRaw.matches_total ?? playoffsRaw.matchesTotal, DEFAULT_PLAYOFFS.matchesTotal) || DEFAULT_PLAYOFFS.matchesTotal,
+            matches_played: toNumber(playoffsRaw.matches_played, DEFAULT_PLAYOFFS.matchesPlayed),
+            matches_total: toNumber(playoffsRaw.matches_total, DEFAULT_PLAYOFFS.matchesTotal) || DEFAULT_PLAYOFFS.matchesTotal,
             status: ['waiting', 'active', 'finished'].includes(playoffsStatus) ? playoffsStatus : DEFAULT_PLAYOFFS.status,
-            winner: playoffsRaw.winner ?? playoffsRaw.winner_team ? String(playoffsRaw.winner ?? playoffsRaw.winner_team) : null
+            winner: playoffsRaw.winner_team ? String(playoffsRaw.winner_team) : null
         });
 
-        // Normalize best player and MVP team data (handle both camelCase and snake_case)
-        const metaData = raw.meta ?? raw.metadata ?? {};
-        const bestPlayer = metaData.mvp_player ?? metaData.best_player ?? raw.best_player ?? raw.bestPlayer;
-        const mvpTeam = metaData.winner_team ?? metaData.mvp_team ?? raw.mvp_team ?? raw.mvpTeam;
+        const metaData = raw.meta ?? {};
+        const bestPlayer = metaData.best_player;
+        const mvpTeam = metaData.winner_team;
         const winners = Array.isArray(raw.winners) ? raw.winners : [];
 
         // Calculate overall division status based on season and playoff status
@@ -111,7 +107,7 @@
             warnings,
             division: {
                 id: resolvedId,
-                divisionId: toNumber(raw.division_id ?? raw.divisionId, null),
+                divisionId: toNumber(raw.division_id, null),
                 name: String(name),
                 tier,
                 tierMeta: TIER_RANGES.find(entry => entry.id === tier) || TIER_RANGES[TIER_RANGES.length - 1],
@@ -125,7 +121,7 @@
                 mvpTeam: mvpTeam ? String(mvpTeam) : null,
                 winners: winners,
                 slug: raw.slug || null,
-                seasonNumber: raw.season_number ?? raw.seasonNumber ?? null,
+                seasonNumber: raw.season_number ?? null,
                 raw
             }
         };

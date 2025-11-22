@@ -74,11 +74,18 @@ window.TeamComparisonBoard = {
             }
 
             return this.teams.map((team, idx) => {
-                const matches = Number(team.matches_played ?? team.matches ?? team.played ?? 0);
-                const wins = Number(team.wins ?? team.maps_won ?? 0);
-                const losses = Number(team.losses ?? team.maps_lost ?? 0);
+                const wins = Number(team.maps_won ?? team.wins ?? 0);
+                const losses = Number(team.maps_lost ?? team.losses ?? 0);
+                const matches = Number(
+                    team.matches_played
+                    ?? team.matches
+                    ?? team.series_played
+                    ?? team.match_count
+                    ?? team.series_count
+                    ?? 0
+                );
                 const roundsDiffRaw = Number(team.rounds_diff ?? team.rounds_delta ?? team.round_diff ?? 0);
-                const winRate = this.parseNumber(team.win_rate ?? team.winRate ?? (matches ? (wins / matches) * 100 : 0));
+                const winRate = this.parseNumber(team.map_win_rate ?? team.win_rate ?? team.winRate ?? (matches ? (wins / matches) * 100 : 0));
                 const kd = this.parseNumber(team.kd ?? team.kd_ratio ?? 0);
                 const adr = this.parseNumber(team.adr ?? team.average_damage ?? 0);
                 const displayName = team.display_name || team.team_name || team.name || `Joukkue ${idx + 1}`;

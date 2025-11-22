@@ -59,69 +59,92 @@
         return Math.round((played / max) * 1000) / 10;
     }
 
-    function deriveStandings(details) {
-        if (!details || !Array.isArray(details.teams)) {
+    function deriveStandingsFromMatches(matches, teams = [], championshipId = null) {
+        if (!Array.isArray(matches) || !matches.length) {
             return [];
         }
-        const standings = details.teams
-            .filter(team => team && !details.excluded_team_ids?.includes?.(team.team_id))
-            .map(team => {
-                const wins = toNumber(team.wins ?? team.matches_won ?? team.maps_won ?? 0);
-                const losses = toNumber(team.losses ?? team.matches_lost ?? team.maps_lost ?? 0);
-                const matchesPlayed = toNumber(team.matches_played ?? wins + losses);
-                const roundDiff = toNumber(team.rounds_diff ?? (team.rounds_won ?? 0) - (team.rounds_lost ?? 0));
-                const mapWinRate = toNumber(team.win_rate ?? team.map_win_rate ?? team.match_win_rate);
-                const kd = toNumber(team.kd ?? team.rating ?? 0);
-                return {
-                    id: team.team_id,
-                    team_id: team.team_id,
-                    name: team.display_name || team.team_name || team.name || 'Joukkue',
-                    logo: ensureAvatar(team.avatar || team.logo || team.team_logo),
-                    wins,
-                    losses,
-                    matchesPlayed,
-                    winRate: mapWinRate,
-                    roundDiff,
-                    roundsWon: toNumber(team.rounds_won ?? 0),
-                    roundsLost: toNumber(team.rounds_lost ?? 0),
-                    kd: toNumber(team.kd ?? 0),
-                    adr: toNumber(team.adr ?? 0),
-                    points: toNumber(team.points ?? wins * 3),
-                    raw: team
-                };
-            });
+        const filtered = matches.filter(match => {
+            if (!championshipId) return true;
+            const matchChampId = match.championship_id || match.championshipId;
+            return String(matchChampId || '') === String(championshipId);
+        });
+        if (!filtered.length) return [];
+
+        const teamMeta = (teams || []).reduce((acc, team) => {
+            if (!team?.team_id) return acc;
+            acc[String(team.team_id)] = team;
+            return acc;
+        }, {});
+
+        const table = new Map();
+        function ensureTeam(id, fallbackName = 'Joukkue') {
+            const key = String(id);
+            if (!table.has(key)) {
+                const meta = teamMeta[key] || {};
+                table.set(key, {
+                    id: key,
+                    team_id: key,
+                    name: meta.display_name || meta.team_name || fallbackName,
+                    logo: ensureAvatar(meta.avatar || meta.logo || meta.team_logo),
+                    wins: 0,
+                    losses: 0,
+                    matchesPlayed: 0,
+                    roundDiff: toNumber(meta.rounds_diff ?? (meta.rounds_won ?? 0) - (meta.rounds_lost ?? 0)),
+                    roundsWon: toNumber(meta.rounds_won ?? 0),
+                    roundsLost: toNumber(meta.rounds_lost ?? 0),
+                    kd: toNumber(meta.kd ?? 0),
+                    adr: toNumber(meta.adr ?? 0),
+                    points: toNumber(meta.points ?? 0),
+                    raw: meta
+                });
+            }
+            return table.get(key);
+        }
+
+        filtered.forEach(match => {
+            const team1 = match.team1_id || match.team1Id;
+            const team2 = match.team2_id || match.team2Id;
+            if (!team1 || !team2) return;
+            const t1Score = toNumber(match.team1_score ?? match.team1Score ?? match.score_team1 ?? 0);
+            const t2Score = toNumber(match.team2_score ?? match.team2Score ?? match.score_team2 ?? 0);
+
+            const entry1 = ensureTeam(team1, match.team1_name || match.team1Name || 'Joukkue 1');
+            const entry2 = ensureTeam(team2, match.team2_name || match.team2Name || 'Joukkue 2');
+
+            entry1.matchesPlayed += 1;
+            entry2.matchesPlayed += 1;
+            entry1.wins += t1Score;
+            entry1.losses += t2Score;
+            entry2.wins += t2Score;
+            entry2.losses += t1Score;
+        });
+
+        const standings = Array.from(table.values()).map(row => ({
+            ...row,
+            winRate: percent(row.wins, row.wins + row.losses),
+            winPct: percent(row.wins, row.wins + row.losses)
+        }));
 
         standings.sort((a, b) => {
-            if (b.wins !== a.wins) {
-                return b.wins - a.wins;
-            }
-            if (b.roundDiff !== a.roundDiff) {
-                return b.roundDiff - a.roundDiff;
-            }
-            if (b.winRate !== a.winRate) {
-                return b.winRate - a.winRate;
-            }
+            if (b.wins !== a.wins) return b.wins - a.wins;
+            if (b.roundDiff !== a.roundDiff) return b.roundDiff - a.roundDiff;
+            if (b.winRate !== a.winRate) return b.winRate - a.winRate;
             return (a.name || '').localeCompare(b.name || '', 'fi');
         });
 
-        return standings.map((row, index) => ({
+        return standings.map((row, idx) => ({
             ...row,
-            rank: index + 1,
-            winPct: percent(row.wins, row.matchesPlayed)
+            rank: idx + 1
         }));
     }
 
     function deriveHighlights(details, standings) {
-        if (!details) {
+        if (!details || !Array.isArray(standings) || !standings.length) {
             return [];
         }
-        const teams = standings && standings.length ? standings : deriveStandings(details);
-        if (!teams.length) {
-            return [];
-        }
-        const topTeam = teams[0];
-        const clutchTeam = [...teams].sort((a, b) => b.roundDiff - a.roundDiff)[0];
-        const kdAce = [...teams].sort((a, b) => b.kd - a.kd)[0];
+        const topTeam = standings[0];
+        const clutchTeam = [...standings].sort((a, b) => b.roundDiff - a.roundDiff)[0];
+        const kdAce = [...standings].sort((a, b) => b.kd - a.kd)[0];
 
         const highlights = [];
         if (topTeam) {
@@ -195,9 +218,7 @@
                     const data = await window.apiClient.getDivisionById(id);
                     entry.details.data = data;
                     entry.details.fetchedAt = now();
-                    entry.standings.data = deriveStandings(data);
-                    entry.standings.fetchedAt = now();
-                    entry.highlights.data = deriveHighlights(data, entry.standings.data);
+                    entry.highlights.data = [];
                     entry.highlights.fetchedAt = now();
                     if (Array.isArray(data?.map_stats) && data.map_stats.length) {
                         entry.maps.data = data.map_stats;
@@ -224,19 +245,16 @@
                 entry.standings.loading = true;
                 entry.standings.error = null;
                 try {
-                    let standings = null;
-                    try {
-                        if (typeof window.apiClient.getDivisionStandings === 'function') {
-                            standings = await window.apiClient.getDivisionStandings(id);
+                    let standings = [];
+                    if (typeof window.apiClient.getDivisionMatches === 'function') {
+                        const matches = await window.apiClient.getDivisionMatches(id);
+                        const scopedMatches = Array.isArray(matches)
+                            ? matches.filter(match => String(match?.championship_id ?? match?.championshipId ?? '') === String(id))
+                            : [];
+                        if (scopedMatches.length) {
+                            const details = entry.details.data || (await this.fetchDivisionDetails(id));
+                            standings = deriveStandingsFromMatches(scopedMatches, details?.teams || [], id);
                         }
-                    } catch (error) {
-                        if (!error || error.status !== 404) {
-                            console.warn('Division standings endpoint failed, using fallback', error);
-                        }
-                    }
-                    if (!Array.isArray(standings) || !standings.length) {
-                        const details = entry.details.data || (await this.fetchDivisionDetails(id));
-                        standings = deriveStandings(details);
                     }
                     entry.standings.data = standings;
                     entry.standings.fetchedAt = now();
@@ -297,7 +315,7 @@
                     }
                     if (!Array.isArray(highlights) || !highlights.length) {
                         const details = entry.details.data || (await this.fetchDivisionDetails(id));
-                        const standings = entry.standings.data || deriveStandings(details);
+                        const standings = entry.standings.data || [];
                         highlights = deriveHighlights(details, standings);
                     }
                     entry.highlights.data = highlights;

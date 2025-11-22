@@ -37,17 +37,11 @@
         if (!raw || typeof raw !== 'object') {
             return { raw: null, aggregates: {} };
         }
-        const summaryTotals =
-            raw.summary_totals ||
-            raw.summaryTotals ||
-            raw.totals ||
-            metricsToTotals(raw.metrics);
+        const summaryTotals = raw.summary_totals;
         if (summaryTotals) {
             const aggregates = {
                 ...raw,
-                summary_totals: summaryTotals,
-                summaryTotals,
-                totals: raw.totals || summaryTotals
+                summary_totals: summaryTotals
             };
             Object.entries(summaryTotals).forEach(([key, value]) => {
                 if (aggregates[key] === undefined) {
@@ -56,8 +50,7 @@
             });
             return { raw, aggregates };
         }
-        const aggregates = raw.aggregates || raw.stats || raw.summary || raw.overview || raw;
-        return { raw, aggregates };
+        return { raw, aggregates: raw };
     }
 
     /**

@@ -36,11 +36,20 @@ function formatPercent(value, decimals = 1) {
 
 function buildMetrics(stats) {
     if (!stats) return [];
-    const wins = toNumber(stats.wins ?? stats.matches_won ?? stats.maps_won);
-    const losses = toNumber(stats.losses ?? stats.matches_lost ?? stats.maps_lost);
-    const matches = toNumber(stats.matches ?? stats.matches_played ?? stats.series_played);
+    const wins = toNumber(stats.maps_won ?? stats.wins ?? stats.matches_won);
+    const losses = toNumber(stats.maps_lost ?? stats.losses ?? stats.matches_lost);
+    const matches = toNumber(
+        stats.matches_played
+        ?? stats.matches
+        ?? stats.series_played
+        ?? stats.match_count
+        ?? stats.series_count
+        ?? 0
+    );
     const roundsDiff = toNumber(stats.rounds_diff ?? stats.round_diff ?? stats.rounds_delta);
-    const winRate = matches > 0 ? (wins / matches) * 100 : toNumber(stats.win_rate);
+    const winRate = matches > 0
+        ? (wins / matches) * 100
+        : toNumber(stats.map_win_rate ?? stats.win_rate ?? stats.match_win_rate);
     const rating = toNumber(stats.rating ?? stats.rating_2 ?? stats.hltv_rating);
     const kd = toNumber(stats.kd ?? stats.kd_ratio);
     const adr = toNumber(stats.adr ?? stats.average_damage);
@@ -84,7 +93,7 @@ function buildMapHighlights(mapStats) {
             const current = entry.curr || entry;
             const name = current.map_name || entry.map_name || 'Kartta';
             const played = toNumber(current.matches ?? current.maps ?? current.maps_played);
-            const wins = toNumber(current.wins ?? current.maps_won);
+            const wins = toNumber(current.maps_won ?? current.wins);
             const winRate = played ? (wins / played) * 100 : toNumber(current.win_rate);
             return {
                 id: name,
