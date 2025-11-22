@@ -53,7 +53,7 @@ window.SankariCard = {
             <div class="sankari-card__content">
                 <header class="sankari-card__head">
                     <h3 class="title-accent titleUnderlineCard">{{ title }}</h3>
-                    <p v-if="description" class="sankari-card__desc">{{ description }}</p>
+                    <p v-if="description" class="sankari-card__desc" v-html="description"></p>
                 </header>
                 <ol class="sankari-card__list">
                     <li

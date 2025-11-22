@@ -37,7 +37,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'nuori-osuja',
                 title: '"Nuori" osuja',
-                description: 'Näyttää nuorille, että vanha jaksaa vielä painaa. Paras K/D.',
+                description: 'Näyttää nuorille, että vanha jaksaa vielä painaa.<br>Paras K/D.',
                 metricKey: 'kd',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -45,7 +45,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'adr-luvut',
                 title: 'ADR-luvut kunnossa',
-                description: 'Jokainen luoti osuu... ainakin johonkin. Käsi tärisee, mutta tilasto tukee tätä. Paras ADR.',
+                description: 'Jokainen luoti osuu... ainakin johonkin. Käsi tärisee, mutta tilasto tukee tätä.<br>Paras ADR.',
                 metricKey: 'adr',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -53,7 +53,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'aim-assist',
                 title: 'Papalla on aim assist',
-                description: 'Vaimo kyselee koska tuut nukkumaan, mut papalla on aim päällä. Paras Kills/Round.',
+                description: 'Vaimo kyselee koska tuut nukkumaan, mut papalla on aim päällä.<br>Paras Kills/Round.',
                 metricKey: 'killsPerRound',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -61,7 +61,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'grim-reapers',
                 title: 'Viikatemiehet',
-                description: 'Voittamattomat pelaajat. Eniten tappoja.',
+                description: 'Voittamattomat pelaajat.<br>Eniten tappoja.',
                 metricKey: 'totalKills',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -69,7 +69,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'eagle',
                 title: 'Eläkeläis-Eagle',
-                description: 'Kun rahaa ei ole mutta rölliä riittää, niin mieltä lohduttaa omaan käteen lyöty Eagle. Eniten pistoolikillejä.',
+                description: 'Kun rahaa ei ole mutta rölliä riittää, niin mieltä lohduttaa omaan käteen lyöty Eagle.<br>Eniten pistoolikillejä.',
                 metricKey: 'pistolKills',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -77,7 +77,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'bossikielto',
                 title: 'Bossikielto peruttu',
-                description: 'Zoomaa ja muistelee CSGO-päiviä. Eniten sniper tappoja.',
+                description: 'Zoomaa ja muistelee CSGO-päiviä.<br>Eniten sniper tappoja.',
                 metricKey: 'sniperKills',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -91,7 +91,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'liiga-ruusu',
                 title: 'Liiga Ruusu',
-                description: 'Pelaa enemmän kuin ehtii nukkua. Klassinen "vielä yksi matsi" -mentaliteetti. Eniten kierroksia pelattu.',
+                description: 'Pelaa enemmän kuin ehtii nukkua. Klassinen "vielä yksi matsi" -mentaliteetti.<br>Eniten kierroksia pelattu.',
                 metricKey: 'roundsPlayed',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -99,7 +99,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'dps-dino',
                 title: 'DPS-dinosaurus',
-                description: 'Vaikka ikää kertyy, ei numerot valehtele. Suurin total damage.',
+                description: 'Vaikka ikää kertyy, ei numerot valehtele.<br>Suurin total damage.',
                 metricKey: 'totalDamage',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -107,7 +107,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'spektaattori',
                 title: 'Spektaattori',
-                description: 'Näkee enemmän deathcamia kuin peliä. Eniten kuolemia.',
+                description: 'Näkee enemmän deathcamia kuin peliä.<br>Eniten kuolemia.',
                 metricKey: 'deaths',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -115,7 +115,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'tukipappajoukot',
                 title: 'Tukipappajoukot',
-                description: 'Syöttää frägejä kuin Pappa grillimakkaraa. Eniten assists.',
+                description: 'Syöttää frägejä kuin Pappa grillimakkaraa.<br>Eniten assists.',
                 metricKey: 'assists',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -123,7 +123,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'parhaat-suonenvedot',
                 title: 'Parhaat suonenvedot',
-                description: 'Käsi muistaa sen spray-patterin vieläkin. Paras HS%.',
+                description: 'Käsi muistaa sen spray-patterin vieläkin.<br>Paras HS%.',
                 metricKey: 'hsPercent',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -131,7 +131,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'pelin-isahahmo',
                 title: 'Pelin isähahmo',
-                description: 'MVP, koska joku muukin tarvitsee roolimallin. Eniten MVP.',
+                description: 'MVP, koska joku muukin tarvitsee roolimallin.<br>Eniten MVP.',
                 metricKey: 'mvps',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -139,7 +139,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'clutch-kills',
                 title: 'Vanha pää, kova käsi',
-                description: 'Refleksit ei ole kuolleet vielä. Eniten Clutch Kills.',
+                description: 'Refleksit ei ole kuolleet vielä.<br>Eniten Clutch Kills.',
                 metricKey: 'clutchKills',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -153,7 +153,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'parhaat-nitrot',
                 title: 'Parhaat nitrot',
-                description: '1v3? Ei ongelmaa – ainakaan jos nitrot ehtii vaikuttaa. Paras Clutch WR%.',
+                description: '1v3? Ei ongelmaa – ainakaan jos nitrot ehtii vaikuttaa.<br>Paras Clutch WR%.',
                 metricKey: 'clutchWinRate',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -161,7 +161,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'tilastopappa',
                 title: 'Tilastopappa',
-                description: 'Kaikki numerot kunnossa, vaikka crosshair ei ole. Paras Rating 1.0.',
+                description: 'Kaikki numerot kunnossa, vaikka crosshair ei ole.<br>Paras Rating 1.0.',
                 metricKey: 'rating',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -169,7 +169,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'taysmaito',
                 title: 'Täysmaito',
-                description: 'Kerran flash osuu muualle kuin omaan tiimiin. Eniten onnistuneita flashbangheittoja.',
+                description: 'Kerran flash osuu muualle kuin omaan tiimiin.<br>Eniten onnistuneita flashbangheittoja.',
                 metricKey: 'flashAssistPercent',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -177,7 +177,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'utility',
                 title: 'Kranaatit syö tyhjäksi',
-                description: 'Polttaa enemmän kuin 2000-luvun LANit. Eniten utility damage.',
+                description: 'Polttaa enemmän kuin 2000-luvun LANit.<br>Eniten utility damage.',
                 metricKey: 'utilityDamage',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -185,7 +185,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'mikapahan',
                 title: 'Mikä pahan tappaisi',
-                description: 'Ei puske – jää odottamaan, säästää eläkkeelle. Klassinen pappa-stratti. Paras Survival%.',
+                description: 'Ei puske – jää odottamaan, säästää eläkkeelle. Klassinen pappa-stratti.<br>Paras Survival%.',
                 metricKey: 'survivalPercent',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -193,7 +193,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'valot-paalle',
                 title: 'Valot päälle, papat!',
-                description: 'Heittää flashin ennen kuin round edes alkaa. Eniten heitettyjä flashbangeja.',
+                description: 'Heittää flashin ennen kuin round edes alkaa.<br>Eniten heitettyjä flashbangeja.',
                 metricKey: 'flashbangsThrown',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -201,7 +201,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'flash-dance',
                 title: 'Flash Bang Dance',
-                description: 'Vihu näkee enemmän välähdyksiä kuin diskossa 90-luvulla. Eniten vihollisia sokaistu.',
+                description: 'Vihu näkee enemmän välähdyksiä kuin diskossa 90-luvulla.<br>Eniten vihollisia sokaistu.',
                 metricKey: 'enemiesFlashed',
                 sortDirection: 'desc',
                 maxEntries: 4
