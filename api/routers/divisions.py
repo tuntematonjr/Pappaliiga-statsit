@@ -118,6 +118,37 @@ class DivisionAggregates(CamelModel):
     forfeits: int
 
 
+class DivisionPlayerTotals(CamelModel):
+    player_id: str
+    team_id: Optional[str]
+    team_name: Optional[str]
+    nickname: Optional[str]
+    avatar: Optional[str]
+    maps_played: int
+    rounds_played: int
+    kills: int
+    deaths: int
+    assists: int
+    adr: float
+    kr: float
+    kd: float
+    rating: float
+    hs_pct: float
+    mvps: int
+    pistol_kills: int
+    sniper_kills: int
+    utility_damage: int
+    enemies_flashed: int
+    flash_count: int
+    flash_successes: int
+    clutch_kills: int
+    cl_1v1_attempts: int
+    cl_1v1_wins: int
+    cl_1v2_attempts: int
+    cl_1v2_wins: int
+    damage: int
+
+
 class DivisionLeader(CamelModel):
     player_id: Optional[str]
     team_id: Optional[str]
@@ -148,6 +179,7 @@ class DivisionDetails(CamelModel):
     player_count: int | None = None
     season_player_count: int | None = None
     all_time_player_count: int | None = None
+    player_totals: Optional[List[DivisionPlayerTotals]] = None
 
 
 class DivisionListResponse(CamelModel):

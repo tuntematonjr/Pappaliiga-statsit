@@ -312,6 +312,92 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
     for plist in players_by_team.values():
         plist.sort(key=lambda p: (p.get("nickname") or "").lower())
 
+    player_totals_params: dict[str, Any] = {"season": season, "division": division_num}
+    exclusion_clause = ""
+    if excluded:
+        placeholders = ", ".join(f":ex{i}" for i in range(len(excluded)))
+        exclusion_clause = f" AND (pst.team_id IS NULL OR pst.team_id NOT IN ({placeholders}))"
+        for i, team_id in enumerate(excluded):
+            player_totals_params[f"ex{i}"] = team_id
+
+    player_totals_rows = await query_async(
+        f"""
+        SELECT
+            pst.player_id,
+            pst.team_id,
+            pst.maps_played,
+            pst.rounds_played,
+            pst.kills,
+            pst.deaths,
+            pst.assists,
+            pst.mvps,
+            pst.sniper_kills,
+            pst.utility_damage,
+            pst.enemies_flashed,
+            pst.flash_count,
+            pst.flash_successes,
+            pst.clutch_kills,
+            pst.cl_1v1_attempts,
+            pst.cl_1v1_wins,
+            pst.cl_1v2_attempts,
+            pst.cl_1v2_wins,
+            pst.pistol_kills,
+            pst.adr,
+            pst.kr,
+            pst.kd,
+            pst.rating,
+            pst.hs_pct,
+            pst.damage,
+            p.nickname,
+            t.name AS team_name
+        FROM player_season_totals pst
+        LEFT JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN teams t ON t.team_id = pst.team_id
+        WHERE pst.season = :season
+          AND pst.division_num = :division
+          {exclusion_clause}
+        """,
+        player_totals_params,
+    )
+
+    player_totals: list[dict[str, Any]] = []
+    for row in player_totals_rows:
+        player_id = row.get("player_id")
+        if player_id:
+            unique_player_ids.add(str(player_id))
+        player_totals.append(
+            {
+                "player_id": row.get("player_id"),
+                "team_id": row.get("team_id"),
+                "team_name": row.get("team_name"),
+                "nickname": row.get("nickname"),
+                "avatar": DEFAULT_AVATAR,
+                "maps_played": int(row.get("maps_played") or 0),
+                "rounds_played": int(row.get("rounds_played") or 0),
+                "kills": int(row.get("kills") or 0),
+                "deaths": int(row.get("deaths") or 0),
+                "assists": int(row.get("assists") or 0),
+                "mvps": int(row.get("mvps") or 0),
+                "sniper_kills": int(row.get("sniper_kills") or 0),
+                "utility_damage": int(row.get("utility_damage") or 0),
+                "enemies_flashed": int(row.get("enemies_flashed") or 0),
+                "flash_count": int(row.get("flash_count") or 0),
+                "flash_successes": int(row.get("flash_successes") or 0),
+                "clutch_kills": int(row.get("clutch_kills") or 0),
+                "cl_1v1_attempts": int(row.get("cl_1v1_attempts") or 0),
+                "cl_1v1_wins": int(row.get("cl_1v1_wins") or 0),
+                "cl_1v2_attempts": int(row.get("cl_1v2_attempts") or 0),
+                "cl_1v2_wins": int(row.get("cl_1v2_wins") or 0),
+                "pistol_kills": int(row.get("pistol_kills") or 0),
+                "adr": float(row.get("adr") or 0.0),
+                "kr": float(row.get("kr") or 0.0),
+                "kd": float(row.get("kd") or 0.0),
+                "rating": float(row.get("rating") or 0.0),
+                "hs_pct": float(row.get("hs_pct") or 0.0),
+                "damage": int(row.get("damage") or 0),
+            }
+        )
+
     teams: list[dict[str, Any]] = []
     for t in team_rows:
         matches_played = int(t.get("matches_played") or 0)
@@ -400,6 +486,7 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
         "map_stats": map_stats,
         "aggregates": aggregates,
         "leaders": leaders,
+        "player_totals": player_totals,
         "player_count": int(division_player_count or 0),
         "season_player_count": int(player_counts.get("season_players") or 0),
         "all_time_player_count": int(player_counts.get("all_time_players") or 0),

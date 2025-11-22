@@ -29,6 +29,210 @@ const DIVISION_MAP_COLUMNS = [
     { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '110px' }
 ];
 
+const SANKARI_CARD_GROUPS = [
+    {
+        id: 'attack',
+        groupTitle: 'Tappokoneet',
+        cards: [
+            {
+                id: 'nuori-osuja',
+                title: '"Nuori" osuja',
+                description: 'Näyttää nuorille, että vanha jaksaa vielä painaa. Paras K/D.',
+                metricKey: 'kd',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'adr-luvut',
+                title: 'ADR-luvut kunnossa',
+                description: 'Jokainen luoti osuu... ainakin johonkin. Käsi tärisee, mutta tilasto tukee tätä. Paras ADR.',
+                metricKey: 'adr',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'aim-assist',
+                title: 'Papalla on aim assist',
+                description: 'Vaimo kyselee koska tuut nukkumaan, mut papalla on aim päällä. Paras Kills/Round.',
+                metricKey: 'killsPerRound',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'grim-reapers',
+                title: 'Viikatemiehet',
+                description: 'Voittamattomat pelaajat. Eniten tappoja.',
+                metricKey: 'totalKills',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'eagle',
+                title: 'Eläkeläis-Eagle',
+                description: 'Kun rahaa ei ole mutta rölliä riittää, niin mieltä lohduttaa omaan käteen lyöty Eagle. Eniten pistoolikillejä.',
+                metricKey: 'pistolKills',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'bossikielto',
+                title: 'Bossikielto peruttu',
+                description: 'Zoomaa ja muistelee CSGO-päiviä. Eniten sniper tappoja.',
+                metricKey: 'sniperKills',
+                sortDirection: 'desc',
+                maxEntries: 4
+            }
+        ]
+    },
+    {
+        id: 'results',
+        groupTitle: 'Pelin Tekijät',
+        cards: [
+            {
+                id: 'liiga-ruusu',
+                title: 'Liiga Ruusu',
+                description: 'Pelaa enemmän kuin ehtii nukkua. Klassinen "vielä yksi matsi" -mentaliteetti. Eniten kierroksia pelattu.',
+                metricKey: 'roundsPlayed',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'dps-dino',
+                title: 'DPS-dinosaurus',
+                description: 'Vaikka ikää kertyy, ei numerot valehtele. Suurin total damage.',
+                metricKey: 'totalDamage',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'spektaattori',
+                title: 'Spektaattori',
+                description: 'Näkee enemmän deathcamia kuin peliä. Eniten kuolemia.',
+                metricKey: 'deaths',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'tukipappajoukot',
+                title: 'Tukipappajoukot',
+                description: 'Syöttää frägejä kuin Pappa grillimakkaraa. Eniten assists.',
+                metricKey: 'assists',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'parhaat-suonenvedot',
+                title: 'Parhaat suonenvedot',
+                description: 'Käsi muistaa sen spray-patterin vieläkin. Paras HS%.',
+                metricKey: 'hsPercent',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'pelin-isahahmo',
+                title: 'Pelin isähahmo',
+                description: 'MVP, koska joku muukin tarvitsee roolimallin. Eniten MVP.',
+                metricKey: 'mvps',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'clutch-kills',
+                title: 'Vanha pää, kova käsi',
+                description: 'Refleksit ei ole kuolleet vielä. Eniten Clutch Kills.',
+                metricKey: 'clutchKills',
+                sortDirection: 'desc',
+                maxEntries: 4
+            }
+        ]
+    },
+    {
+        id: 'support',
+        groupTitle: 'Taustapapat',
+        cards: [
+            {
+                id: 'parhaat-nitrot',
+                title: 'Parhaat nitrot',
+                description: '1v3? Ei ongelmaa – ainakaan jos nitrot ehtii vaikuttaa. Paras Clutch WR%.',
+                metricKey: 'clutchWinRate',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'tilastopappa',
+                title: 'Tilastopappa',
+                description: 'Kaikki numerot kunnossa, vaikka crosshair ei ole. Paras Rating 1.0.',
+                metricKey: 'rating',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'taysmaito',
+                title: 'Täysmaito',
+                description: 'Kerran flash osuu muualle kuin omaan tiimiin. Eniten onnistuneita flashbangheittoja.',
+                metricKey: 'flashAssistPercent',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'utility',
+                title: 'Kranaatit syö tyhjäksi',
+                description: 'Polttaa enemmän kuin 2000-luvun LANit. Eniten utility damage.',
+                metricKey: 'utilityDamage',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'mikapahan',
+                title: 'Mikä pahan tappaisi',
+                description: 'Ei puske – jää odottamaan, säästää eläkkeelle. Klassinen pappa-stratti. Paras Survival%.',
+                metricKey: 'survivalPercent',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'valot-paalle',
+                title: 'Valot päälle, papat!',
+                description: 'Heittää flashin ennen kuin round edes alkaa. Eniten heitettyjä flashbangeja.',
+                metricKey: 'flashbangsThrown',
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'flash-dance',
+                title: 'Flash Bang Dance',
+                description: 'Vihu näkee enemmän välähdyksiä kuin diskossa 90-luvulla. Eniten vihollisia sokaistu.',
+                metricKey: 'enemiesFlashed',
+                sortDirection: 'desc',
+                maxEntries: 4
+            }
+        ]
+    }
+];
+
+const SANKARI_METRIC_META = {
+    kd: { decimals: 2 },
+    adr: { decimals: 1 },
+    killsPerRound: { decimals: 2 },
+    totalKills: { decimals: 0 },
+    pistolKills: { decimals: 0 },
+    sniperKills: { decimals: 0 },
+    roundsPlayed: { decimals: 0 },
+    totalDamage: { decimals: 0 },
+    deaths: { decimals: 0 },
+    assists: { decimals: 0 },
+    hsPercent: { decimals: 1, percent: true },
+    mvps: { decimals: 0 },
+    clutchKills: { decimals: 0 },
+    clutchWinRate: { decimals: 1, percent: true },
+    rating: { decimals: 2 },
+    flashAssistPercent: { decimals: 1, percent: true },
+    utilityDamage: { decimals: 0 },
+    survivalPercent: { decimals: 1, percent: true },
+    flashbangsThrown: { decimals: 0 },
+    enemiesFlashed: { decimals: 0 }
+};
+
 const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
 
 function pickValue(obj, keys) {
@@ -110,7 +314,8 @@ window.DivisionView = {
         get TeamComparisonBoard() { return window.TeamComparisonBoard; },
         get MapsStats() { return window.MapsStats; },
         get CopyLink() { return window.CopyLink; },
-        get SummaryStatCard() { return window.SummaryStatCard; }
+        get SummaryStatCard() { return window.SummaryStatCard; },
+        get SankariCard() { return window.SankariCard; }
     },
     data() {
         const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
@@ -181,6 +386,37 @@ window.DivisionView = {
         },
         mapsError() {
             return this.mapsState.error;
+        },
+        sankariPlayers() {
+            const source = this.divisionDetails?.player_totals || this.divisionDetails?.playerTotals || [];
+            if (!Array.isArray(source)) {
+                return [];
+            }
+            return source
+                .map(entry => this.normalizeSankariPlayer(entry))
+                .filter(Boolean);
+        },
+        sankariGroups() {
+            if (!this.sankariPlayers.length) return [];
+            return SANKARI_CARD_GROUPS.map(group => {
+                const cards = group.cards
+                    .map(card => ({
+                        ...card,
+                        entries: this.buildSankariEntries(this.sankariPlayers, card)
+                    }))
+                    .filter(card => card.entries.length);
+                if (!cards.length) return null;
+                return {
+                    ...group,
+                    cards
+                };
+            }).filter(Boolean);
+        },
+        hasSankariGroups() {
+            return this.sankariGroups.length > 0;
+        },
+        sankariLoading() {
+            return this.divisionLoading;
         },
         highlightsState() {
             return this.divisionState.highlights;
@@ -424,6 +660,160 @@ window.DivisionView = {
             } catch (error) {
                 return src || DEFAULT_TEAM_LOGO;
             }
+        },
+        toNumber(value, fallback = 0) {
+            if (value === null || value === undefined) return fallback;
+            const numeric = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
+            if (Number.isFinite(numeric)) return numeric;
+            return fallback;
+        },
+        normalizeSankariPlayer(row) {
+            if (!row) return null;
+            const safe = (value, fallback = 0) => this.toNumber(value, fallback);
+            const rounds = safe(row.rounds_played ?? row.rounds);
+            const kills = safe(row.kills);
+            const deaths = safe(row.deaths);
+            return {
+                id: row.player_id || row.id,
+                playerId: row.player_id || row.id,
+                nickname: row.nickname || row.name,
+                teamName: row.team_name || row.teamName || '',
+                avatar: this.resolveAvatar(row.avatar || row.photo),
+                maps: safe(row.maps_played ?? row.maps),
+                rounds,
+                kills,
+                deaths,
+                assists: safe(row.assists),
+                adr: this.toNumber(row.adr, null),
+                kr: this.toNumber(row.kr, null),
+                kd: this.toNumber(row.kd, null),
+                rating: this.toNumber(row.rating, null),
+                hsPct: this.toNumber(row.hs_pct ?? row.hsPercent ?? row.hs, null),
+                mvps: safe(row.mvps),
+                pistolKills: safe(row.pistol_kills ?? row.pistolKills),
+                sniperKills: safe(row.sniper_kills ?? row.sniperKills),
+                utilityDamage: safe(row.utility_damage ?? row.utilityDamage),
+                enemiesFlashed: safe(row.enemies_flashed ?? row.enemiesFlashed),
+                flashCount: safe(row.flash_count ?? row.flashCount),
+                flashSuccesses: safe(row.flash_successes ?? row.flashSuccesses),
+                clutchKills: safe(row.clutch_kills ?? row.clutchKills),
+                cl1v1Attempts: safe(row.cl_1v1_attempts ?? row.clutch1v1Attempts),
+                cl1v1Wins: safe(row.cl_1v1_wins ?? row.clutch1v1Wins),
+                cl1v2Attempts: safe(row.cl_1v2_attempts ?? row.clutch1v2Attempts),
+                cl1v2Wins: safe(row.cl_1v2_wins ?? row.clutch1v2Wins),
+                damage: safe(row.damage)
+            };
+        },
+        buildSankariEntries(players, card) {
+            if (!Array.isArray(players) || !card || !card.metricKey) return [];
+            const direction = (card.sortDirection || 'desc').toLowerCase();
+            const sorted = players
+                .map(player => {
+                    const value = this.sankariMetricValue(player, card.metricKey);
+                    if (value === null || value === undefined || Number.isNaN(value)) {
+                        return null;
+                    }
+                    return {
+                        id: player.id || player.playerId,
+                        nickname: player.nickname || 'Tuntematon',
+                        teamName: player.teamName || '',
+                        avatar: player.avatar,
+                        maps: player.maps,
+                        rounds: player.rounds,
+                        rawValue: value,
+                        displayValue: this.formatSankariValue(value, card.metricKey)
+                    };
+                })
+                .filter(Boolean)
+                .sort((a, b) => direction === 'asc' ? a.rawValue - b.rawValue : b.rawValue - a.rawValue);
+            const limit = Number(card.maxEntries) || 4;
+            return sorted.slice(0, limit);
+        },
+        sankariMetricValue(player, metricKey) {
+            if (!player) return null;
+            switch (metricKey) {
+                case 'kd':
+                    return player.deaths ? player.kills / player.deaths : (player.kills || 0);
+                case 'adr':
+                    return player.adr;
+                case 'killsPerRound':
+                    if (player.kr != null && !Number.isNaN(player.kr)) return player.kr;
+                    return player.rounds ? player.kills / player.rounds : null;
+                case 'totalKills':
+                    return player.kills;
+                case 'pistolKills':
+                    return player.pistolKills;
+                case 'sniperKills':
+                    return player.sniperKills;
+                case 'roundsPlayed':
+                    return player.rounds;
+                case 'totalDamage':
+                    return player.damage;
+                case 'deaths':
+                    return player.deaths;
+                case 'assists':
+                    return player.assists;
+                case 'hsPercent':
+                    return this.percentValue(player.hsPct);
+                case 'mvps':
+                    return player.mvps;
+                case 'clutchKills':
+                    return player.clutchKills;
+                case 'clutchWinRate': {
+                    const attempts = player.cl1v1Attempts + player.cl1v2Attempts;
+                    const wins = player.cl1v1Wins + player.cl1v2Wins;
+                    if (!attempts) return null;
+                    return this.percentValue(wins / attempts);
+                }
+                case 'rating':
+                    return player.rating != null && !Number.isNaN(player.rating) ? player.rating : player.kd;
+                case 'flashAssistPercent':
+                    if (!player.flashCount) return null;
+                    return this.percentValue(player.flashSuccesses / player.flashCount);
+                case 'utilityDamage':
+                    return player.utilityDamage;
+                case 'survivalPercent':
+                    if (!player.rounds) return null;
+                    return this.percentValue((player.rounds - player.deaths) / player.rounds);
+                case 'flashbangsThrown':
+                    return player.flashCount;
+                case 'enemiesFlashed':
+                    return player.enemiesFlashed;
+                default:
+                    return null;
+            }
+        },
+        percentValue(value) {
+            const numeric = this.toNumber(value, null);
+            if (numeric === null) return null;
+            if (numeric > 1.01) {
+                return numeric / 100;
+            }
+            return numeric;
+        },
+        formatSankariValue(value, metricKey) {
+            const meta = SANKARI_METRIC_META[metricKey] || {};
+            const isPercent = meta.percent === true;
+            const numeric = this.toNumber(value, null);
+            if (numeric === null) {
+                return '–';
+            }
+            if (isPercent) {
+                const pct = this.percentValue(numeric);
+                if (pct === null) return '–';
+                const valuePct = pct * 100;
+                const decimals = typeof meta.decimals === 'number' ? meta.decimals : 1;
+                return `${valuePct.toFixed(decimals)} %`;
+            }
+            const decimals = typeof meta.decimals === 'number' ? meta.decimals : null;
+            if (decimals === 0) {
+                return Math.round(numeric);
+            }
+            if (decimals != null) {
+                return numeric.toFixed(decimals);
+            }
+            if (Math.abs(numeric) >= 100) return Math.round(numeric);
+            return numeric.toFixed(2);
         },
         teamLogo(team) {
             if (!team) return DEFAULT_TEAM_LOGO;
@@ -670,44 +1060,30 @@ window.DivisionView = {
                     ></maps-stats>
                 </section>
 
-                <section id="heroes" class="division-section">
+                <section id="heroes" class="division-section division-section--heroes">
                     <header class="division-section__heading">
-                        <p class="section-eyebrow">Divarin Sankarit</p>
                         <h2 class="title-accent titleUnderlineMain">Divarin Sankarit</h2>
                     </header>
                     <loading-spinner
-                        v-if="highlightsLoading && !hasHeroCards"
-                        message="Nostoja kootaan..."
+                        v-if="sankariLoading && !hasSankariGroups"
+                        message="Sankareita kootaan..."
                     ></loading-spinner>
-                    <error-message
-                        v-else-if="highlightsError && !hasHeroCards"
-                        :message="highlightsError"
-                        @retry="retryHighlights"
-                    ></error-message>
-                    <div v-else>
-                        <div v-if="hasHeroCards" class="division-hero-grid">
-                            <article
-                                v-for="card in heroCards"
-                                :key="card.id"
-                                class="division-hero-card glass-card division-surface"
-                            >
-                                <header class="division-hero-card__head">
-                                    <h3 class="title-accent titleUnderlineCard">{{ card.title }}</h3>
-                                    <p v-if="card.subtitle" class="division-hero-card__subtitle">{{ card.subtitle }}</p>
-                                </header>
-                                <ul class="division-hero-card__list">
-                                    <li v-for="(entry, idx) in card.entries" :key="entry.id || idx">
-                                        <img :src="entry.avatar" :alt="entry.name + ' avatar'" loading="lazy">
-                                        <div class="division-hero-card__text">
-                                            <p class="division-hero-card__name">{{ entry.name }}</p>
-                                            <p v-if="entry.team" class="division-hero-card__team">{{ entry.team }}</p>
-                                        </div>
-                                        <span class="division-hero-card__value">{{ entry.value }}</span>
-                                    </li>
-                                </ul>
-                            </article>
+                    <p v-else-if="!hasSankariGroups" class="division-section__empty">Sankaritilastoja ei löytynyt tälle divisioonalle.</p>
+                    <div v-else class="sankari-groups">
+                        <div v-for="group in sankariGroups" :key="group.id" class="sankari-group">
+                            <div class="sankari-group__label">
+                                <h3 class="sankari-group__title title-accent titleUnderlineCard">{{ group.groupTitle }}</h3>
+                            </div>
+                            <div class="sankari-group__cards">
+                                <sankari-card
+                                    v-for="card in group.cards"
+                                    :key="card.id"
+                                    :title="card.title"
+                                    :description="card.description"
+                                    :entries="card.entries"
+                                ></sankari-card>
+                            </div>
                         </div>
-                        <p v-else class="division-section__empty">Ei merkittäviä nostoja tälle divisioonalle.</p>
                     </div>
                 </section>
 
