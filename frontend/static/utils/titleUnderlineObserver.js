@@ -1,10 +1,18 @@
 (function () {
     'use strict';
 
-    const SELECTOR = '.titleUnderlineMain, .titleUnderlineCard';
+    const SELECTOR = '.titleUnderlinePage, .titleUnderlineSection, .titleUnderlineMain, .titleUnderlineCard';
     const SCALE_FACTORS = {
-        main: 1.28,
+        page: 1.36,
+        section: 1.22,
+        main: 1.22,
         card: 1.08
+    };
+    const DURATION_BY_TYPE = {
+        page: { base: 6.5, spread: 2.5 },
+        section: { base: 6, spread: 2 },
+        main: { base: 6, spread: 2 },
+        card: { base: 6.4, spread: 1.8 }
     };
     const SAFE_MARGIN = 12;
     const RESIZE_SUPPORTED = typeof ResizeObserver !== 'undefined';
@@ -73,18 +81,21 @@
             return;
         }
         this._tracked.add(el);
-        this._assignDelay(el);
+        this._assignTiming(el);
         if (this._resizeObserver) {
             this._resizeObserver.observe(el);
         }
         this._update(el);
     };
 
-    TitleUnderlineManager.prototype._assignDelay = function _assignDelay(el) {
+    TitleUnderlineManager.prototype._assignTiming = function _assignTiming(el) {
         const delay = this._computeDelay(el);
+        const duration = this._computeDuration(el);
         const state = this._stateFor(el);
         el.style.setProperty('--title-underline-delay', delay + 's');
+        el.style.setProperty('--title-underline-duration', duration + 's');
         state.delay = delay;
+        state.duration = duration;
         this._restartAnimation(el);
     };
 
@@ -103,11 +114,27 @@
         return Number((minDelay + normalized * (maxDelay - minDelay)).toFixed(2));
     };
 
+    TitleUnderlineManager.prototype._computeDuration = function _computeDuration(el) {
+        const type = this._titleType(el);
+        const timing = DURATION_BY_TYPE[type] || DURATION_BY_TYPE.section;
+        const key = (el.getAttribute('data-title-key') || el.textContent || el.id || 'title').trim();
+        let hash = 0;
+        for (let i = 0; i < key.length; i += 1) {
+            hash = (hash * 17 + key.charCodeAt(i)) >>> 0;
+        }
+        if (!hash) {
+            hash = Math.floor(Math.random() * 1e6);
+        }
+        const normalized = (hash % 900) / 1000; // 0 -> 0.899
+        const jitter = normalized * (timing.spread || 0);
+        return Number((timing.base + jitter).toFixed(2));
+    };
+
     TitleUnderlineManager.prototype._update = function _update(el) {
         if (!el || !el.isConnected) {
             return;
         }
-        const type = el.classList.contains('titleUnderlineCard') ? 'card' : 'main';
+        const type = this._titleType(el);
         const scale = SCALE_FACTORS[type] || SCALE_FACTORS.main;
         const measure = () => {
             const rect = el.getBoundingClientRect();
@@ -139,6 +166,14 @@
         } else {
             measure();
         }
+    };
+
+    TitleUnderlineManager.prototype._titleType = function _titleType(el) {
+        if (!el || !el.classList) return 'section';
+        if (el.classList.contains('titleUnderlinePage')) return 'page';
+        if (el.classList.contains('titleUnderlineCard')) return 'card';
+        if (el.classList.contains('titleUnderlineMain')) return 'section';
+        return 'section';
     };
 
     TitleUnderlineManager.prototype._stateFor = function _stateFor(el) {

@@ -2,31 +2,38 @@ const DIVISION_METRIC_SCHEMA = [
     { id: 'teams', key: ['team_count', 'teams.length', 'aggregates.team_count'], label: 'Joukkueet', digits: 0 },
     { id: 'players', key: ['player_count', 'aggregates.player_count'], label: 'Pelaajat', digits: 0 },
     { id: 'matches', key: ['aggregates.matches_played', 'aggregates.total_matches', 'matches_played'], label: 'Ottelut', digits: 0 },
-    { id: 'maps', key: ['aggregates.maps_played_total', 'maps_played_total', 'maps_played'], label: 'Kartat', digits: 0 },
+    { id: 'maps', key: ['aggregates.maps_played_total', 'maps_played_total', 'maps_played'], label: 'Karttoja pelattu', digits: 0 },
+    { id: 'rounds', key: ['aggregates.rounds_played_total', 'rounds_played_total', 'rounds'], label: 'Erää pelattu', digits: 0 },
     { id: 'adr', key: ['aggregates.median_adr', 'median_adr'], label: 'Median ADR', digits: 1 },
+    { id: 'kr', key: ['aggregates.median_kr', 'median_kr'], label: 'Median K/R', digits: 2 },
     { id: 'kd', key: ['aggregates.avg_kd', 'aggregates.median_kd'], label: 'Keski K/D', digits: 2 },
-    { id: 'survival', key: ['aggregates.median_survival', 'median_survival'], label: 'Selviytyminen', percent: true, digits: 1 }
+    { id: 'hs', key: ['aggregates.median_hs_pct', 'median_hs_pct'], label: 'Median HS%', percent: true, digits: 1 },
+    { id: 'kills', key: ['aggregates.total_kills', 'kills_total', 'kills'], label: 'Total kills', digits: 0 },
+    { id: 'deaths', key: ['aggregates.total_deaths', 'deaths_total', 'deaths'], label: 'Total deaths', digits: 0 },
+    { id: 'survival', key: ['aggregates.median_survival', 'median_survival'], label: 'Selviytyminen', percent: true, digits: 1 },
+    { id: 'flashbangs', key: ['aggregates.total_flashbangs', 'flashbangs_total', 'flash_count'], label: 'Heitetyt flashbangit', digits: 0 },
+    { id: 'flash_success', key: ['aggregates.flash_success_rate', 'flash_success_rate'], label: 'Flash onnistumis%', percent: true, digits: 1 }
 ];
 
 const DIVISION_MAP_COLUMNS = [
-    { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name', width: '220px' },
-    { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '90px' },
-    { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '90px' },
-    { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '90px' },
-    { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 2, width: '90px' },
-    { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '90px' },
-    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '90px' },
-    { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '90px' },
+    { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name', width: '210px' },
+    { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '88px' },
+    { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '88px' },
+    { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '94px' },
+    { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 2, width: '88px' },
+    { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '88px' },
+    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '88px' },
+    { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '88px' },
     { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'right', decimals: 1, width: '90px' },
-    { key: 'kr', label: 'K/R', sortable: true, numeric: true, align: 'right', decimals: 2, width: '80px' },
-    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, align: 'right', decimals: 2, width: '90px' },
-    { key: 'enemy_flash', label: 'Enemy/Flash', sortable: true, numeric: true, align: 'right', decimals: 2, width: '110px' },
-    { key: 'k2', label: '2K', sortable: true, numeric: true, align: 'right', width: '70px' },
-    { key: 'k3', label: '3K', sortable: true, numeric: true, align: 'right', width: '70px' },
-    { key: 'k4', label: '4K', sortable: true, numeric: true, align: 'right', width: '70px' },
-    { key: 'ace', label: 'Ace', sortable: true, numeric: true, align: 'right', width: '70px' },
-    { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '110px' },
-    { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '110px' }
+    { key: 'kr', label: 'K/R', sortable: true, numeric: true, align: 'right', decimals: 2, width: '78px' },
+    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, align: 'right', decimals: 2, width: '94px' },
+    { key: 'enemy_flash', label: 'Enemy/Flash', sortable: true, numeric: true, align: 'right', decimals: 2, width: '108px' },
+    { key: 'k2', label: '2K', sortable: true, numeric: true, align: 'right', width: '68px' },
+    { key: 'k3', label: '3K', sortable: true, numeric: true, align: 'right', width: '68px' },
+    { key: 'k4', label: '4K', sortable: true, numeric: true, align: 'right', width: '68px' },
+    { key: 'ace', label: 'Ace', sortable: true, numeric: true, align: 'right', width: '68px' },
+    { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '104px' },
+    { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '104px' }
 ];
 
 const SANKARI_CARD_GROUPS = [
@@ -319,7 +326,6 @@ window.DivisionView = {
     components: {
         get LoadingSpinner() { return window.LoadingSpinner; },
         get ErrorMessage() { return window.ErrorMessage; },
-        get TeamNav() { return window.TeamNav; },
         get TeamComparisonBoard() { return window.TeamComparisonBoard; },
         get MapsStats() { return window.MapsStats; },
         get CopyLink() { return window.CopyLink; },
@@ -334,11 +340,10 @@ window.DivisionView = {
             seasonsStore,
             mapColumns: DIVISION_MAP_COLUMNS,
             quickLinks: [
-                { id: 'standings', label: 'Joukkuavertailu' },
                 { id: 'summary', label: 'Tilastot' },
-                { id: 'maps', label: 'Kartat' },
-                { id: 'heroes', label: 'Sankarit' },
-                { id: 'teams', label: 'Joukkueet' }
+                { id: 'standings', label: 'Joukkuavertailu' },
+                { id: 'maps', label: 'Karttatilastot' },
+                { id: 'heroes', label: 'Sankarit' }
             ],
             activeTeamChipId: null
         };
@@ -448,16 +453,121 @@ window.DivisionView = {
             if (!this.divisionDetails) return 'Divisioona';
             return this.divisionDetails.name || `Divisioona ${this.divisionDetails.division_num}`;
         },
+        divisionSeasonLabel() {
+            if (this.breadcrumbSeason?.label) {
+                return this.breadcrumbSeason.label;
+            }
+            if (this.divisionDetails?.season) {
+                return `Kausi ${this.divisionDetails.season}`;
+            }
+            return null;
+        },
         statMetrics() {
             if (!this.divisionDetails) {
                 return [];
             }
+            const aggregates = this.derivedAggregates;
             const source = {
-                ...this.divisionDetails.aggregates,
-                team_count: Array.isArray(this.divisionDetails.teams) ? this.divisionDetails.teams.length : this.divisionDetails.team_count,
-                player_count: this.divisionDetails.player_count
+                ...aggregates,
+                aggregates
             };
             return buildMetricCards(source, DIVISION_METRIC_SCHEMA);
+        },
+        derivedAggregates() {
+            const details = this.divisionDetails || {};
+            const aggregates = { ...(details.aggregates || {}) };
+            const teams = Array.isArray(details.teams) ? details.teams : [];
+            const standings = Array.isArray(this.standings) ? this.standings : [];
+            const players = Array.isArray(details.player_totals || details.playerTotals) ? (details.player_totals || details.playerTotals) : [];
+            const maps = Array.isArray(this.mapStats) ? this.mapStats : [];
+
+            aggregates.team_count = aggregates.team_count ?? teams.length ?? details.team_count;
+            aggregates.player_count = aggregates.player_count ?? details.player_count ?? players.length;
+
+            if (aggregates.matches_played == null) {
+                const matchFromStandings = standings.reduce((max, team) => Math.max(max, Number(team.matches_played ?? team.matches ?? 0)), 0);
+                if (matchFromStandings > 0) {
+                    aggregates.matches_played = matchFromStandings;
+                    aggregates.total_matches = aggregates.total_matches ?? matchFromStandings;
+                }
+            }
+            if (aggregates.maps_played_total == null && maps.length) {
+                aggregates.maps_played_total = maps.reduce((sum, entry) => sum + Number(entry.maps_played ?? entry.curr?.maps_played ?? 0), 0);
+            }
+            if ((aggregates.matches_played == null || aggregates.matches_played === 0) && aggregates.maps_played_total > 0) {
+                aggregates.matches_played = aggregates.maps_played_total;
+                aggregates.total_matches = aggregates.total_matches ?? aggregates.maps_played_total;
+            }
+            if (aggregates.rounds_played_total == null && maps.length) {
+                aggregates.rounds_played_total = maps.reduce((sum, entry) => sum + Number(entry.rounds_played ?? entry.curr?.rounds_played ?? 0), 0);
+            }
+            if (aggregates.total_kills == null && players.length) {
+                aggregates.total_kills = players.reduce((sum, p) => sum + this.toNumber(p.kills, 0), 0);
+            }
+            if (aggregates.total_deaths == null && players.length) {
+                aggregates.total_deaths = players.reduce((sum, p) => sum + this.toNumber(p.deaths, 0), 0);
+            }
+            if (aggregates.total_kills == null && maps.length) {
+                aggregates.total_kills = maps.reduce((sum, entry) => sum + this.toNumber(entry.kills ?? entry.curr?.kills, 0), 0);
+            }
+            if (aggregates.total_deaths == null && maps.length) {
+                aggregates.total_deaths = maps.reduce((sum, entry) => sum + this.toNumber(entry.deaths ?? entry.curr?.deaths, 0), 0);
+            }
+            if (aggregates.total_flashbangs == null && players.length) {
+                aggregates.total_flashbangs = players.reduce((sum, p) => sum + this.toNumber(p.flash_count, 0), 0);
+            }
+
+            const adrValues = players
+                .map(p => this.toNumber(p.adr, null))
+                .filter(v => v != null && Number.isFinite(v));
+            if (aggregates.median_adr == null && adrValues.length) {
+                aggregates.median_adr = this.median(adrValues);
+            }
+
+            const kdValues = players
+                .map(p => this.toNumber(p.kd ?? (p.deaths ? p.kills / p.deaths : p.kills), null))
+                .filter(v => v != null && Number.isFinite(v));
+            if (aggregates.avg_kd == null && kdValues.length) {
+                aggregates.avg_kd = kdValues.reduce((acc, val) => acc + val, 0) / kdValues.length;
+            }
+            if ((aggregates.avg_kd == null || aggregates.avg_kd === 0) && aggregates.total_kills != null && aggregates.total_deaths != null) {
+                const totalKills = this.toNumber(aggregates.total_kills, null);
+                const totalDeaths = this.toNumber(aggregates.total_deaths, null);
+                if (totalKills != null && totalDeaths != null) {
+                    aggregates.avg_kd = totalDeaths ? totalKills / totalDeaths : totalKills;
+                }
+            }
+            const krValues = players
+                .map(p => this.toNumber(p.kr ?? (p.rounds ? p.kills / p.rounds : null), null))
+                .filter(v => v != null && Number.isFinite(v));
+            if (aggregates.median_kr == null && krValues.length) {
+                aggregates.median_kr = this.median(krValues);
+            }
+            const hsValues = players
+                .map(p => this.toNumber(p.hs_pct ?? p.hsPercent ?? p.hs, null))
+                .filter(v => v != null && Number.isFinite(v));
+            if (aggregates.median_hs_pct == null && hsValues.length) {
+                aggregates.median_hs_pct = this.median(hsValues);
+            }
+            if (aggregates.flash_success_rate == null && players.length) {
+                const totalFlash = players.reduce((sum, p) => sum + this.toNumber(p.flash_count, 0), 0);
+                const success = players.reduce((sum, p) => sum + this.toNumber(p.flash_successes, 0), 0);
+                aggregates.flash_success_rate = totalFlash ? success / totalFlash : null;
+            }
+
+            const survivalValues = players
+                .map(p => {
+                    const rounds = this.toNumber(p.rounds_played ?? p.rounds, null);
+                    const deaths = this.toNumber(p.deaths, null);
+                    if (!rounds || deaths == null) return null;
+                    return (rounds - deaths) / rounds;
+                })
+                .filter(v => v != null && Number.isFinite(v));
+            if (aggregates.median_survival == null && survivalValues.length) {
+                aggregates.median_survival = this.median(survivalValues);
+            }
+
+            return aggregates;
         },
         divisionBadgeLabel() {
             if (!this.divisionDetails) return 'Divisioona';
@@ -616,8 +726,15 @@ window.DivisionView = {
             const el = document.getElementById(id);
             if (!el) return;
             try {
+                const targetHash = `#${id}`;
+                if (history && history.pushState) {
+                    history.pushState(null, '', targetHash);
+                } else {
+                    window.location.hash = targetHash;
+                }
                 el.scrollIntoView({ behavior: 'smooth', block: 'start' });
             } catch (error) {
+                window.location.hash = `#${id}`;
                 window.scrollTo(0, el.offsetTop || 0);
             }
         },
@@ -931,10 +1048,16 @@ window.DivisionView = {
                 players: '👤',
                 matches: '⚔️',
                 maps: '🗺️',
+                rounds: '🎯',
                 adr: '💥',
+                kr: '📈',
                 kd: '⚖️',
-                survival: '🛡️',
-                rounds: '🔄'
+                kills: '🗡️',
+                deaths: '💀',
+                flashbangs: '💡',
+                hs: '🎯',
+                flash_success: '✨',
+                survival: '🛡️'
             };
             return icons[key] || '📊';
         },
@@ -989,49 +1112,20 @@ window.DivisionView = {
                 <div class="division-hero__grid">
                     <div class="division-hero__identity">
                         <div>
-                            <h1 id="division-title" class="title-accent titleUnderlineMain">{{ divisionTitle }}</h1>
+                            <h1 id="division-title" class="title-accent titleUnderlinePage">{{ divisionTitle }}</h1>
                         </div>
-                    </div>
-                    <div class="division-hero__meta">
-                        <p v-if="divisionSeasonLabel" class="division-hero__season">{{ divisionSeasonLabel }}</p>
-                        <div v-if="divisionHeaderStats.length" class="division-hero__stats">
-                            <div v-for="stat in divisionHeaderStats" :key="stat.key" class="division-hero__stat">
-                                <span class="division-hero__stat-label">{{ stat.label }}</span>
-                                <span class="division-hero__stat-value">{{ stat.value }}</span>
-                            </div>
-                        </div>
-                        <span
-                            v-if="divisionStatusLabel"
-                            class="division-hero__status"
-                            :class="'division-hero__status--' + divisionStatusTone"
-                        >
-                            {{ divisionStatusLabel }}
-                        </span>
-                        <copy-link
-                            v-if="championshipId"
-                            :url="shareUrl"
-                            label="Kopioi divisioona linkki"
-                            variant="primary"
-                        ></copy-link>
                     </div>
                 </div>
                 <nav class="division-hero__nav" aria-label="Pikalinkit divisioonalle">
-                    <button
+                    <a
                         v-for="link in quickLinks"
                         :key="link.id"
-                        type="button"
                         class="division-hero__nav-link"
-                        @click="scrollToSection(link.id)"
+                        :href="sectionLinkTarget(link)"
+                        @click.prevent="scrollToSection(link.id)"
                     >
                         {{ link.label }}
-                    </button>
-                    <router-link
-                        v-if="breadcrumbSeason"
-                        class="division-hero__nav-link division-hero__nav-link--subtle"
-                        :to="{ name: 'seasons' }"
-                    >
-                        {{ breadcrumbSeason.label || ('Kausi ' + breadcrumbSeason.seasonNumber) }}
-                    </router-link>
+                    </a>
                 </nav>
             </section>
 
@@ -1047,10 +1141,25 @@ window.DivisionView = {
             ></error-message>
 
             <template v-else>
+                <section id="summary" class="division-section">
+                    <header class="division-section__heading">
+                        <h2 class="title-accent titleUnderlineSection">Divisioonan tilastot</h2>
+                    </header>
+                    <div class="summary-card-grid division-summary-grid" role="list">
+                        <summary-stat-card
+                            v-for="metric in divisionSummaryMetrics"
+                            :key="metric.key"
+                            :icon="metric.icon"
+                            :label="metric.label"
+                            :value="metric.value"
+                        ></summary-stat-card>
+                    </div>
+                </section>
+
                 <section id="standings" class="division-section division-section--stacked">
                     <header class="division-section__heading division-team-heading">
-                        <h2 class="title-accent titleUnderlineMain">Joukkuavertailu</h2>
-                        </header>
+                        <h2 class="title-accent titleUnderlineSection">Joukkuavertailu</h2>
+                    </header>
                     <div class="division-team-module">
                         <div class="division-team-panels">
                             <team-comparison-board
@@ -1065,51 +1174,11 @@ window.DivisionView = {
                             ></team-comparison-board>
                         </div>
                     </div>
-                    <div v-if="teamChipItems.length" class="division-team-chips" role="tablist" aria-label="Joukkuepikalinkit">
-                        <button
-                            v-for="team in teamChipItems"
-                            :key="team.id"
-                            type="button"
-                            class="season-pill division-chip"
-                            :class="{ 'division-chip--active': String(activeTeamChipId) === String(team.id) }"
-                            :aria-pressed="String(activeTeamChipId) === String(team.id)"
-                            @click="handleTeamChipSelect(team.id)"
-                        >
-                            <span class="division-chip__rank">#{{ team.rank }}</span>
-                            <img
-                                v-if="team.logo"
-                                :src="team.logo"
-                                :alt="team.label + ' logo'"
-                                class="division-chip__logo"
-                                loading="lazy"
-                            >
-                            <span class="division-chip__label">{{ team.label }}</span>
-                            <span class="division-chip__meta">{{ team.record }}</span>
-                            <span class="division-chip__delta" :class="{ positive: team.roundDiff > 0, negative: team.roundDiff < 0 }">
-                                {{ team.roundDiff > 0 ? '+' : '' }}{{ team.roundDiff }}
-                            </span>
-                        </button>
-                    </div>
-                </section>
-
-                <section id="summary" class="division-section">
-                    <header class="division-section__heading">
-                        <h2 class="title-accent titleUnderlineMain">Divisioonan tilastot</h2>
-                    </header>
-                    <div class="summary-card-grid division-summary-grid" role="list">
-                        <summary-stat-card
-                            v-for="metric in divisionSummaryMetrics"
-                            :key="metric.key"
-                            :icon="metric.icon"
-                            :label="metric.label"
-                            :value="metric.value"
-                        ></summary-stat-card>
-                    </div>
                 </section>
 
                 <section id="maps" class="division-section">
                     <header class="division-section__heading">
-                        <h2 class="title-accent titleUnderlineMain">Karttatilastot</h2>
+                        <h2 class="title-accent titleUnderlineSection">Karttatilastot</h2>
                     </header>
                     <maps-stats
                         class="division-surface glass-card"
@@ -1126,7 +1195,7 @@ window.DivisionView = {
 
                 <section id="heroes" class="division-section division-section--heroes">
                     <header class="division-section__heading">
-                        <h2 class="title-accent titleUnderlineMain">Divarin Sankarit</h2>
+                        <h2 class="title-accent titleUnderlineSection">Divarin Sankarit</h2>
                     </header>
                     <loading-spinner
                         v-if="sankariLoading && !hasSankariGroups"
@@ -1150,22 +1219,6 @@ window.DivisionView = {
                             </div>
                         </div>
                     </div>
-                </section>
-
-                <section id="teams" class="division-section">
-                    <header class="division-section__heading">
-                        <p class="section-eyebrow">Joukkuelista</p>
-                        <h2 class="title-accent titleUnderlineMain">Joukkueet</h2>
-                    </header>
-                    <div v-if="hasTeams" class="glass-card division-surface division-team-list">
-                        <team-nav
-                            :teams="teams"
-                            :championship-id="championshipId"
-                        ></team-nav>
-                    </div>
-                    <p v-else class="division-section__empty">
-                        Joukkueita ei löytynyt.
-                    </p>
                 </section>
             </template>
         </div>

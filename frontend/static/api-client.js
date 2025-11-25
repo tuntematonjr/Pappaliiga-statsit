@@ -97,7 +97,12 @@
             `/api/v1/seasons/${seasonId}/summary`,
             `/api/seasons/${seasonId}/stats/summary`
         ],
-        health: () => [`/api/health`, `/api/v1/health`, `/healthz`]
+        health: () => [`/api/health`, `/api/v1/health`, `/healthz`],
+        mapsCatalog: () => [
+            `/api/maps_catalog`,
+            `/api/maps-catalog`,
+            `/api/maps/catalog`
+        ]
     });
 
     function encodeSeasonId(value) {
@@ -739,6 +744,7 @@
             this.healthCheck = healthCheck;
             this._divisionDetailsCache = new Map();
             this._divisionCacheTtlMs = DIVISION_CACHE_TTL_MS;
+            this._mapCatalogCache = null;
         }
 
         proxyAvatar(url) {
@@ -818,6 +824,21 @@
                 const legacyResult = await fetchJson('/divisions/seasons').catch(() => []);
                 return legacyResult?.data ?? legacyResult ?? [];
             }
+        }
+
+        async getMapsCatalog(options = {}) {
+            const { force = false, cacheTtlMs = 5 * 60 * 1000, ...requestOptions } = options || {};
+            const cached = this._mapCatalogCache;
+            if (!force && cached && cached.data && now() - cached.timestamp < cacheTtlMs) {
+                return cached.data;
+            }
+            const routes = buildRouteCandidates('mapsCatalog');
+            const result = await fetchWithFallback(routes, requestOptions);
+            const payload = result?.data ?? result ?? [];
+            const normalized = ensureSnakeCaseDeep(payload);
+            const data = Array.isArray(normalized) ? normalized : [];
+            this._mapCatalogCache = { data, timestamp: now() };
+            return data;
         }
 
         async getSeasonStats(seasonId) {

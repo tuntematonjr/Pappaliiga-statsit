@@ -316,7 +316,7 @@ window.PlayerView = {
                             <span v-else>{{ (profile?.nickname || '?').charAt(0).toUpperCase() }}</span>
                         </div>
                         <div class="player-hero__meta">
-                            <h1 class="title-accent titleUnderlineMain">{{ profile?.nickname || 'Pelaaja' }}</h1>
+                            <h1 class="title-accent titleUnderlinePage">{{ profile?.nickname || 'Pelaaja' }}</h1>
                             <p v-if="heroTeam" class="player-hero__team">{{ heroTeam }}</p>
                             <div class="player-hero__actions">
                                 <a v-if="profile?.faceit_url" :href="profile.faceit_url" target="_blank" rel="noopener" class="btn-primary">Faceit</a>

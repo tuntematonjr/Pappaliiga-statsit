@@ -8,7 +8,7 @@ window.SeasonsView = {
     template: `
         <div class="seasons-view">
             <masthead></masthead>
-            <h1 class="title-accent titleUnderlineMain">Seasons & Divisions</h1>
+            <h1 class="title-accent titleUnderlinePage">Seasons & Divisions</h1>
             
             <loading-spinner v-if="loading" message="Kausia ladataan..."></loading-spinner>
             <error-message v-else-if="error" :message="error" @retry="loadSeasons"></error-message>

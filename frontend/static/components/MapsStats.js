@@ -46,7 +46,7 @@ window.MapsStats = {
     },
     computed: {
         headingClass() {
-            return this.headingVariant === 'main' ? 'titleUnderlineMain' : 'titleUnderlineCard';
+            return this.headingVariant === 'main' ? 'titleUnderlineSection' : 'titleUnderlineCard';
         }
     },
     template: `

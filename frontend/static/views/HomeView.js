@@ -937,7 +937,7 @@ window.HomeView = {
                         </div>
                         <div class="partner-callout__titles">
                             <span class="partner-callout__eyebrow">{{ callout.eyebrow }}</span>
-                            <h2 class="title-accent titleUnderlineMain">{{ callout.name }}</h2>
+                            <h2 class="title-accent titleUnderlineCard">{{ callout.name }}</h2>
                         </div>
                     </header>
                     <p class="partner-callout__body">{{ callout.description }}</p>
@@ -956,7 +956,7 @@ window.HomeView = {
                 <header class="section-heading section-heading--centered">
                     <h2
                         id="global-summary-heading"
-                        class="title-accent titleUnderlineMain"
+                        class="title-accent titleUnderlineSection"
                     >
                         Kaikki kaudet yhteensä
                     </h2>
@@ -994,7 +994,7 @@ window.HomeView = {
                     <div>
                         <h2
                             id="season-explorer-heading"
-                            class="title-accent titleUnderlineMain"
+                            class="title-accent titleUnderlineSection"
                         >
                             Kausiselain
                         </h2>
@@ -1041,7 +1041,7 @@ window.HomeView = {
                             <div class="season-explorer__summary-header">
                                 <div>
                                     <h3
-                                        class="title-accent titleUnderlineMain title-duration-slow"
+                                        class="title-accent titleUnderlineSection title-duration-slow"
                                         id="season-summary-heading"
                                         aria-live="polite"
                                         aria-atomic="true"

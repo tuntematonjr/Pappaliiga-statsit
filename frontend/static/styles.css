@@ -107,7 +107,7 @@
 /* ---- Animated Title Underlines ---- */
 .title-accent {
     --title-underline-delay: 0s;
-    --title-underline-duration: 0s;
+    --title-underline-duration: 6s;
     --title-underline-gap: 0.35rem;
     --title-underline-thickness: 2px;
     --title-underline-gradient: linear-gradient(90deg, rgba(106, 186, 255, 0.15), rgba(124, 215, 243, 0.9), rgba(106, 186, 255, 0.15));
@@ -149,10 +149,14 @@
     will-change: transform;
 }
 
-.titleUnderlineMain,
-.titleUnderlineCard {
+.titleUnderlinePage,
+.titleUnderlineSection,
+.titleUnderlineCard,
+.titleUnderlineMain {
     position: relative;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: fit-content;
     max-width: 100%;
     text-wrap: balance;
@@ -163,19 +167,33 @@
     --title-underline-animation-name: titleUnderlineShimmer;
 }
 
-.titleUnderlineMain {
-    font-size: clamp(1.6rem, 2.8vw, 2.6rem);
-    letter-spacing: 0.03em;
-    padding-bottom: clamp(0.5rem, 1.5vw, 0.8rem);
-    --title-underline-gap: clamp(0.6rem, 1vw, 0.7rem);
-    --title-underline-thickness: 6px;
-    --title-underline-min: 6rem;
-    --title-underline-max: 64rem;
-    --title-underline-gradient: linear-gradient(110deg, rgba(50, 130, 255, 0.2), rgba(177, 246, 255, 0.95), rgba(60, 150, 255, 0.85));
+.titleUnderlinePage {
+    font-size: clamp(1.85rem, 3vw, 2.9rem);
+    letter-spacing: 0.035em;
+    padding-bottom: clamp(0.6rem, 1.6vw, 0.95rem);
+    --title-underline-gap: clamp(0.65rem, 1vw, 0.8rem);
+    --title-underline-thickness: 7px;
+    --title-underline-min: 7rem;
+    --title-underline-max: 72rem;
+    --title-underline-gradient: linear-gradient(108deg, rgba(50, 130, 255, 0.18), rgba(177, 246, 255, 0.98), rgba(60, 150, 255, 0.82));
     --title-underline-blur: 16px;
     --title-underline-opacity: 0.98;
-    --title-underline-amp: 9px;
-    --title-underline-duration: 4s;
+    --title-underline-amp: 11px;
+}
+
+.titleUnderlineSection,
+.titleUnderlineMain {
+    font-size: clamp(1.55rem, 2.6vw, 2.35rem);
+    letter-spacing: 0.028em;
+    padding-bottom: clamp(0.45rem, 1.4vw, 0.75rem);
+    --title-underline-gap: clamp(0.55rem, 1vw, 0.65rem);
+    --title-underline-thickness: 5px;
+    --title-underline-min: 5.5rem;
+    --title-underline-max: 42rem;
+    --title-underline-gradient: linear-gradient(112deg, rgba(70, 125, 240, 0.24), rgba(168, 215, 255, 0.9), rgba(76, 132, 255, 0.8));
+    --title-underline-blur: 12px;
+    --title-underline-opacity: 0.92;
+    --title-underline-amp: 7px;
 }
 
 .titleUnderlineCard {
@@ -185,13 +203,12 @@
     padding-bottom: clamp(0.35rem, 1vw, 0.6rem);
     --title-underline-gap: clamp(0.4rem, 0.9vw, 0.55rem);
     --title-underline-thickness: 2.4px;
-    --title-underline-min: 3rem;
+    --title-underline-min: 3.4rem;
     --title-underline-max: 18rem;
     --title-underline-gradient: linear-gradient(120deg, rgba(70, 105, 200, 0.2), rgba(148, 202, 255, 0.7), rgba(62, 100, 190, 0.3));
     --title-underline-blur: 7px;
     --title-underline-opacity: 0.75;
-    --title-underline-amp: 3px;
-    --title-underline-duration: 6.4s;
+    --title-underline-amp: 3.2px;
 }
 
 @media (max-width: 520px) {
@@ -742,7 +759,9 @@
     width: 100%;
 }
 
+.section-heading--centered .titleUnderlineSection,
 .section-heading--centered .titleUnderlineMain,
+.section-heading--centered .titleUnderlinePage,
 .section-heading--centered .titleUnderlineCard {
     width: fit-content;
     max-width: 100%;
@@ -1311,9 +1330,6 @@
 }
 
 .division-season-bar {
-    position: sticky;
-    top: 72px;
-    z-index: 6;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 1rem;
@@ -2083,14 +2099,14 @@
 .division-view {
     display: flex;
     flex-direction: column;
-    gap: clamp(2rem, 4vw, 3.5rem);
+    gap: clamp(1.75rem, 3.2vw, 2.6rem);
 }
 
 .division-hero {
     display: flex;
     flex-direction: column;
-    gap: clamp(0.9rem, 2vw, 1.4rem);
-    padding: clamp(1.25rem, 2.6vw, 2.1rem);
+    gap: clamp(0.85rem, 2vw, 1.35rem);
+    padding: clamp(1.15rem, 2.4vw, 2rem);
     border-radius: clamp(20px, 2.5vw, 28px);
 }
 
@@ -2100,19 +2116,13 @@
     gap: clamp(0.85rem, 2vw, 1.25rem);
 }
 
-@media (min-width: 900px) {
-    .division-hero__grid {
-        flex-direction: row;
-        align-items: stretch;
-        justify-content: space-between;
-    }
-}
-
 .division-hero__identity {
     display: flex;
     align-items: center;
     gap: clamp(1rem, 2vw, 1.5rem);
     flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
 }
 
 .division-hero__badge {
@@ -2130,85 +2140,11 @@
     font-size: 1rem;
 }
 
-.division-hero__meta {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-    align-items: flex-start;
-    width: 100%;
-}
-
-@media (min-width: 900px) {
-    .division-hero__meta {
-        max-width: 360px;
-        margin-left: auto;
-    }
-}
-
-.division-hero__stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 0.75rem;
-    width: 100%;
-}
-
-.division-hero__stat {
-    padding: 0.9rem 1rem;
-    border-radius: clamp(12px, 1.5vw, 16px);
-    background: rgba(6, 12, 28, 0.68);
-    border: 1px solid rgba(82, 132, 255, 0.18);
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.division-hero__stat-label {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: rgba(190, 205, 240, 0.76);
-}
-
-.division-hero__stat-value {
-    font-size: 1.3rem;
-    font-weight: 700;
-}
-
-.division-hero__status {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.9rem;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.division-hero__status--active {
-    background: rgba(79, 130, 255, 0.12);
-    border-color: rgba(90, 140, 255, 0.35);
-    color: var(--accent-2);
-}
-
-.division-hero__status--playoff {
-    background: rgba(255, 160, 90, 0.12);
-    border-color: rgba(255, 170, 110, 0.35);
-    color: #ffba7b;
-}
-
-.division-hero__status--finished {
-    background: rgba(57, 217, 138, 0.12);
-    border-color: rgba(57, 217, 138, 0.35);
-    color: var(--ok);
-}
-
 .division-hero__nav {
     display: flex;
     flex-wrap: wrap;
     gap: 0.65rem;
+    justify-content: center;
 }
 
 .division-hero__nav-link {
@@ -2236,11 +2172,18 @@
     color: rgba(200, 210, 240, 0.74);
 }
 
+.division-hero__nav-link--primary {
+    border-color: rgba(120, 180, 255, 0.5);
+    background: linear-gradient(135deg, rgba(58, 163, 255, 0.95), rgba(62, 255, 210, 0.85));
+    color: #041023;
+    box-shadow: 0 12px 26px rgba(40, 110, 255, 0.35);
+}
+
 .division-section {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-    margin-top: 3rem;
+    gap: 1.25rem;
+    margin-top: clamp(1.8rem, 3vw, 2.35rem);
 }
 
 .division-section:first-of-type {
@@ -2251,7 +2194,7 @@
     text-align: center;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.55rem;
     align-items: center;
 }
 
@@ -2363,6 +2306,16 @@
 
 .division-team-panel--table .table-container {
     margin-top: 0.35rem;
+}
+
+#season-selector .season-selector--flat {
+    width: 100%;
+    max-width: 980px;
+    margin: 0 auto;
+}
+
+#season-selector .season-selector__pills {
+    justify-content: center;
 }
 
 @media (max-width: 640px) {
@@ -2569,7 +2522,7 @@
 .sankari-groups {
     display: flex;
     flex-direction: column;
-    gap: clamp(2rem, 3vw, 2.6rem);
+    gap: clamp(1.6rem, 2.5vw, 2.2rem);
 }
 
 .sankari-group {
@@ -2601,7 +2554,7 @@
 .sankari-group__cards {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: clamp(1rem, 2vw, 1.35rem);
+    gap: clamp(0.9rem, 1.8vw, 1.25rem);
     align-items: stretch;
 }
 
@@ -2627,6 +2580,7 @@
         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     }
 }
+
 
 .sankari-card {
     padding: clamp(1.1rem, 2vw, 1.45rem);
@@ -2972,20 +2926,21 @@
     text-transform: uppercase;
     font-size: 0.75rem;
     letter-spacing: 0.08em;
-    padding: 0.85rem;
+    padding: 0.75rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(12, 18, 36, 0.9);
+    background: rgba(12, 18, 36, 0.92);
 }
 
 .table-sortable.sticky-header thead th {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 3;
     box-shadow: 0 6px 12px rgba(5, 9, 20, 0.45);
+    background: linear-gradient(180deg, rgba(12, 18, 36, 0.95), rgba(10, 16, 30, 0.88));
 }
 
 .table-sortable tbody td {
-    padding: 0.85rem;
+    padding: 0.75rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
@@ -3713,9 +3668,6 @@
 .main-nav {
     background: rgba(10, 16, 34, 0.92);
     border-bottom: 1px solid rgba(52, 76, 128, 0.4);
-    position: sticky;
-    top: 0;
-    z-index: 100;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     box-shadow: 0 14px 28px rgba(5, 9, 20, 0.45);
@@ -3842,7 +3794,6 @@
 */
 html, body {
     box-sizing: border-box;
-    overflow-x: auto; 
 }
 
 #app {
@@ -4199,24 +4150,38 @@ html, body {
 }
 
 .map-sortable .table-sortable {
-    min-width: 840px;
+    min-width: 780px;
 }
 
 .map-name {
     display: inline-flex;
     align-items: center;
-    gap: 0.65rem;
+    gap: 0.55rem;
     font-weight: 600;
-    color: var(--accent-2);
+    color: #e4edff;
 }
 
 .map-logo {
-    width: 46px;
-    height: 46px;
-    border-radius: 12px;
+    width: 42px;
+    height: 42px;
+    aspect-ratio: 1 / 1;
+    flex-shrink: 0;
+    border-radius: 11px;
     object-fit: cover;
+    background: var(--table-bg);
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 4px 12px rgba(5, 9, 20, 0.35);
+}
+
+@media (max-width: 720px) {
+    .map-logo {
+        width: 34px;
+        height: 34px;
+    }
+    .map-name {
+        gap: 0.45rem;
+        align-items: flex-start;
+    }
 }
 
 /* Delta Indicators */
@@ -4322,7 +4287,6 @@ img.logo.promo-logo {
 }
 
 *{box-sizing:border-box;}
-html,body{height:100%;}
 body{
 	margin:0;
 	background: radial-gradient(1800px 600px at 20% -10%, #152046 0%, #0b1020 55%) fixed;
@@ -5102,7 +5066,7 @@ table{
 	margin:.5rem 0 1rem; 
 	background:var(--table-bg);
 }
-thead th{ position:sticky; top:0; background:var(--head); border-bottom:1px solid var(--border); font-weight:600; color:var(--fg); }
+thead th{ background:var(--head); border-bottom:1px solid var(--border); font-weight:600; color:var(--fg); }
 th,td{ padding:.55rem .7rem; border-bottom:1px solid var(--border); text-align:center; }
 th[data-sortable] { cursor: pointer; user-select: none; position: relative; }
 th[data-sortable]:hover { background: rgba(58,163,255,0.1); }
@@ -5117,7 +5081,7 @@ th[data-sortable]::after {
 th[data-sort-dir="asc"]::after { content: '↑'; color: var(--accent); opacity: 1; }
 th[data-sort-dir="desc"]::after { content: '↓'; color: var(--accent); opacity: 1; }
 tbody tr:nth-child(even){ background:var(--table-alt); }
-th:first-child,td:first-child{ text-align:left; position:sticky; left:0; z-index:1; background:var(--table-bg); }
+th:first-child,td:first-child{ text-align:left; background:var(--table-bg); }
 tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
 .chips{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.4rem 0 .8rem; }
 
@@ -5178,8 +5142,8 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
     color: #fff;
 }
 
-.cell-grad.good{ background:linear-gradient(90deg, rgba(34,197,94,0.25), transparent); }
-.cell-grad.bad{  background:linear-gradient(90deg, rgba(239,68,68,0.25), transparent); }
+.cell-grad.good{ background:linear-gradient(90deg, rgba(34,197,94,0.16), transparent); }
+.cell-grad.bad{  background:linear-gradient(90deg, rgba(239,68,68,0.16), transparent); }
 .cell-muted{ color:var(--muted); }
 th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cursor:help; }
 
@@ -7408,9 +7372,6 @@ body.is-division .card.maps-section {
 }
 
 .season-control-bar {
-    position: sticky;
-    top: clamp(0.5rem, 2vw, 1rem);
-    z-index: 12;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 1rem;

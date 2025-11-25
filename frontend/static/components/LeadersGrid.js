@@ -10,7 +10,7 @@ window.LeadersGrid = {
             <h2 class="sr-only">Top Players</h2>
             <div v-for="(category, catIdx) in categories" :key="category.id || category.categoryTitle || catIdx" class="leader-category">
                 <h3
-                    class="category-title title-accent titleUnderlineMain"
+                    class="category-title title-accent titleUnderlineSection"
                 >
                     {{ category.categoryTitle }}
                 </h3>

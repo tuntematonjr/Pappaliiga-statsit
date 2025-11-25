@@ -150,7 +150,7 @@ window.TeamView = {
                             <img :src="crestUrl" :alt="teamName" loading="lazy" />
                         </div>
                         <div class="team-header__meta">
-                            <h1 class="title-accent titleUnderlineMain">{{ teamName }}</h1>
+                            <h1 class="title-accent titleUnderlinePage">{{ teamName }}</h1>
                             <div class="team-header__actions">
                                 <a v-if="faceitLink" :href="faceitLink" target="_blank" rel="noopener" class="btn-primary">Faceit</a>
                                 <copy-link label="Jaa joukkue"></copy-link>

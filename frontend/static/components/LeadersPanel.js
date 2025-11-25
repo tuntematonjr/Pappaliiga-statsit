@@ -9,7 +9,7 @@ window.LeadersPanel = {
         <section class="leaders-panel" aria-label="Division leaders">
             <div class="leaders-panel-inner">
                 <header class="leaders-header">
-                    <h2 class="panel-title title-accent titleUnderlineMain">Division Leaders</h2>
+                    <h2 class="panel-title title-accent titleUnderlineSection">Division Leaders</h2>
                     <p class="panel-sub">Top players across requested stats</p>
                 </header>
 

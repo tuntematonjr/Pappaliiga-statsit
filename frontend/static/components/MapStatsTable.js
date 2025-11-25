@@ -31,27 +31,30 @@ window.MapStatsTable = {
     data() {
         return {
             defaultColumns: [
-                { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name', width: '220px' },
-                { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '90px' },
-                { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '90px' },
-                { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '90px' },
-                { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 2, width: '90px' },
-                { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '90px' },
-                { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '90px' },
-                { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '90px' },
+                { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name', width: '210px' },
+                { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '88px' },
+                { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '88px' },
+                { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '94px' },
+                { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 2, width: '88px' },
+                { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '88px' },
+                { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '88px' },
+                { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '88px' },
                 { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'right', decimals: 1, width: '90px' },
-                { key: 'kr', label: 'K/R', sortable: true, numeric: true, align: 'right', decimals: 2, width: '80px' },
-                { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, align: 'right', decimals: 2, width: '90px' },
-                { key: 'enemy_flash', label: 'Enemy/Flash', sortable: true, numeric: true, align: 'right', decimals: 2, width: '110px' },
-                { key: 'k2', label: '2K', sortable: true, numeric: true, align: 'right', width: '70px' },
-                { key: 'k3', label: '3K', sortable: true, numeric: true, align: 'right', width: '70px' },
-                { key: 'k4', label: '4K', sortable: true, numeric: true, align: 'right', width: '70px' },
-                { key: 'ace', label: 'Ace', sortable: true, numeric: true, align: 'right', width: '70px' },
-                { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '110px' },
-                { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '110px' }
+                { key: 'kr', label: 'K/R', sortable: true, numeric: true, align: 'right', decimals: 2, width: '78px' },
+                { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, align: 'right', decimals: 2, width: '94px' },
+                { key: 'enemy_flash', label: 'Enemy/Flash', sortable: true, numeric: true, align: 'right', decimals: 2, width: '108px' },
+                { key: 'k2', label: '2K', sortable: true, numeric: true, align: 'right', width: '68px' },
+                { key: 'k3', label: '3K', sortable: true, numeric: true, align: 'right', width: '68px' },
+                { key: 'k4', label: '4K', sortable: true, numeric: true, align: 'right', width: '68px' },
+                { key: 'ace', label: 'Ace', sortable: true, numeric: true, align: 'right', width: '68px' },
+                { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '104px' },
+                { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '104px' }
             ],
             defaultColorizeColumns: ['kd', 'adr', 'kr', 'udpr'],
-            defaultSort: { column: 'maps_played', order: 'desc', numeric: true }
+            defaultSort: { column: 'maps_played', order: 'desc', numeric: true },
+            mapImageLookup: {},
+            catalogLoaded: false,
+            catalogLoading: false
         };
     },
     computed: {
@@ -91,11 +94,13 @@ window.MapStatsTable = {
                 const k4 = Number(curr.k4 ?? curr.four_k ?? 0);
                 const ace = Number(curr.ace ?? curr.five_k ?? 0);
                 const pistolKills = Number(curr.pistol_kills ?? 0);
+                const name = entry.pretty_name || curr.pretty_name || entry.map_name || curr.name || 'Kartta';
+                const mapId = entry.map_name || curr.map_name || entry.mapId || name;
 
                 return {
-                    id: entry.map_name || `map-${idx}`,
-                    map_name: entry.map_name || curr.name || 'Kartta',
-                    logo: curr.logo || curr.image || entry.image || entry.thumbnail || null,
+                    id: mapId || `map-${idx}`,
+                    map_name: name,
+                    logo: this.resolveMapImage(entry),
                     maps_played: mapsPlayed,
                     banned: Number(curr.banned ?? 0),
                     rounds_played: roundsPlayed,
@@ -143,6 +148,87 @@ window.MapStatsTable = {
                 normalized *= 100;
             }
             return Number(normalized.toFixed(1));
+        },
+        mapKey(name) {
+            if (!name) return null;
+            return String(name).trim().toLowerCase();
+        },
+        extractMapImage(entry) {
+            if (!entry) return null;
+            const curr = entry.curr || {};
+            return (
+                entry.image_sm || entry.image_lg || entry.image_sm_url || entry.image_url || entry.image ||
+                curr.image_sm || curr.image_lg || curr.image || curr.logo ||
+                entry.logo || entry.thumbnail || null
+            );
+        },
+        resolveMapImage(entry) {
+            const direct = this.extractMapImage(entry);
+            const fallbackKey = this.mapKey(entry?.map_name || entry?.mapId || entry?.pretty_name);
+            const lookup = fallbackKey && this.mapImageLookup[fallbackKey] ? this.mapImageLookup[fallbackKey] : null;
+            const resolved = direct || lookup;
+            if (!resolved) return null;
+            try {
+                return window.apiClient && typeof window.apiClient.proxyAvatar === 'function'
+                    ? window.apiClient.proxyAvatar(resolved)
+                    : resolved;
+            } catch (error) {
+                return resolved;
+            }
+        },
+        buildMapImageLookup(stats, existing = {}) {
+            const lookup = { ...(existing || {}) };
+            if (!Array.isArray(stats)) return lookup;
+            stats.forEach(item => {
+                const key = this.mapKey(item?.map_name || item?.mapId || item?.pretty_name);
+                const img = this.extractMapImage(item);
+                if (key && img && !lookup[key]) {
+                    lookup[key] = img;
+                }
+            });
+            return lookup;
+        },
+        shouldFetchCatalog(stats) {
+            if (this.catalogLoaded || this.catalogLoading) return false;
+            if (!Array.isArray(stats) || !stats.length) return false;
+            return stats.some(item => !this.extractMapImage(item) && this.mapKey(item?.map_name || item?.mapId || item?.pretty_name));
+        },
+        async ensureMapCatalog() {
+            if (this.catalogLoaded || this.catalogLoading || !window.apiClient || typeof window.apiClient.getMapsCatalog !== 'function') {
+                return;
+            }
+            this.catalogLoading = true;
+            try {
+                const catalog = await window.apiClient.getMapsCatalog();
+                if (Array.isArray(catalog) && catalog.length) {
+                    const lookup = { ...this.mapImageLookup };
+                    catalog.forEach(item => {
+                        const key = this.mapKey(item?.map_id || item?.pretty_name);
+                        const img = item?.image_sm || item?.image_lg;
+                        if (key && img && !lookup[key]) {
+                            lookup[key] = img;
+                        }
+                    });
+                    this.mapImageLookup = lookup;
+                }
+                this.catalogLoaded = true;
+            } catch (error) {
+                console.warn('[MapStatsTable] map catalog fetch failed', error);
+                this.catalogLoaded = true;
+            } finally {
+                this.catalogLoading = false;
+            }
+        }
+    },
+    watch: {
+        mapStats: {
+            immediate: true,
+            handler(newStats) {
+                this.mapImageLookup = this.buildMapImageLookup(newStats, this.mapImageLookup);
+                if (this.shouldFetchCatalog(newStats)) {
+                    this.ensureMapCatalog();
+                }
+            }
         }
     },
     template: `
