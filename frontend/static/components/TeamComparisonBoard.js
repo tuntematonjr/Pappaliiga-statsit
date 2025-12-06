@@ -47,6 +47,10 @@ window.TeamComparisonBoard = {
             type: Boolean,
             default: true
         },
+        showHeader: {
+            type: Boolean,
+            default: false
+        },
         highlightTeamId: {
             type: [String, Number],
             default: null
@@ -144,6 +148,9 @@ window.TeamComparisonBoard = {
             const numeric = this.parseNumber(value);
             return TEAM_BOARD_INT_FORMATTER.format(numeric);
         },
+        getTeamUrl(teamId) {
+            return '/team/' + teamId;
+        },
         scrollToTeam(teamId, options = {}) {
             const resolvedId = this.resolveTeamId(teamId);
             if (!resolvedId) return;
@@ -181,7 +188,7 @@ window.TeamComparisonBoard = {
     },
     template: `
         <section class="team-comparison glass-card division-surface">
-            <header class="card-head team-comparison__head">
+            <header v-if="showHeader" class="card-head team-comparison__head">
                 <div>
                     <p class="section-eyebrow">TILASTOT</p>
                     <h2 class="title title-accent titleUnderlineCard">{{ title }}</h2>
@@ -209,7 +216,7 @@ window.TeamComparisonBoard = {
                             <div class="team-comparison-team">
                                 <span class="team-rank">{{ row.rank }}</span>
                                 <img class="team-logo" :src="row.logo" :alt="row.name" loading="lazy" />
-                                <span class="team-name">{{ row.name }}</span>
+                                <a :href="getTeamUrl(row.id)" class="team-name team-name--link">{{ row.name }}</a>
                             </div>
                         </template>
 

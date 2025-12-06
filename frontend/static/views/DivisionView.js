@@ -1168,7 +1168,7 @@ window.DivisionView = {
                                 :teams="teams"
                                 :loading="standingsLoading"
                                 :error="standingsError"
-                                title="Joukkuevertailu"
+                                :show-header="false"
                                 :sticky-header="true"
                                 :highlight-team-id="activeTeamChipId"
                             ></team-comparison-board>

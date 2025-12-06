@@ -260,8 +260,14 @@ window.SortableTable = {
                             @click="handleSort(column)"
                             v-bind:data-sortable="column.sortable !== false ? true : null"
                             v-bind:data-sort-dir="(currentSort && currentSort.column === column.key) ? currentSort.order : null"
+                            :title="column.sortable !== false ? 'Click to sort' : ''"
                         >
-                            {{ column.label }}
+                            <span class="th-content">
+                                {{ column.label }}
+                                <span v-if="column.sortable !== false && getSortIndicator(column.key)" class="sort-indicator">
+                                    {{ getSortIndicator(column.key) }}
+                                </span>
+                            </span>
                         </th>
                     </tr>
                 </thead>

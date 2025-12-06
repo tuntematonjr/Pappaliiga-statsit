@@ -120,7 +120,8 @@
                 seasonEntry.details.loading = true;
                 seasonEntry.details.error = null;
                 try {
-                    const data = await window.apiClient.getTeamDetails(championshipId, teamId);
+                    // API expects (teamId, championshipId)
+                    const data = await window.apiClient.getTeamDetails(teamId, championshipId);
                     seasonEntry.details.data = data;
                     seasonEntry.details.fetchedAt = now();
                     return data;
@@ -180,7 +181,8 @@
                     globalEntry.matches.loading = true;
                     globalEntry.matches.error = null;
                     try {
-                        const data = await window.apiClient.getTeamMatches(null, teamId);
+                        // API expects (teamId, seasonId)
+                        const data = await window.apiClient.getTeamMatches(teamId, null);
                         globalEntry.matches.data = Array.isArray(data) ? data : [];
                         globalEntry.matches.fetchedAt = now();
                         return globalEntry.matches.data;
@@ -202,7 +204,8 @@
                 seasonEntry.matches.loading = true;
                 seasonEntry.matches.error = null;
                 try {
-                    const data = await window.apiClient.getTeamMatches(targetChampionship, teamId);
+                    // API expects (teamId, seasonId)
+                    const data = await window.apiClient.getTeamMatches(teamId, targetChampionship);
                     seasonEntry.matches.data = Array.isArray(data) ? data : [];
                     seasonEntry.matches.fetchedAt = now();
                     return seasonEntry.matches.data;

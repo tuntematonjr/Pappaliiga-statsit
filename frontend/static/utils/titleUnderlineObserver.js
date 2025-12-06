@@ -33,7 +33,7 @@
                           if (node.nodeType !== 1) {
                               return;
                           }
-                          if (node.matches && node.matches(SELECTOR)) {
+                          if (typeof node.matches === 'function' && node.matches(SELECTOR)) {
                               this._register(node);
                           }
                           if (node.querySelectorAll) {
