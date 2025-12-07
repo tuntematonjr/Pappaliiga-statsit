@@ -30,8 +30,10 @@ async def fetch_team(team_id: str) -> dict[str, Any]:
 async def fetch_team_season_stats(team_id: str) -> list[dict[str, Any]]:
     rows = await query_async(
         """
-        SELECT tst.season, tst.division_num, c.championship_id,
-               tst.maps_played, tst.matches_played, tst.matches_won AS wins,
+         SELECT tst.season, tst.division_num, c.championship_id,
+             c.name,
+             c.is_playoffs,
+             tst.maps_played, tst.matches_played, tst.matches_won AS wins,
                (tst.matches_played - tst.matches_won) AS losses,
                CASE WHEN tst.matches_played > 0
                     THEN (tst.matches_won / tst.matches_played)

@@ -25,6 +25,8 @@ class TeamSeasonStats(CamelModel):
     season: int
     division_num: int
     championship_id: str
+    name: Optional[str] = None
+    is_playoffs: Optional[bool] = None
     maps_played: int
     matches_played: int
     wins: int

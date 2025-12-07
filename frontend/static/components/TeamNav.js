@@ -14,7 +14,7 @@ window.TeamNav = {
     template: `
         <div class="teams-navigation">
             <template v-for="team in teams" :key="team.team_id">
-                <router-link v-if="championshipId" class="team-nav-item" :to="{ name: 'team-detail', params: { championshipId: championshipId, teamId: team.team_id } }">
+                <router-link v-if="championshipId" class="team-nav-item" :to="{ name: 'team-detail', params: { championshipId: championshipId, teamId: team.team_id }, query: { championship: championshipId } }">
                     <img class="team-nav-logo" :src="avatarUrl(team)" :alt="team.display_name || team.team_name" loading="lazy">
                     <span class="nav-name">{{ team.display_name || team.team_name }}</span>
                 </router-link>

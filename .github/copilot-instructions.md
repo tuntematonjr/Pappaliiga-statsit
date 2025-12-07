@@ -1,139 +1,61 @@
-# Pappaliiga Stats - AI Agent Instructions
+# Pappaliiga Stats – AI Agent Playbook
 
-## Architecture Overview
+## Stack at a Glance
+- Data sync: `sync.py`, `sync_pipeline.py` → Faceit API → MariaDB with adaptive rate limiting.
+- API: FastAPI (`api/`) with service layer, async DB ops, TTL caching.
+- Frontend: Vue 3 SPA (`frontend/static`), Pinia stores, Vue Router (history mode), custom components (no build step).
 
-**Three-tier system**: Async data sync pipeline → FastAPI REST API → Vue 3 SPA frontend
+## Runbook
+- Dev start (backend + SPA server): `./scripts/dev_start.ps1`
+- Manual dev: `python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000` and `python frontend/spa_server.py 8080`
+- Sync data: `python sync.py` (all) | `python sync.py --season <n>` | `python sync.py --match <match_id>` | `python sync.py --reset`
+- DB utilities: `python tools/check_db_connection.py` | `python tools/apply_schema.py` | `python tools/recompute_totals.py`
 
-- **Data pipeline** (`sync.py`, `sync_pipeline.py`): Fetches Faceit API data with adaptive rate limiting, normalizes stats, persists to MariaDB
-- **API layer** (`api/`): FastAPI server with service-based architecture, TTL caching, and comprehensive async DB operations
-- **Frontend** (`frontend/`): Vue 3 SPA with Pinia stores, component-based UI, client-side routing via Vue Router
+## Backend Conventions
+- Async everywhere; use `connection()`, `readonly_connection()`, `transaction()` from `db_async.py`.
+- Deadlock safety: wrap writes with `_retry_on_deadlock(..., max_attempts=3)` in `db_ops_async.py`.
+- Rate limits: Faceit 10k/hr, adaptive limiter in `faceit_client_async.py`; backs off on 429.
+- Service layer only talks to DB helpers; routers stay thin.
+- Caching: `AsyncTTLCache` (30s, 128 entries) for heavy aggregations (e.g., `stats_service.get_season_stats`).
 
-## Critical Workflows
+## Data & Schema Notes
+- Championships table has `is_playoffs` and `name`; use it to distinguish regular vs playoffs.
+- Championships must exist before matches; keep FK order in migrations and sync.
+- Division overrides: `division_overrides.json` marks banned/quit teams; matches with banned teams set `ignored_due_ban=1` and are excluded from stats.
+- Match normalization lives in `sync_pipeline.py::_build_normalised_match` (handles rounds vs detailed_results, forfeits, veto vote quirks).
+- Diagnostics: `runtime_diagnostics.py` writes JSONL snapshots to `logs/runtime_diagnostics.jsonl`; enable pool debug via `DB_POOL_DEBUG=1`.
 
-### Running the application locally
-```powershell
-# Start both backend and frontend (opens two terminal windows)
-.\scripts\dev_start.ps1
-
-# Or manually:
-python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
-python frontend\spa_server.py 8080
-```
-
-### Syncing data from Faceit
-```powershell
-# Full sync of current season
-python sync.py
-
-# Sync specific season
-python sync.py --season 11
-
-# Reset database and resync
-python sync.py --reset
-
-# Update single match
-python sync.py --match <match_id>
-```
-
-### Database operations
-```powershell
-# Check database connection
-python tools\check_db_connection.py
-
-# Apply schema changes
-python tools\apply_schema.py
-
-# Recompute aggregated totals
-python tools\recompute_totals.py
-```
-
-## Project Conventions
-
-### Async everywhere
-- All I/O operations use `async`/`await`
-- Use `db_async.py` connection helpers: `connection()`, `readonly_connection()`, `transaction()`
-- Database pool sizing: `DEFAULT_POOL_MAX_SIZE = 30` (sized for 10 concurrent championships × 3 connections each)
-- Never block the event loop - use `asyncio.create_task()` for concurrent operations
-
-### Database patterns
-```python
-# Transactional writes
-async with connection(label="descriptive-label") as conn:
-    await upsert_match_async(conn, match_data)
-    # conn.commit() called automatically on exit
-
-# Readonly queries (uses separate pool)
-async with readonly_connection(label="query-teams") as conn:
-    teams = await fetch_all("SELECT * FROM teams WHERE ...", params)
-
-# Retry on deadlock (built into db_ops_async)
-await _retry_on_deadlock(
-    lambda: upsert_operation(data),
-    label="operation-name",
-    max_attempts=3
-)
-```
-
-### Rate limiting strategy
-- Faceit API: 10,000 requests/hour hard limit
-- Adaptive throttling via `AdaptiveLimiter` in `faceit_client_async.py`
-- Backs off exponentially on 429 errors, recovers gradually on success
-- Track usage: `get_rate_limit_stats()` shows calls/hour and current delay
-
-### Service layer architecture
-- Services in `api/services/` contain business logic, no direct DB queries in routers
-- Use `AsyncTTLCache` for expensive aggregations: default 30s TTL, 128 entries
-- Example: `stats_service.get_season_stats()` caches division standings computation
-
-### Division overrides system
-- `division_overrides.json`: Define banned/quit teams per championship
-- Effects: matches with banned teams set `ignored_due_ban=1`, excluded from stats
-- Load via `load_division_overrides()` which returns dict[championship_id, {banned_teams, quit_teams}]
-
-### Frontend API integration
-- API base URL: runtime injection via `window.__API_BASE__` in `api/main.py`
-- API client: `frontend/static/api-client.js` wraps fetch with base URL resolution
-- Fallback: hostname heuristic (`localhost:8080` → `http://localhost:8000/api`)
-
-### Match data normalization
-- Parse Faceit API responses in `sync_pipeline.py:_build_normalised_match()`
-- Handles multiple API formats: `rounds` array from stats, `detailed_results` from match details
-- Forfeit detection: `score_team1 + score_team2 == 0` or `map_name == 'forfeit'`
-- Map votes: Democracy API provides veto/pick sequence, round 7 special handling (BO3 decider vs BO2 overflow)
-
-### Diagnostic logging
-- `runtime_diagnostics.py`: Emits JSONL snapshots to `logs/runtime_diagnostics.jsonl` every 15s during sync
-- Track progress: `diagnostics.mark_progress("match", match_id)`
-- Pool monitoring: includes MariaDB connection pool saturation metrics when `DB_POOL_DEBUG=1`
+## Frontend Guidance (Vue SPA)
+- Routing (history mode):
+  - Team base: `/team/:teamId`
+  - Team with division context: `/team/:championshipId/:teamId`
+  - Division: `/division/:championshipId` (and `/division/:championshipId/playoffs`)
+- Team page state: `TeamDetail` uses Pinia `useTeamStore` and `apiClient.getTeamPage(teamId, championshipId)`; `championship` query param is mirrored to keep links shareable.
+- Season selector: dropdown defaults to newest season; labels use championship name to differentiate regular vs playoffs.
+- When adding links to a team within a division, include `query: { championship: <championshipId> }` so copy-paste preserves the division.
+- API base URL injected at runtime via `window.__API_BASE__`; fallback heuristic in `api-client.js` for localhost.
 
 ## Common Pitfalls
+1) Blocking the event loop—never run sync DB/HTTP work without `await` or proper tasks.
+2) Missing deadlock retries on writes—use `_retry_on_deadlock` wrappers.
+3) Forgetting playoffs flag/name—championship names differentiate PO vs regular; surface them in UI.
+4) SPA deep links 404—ensure backend serves `index.html` for unknown paths (handled in `api/main.py`).
+5) Over-parallel Faceit calls—respect the adaptive limiter; avoid naive loops.
 
-1. **Deadlocks in DB writes**: Use `_retry_on_deadlock()` wrapper for all upsert operations in `db_ops_async.py`
-2. **Forgetting `await`**: All async functions must be awaited; use `asyncio.create_task()` for fire-and-forget
-3. **Rate limit exhaustion**: Sync pipeline throttles aggressively - don't add naive parallel loops over Faceit API calls
-4. **Schema FK constraints**: Championships must exist before matches; use `upsert_championships_async()` before syncing matches
-5. **Frontend routing**: SPA uses history mode - backend must serve `index.html` for unknown paths (already handled in `api/main.py`)
+## Key Files
+- `sync_pipeline.py`, `db_async.py`, `db_ops_async.py`, `faceit_client_async.py`
+- `api/main.py`, `api/services/*`, `api/routers/teams.py`
+- `frontend/static/components/TeamDetail.js`, `frontend/static/api-client.js`, `frontend/static/views/DivisionView.js`, `frontend/static/components/TeamNav.js`
 
-## Key Files Reference
-
-- `sync_pipeline.py`: Match normalization, stat aggregation logic (~1200 lines)
-- `db_async.py`: Connection pooling, transaction helpers, schema management
-- `db_ops_async.py`: All database write operations with deadlock retry logic (~2000 lines)
-- `faceit_client_async.py`: Rate-limited HTTP client with adaptive throttling
-- `api/main.py`: FastAPI app entrypoint, CORS config, SPA fallback routing
-- `mariadb_schema.sql`: Complete schema definition, materialized via `create_schema_async()`
-
-## Environment Setup
-
-Required `.env` file in repo root:
-```env
+## Environment
+Required `.env` in repo root:
+```
 FACEIT_API_KEY=your_faceit_api_key_here
 DATABASE_URL=mariadb://user:pass@host:3306/pappaliiga
 ```
-
-Optional tuning:
-```env
-DB_POOL_MAX_SIZE=30          # Connection pool size
-MAX_DB_WRITER_CONCURRENCY=6  # Max concurrent DB writes
-SYNC_DIAGNOSTICS=1           # Enable diagnostic logging
+Optional:
+```
+DB_POOL_MAX_SIZE=30
+MAX_DB_WRITER_CONCURRENCY=6
+SYNC_DIAGNOSTICS=1
 ```

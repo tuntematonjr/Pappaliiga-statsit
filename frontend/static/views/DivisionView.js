@@ -744,9 +744,13 @@ window.DivisionView = {
         teamRoute(team) {
             if (!team || !team.team_id) return null;
             if (this.championshipId) {
-                return { name: 'team-detail', params: { championshipId: this.championshipId, teamId: team.team_id } };
+                return {
+                    name: 'team-detail',
+                    params: { championshipId: this.championshipId, teamId: team.team_id },
+                    query: { championship: this.championshipId }
+                };
             }
-            return { name: 'team', params: { teamId: team.team_id } };
+            return { name: 'team', params: { teamId: team.team_id }, query: {} };
         },
         highlightTeamRoute(highlight) {
             if (!highlight?.team) return null;
