@@ -6,7 +6,7 @@
 - Frontend: Vue 3 SPA (`frontend/static`), Pinia stores, Vue Router (history mode), custom components (no build step).
 
 ## Runbook
-- Dev start (backend + SPA server): `./scripts/dev_start.ps1`
+- Dev start (backend + SPA server): `./scripts/dev_start_simple.ps1` (Windows) or `./scripts/dev_start_simple.sh` (WSL/macOS/Linux)
 - Manual dev: `python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000` and `python frontend/spa_server.py 8080`
 - Sync data: `python sync.py` (all) | `python sync.py --season <n>` | `python sync.py --match <match_id>` | `python sync.py --reset`
 - DB utilities: `python tools/check_db_connection.py` | `python tools/apply_schema.py` | `python tools/recompute_totals.py`
@@ -45,7 +45,7 @@
 ## Key Files
 - `sync_pipeline.py`, `db_async.py`, `db_ops_async.py`, `faceit_client_async.py`
 - `api/main.py`, `api/services/*`, `api/routers/teams.py`
-- `frontend/static/components/TeamDetail.js`, `frontend/static/api-client.js`, `frontend/static/views/DivisionView.js`, `frontend/static/components/TeamNav.js`
+- `frontend/static/components/TeamDetail.js`, `frontend/static/api-client.js`, `frontend/static/views/DivisionView.js`
 
 ## Environment
 Required `.env` in repo root:
