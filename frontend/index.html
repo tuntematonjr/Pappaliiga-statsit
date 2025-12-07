@@ -7,12 +7,16 @@
     <link rel="stylesheet" href="/static/styles.css">
     <!-- Favicon: inline SVG (data URI) used to avoid extra requests; also provide a static fallback at /favicon.svg -->
     <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%232b6cb0'/><text x='8' y='11' font-size='9' text-anchor='middle' fill='white' font-family='Arial, Helvetica, sans-serif'>PL</text></svg>">
-    <!-- Vue 3 production builds -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"></script>
+    <!-- Vue 3 production builds (prefer local, fallback to CDN if allowed) -->
+    <script src="/static/lib/vue.global.prod.js"></script>
+    <script>if (typeof Vue === 'undefined') { document.write('<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"><\\/script>'); }</script>
+    <script src="/static/lib/vue-router.global.prod.js"></script>
+    <script>if (typeof VueRouter === 'undefined') { document.write('<script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"><\\/script>'); }</script>
     <!-- Pinia with vue-demi polyfill for browser -->
-    <script src="https://unpkg.com/vue-demi@0.14.6/lib/index.iife.js"></script>
-    <script src="https://unpkg.com/pinia@2.1.7/dist/pinia.iife.js"></script>
+    <script src="/static/lib/vue-demi.iife.js"></script>
+    <script>if (typeof VueDemi === 'undefined') { document.write('<script src="https://unpkg.com/vue-demi@0.14.6/lib/index.iife.js"><\\/script>'); }</script>
+    <script src="/static/lib/pinia.iife.js"></script>
+    <script>if (typeof Pinia === 'undefined') { document.write('<script src="https://unpkg.com/pinia@2.1.7/dist/pinia.iife.js"><\\/script>'); }</script>
     <!-- If CDN scripts fail (offline or blocked), present a clear message and stop further app scripts -->
     <script>
         (function () {
@@ -134,6 +138,8 @@
     <script src="/static/components/PlayerRow.js"></script>
     <script src="/static/components/TeamNav.js"></script>
     <script src="/static/components/StandingsTable.js"></script>
+    <!-- TeamView is a page-level shell reused by TeamDetail -->
+    <script src="/static/views/TeamView.js"></script>
     <script src="/static/components/TeamDetail.js"></script>
     
     <!-- Views -->

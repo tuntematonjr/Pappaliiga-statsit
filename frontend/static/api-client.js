@@ -86,6 +86,18 @@
             `/api/v1/teams/${teamId}`,
             `/api/v1/teams/${teamId}/info`
         ],
+        teamPage: (teamId, seasonId) => {
+            const seasonQuery = seasonId ? `?championship_id=${seasonId}` : '';
+            const routes = [
+                `/api/teams/${teamId}/page${seasonQuery}`,
+                `/api/v1/teams/${teamId}/page${seasonQuery}`
+            ];
+            if (seasonId) {
+                routes.push(`/api/teams/${teamId}/season/${seasonId}/page`);
+                routes.push(`/api/v1/teams/${teamId}/season/${seasonId}/page`);
+            }
+            return routes;
+        },
         teamSeasons: teamId => [
             `/api/teams/${teamId}/seasons`,
             `/api/v1/teams/${teamId}/seasons`,
@@ -1015,6 +1027,24 @@
                     console.warn('[apiClient] teamSeasons endpoint failed', error);
                 }
                 return [];
+            }
+        }
+
+        async getTeamPage(teamId, seasonId, options = {}) {
+            if (!teamId) {
+                throw new Error('teamId is required');
+            }
+            const encTeamId = encodeURIComponent(teamId);
+            const encSeasonId = seasonId ? encodeURIComponent(seasonId) : null;
+            const routes = buildRouteCandidates('teamPage', encTeamId, encSeasonId);
+            try {
+                const result = await fetchWithFallback(routes, options);
+                return result?.data ?? result ?? {};
+            } catch (error) {
+                if (isDev) {
+                    console.warn('[apiClient] teamPage endpoint failed', error);
+                }
+                throw error;
             }
         }
 

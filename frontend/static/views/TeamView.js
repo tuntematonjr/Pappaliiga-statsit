@@ -91,21 +91,30 @@ window.TeamView = {
             return crumb?.to || null;
         },
         formatMatchDate(match) {
-            const raw = match?.played_at || match?.date || match?.scheduled_at;
+            const raw = match?.played_at || match?.played || match?.ts || match?.date || match?.scheduled_at;
             if (!raw) return '';
             try {
-                const date = new Date(raw);
+                const date = typeof raw === 'number' ? new Date(raw * 1000) : new Date(raw);
                 return date.toLocaleDateString('fi-FI', { day: '2-digit', month: '2-digit', year: 'numeric' });
             } catch (error) {
                 return raw;
             }
         },
         matchOpponent(match) {
-            return match?.opponent?.name || match?.opponent_name || match?.enemy || match?.opponent || 'Vastustaja';
+            return match?.opponent_name
+                || match?.opponentName
+                || match?.opponent?.name
+                || match?.team2_name
+                || match?.team2Name
+                || match?.team1_name
+                || match?.team1Name
+                || match?.enemy
+                || match?.opponent
+                || 'Vastustaja';
         },
         matchScoreline(match) {
-            const forScore = match?.team_score ?? match?.score_for ?? match?.for ?? match?.score?.for;
-            const againstScore = match?.opponent_score ?? match?.score_against ?? match?.against ?? match?.score?.against;
+            const forScore = match?.team_score ?? match?.teamScore ?? match?.score_for ?? match?.for ?? match?.score?.for;
+            const againstScore = match?.opponent_score ?? match?.opponentScore ?? match?.score_against ?? match?.against ?? match?.score?.against;
             if (forScore == null || againstScore == null) {
                 return match?.scoreline || match?.result || '';
             }
@@ -114,16 +123,14 @@ window.TeamView = {
                 return `${formatted} · ${match.result}`;
             }
             return formatted;
-        }
-        return '';
         },
         matchOutcomeClass(match) {
             const result = (match?.result || '').toLowerCase();
             if (result.includes('win') || result.includes('voitto')) return 'match-card__score--win';
             if (result.includes('loss') || result.includes('tappio')) return 'match-card__score--loss';
             if (result.includes('draw') || result.includes('tasapeli')) return 'match-card__score--draw';
-            const scoreFor = match?.team_score ?? match?.score_for;
-            const scoreAgainst = match?.opponent_score ?? match?.score_against;
+            const scoreFor = match?.team_score ?? match?.teamScore ?? match?.score_for;
+            const scoreAgainst = match?.opponent_score ?? match?.opponentScore ?? match?.score_against;
             if (scoreFor > scoreAgainst) return 'match-card__score--win';
             if (scoreFor < scoreAgainst) return 'match-card__score--loss';
             return '';

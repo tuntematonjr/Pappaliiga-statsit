@@ -249,7 +249,7 @@ const SANKARI_METRIC_META = {
     assistSupport: { decimals: 0 }
 };
 
-const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
+const DIVISION_DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
 
 function pickValue(obj, keys) {
     if (!obj) return undefined;
@@ -763,15 +763,15 @@ window.DivisionView = {
             });
         },
         resolveAvatar(src) {
-            if (!src) return DEFAULT_TEAM_LOGO;
+            if (!src) return DIVISION_DEFAULT_TEAM_LOGO;
             try {
                 if (window.apiClient && typeof window.apiClient.proxyAvatar === 'function') {
                     const resolved = window.apiClient.proxyAvatar(src);
-                    return resolved || DEFAULT_TEAM_LOGO;
+                    return resolved || DIVISION_DEFAULT_TEAM_LOGO;
                 }
-                return src || DEFAULT_TEAM_LOGO;
+                return src || DIVISION_DEFAULT_TEAM_LOGO;
             } catch (error) {
-                return src || DEFAULT_TEAM_LOGO;
+                return src || DIVISION_DEFAULT_TEAM_LOGO;
             }
         },
         toNumber(value, fallback = 0) {
@@ -818,7 +818,7 @@ window.DivisionView = {
             const rounds = safe(row.rounds_played ?? row.rounds);
             const kills = safe(row.kills);
             const deaths = safe(row.deaths);
-            const teamLogo = this.playerTeamLogo(row) || DEFAULT_TEAM_LOGO;
+            const teamLogo = this.playerTeamLogo(row) || DIVISION_DEFAULT_TEAM_LOGO;
             return {
                 id: row.player_id || row.id,
                 playerId: row.player_id || row.id,
@@ -899,8 +899,8 @@ window.DivisionView = {
                         id: player.id || player.playerId,
                         nickname: player.nickname || 'Tuntematon',
                         teamName: player.teamName || '',
-                        avatar: player.logo || DEFAULT_TEAM_LOGO,
-                        logo: player.logo || DEFAULT_TEAM_LOGO,
+                        avatar: player.logo || DIVISION_DEFAULT_TEAM_LOGO,
+                        logo: player.logo || DIVISION_DEFAULT_TEAM_LOGO,
                         maps: player.maps,
                         rounds: player.rounds,
                         rawValue: value,
@@ -1007,7 +1007,7 @@ window.DivisionView = {
             return numeric.toFixed(2);
         },
         teamLogo(team) {
-            if (!team) return DEFAULT_TEAM_LOGO;
+            if (!team) return DIVISION_DEFAULT_TEAM_LOGO;
             const src = team.logo || team.avatar || team.team_logo || team.raw?.avatar || team.raw?.logo;
             return this.resolveAvatar(src);
         },
