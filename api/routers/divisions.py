@@ -258,11 +258,6 @@ async def get_division_by_id(championship_id: str):
     return DivisionDetails(**details)
 
 
-@router.get("/{championship_id}/details", response_model=DivisionDetails)
-async def get_division_by_id_legacy(championship_id: str):
-    return await get_division_by_id(championship_id)
-
-
 def _coerce_epoch_ms(value: Any) -> Optional[int]:
     if value in (None, 0):
         return None

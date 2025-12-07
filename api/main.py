@@ -20,7 +20,7 @@ from db_async import close_pool, get_pool
 
 from api.services import stats_service
 from .routers import championships, divisions, matches, players, stats, teams, seasons
-from .routers import maps_catalog, image_proxy, v3
+from .routers import maps_catalog, image_proxy, season_view
 from api.exceptions import BadRequestError, NotFoundError
 
 # Track app start time for uptime calculation
@@ -93,42 +93,7 @@ app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
-app.include_router(v3.router, prefix="/api", tags=["v3"])
-
-
-# Shared helper so legacy/compat routes stay in sync
-async def _season_stats_payload(season: int):
-    return await stats.get_season_stats(season)
-
-
-# Expose compatibility endpoints the SPA probes dynamically
-@app.get('/api/seasons/{season}/stats')
-async def seasons_stats_compat(season: int):
-    return await _season_stats_payload(season)
-
-
-@app.get('/api/seasons/{season}/summary')
-async def seasons_summary_compat(season: int):
-    return await _season_stats_payload(season)
-
-
-@app.get('/api/seasons/{season}/stats/summary')
-async def seasons_stats_summary(season: int):
-    return await _season_stats_payload(season)
-
-
-@app.get('/api/v1/seasons/{season}/summary')
-async def seasons_summary_v1(season: int):
-    return await _season_stats_payload(season)
-
-
-@app.get("/api/home")
-async def home_overview():
-    """Legacy home endpoint returning aggregate stats."""
-    overview = await stats_service.get_overview_stats()
-    return {"aggregates": overview}
-
-
+app.include_router(season_view.router, prefix="/api", tags=["season-view"])
 
 
 @app.get("/")

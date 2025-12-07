@@ -51,13 +51,13 @@
             `/api/v1/seasons`
         ],
         seasonSummary: seasonId => [
-            `/api/v3/summary/${seasonId}`,
+            `/api/season-view/summary/${seasonId}`,
             `/api/seasons/${seasonId}/summary`,
             `/api/v1/seasons/${seasonId}/summary`,
             `/api/seasons/${seasonId}/stats/summary`
         ],
         seasonDivisions: seasonId => [
-            `/api/v3/divisions/${seasonId}`,
+            `/api/season-view/divisions/${seasonId}`,
             `/api/seasons/${seasonId}/divisions`,
             `/api/v1/seasons/${seasonId}/divisions`,
             `/api/divisions/season/${seasonId}`,
@@ -130,7 +130,7 @@
         ],
         // Legacy compatibility
         divisions: seasonId => [
-            `/api/v3/divisions/${seasonId}`,
+            `/api/season-view/divisions/${seasonId}`,
             `/api/divisions/season/${seasonId}`,
             `/api/seasons/${seasonId}/divisions`,
             `/api/v1/divisions/season/${seasonId}`,
@@ -140,7 +140,7 @@
         ],
         summary: seasonId => [
             `/api/stats/summary/season/${seasonId}`,
-            `/api/v3/summary/${seasonId}`,
+            `/api/season-view/summary/${seasonId}`,
             `/api/seasons/${seasonId}/summary`,
             `/api/v1/seasons/${seasonId}/summary`,
             `/api/seasons/${seasonId}/stats/summary`

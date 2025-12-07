@@ -1,6 +1,6 @@
 // Main Vue App with Router
 const { createApp } = Vue;
-const { createRouter, createWebHistory, createWebHashHistory } = VueRouter;
+const { createRouter, createWebHistory } = VueRouter;
 const { createPinia } = Pinia;
 
 // Create router

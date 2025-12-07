@@ -7,6 +7,7 @@ from . import (
     maps_catalog,
     matches,
     players,
+    season_view,
     stats,
     teams,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "divisions",
     "matches",
     "players",
+    "season_view",
     "stats",
     "teams",
     "maps_catalog",

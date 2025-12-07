@@ -79,13 +79,6 @@ async def get_season_summary(season_id: int):
     return StatsSummaryResponse(**payload)
 
 
-@router.get("/home")
-async def get_home_summary():
-    """Compatibility endpoint used by the legacy frontend."""
-    overview = await stats_service.get_overview_stats()
-    return {"aggregates": overview}
-
-
 @router.get("/top-players/{stat}", response_model=List[TopPlayer])
 async def get_top_players(
     stat: str,
