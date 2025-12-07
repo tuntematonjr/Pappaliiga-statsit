@@ -111,6 +111,10 @@ function beautifyMapName(raw) {
     return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
 }
 
+function mapKey(name) {
+    return String(name || '').trim().toLowerCase();
+}
+
 function formatDate(ts) {
     if (!ts) return '';
     const d = new Date(ts * 1000);
@@ -147,10 +151,11 @@ function normalizeMap(entry) {
         return null; // never include forfeit entries as maps
     }
     const beautified = prettyName || beautifyMapName(rawName) || rawName;
-    const played = toNumber(entry.played ?? entry.matches ?? entry.maps ?? entry.maps_played);
-    const games = toNumber(entry.games ?? entry.games_played ?? played);
+    const playedRaw = toNumber(entry.played ?? entry.matches ?? entry.maps ?? entry.maps_played);
+    const games = toNumber(entry.games ?? entry.games_played ?? playedRaw ?? (entry.wins + entry.losses));
+    const played = playedRaw || games;
     const wins = toNumber(entry.wins ?? entry.maps_won);
-    const losses = Math.max(0, games - wins);
+    const losses = toNumber(entry.losses ?? entry.maps_lost ?? Math.max(0, (games || played) - wins));
     const picks = toNumber(entry.picks ?? entry.times_picked ?? entry.timesPicked);
     const oppPicks = toNumber(entry.opp_picks ?? entry.oppPicks);
     const ban1 = toNumber(entry.ban1);
@@ -158,17 +163,27 @@ function normalizeMap(entry) {
     const oppBan = toNumber(entry.opp_ban ?? entry.oppBan);
     const totalOwnBan = toNumber(entry.total_own_ban ?? entry.totalOwnBan ?? (ban1 + ban2));
     const decov = toNumber(entry.decov);
-    const kd = toNumber(entry.kd ?? entry.kd_ratio);
-    const adr = toNumber(entry.adr ?? entry.average_damage);
-    const rating = toNumber(entry.rating ?? entry.map_rating ?? kd);
+    const kills = toNumber(entry.kills);
+    const deaths = toNumber(entry.deaths);
+    const kdRaw = toNumber(entry.kd ?? entry.kd_ratio);
+    const kd = kdRaw || (deaths ? kills / deaths : kills);
+    const adr = toNumber(entry.adr ?? entry.average_damage ?? (entry.damage && games ? entry.damage / (games * 30) : 0));
+    let rating = toNumber(entry.rating ?? entry.rating_2 ?? entry.map_rating ?? entry.hltv_rating);
+    if (!rating && kd) rating = kd;
     const damage = toNumber(entry.damage);
     const utilityDamage = toNumber(entry.utility_damage ?? entry.utilityDamage);
     const mvps = toNumber(entry.mvps ?? entry.mvp);
-    const kills = toNumber(entry.kills);
-    const deaths = toNumber(entry.deaths);
     const rd = toNumber(entry.rd ?? entry.round_diff ?? entry.rounds_diff);
-    const winrate = toNumber(entry.winrate ?? entry.win_rate ?? entry.winRate ?? entry.wr ?? (games ? (wins / games) * 100 : 0));
-    const pickRate = toNumber(entry.pick_rate ?? entry.pickRate ?? (played ? (picks / played) * 100 : 0));
+    const totalGames = games || played || wins + losses;
+    const winrateRaw = toNumber(entry.winrate ?? entry.win_rate ?? entry.winRate ?? entry.wr);
+    const winrate = Number.isFinite(winrateRaw) && winrateRaw !== 0
+        ? (Math.abs(winrateRaw) <= 1 ? winrateRaw * 100 : winrateRaw)
+        : (totalGames ? (wins / totalGames) * 100 : 0);
+    const totalPicks = picks + oppPicks;
+    const pickRateRaw = toNumber(entry.pick_rate ?? entry.pickRate);
+    const pickRate = Number.isFinite(pickRateRaw) && pickRateRaw !== 0
+        ? (Math.abs(pickRateRaw) <= 1 ? pickRateRaw * 100 : pickRateRaw)
+        : (totalPicks ? (picks / totalPicks) * 100 : (played ? (picks / played) * 100 : 0));
     const ctWr = toNumber(entry.ct_wr ?? entry.ct_wr_pct ?? entry.ctWinrate ?? 0);
     const tWr = toNumber(entry.t_wr ?? entry.t_wr_pct ?? entry.tWinrate ?? 0);
 
@@ -230,15 +245,17 @@ function normalizePlayer(player, idx = 0) {
     const mk4k = toNumber(player.mk_4k ?? player['4k']);
     const mk5k = toNumber(player.mk_5k ?? player['5k']);
     const clutchKills = toNumber(player.clutch_kills ?? player.clutches ?? player.clutch_wins);
-    const rating = toNumber(player.rating ?? player.rating_2 ?? player.hltv_rating);
-    const kd = toNumber(player.kd ?? player.kd_ratio);
-    const adr = toNumber(player.adr ?? player.average_damage);
-    const kr = toNumber(player.kr ?? player.kills_per_round);
+    let rating = toNumber(player.rating ?? player.rating_2 ?? player.hltv_rating);
+    const kdRaw = toNumber(player.kd ?? player.kd_ratio);
+    const kd = kdRaw || (deaths ? kills / deaths : kills);
+    const adr = toNumber(player.adr ?? player.average_damage ?? (roundsPlayed ? damage / roundsPlayed : 0));
+    const kr = toNumber(player.kr ?? player.kills_per_round ?? (roundsPlayed ? kills / roundsPlayed : 0));
     const hsPct = toNumber(player.hs_pct ?? player.hs_percent ?? player.headshot_percent);
     const entryWinPct = entryCount ? (entryWins / entryCount) * 100 : 0;
     const clutch1v1Pct = cl1v1Attempts ? (cl1v1Wins / cl1v1Attempts) * 100 : 0;
     const clutch1v2Pct = cl1v2Attempts ? (cl1v2Wins / cl1v2Attempts) * 100 : 0;
     const flashSuccessPct = flashCount ? (flashSuccesses / flashCount) * 100 : 0;
+    if (!rating && kd) rating = kd;
 
     return {
         playerId: player.player_id || player.id || `player-${idx}`,
@@ -282,6 +299,7 @@ function normalizePlayer(player, idx = 0) {
 function normalizeMatch(match, teamId = null) {
     if (!match) return null;
     const matchId = match.match_id || match.matchId || match.id;
+    const playedFlag = toNumber(match.played);
     const bestOf = toNumber(match.best_of ?? match.bestOf ?? match.bo ?? 0);
     const rawMaps = Array.isArray(match.maps) ? match.maps : [];
     const left = match.left || {
@@ -297,8 +315,13 @@ function normalizeMatch(match, teamId = null) {
     const meOnLeft = teamId ? String(left?.team_id) === String(teamId) : true;
     const mySide = meOnLeft ? left : right;
     const oppSide = meOnLeft ? right : left;
-    const myName = mySide?.team_name || mySide?.team || match.team1_name || match.team2_name;
-    const oppName = oppSide?.team_name || oppSide?.team || match.opponent_name || match.opponent;
+    const myName = mySide?.team_name || mySide?.team || match.team1_name || match.team2_name || match.team;
+    const oppName = oppSide?.team_name
+        || oppSide?.team
+        || match.opponent_name
+        || match.opponent
+        || (meOnLeft ? (match.team2_name || match.team2) : (match.team1_name || match.team1))
+        || '';
     const maps = [];
     rawMaps.forEach((m, idx) => {
         if (m.is_forfeit) return; // never render forfeit as map
@@ -328,24 +351,32 @@ function normalizeMatch(match, teamId = null) {
             oppDeaths: toNumber(oppStats.deaths)
         });
     });
+    maps.sort((a, b) => (a.roundIndex || 0) - (b.roundIndex || 0));
     const mapWins = maps.filter(m => m.scoreFor > m.scoreAgainst).length;
     const mapLosses = maps.filter(m => m.scoreFor < m.scoreAgainst).length;
     const mapDraws = maps.length - mapWins - mapLosses;
     const roundsFor = maps.reduce((sum, m) => sum + m.scoreFor, 0);
     const roundsAgainst = maps.reduce((sum, m) => sum + m.scoreAgainst, 0);
-    const roundDiff = roundsFor - roundsAgainst;
+    let roundDiff = toNumber(match.round_diff ?? match.roundDiff);
+    if (!Number.isFinite(roundDiff)) {
+        roundDiff = roundsFor - roundsAgainst;
+    }
     // parenthesize fallbacks to avoid ?? precedence issues with ||
-    const played = toNumber(match.played ?? match.map_count ?? (maps.length || 0));
+    const played = maps.length || toNumber(match.map_count ?? match.played ?? 0);
     const matchRating = maps.length ? safeDivide(maps.reduce((sum, m) => sum + (m.kd || 0), 0), maps.length) : 0;
+    const rawTeamScore = match.team_score ?? match.teamScore ?? match.series_wins;
+    const rawOppScore = match.opp_score ?? match.oppScore ?? match.series_losses;
+    const teamScore = rawTeamScore != null ? toNumber(rawTeamScore) : mapWins;
+    const oppScore = rawOppScore != null ? toNumber(rawOppScore) : mapLosses;
 
     return {
         matchId,
         ts: toNumber(match.ts ?? match.started_at ?? match.start_ts ?? match.date),
-        status: match.status || 'pending',
+        status: match.status || (playedFlag ? 'finished' : 'scheduled'),
         bestOf: bestOf || Math.max(1, maps.length),
         played,
-        teamScore: mapWins,
-        oppScore: mapLosses,
+        teamScore,
+        oppScore,
         mapDraws,
         roundsFor,
         roundsAgainst,
@@ -363,8 +394,9 @@ function normalizeMatch(match, teamId = null) {
 
 function normalizeVeto(entry) {
     if (!entry) return null;
+    const pretty = beautifyMapName(entry.map_name || entry.mapName || entry.selected_map_name);
     return {
-        mapName: entry.map_name || entry.mapName || 'Kartta',
+        mapName: pretty || 'Kartta',
         timesPicked: toNumber(entry.times_picked ?? entry.picked),
         timesBanned: toNumber(entry.times_banned ?? entry.banned),
         timesOpponentPicked: toNumber(entry.times_opponent_picked ?? entry.timesOpponentPicked),
@@ -405,7 +437,8 @@ window.TeamDetail = {
             selectedChampionship: this.championshipId ? String(this.championshipId) : null,
             activeTab: 'overview',
             matchMetric: 'roundDiff',
-            mapMetric: 'winrate'
+            mapMetric: 'winrate',
+            matchesPage: 1
         };
     },
     computed: {
@@ -549,8 +582,9 @@ window.TeamDetail = {
             };
             if (!this.mapStats.length) return { ...totals, avgAdr: 0, avgRating: 0, kd: 0, winrate: 0, pickRate: 0, ctWr: 0, tWr: 0 };
             this.mapStats.forEach(map => {
-                totals.played += map.played || 0;
-                totals.games += map.games || 0;
+                const games = map.games || map.played || (map.wins + map.losses) || 0;
+                totals.played += map.played || games;
+                totals.games += games;
                 totals.wins += map.wins || 0;
                 totals.losses += map.losses || 0;
                 totals.picks += map.picks || 0;
@@ -566,36 +600,42 @@ window.TeamDetail = {
                 totals.damage += map.damage || 0;
                 totals.utilityDamage += map.utilityDamage || 0;
                 totals.mvps += map.mvps || 0;
-                totals.adrWeighted += (map.adr || 0) * (map.games || 1);
-                totals.ratingWeighted += (map.rating || 0) * (map.games || 1);
-                totals.ctWrWeighted += (map.ctWr || 0) * (map.games || 1);
-                totals.tWrWeighted += (map.tWr || 0) * (map.games || 1);
+                totals.adrWeighted += (map.adr || 0) * (games || 1);
+                totals.ratingWeighted += (map.rating || 0) * (games || 1);
+                totals.ctWrWeighted += (map.ctWr || 0) * (games || 1);
+                totals.tWrWeighted += (map.tWr || 0) * (games || 1);
             });
             const games = totals.games || totals.played || 1;
             const kd = totals.deaths ? totals.kills / totals.deaths : totals.kills || 0;
             const avgAdr = totals.adrWeighted / games;
             const avgRating = totals.ratingWeighted / games;
             const winrate = games ? (totals.wins / games) * 100 : 0;
-            const pickRate = totals.played ? (totals.picks / totals.played) * 100 : 0;
+            const totalPicks = totals.picks + totals.oppPicks;
+            const pickRate = totalPicks ? (totals.picks / totalPicks) * 100 : 0;
             const ctWr = games ? (totals.ctWrWeighted / games) : 0;
             const tWr = games ? (totals.tWrWeighted / games) : 0;
             return { ...totals, kd, avgAdr, avgRating, winrate, pickRate, ctWr, tWr };
         },
         seasonStatCards() {
             const s = this.teamStats || {};
-            const wins = toNumber(s.wins ?? s.maps_won ?? s.matches_won);
-            const losses = toNumber(s.losses ?? s.maps_lost ?? s.matches_lost);
-            const matches = toNumber(s.matches ?? s.matches_played ?? s.series_played);
-            const winRate = matches ? (wins / matches) * 100 : toNumber(s.win_rate ?? s.match_win_rate);
+            const wins = toNumber(s.wins ?? s.matches_won ?? s.maps_won ?? 0);
+            const losses = toNumber(s.losses ?? s.matches_lost ?? s.maps_lost ?? 0);
+            const matches = toNumber(s.matches ?? s.matches_played ?? s.series_played ?? (wins + losses));
+            let winRate = matches ? (wins / matches) * 100 : toNumber(s.win_rate ?? s.match_win_rate ?? 0);
+            if (winRate <= 1) winRate = winRate * 100;
             const roundsWon = toNumber(s.rounds_won);
             const roundsLost = toNumber(s.rounds_lost);
             const roundsDiff = toNumber(s.rounds_diff ?? s.round_diff ?? (roundsWon - roundsLost));
             const mapsPlayed = toNumber(s.maps_played ?? this.mapTotals.played);
-            const mapsWon = toNumber(s.maps_won);
-            const mapWinRate = mapsPlayed ? (mapsWon / mapsPlayed) * 100 : this.mapTotals.winrate;
-            const avgRating = this.players.length ? (this.players.reduce((acc, p) => acc + (p.rating || 0), 0) / this.players.length) : toNumber(s.rating ?? s.rating_2 ?? s.hltv_rating);
+            const mapsWon = toNumber(s.maps_won ?? this.mapTotals.wins);
+            let mapWinRate = mapsPlayed ? (mapsWon / Math.max(1, mapsPlayed)) * 100 : this.mapTotals.winrate;
+            if (mapWinRate <= 1) mapWinRate = mapWinRate * 100;
+            const avgRating = this.players.length
+                ? (this.players.reduce((acc, p) => acc + (p.rating || 0), 0) / this.players.length)
+                : toNumber(s.rating ?? s.rating_2 ?? s.hltv_rating ?? this.mapTotals.avgRating);
             const prevSeason = (this.pageData?.seasons || []).find(sea => String(sea.championship_id || sea.championshipId) !== String(this.currentChampionshipId));
-            const prevWinRate = prevSeason ? toNumber(prevSeason.win_rate) * 100 : null;
+            let prevWinRate = prevSeason ? toNumber(prevSeason.win_rate) : null;
+            if (prevWinRate != null && prevWinRate <= 1) prevWinRate *= 100;
             const winTrend = prevWinRate != null ? (winRate - prevWinRate) : null;
             const totalClutch = this.players.reduce((acc, p) => acc + (p.clutchKills || 0), 0);
 
@@ -641,8 +681,11 @@ window.TeamDetail = {
                 height: Math.max(10, (item.value / maxValue) * 100)
             }));
         },
+        hasMapPerformanceData() {
+            return this.mapStats.some(map => (map.games || map.played || map.wins || map.losses || map.picks || map.oppPicks));
+        },
         mapWinLossStack() {
-            return this.mapStats.map(map => ({
+            return this.mapStats.filter(map => (map.games || map.played || map.wins || map.losses)).map(map => ({
                 label: map.mapName,
                 wins: map.wins,
                 losses: map.losses
@@ -661,11 +704,15 @@ window.TeamDetail = {
             return Math.max(...this.mapStats.map(m => (m.totalOwnBan || 0) + (m.oppBan || 0)), 1);
         },
         mapRadarMetrics() {
-            if (!this.mapStats.length) return [];
-            const top = [...this.mapStats].sort((a, b) => (b.winrate || 0) - (a.winrate || 0)).slice(0, 7);
+            const withGames = this.mapStats.filter(map => map.games || map.played);
+            if (!withGames.length) return [];
+            const top = [...withGames].sort((a, b) => (b.winrate || 0) - (a.winrate || 0)).slice(0, 7);
             return top.map(map => ({
                 label: map.mapName,
-                value: toNumber(map.winrate || 0),
+                value: (() => {
+                    const wr = toNumber(map.winrate || 0);
+                    return Math.abs(wr) <= 1 ? wr * 100 : wr;
+                })(),
                 max: 100
             }));
         },
@@ -676,14 +723,13 @@ window.TeamDetail = {
             return normalized.sort((a, b) => {
                 const at = a.ts ?? 0;
                 const bt = b.ts ?? 0;
-                if (!at && bt) return 1;   // missing dates go to bottom
+                if (!at && bt) return 1; // missing dates go to bottom
                 if (at && !bt) return -1;
-                return at - bt; // oldest first
+                return bt - at; // newest first for tables
             });
         },
         paginatedMatches() {
-            const items = this.matchesList;
-            return { items, total: items.length, totalPages: 1, page: 1 };
+            return paginate(this.matchesList, this.matchesPage, MATCHES_PAGE_SIZE);
         },
         matchesPerformanceSeries() {
             const sorted = [...this.matchesList].sort((a, b) => (a.ts || 0) - (b.ts || 0));
@@ -692,7 +738,7 @@ window.TeamDetail = {
                     ? safeDivide(match.maps.reduce((sum, m) => sum + (m.adr || 0), 0), Math.max(match.maps.length, 1))
                     : this.matchMetric === 'rating'
                         ? match.matchRating || 0
-                    : match.roundDiff;
+                    : (match.roundDiff ?? 0);
                 return {
                     label: formatDate(match.ts) || match.matchId,
                     value,
@@ -734,16 +780,38 @@ window.TeamDetail = {
             const raw = this.seasonData?.vetoAggregates || this.seasonData?.veto_aggregates || [];
             return Array.isArray(raw) ? raw.map(normalizeVeto).filter(Boolean) : [];
         },
+        derivedVetoCounts() {
+            const counts = {};
+            this.vetoByMatch.forEach(entry => {
+                entry.steps.forEach(step => {
+                    if (step.action !== 'pick' && step.action !== 'ban') return;
+                    if (step.actor === 'system') return;
+                    const key = mapKey(step.mapName);
+                    if (!key) return;
+                    const bucket = counts[key] || { mapName: step.mapName, timesPicked: 0, timesOpponentPicked: 0, timesBanned: 0 };
+                    if (step.action === 'pick') {
+                        if (step.actor === 'team') bucket.timesPicked += 1;
+                        if (step.actor === 'opponent') bucket.timesOpponentPicked += 1;
+                    }
+                    if (step.action === 'ban' && step.actor === 'team') {
+                        bucket.timesBanned += 1;
+                    }
+                    counts[key] = bucket;
+                });
+            });
+            return counts;
+        },
         enhancedVetoAggregates() {
             const pickOutcomes = {};
             this.matchesList.forEach(match => {
                 match.maps.forEach(map => {
-                    const name = map.mapName;
-                    if (!name) return;
+                    const name = beautifyMapName(map.mapName);
+                    const key = mapKey(name);
+                    if (!key) return;
                     if (map.pickTeamId && String(map.pickTeamId) === String(this.teamId)) {
-                        pickOutcomes[name] = pickOutcomes[name] || { wins: 0, total: 0 };
-                        pickOutcomes[name].total += 1;
-                        if (map.scoreFor > map.scoreAgainst) pickOutcomes[name].wins += 1;
+                        pickOutcomes[key] = pickOutcomes[key] || { mapName: name, wins: 0, total: 0 };
+                        pickOutcomes[key].total += 1;
+                        if (map.scoreFor > map.scoreAgainst) pickOutcomes[key].wins += 1;
                     }
                 });
             });
@@ -752,25 +820,60 @@ window.TeamDetail = {
             this.matchesList.forEach(match => {
                 match.maps.forEach(map => {
                     if (map.pickTeamId) return;
-                    const name = map.mapName;
-                    if (!name) return;
-                    deciderOutcomes[name] = deciderOutcomes[name] || { wins: 0, total: 0 };
-                    deciderOutcomes[name].total += 1;
-                    if (map.scoreFor > map.scoreAgainst) deciderOutcomes[name].wins += 1;
+                    const name = beautifyMapName(map.mapName);
+                    const key = mapKey(name);
+                    if (!key) return;
+                    deciderOutcomes[key] = deciderOutcomes[key] || { mapName: name, wins: 0, total: 0 };
+                    deciderOutcomes[key].total += 1;
+                    if (map.scoreFor > map.scoreAgainst) deciderOutcomes[key].wins += 1;
                 });
             });
 
-            const enriched = this.vetoAggregatesData.map(row => {
-                const pickData = pickOutcomes[row.mapName] || { wins: 0, total: 0 };
+            const aggregates = this.vetoAggregatesData.map(row => {
+                const key = mapKey(row.mapName);
+                const derived = this.derivedVetoCounts[key] || {};
+                const pickData = pickOutcomes[key] || { wins: 0, total: 0 };
+                const deciderData = deciderOutcomes[key] || { wins: 0, total: 0 };
+                const timesPicked = derived.timesPicked || row.timesPicked || 0;
+                const timesOpponentPicked = derived.timesOpponentPicked || row.timesOpponentPicked || 0;
+                const timesBanned = derived.timesBanned || row.timesBanned || 0;
+                const totalActions = timesPicked + timesOpponentPicked + timesBanned;
+                const pickRate = totalActions ? (timesPicked / totalActions) * 100 : (row.pickRate || 0);
+                const banRate = totalActions ? (timesBanned / totalActions) * 100 : (row.banRate || 0);
                 const derivedWinRate = pickData.total ? (pickData.wins / pickData.total) * 100 : row.pickWinRate || 0;
-                const deciderData = deciderOutcomes[row.mapName] || { wins: 0, total: 0 };
                 const deciderWinRate = deciderData.total ? (deciderData.wins / deciderData.total) * 100 : 0;
-                return { ...row, pickWinRate: derivedWinRate, deciderWinRate };
+                return {
+                    ...row,
+                    mapName: row.mapName,
+                    timesPicked,
+                    timesOpponentPicked,
+                    timesBanned,
+                    pickRate,
+                    banRate,
+                    pickWinRate: derivedWinRate,
+                    deciderWinRate
+                };
             });
 
-            const maxPick = Math.max(...enriched.map(e => e.timesPicked || 0), 0);
-            const maxBan = Math.max(...enriched.map(e => e.timesBanned || 0), 0);
-            return enriched.map(e => ({
+            Object.entries(this.derivedVetoCounts).forEach(([key, derived]) => {
+                const existing = aggregates.find(row => mapKey(row.mapName) === key);
+                if (existing) return;
+                const totalActions = derived.timesPicked + derived.timesOpponentPicked + derived.timesBanned;
+                aggregates.push({
+                    mapName: derived.mapName,
+                    timesPicked: derived.timesPicked,
+                    timesOpponentPicked: derived.timesOpponentPicked,
+                    timesBanned: derived.timesBanned,
+                    pickRate: totalActions ? (derived.timesPicked / totalActions) * 100 : 0,
+                    banRate: totalActions ? (derived.timesBanned / totalActions) * 100 : 0,
+                    pickWinRate: 0,
+                    deciderWinRate: 0
+                });
+            });
+
+            const maxPick = Math.max(...aggregates.map(e => e.timesPicked || 0), 0);
+            const maxBan = Math.max(...aggregates.map(e => e.timesBanned || 0), 0);
+            return aggregates.map(e => ({
                 ...e,
                 isTopPick: e.timesPicked === maxPick && maxPick > 0,
                 isTopBan: e.timesBanned === maxBan && maxBan > 0
@@ -784,12 +887,12 @@ window.TeamDetail = {
             const raw = this.seasonData?.vetoHistory || this.seasonData?.veto_history || [];
             return Array.isArray(raw) ? raw.map(entry => ({
                 matchId: entry.match_id || entry.matchId,
-                mapName: entry.map_name || entry.mapName || 'Kartta',
+                mapName: beautifyMapName(entry.map_name || entry.mapName) || 'Kartta',
                 status: (entry.status || '').toLowerCase(),
                 selectedByTeamId: entry.selected_by_team_id || entry.selectedByTeamId,
                 selectedByTeamName: entry.selected_by_team_name || entry.selectedByTeamName,
                 roundNum: toNumber(entry.round_num ?? entry.roundNum ?? entry.order),
-                order: toNumber(entry.order ?? entry.order_in_match ?? entry.round_num)
+                order: toNumber(entry.order ?? entry.order_in_match ?? entry.round_num ?? entry.roundNum)
             })) : [];
         },
         vetoByMatch() {
@@ -837,6 +940,9 @@ window.TeamDetail = {
                 this.selectedChampionship = String(newVal);
                 this.fetchSeason(String(newVal), { force: true });
             }
+        },
+        matchesList() {
+            this.matchesPage = 1;
         }
     },
     methods: {
@@ -881,43 +987,63 @@ window.TeamDetail = {
                 query
             }).catch(() => {});
         },
+        changeMatchesPage(page) {
+            const total = this.paginatedMatches.totalPages || 1;
+            const next = Math.min(Math.max(page, 1), total);
+            this.matchesPage = next;
+        },
         selectTab(tab) {
             this.activeTab = tab;
+            if (tab === 'matches') {
+                this.matchesPage = 1;
+            }
         },
         detectSeriesFormat(bestOf, steps = []) {
             if (Number(bestOf) === 2) return 'bo2';
             if (Number(bestOf) === 3) return 'bo3';
+            const statuses = (steps || []).map(s => (s.status || s.action || '').toLowerCase());
+            if (statuses.some(st => st.includes('overflow'))) return 'bo2';
+            if (statuses.some(st => st.includes('decider'))) return 'bo3';
             const stepCount = Array.isArray(steps) ? steps.length : 0;
+            if (stepCount === 6) return 'bo2';
             return stepCount >= 6 ? 'bo3' : 'bo2';
         },
         decorateVetoSteps(steps, format, match = {}) {
+            const expected = format === 'bo3'
+                ? ['ban', 'ban', 'pick', 'pick', 'ban', 'ban']
+                : ['ban', 'ban', 'ban', 'ban', 'pick', 'pick'];
+            const teamName = this.teamInfo?.teamName || 'Oma joukkue';
+            const opponentName = match?.opponentName || match?.team2Name || 'Vastustaja';
+
             const normalized = (steps || []).map((step, idx) => {
-                const raw = (step.status || '').toLowerCase();
-                let action = raw;
+                const raw = (step.status || step.action || '').toLowerCase();
+                let action = null;
                 if (raw.includes('ban') || raw === 'drop' || raw === 'banned') action = 'ban';
-                if (raw.includes('pick')) action = 'pick';
-                if (raw.includes('decider')) action = 'decider';
-                if (raw.includes('overflow')) action = 'overflow';
-                if (!action) action = format === 'bo3' && idx >= 4 ? 'decider' : 'ban';
+                else if (raw.includes('pick')) action = 'pick';
+                else if (raw.includes('decider')) action = 'decider';
+                else if (raw.includes('overflow')) action = 'overflow';
+                if (!action && expected[idx]) action = expected[idx];
+                if (!action) action = 'ban';
                 const actor = step.selectedByTeamId
                     ? (String(step.selectedByTeamId) === String(this.teamId) ? 'team' : 'opponent')
                     : 'system';
-                const stepNum = idx + 1;
+                const mapName = beautifyMapName(step.mapName) || 'Kartta';
                 return {
                     ...step,
                     action,
                     actor,
-                    step: stepNum,
-                    label: action === 'ban' ? 'Ban' : action === 'pick' ? 'Pick' : action === 'decider' ? 'Decider' : 'Overflow',
-                    mapName: step.mapName || 'Kartta',
-                    teamName: step.selectedByTeamName || (actor === 'team' ? (this.teamInfo?.teamName || 'Oma joukkue') : (step.selectedByTeamName || 'Vastustaja'))
+                    step: idx + 1,
+                    label: this.actionLabel(action),
+                    mapName,
+                    teamName: step.selectedByTeamName || (actor === 'team' ? teamName : opponentName)
                 };
             });
 
+            const usedNames = new Set(normalized.map(s => s.mapName).filter(Boolean));
             const hasDecider = normalized.some(s => s.action === 'decider');
             const hasOverflow = normalized.some(s => s.action === 'overflow');
             if (format === 'bo3' && !hasDecider) {
-                const deciderName = (match.maps || []).find(m => !m.pickTeamId)?.mapName || 'Decider';
+                const deciderName = this.resolveDeciderMap(match, usedNames);
                 normalized.push({
                     action: 'decider',
                     actor: 'system',
@@ -926,18 +1052,40 @@ window.TeamDetail = {
                     mapName: deciderName,
                     teamName: 'Decider'
                 });
+                usedNames.add(deciderName);
             }
             if (format === 'bo2' && !hasOverflow) {
+                const overflowName = this.resolveOverflowMap(usedNames);
                 normalized.push({
                     action: 'overflow',
                     actor: 'system',
                     step: normalized.length + 1,
                     label: 'Overflow',
-                    mapName: 'Not played (Overflow)',
+                    mapName: overflowName,
                     teamName: 'Overflow'
                 });
             }
-            return normalized;
+            return normalized.map((step, idx) => ({ ...step, step: idx + 1 }));
+        },
+        resolveDeciderMap(match, usedNames = new Set()) {
+            const maps = Array.isArray(match?.maps) ? match.maps : [];
+            const leftover = maps.find(m => !m.pickTeamId && !usedNames.has(m.mapName)) || maps.find(m => !usedNames.has(m.mapName));
+            if (leftover?.mapName) return leftover.mapName;
+            const fromPool = this.mapStats.find(m => !usedNames.has(m.mapName));
+            return fromPool?.mapName || 'Decider';
+        },
+        resolveOverflowMap(usedNames = new Set()) {
+            const pool = new Set();
+            this.mapStats.forEach(m => { if (m.mapName) pool.add(m.mapName); });
+            this.vetoAggregatesData.forEach(v => { if (v.mapName) pool.add(v.mapName); });
+            const candidate = Array.from(pool).find(name => !usedNames.has(name));
+            return candidate || 'Overflow';
+        },
+        actionLabel(action) {
+            if (action === 'pick') return 'Pick';
+            if (action === 'ban') return 'Ban';
+            if (action === 'decider') return 'Decider';
+            return 'Overflow';
         },
         formatPercent,
         formatNumber,
@@ -1034,7 +1182,7 @@ window.TeamDetail = {
                                     <button class="pill" :class="{ 'pill--active': mapMetric === 'rating' }" @click="mapMetric = 'rating'">Rating</button>
                                 </div>
                             </div>
-                            <div v-if="mapPerformanceSeries.length" class="bar-chart bar-chart--vertical">
+                            <div v-if="mapPerformanceSeries.length && hasMapPerformanceData" class="bar-chart bar-chart--vertical">
                                 <div v-for="bar in mapPerformanceSeries" :key="bar.label" class="bar-chart__item">
                                     <div class="bar-chart__bar">
                                         <div class="bar-chart__fill" :style="{ height: bar.height + 'px' }">
@@ -1054,7 +1202,6 @@ window.TeamDetail = {
                                 </div>
                             </div>
                         </div>
-                    </div>
                     <div class="glass-card">
                         <div class="section-heading">
                             <h3 class="section-title titleUnderline">Karttavertailu</h3>
@@ -1284,9 +1431,10 @@ window.TeamDetail = {
                                     <td :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'">{{ match.roundDiff }}</td>
                                     <td>{{ match.status }}</td>
                                     <td>
-                                        <div class="micro-stack">
+                                        <div class="micro-stack" v-if="match.maps && match.maps.length">
                                             <span v-for="map in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
                                         </div>
+                                        <span v-else class="cell-muted">Ei karttoja</span>
                                     </td>
                                     <td>
                                         <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">FACEIT</a>
@@ -1295,6 +1443,11 @@ window.TeamDetail = {
                                 </tr>
                             </tbody>
                         </table>
+                        <div class="table-pagination" v-if="paginatedMatches.totalPages > 1">
+                            <button type="button" class="pill" :disabled="paginatedMatches.page === 1" @click="changeMatchesPage(paginatedMatches.page - 1)">Edellinen</button>
+                            <span class="pagination-meta">Sivu {{ paginatedMatches.page }} / {{ paginatedMatches.totalPages }}</span>
+                            <button type="button" class="pill" :disabled="paginatedMatches.page === paginatedMatches.totalPages" @click="changeMatchesPage(paginatedMatches.page + 1)">Seuraava</button>
+                        </div>
                     </div>
                     <div v-else class="empty-state-container">
                         <div class="empty-state-card">
