@@ -498,6 +498,42 @@ window.TeamDetail = {
                 lookup[key] = m;
             });
 
+            // Fallback aggregation from match maps to avoid missing data
+            const matchAgg = {};
+            this.matchesList.forEach(match => {
+                (match.maps || []).forEach(map => {
+                    const name = beautifyMapName(map.mapName);
+                    if (!name) return;
+                    const key = mapKey(name);
+                    const bucket = matchAgg[key] || {
+                        id: key,
+                        mapName: name,
+                        games: 0,
+                        wins: 0,
+                        losses: 0,
+                        picks: 0,
+                        oppPicks: 0,
+                        decov: 0,
+                        rd: 0,
+                        adrSum: 0,
+                        kdSum: 0
+                    };
+                    bucket.games += 1;
+                    if (map.scoreFor > map.scoreAgainst) bucket.wins += 1;
+                    else if (map.scoreFor < map.scoreAgainst) bucket.losses += 1;
+                    if (map.pickTeamId) {
+                        if (String(map.pickTeamId) === String(this.teamId)) bucket.picks += 1;
+                        else bucket.oppPicks += 1;
+                    } else {
+                        bucket.decov += 1;
+                    }
+                    bucket.rd += (map.scoreFor - map.scoreAgainst);
+                    bucket.adrSum += toNumber(map.adr);
+                    bucket.kdSum += toNumber(map.kd);
+                    matchAgg[key] = bucket;
+                });
+            });
+
             // Build pool only from season data, match maps, and season veto list (season-level pool).
             const poolNames = new Set();
             normalized.forEach(m => poolNames.add(m.mapName));
@@ -520,29 +556,68 @@ window.TeamDetail = {
                 const key = String(name).toLowerCase();
                 const existing = lookup[key];
                 if (existing) {
-                    finalMaps.push(existing);
+                    // Enrich existing entry with aggregated match data if missing
+                    const agg = matchAgg[key];
+                    if (agg) {
+                        const games = existing.games || existing.played || agg.games;
+                        const wins = existing.wins || agg.wins;
+                        const losses = existing.losses || agg.losses;
+                        const winrate = games ? (wins / games) * 100 : existing.winrate;
+                        const picks = existing.picks || agg.picks;
+                        const oppPicks = existing.oppPicks || agg.oppPicks;
+                        const totalPicks = picks + oppPicks;
+                        const pickRate = totalPicks ? (picks / totalPicks) * 100 : existing.pickRate;
+                        const decov = existing.decov || agg.decov;
+                        const rd = existing.rd || agg.rd;
+                        const adr = existing.adr || (agg.games ? agg.adrSum / agg.games : 0);
+                        const rating = existing.rating || (agg.games ? safeDivide(agg.kdSum, agg.games) : existing.rating);
+                        const kd = existing.kd || (agg.games ? safeDivide(agg.kdSum, agg.games) : existing.kd);
+                        finalMaps.push({
+                            ...existing,
+                            games,
+                            played: existing.played || games,
+                            wins,
+                            losses,
+                            winrate,
+                            picks,
+                            oppPicks,
+                            pickRate,
+                            decov,
+                            rd,
+                            adr,
+                            rating,
+                            kd
+                        });
+                    } else {
+                        finalMaps.push(existing);
+                    }
                 } else {
                     const display = beautifyMapName(name) || name;
+                    const agg = matchAgg[key];
                     finalMaps.push({
                         id: name,
                         mapName: display,
-                        played: 0,
-                        games: 0,
-                        wins: 0,
-                        losses: 0,
-                        winrate: 0,
-                        rating: 0,
-                        picks: 0,
-                        oppPicks: 0,
-                        pickRate: 0,
+                        played: agg?.games || 0,
+                        games: agg?.games || 0,
+                        wins: agg?.wins || 0,
+                        losses: agg?.losses || 0,
+                        winrate: agg?.games ? (agg.wins / agg.games) * 100 : 0,
+                        rating: agg?.games ? safeDivide(agg.kdSum, agg.games) : 0,
+                        picks: agg?.picks || 0,
+                        oppPicks: agg?.oppPicks || 0,
+                        pickRate: (() => {
+                            const total = (agg?.picks || 0) + (agg?.oppPicks || 0);
+                            const picks = agg?.picks || 0;
+                            return total ? (picks / total) * 100 : 0;
+                        })(),
                         ban1: 0,
                         ban2: 0,
                         oppBan: 0,
                         totalOwnBan: 0,
-                        decov: 0,
-                        rd: 0,
-                        kd: 0,
-                        adr: 0,
+                        decov: agg?.decov || 0,
+                        rd: agg?.rd || 0,
+                        kd: agg?.games ? safeDivide(agg.kdSum, agg.games) : 0,
+                        adr: agg?.games ? agg.adrSum / agg.games : 0,
                         ctWr: 0,
                         tWr: 0,
                         damage: 0,
