@@ -31,6 +31,17 @@ class PaginationMeta(CamelModel):
 from typing import List, Optional, Literal
 
 
+class SeasonProgress(CamelModel):
+    divisions_finished: int
+    divisions_total: int
+    regular_matches_played: int
+    regular_matches_total: int
+    playoff_matches_played: int
+    playoff_matches_total: int
+    overall_matches_played: int
+    overall_matches_total: int
+
+
 class SeasonSummary(CamelModel):
     season_id: int
     divisions_total: int
@@ -44,6 +55,7 @@ class SeasonSummary(CamelModel):
     adr_avg: Optional[float] = None
     kd_avg: Optional[float] = None
     win_rate: Optional[float] = None
+    progress: SeasonProgress | None = None
 
 
 class DivisionSeasonStats(CamelModel):

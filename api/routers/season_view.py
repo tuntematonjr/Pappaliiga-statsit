@@ -1,8 +1,8 @@
-"""Season overview routes (formerly v3)."""
+"""Season overview routes (SPA-focused)."""
 from __future__ import annotations
 from typing import List
 from fastapi import APIRouter, HTTPException
-from api.models_v3 import SeasonSummary, DivisionV3
+from api.models import SeasonSummary, DivisionV3
 from api.services import season_view_service
 
 router = APIRouter()
