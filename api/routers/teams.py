@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from api.exceptions import NotFoundError
 from api.models import CamelModel
 from api.services import teams_service
-from async_db import query_async
+from db_async import query_async
 
 router = APIRouter()
 

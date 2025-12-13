@@ -1,6 +1,5 @@
 import asyncio
-from db_async import connection
-from db_ops_async import upsert_team_map_season_totals_async
+from db_async import connection, upsert_team_map_season_totals_async
 
 
 async def recompute(season: int = 11):

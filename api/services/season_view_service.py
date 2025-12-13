@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-import db_ops_async as db
+import db_async as db
 from api.services import seasons_service
 from db_async import get_pool
 

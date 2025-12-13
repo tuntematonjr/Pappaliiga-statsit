@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal, Optional
 
-from async_db import query_async
+from db_async import query_async
 
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.player_counts import get_player_counts

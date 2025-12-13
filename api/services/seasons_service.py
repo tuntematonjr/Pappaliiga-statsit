@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from async_db import query_async
+from db_async import query_async
 from division_overrides import combined_status_teams
 from api.services.season_aggregates import get_season_summary_totals
 

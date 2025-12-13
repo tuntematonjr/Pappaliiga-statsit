@@ -507,3 +507,13 @@ CREATE TABLE IF NOT EXISTS team_map_season_totals_prev (
     KEY idx_team_map_totals_prev_snapshot (snapshot_ts),
     CONSTRAINT fk_team_map_totals_prev_team FOREIGN KEY (team_id) REFERENCES teams (team_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Snapshot tracking for division-level aggregates
+CREATE TABLE IF NOT EXISTS division_snapshots (
+    snapshot_ts BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    season SMALLINT NOT NULL,
+    division_num SMALLINT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (snapshot_ts),
+    KEY idx_division_snapshots_season_division (season, division_num)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

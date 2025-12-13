@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from async_db import query_async
+from db_async import query_async
 from division_overrides import combined_status_teams
 
 from api.exceptions import NotFoundError

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from typing import Any, Dict, Tuple
 
-from async_db import query_async
+from db_async import query_async
 
 from api.exceptions import NotFoundError
 from api.utils.cache import AsyncTTLCache

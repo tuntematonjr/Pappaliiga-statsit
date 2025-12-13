@@ -5,7 +5,7 @@ This helper does two things:
  1. Applies the current `division_overrides.json` banned/quit lists to the
     `matches.ignored_due_ban` column for the given championship.
  2. Recomputes `player_season_totals` and `team_season_totals` for affected
-    players and teams by calling the existing upsert functions in `db_ops_async.py`.
+    players and teams by calling the existing upsert functions in `db_async.py`.
 
 Usage:
   python tools/recompute_totals.py --championship-id <CHAMP_ID>
@@ -22,8 +22,11 @@ import json
 from pathlib import Path
 from typing import Iterable, List, Set
 
-from db_async import connection
-from db_ops_async import upsert_player_season_totals_async, upsert_team_season_totals_async
+from db_async import (
+    connection,
+    upsert_player_season_totals_async,
+    upsert_team_season_totals_async,
+)
 import faceit_config
 
 OVERRIDES_PATH = (Path(__file__).resolve().parent.parent / "division_overrides.json")

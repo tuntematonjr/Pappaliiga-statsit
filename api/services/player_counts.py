@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from async_db import query_async
+from db_async import query_async
 
 
 async def get_player_counts(

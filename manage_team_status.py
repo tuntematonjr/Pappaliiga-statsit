@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from async_db import fetch_all
+from db_async import fetch_all
 from division_overrides import load_division_overrides
 import faceit_config
 

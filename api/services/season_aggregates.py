@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from async_db import query_async
+from db_async import query_async
 
 
 def dedupe_team_total(value: float | int | None) -> int:

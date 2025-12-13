@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Collection, Dict, Optional
 from datetime import datetime, timezone
 
-from async_db import compute_team_map_deltas_async, get_team_matches_mirror_async, query_async
+from db_async import compute_team_map_deltas_async, get_team_matches_mirror_async, query_async
 
 from api.exceptions import NotFoundError
 

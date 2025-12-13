@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from async_db import query_async
+from db_async import query_async
 
 router = APIRouter()
 

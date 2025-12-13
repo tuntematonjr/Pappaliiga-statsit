@@ -12,12 +12,11 @@ import sys
 import time
 from typing import Any, Sequence
 
-from db_async import create_schema_async, fetch_val, reset_db_async, connection
+from db_async import create_schema_async, fetch_val, reset_db_async, connection, upsert_championships_async
 from division_overrides import load_division_overrides
 from faceit_client_async import get_rate_limit_stats, reset_rate_limit_stats, shutdown_clients
 import faceit_config
 from sync_pipeline import ChampionshipSyncResult, sync_championship_async, update_single_match_async
-from db_ops_async import upsert_championships_async
 from utils import format_hms, log_stage
 from division_registry import refresh_divisions
 from runtime_diagnostics import SyncDiagnostics
@@ -45,20 +44,6 @@ def _configure_logging(verbose: bool) -> None:
     console_handler.setLevel(level)
 
     max_files = int(os.environ.get("SYNC_LOG_MAX_FILES", DEFAULT_LOG_MAX_FILES))
-    # Prune older logs (keep newest `max_files` files). If max_files <= 0, keep unlimited.
-    try:
-        if max_files > 0:
-            logs = sorted(LOG_DIR.glob("sync-*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
-            for old in logs[max_files:]:
-                try:
-                    old.unlink()
-                except Exception:
-                    # Avoid failing startup due to pruning errors; just warn.
-                    logging.getLogger("pappaliiga.sync").warning("Failed to remove old log file %s", old)
-    except Exception:
-        # If pruning fails for some reason (permissions, NFS, etc), continue without blocking.
-        logging.getLogger("pappaliiga.sync").exception("Log pruning failed")
-
     # Use a plain file handler so we don't split the log file by size.
     from logging import FileHandler
     file_handler = FileHandler(log_path, mode="a", encoding="utf-8")

@@ -6,7 +6,7 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
 from utils import format_hms, log_stage
 from runtime_diagnostics import SyncDiagnostics
@@ -22,11 +22,12 @@ from faceit_client_async import (
 
 import faceit_config
 
-from db_async import connection, readonly_connection, fetch_all
-from db_ops_async import (
+from db_async import (
     DEFAULT_TEAM_AVATAR,
     clear_obsolete_maps_async,
+    connection,
     delete_stats_for_match_async,
+    fetch_all,
     get_division_snapshot_ts_async,
     get_map_id_lookup_async,
     replace_map_votes_async,
@@ -61,7 +62,6 @@ class MatchContext:
     championship_id: str
     season: int
     division_num: int
-    slug: str
     is_playoffs: bool
     banned_team_ids: Set[str]
     banned_lookup: Dict[str, Dict[str, Any]]
@@ -612,7 +612,6 @@ async def sync_match_async(
     division_num: int,
     match_id: str,
     *,
-    slug: str,
     is_playoffs: bool,
     banned_lookup: Dict[str, Dict[str, Any]],
     diagnostics: SyncDiagnostics | None = None,
@@ -624,7 +623,6 @@ async def sync_match_async(
         championship_id=championship_id,
         season=season,
         division_num=division_num,
-        slug=slug,
         is_playoffs=is_playoffs,
         banned_team_ids=set(banned_lookup.keys()),
         banned_lookup=banned_lookup,
@@ -749,7 +747,6 @@ async def sync_match_async(
 
     await delete_stats_for_match_async(
         match_id,
-        snapshot_ts=snapshot_ts,
         label=f"match:{match_id}:delete-stats",
     )
 
@@ -902,14 +899,13 @@ async def sync_championship_async(
     *,
     division: Mapping[str, Any] | None = None,
     full: bool = False,
-    force_matches: bool = False,
     overrides: Mapping[str, dict[str, List[dict[str, str]]]] | None = None,
     end_on_error: bool = False,
     db_semaphore: asyncio.Semaphore | None = None,
     diagnostics: SyncDiagnostics | None = None,
 ) -> ChampionshipSyncResult:
     start_time = time.perf_counter()
-    force_all_matches = full or force_matches
+    force_all_matches = full
     division_info = division or next((d for d in faceit_config.DIVISIONS if d["championship_id"] == championship_id), None)
     if not division_info:
         raise ValueError(f"Championship {championship_id} not found in DIVISIONS")
@@ -1048,7 +1044,6 @@ async def sync_championship_async(
                         season,
                         division_num,
                         match_id,
-                        slug=slug,
                         is_playoffs=is_playoffs,
                         banned_lookup=banned_lookup,
                         diagnostics=diagnostics,
@@ -1059,7 +1054,6 @@ async def sync_championship_async(
                     season,
                     division_num,
                     match_id,
-                    slug=slug,
                     is_playoffs=is_playoffs,
                     banned_lookup=banned_lookup,
                     diagnostics=diagnostics,
@@ -1189,7 +1183,6 @@ async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics 
         season,
         division_num,
         match_id,
-        slug=slug,
         is_playoffs=is_playoffs,
         banned_lookup=banned_lookup,
         diagnostics=diagnostics,

@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
 
-from async_db import compute_player_map_deltas_async, query_async
+from db_async import compute_player_map_deltas_async, query_async
 
 from api.exceptions import NotFoundError
 
