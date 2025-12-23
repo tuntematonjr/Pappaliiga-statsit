@@ -60,7 +60,12 @@
         if (!raw || typeof raw !== 'object') {
             return { ok: false, error: 'Division payload missing', warnings };
         }
-        const divisionId = raw.division_id;
+        const divisionId =
+            raw.division_id ??
+            raw.divisionId ??
+            raw.id ??
+            raw.championship_id ??
+            raw.championshipId;
         if (divisionId === undefined || divisionId === null) {
             warnings.push('division_id missing');
             return { ok: false, error: 'division_id missing', warnings };
@@ -70,24 +75,39 @@
         const tierValue = toNumber(raw.tier, null);
         const tier = Number.isFinite(tierValue) ? tierValue : inferTier(divisionId);
         const seasonRaw = raw.season && typeof raw.season === 'object' ? raw.season : {};
-        const playoffsRaw = raw.playoffs && typeof raw.playoffs === 'object' ? raw.playoffs : DEFAULT_PLAYOFFS;
+        const playoffsRaw =
+            raw.playoffs && typeof raw.playoffs === 'object'
+                ? raw.playoffs
+                : raw.playoff && typeof raw.playoff === 'object'
+                    ? raw.playoff
+                    : DEFAULT_PLAYOFFS;
 
-        const seasonStatus = (seasonRaw.status || 'waiting').toLowerCase();
-        const playoffsStatus = (playoffsRaw.status || DEFAULT_PLAYOFFS.status).toLowerCase();
-        
+        const normalizeStatus = (value, fallback = 'waiting') => {
+            const normalized = String(value || '').toLowerCase();
+            return ['waiting', 'active', 'finished'].includes(normalized) ? normalized : fallback;
+        };
+
+        const seasonStatus = normalizeStatus(seasonRaw.status || seasonRaw.state || raw.status, 'waiting');
+        const playoffsStatus = normalizeStatus(playoffsRaw.status || raw.playoff_status, DEFAULT_PLAYOFFS.status);
+
         const normalizedSeason = clampMatches({
             teams: toNumber(seasonRaw.teams, 0),
-            matches_played: toNumber(seasonRaw.matches_played, 0),
-            matches_total: toNumber(seasonRaw.matches_total, 0),
-            status: ['waiting', 'active', 'finished'].includes(seasonStatus) ? seasonStatus : 'waiting',
+            matches_played: toNumber(seasonRaw.matches_played ?? seasonRaw.matchesPlayed, 0),
+            matches_total: toNumber(seasonRaw.matches_total ?? seasonRaw.matchesTotal, 0),
+            status: seasonStatus,
             winner: seasonRaw.winner_team ? String(seasonRaw.winner_team) : null
         });
 
         const normalizedPlayoffs = clampMatches({
             teams: toNumber(playoffsRaw.teams, DEFAULT_PLAYOFFS.teams) || DEFAULT_PLAYOFFS.teams,
-            matches_played: toNumber(playoffsRaw.matches_played, DEFAULT_PLAYOFFS.matchesPlayed),
-            matches_total: toNumber(playoffsRaw.matches_total, DEFAULT_PLAYOFFS.matchesTotal) || DEFAULT_PLAYOFFS.matchesTotal,
-            status: ['waiting', 'active', 'finished'].includes(playoffsStatus) ? playoffsStatus : DEFAULT_PLAYOFFS.status,
+            matches_played: toNumber(
+                playoffsRaw.matches_played ?? playoffsRaw.matchesPlayed,
+                DEFAULT_PLAYOFFS.matchesPlayed
+            ),
+            matches_total:
+                toNumber(playoffsRaw.matches_total ?? playoffsRaw.matchesTotal, DEFAULT_PLAYOFFS.matchesTotal) ||
+                DEFAULT_PLAYOFFS.matchesTotal,
+            status: playoffsStatus,
             winner: playoffsRaw.winner_team ? String(playoffsRaw.winner_team) : null
         });
 

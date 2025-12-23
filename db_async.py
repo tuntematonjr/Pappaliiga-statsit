@@ -27,6 +27,7 @@ else is kept in source control.
 from __future__ import annotations
 
 import asyncio
+import re
 import logging
 import os
 import time

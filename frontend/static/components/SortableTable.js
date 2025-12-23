@@ -40,6 +40,11 @@ window.SortableTable = {
         highlightRowClass: {
             type: String,
             default: 'table-row--highlighted'
+        },
+        headerGroups: {
+            type: Array,
+            default: () => []
+            // Format: [{ label: 'Group', colSpan: 3, className: 'group-class' }]
         }
     },
     setup(props) {
@@ -251,6 +256,16 @@ window.SortableTable = {
                     <col v-for="column in columns" :key="column.key" :style="column.width ? ('width:' + column.width) : null" :class="column.colClass || ''" />
                 </colgroup>
                 <thead>
+                    <tr v-if="headerGroups && headerGroups.length" class="table-group-header">
+                        <th
+                            v-for="(group, idx) in headerGroups"
+                            :key="group.label + '-' + idx"
+                            :colspan="group.colSpan"
+                            :class="group.className || ''"
+                        >
+                            {{ group.label }}
+                        </th>
+                    </tr>
                     <tr>
                         <th 
                             v-for="column in columns" 

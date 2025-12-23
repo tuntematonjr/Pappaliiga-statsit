@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Simple launcher for backend (uvicorn) and frontend (spa_server.py) for WSL/macOS/Linux
+# Simple launcher for FastAPI (serves API + frontend) for WSL/macOS/Linux
 # Usage:
 #   chmod +x scripts/dev_start_simple.sh
-#   ./scripts/dev_start_simple.sh [backend_port] [frontend_port] [venv_path]
+#   ./scripts/dev_start_simple.sh [port] [venv_path]
 # Example:
-#   ./scripts/dev_start_simple.sh 8000 8001 .venv/bin/activate
+#   ./scripts/dev_start_simple.sh 8000 .venv/bin/activate
 
 BACKEND_PORT=${1:-8000}
-FRONTEND_PORT=${2:-8001}
-VENV_ACTIVATE=${3:-"./venv/bin/activate"}
+VENV_ACTIVATE=${2:-"./venv/bin/activate"}
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR" || exit 1
@@ -23,10 +22,7 @@ fi
 
 echo "Starting backend on port $BACKEND_PORT (logs -> backend.log)"
 nohup python -m uvicorn api.main:app --reload --host 0.0.0.0 --port "$BACKEND_PORT" > backend.log 2>&1 &
-sleep 0.5
-echo "Starting frontend on port $FRONTEND_PORT (logs -> frontend.log)"
-nohup python frontend/spa_server.py "$FRONTEND_PORT" > frontend.log 2>&1 &
+BACKEND_PID=$!
 
-echo "Backend PID: $(jobs -rp | sed -n '1p')"
-echo "Frontend PID: $(jobs -rp | sed -n '2p')"
-echo "Logs: backend.log, frontend.log"
+echo "Backend PID: $BACKEND_PID"
+echo "Logs: backend.log"

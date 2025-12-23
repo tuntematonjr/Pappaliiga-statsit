@@ -34,7 +34,10 @@ async def fetch_team_season_stats(team_id: str) -> list[dict[str, Any]]:
              c.name,
              c.is_playoffs,
              tst.maps_played, tst.matches_played, tst.matches_won AS wins,
-               (tst.matches_played - tst.matches_won) AS losses,
+               GREATEST(
+                   CAST(tst.matches_played AS SIGNED) - CAST(tst.matches_won AS SIGNED),
+                   0
+               ) AS losses,
                CASE WHEN tst.matches_played > 0
                     THEN (tst.matches_won / tst.matches_played)
                     ELSE 0.0 END AS win_rate,
