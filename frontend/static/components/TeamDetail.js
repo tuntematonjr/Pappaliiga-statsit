@@ -841,12 +841,14 @@ window.TeamDetail = {
             }, 0);
             const activePlayers = this.players.filter(p => (p.mapsPlayed || 0) > 0).length;
             const forfeitedMaps = playedMatches.reduce((acc, m) => {
-                let total = acc + (m.forfeitedMaps || 0);
-                if (!m.maps?.length && m.isForfeit && m.winnerTeamId && String(m.winnerTeamId) !== String(this.teamId)) {
-                    // Forfeit without per-map data: count a single map unless best-of explicitly says more.
-                    total += Math.max(1, m.bestOf || 1);
-                }
-                return total;
+                const forfeitsFromMaps = m.forfeitedMaps || 0;
+                const shouldFallback = !m.maps?.length
+                    && forfeitsFromMaps === 0
+                    && m.isForfeit
+                    && m.winnerTeamId
+                    && String(m.winnerTeamId) !== String(this.teamId);
+                const fallbackCount = shouldFallback ? Math.max(1, m.bestOf || 2) : 0;
+                return acc + forfeitsFromMaps + fallbackCount;
             }, 0);
             const roundsWon = playedMatches.reduce((acc, m) => acc + (m.roundsFor || 0), 0);
             const roundsLost = playedMatches.reduce((acc, m) => acc + (m.roundsAgainst || 0), 0);
