@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
@@ -51,6 +51,18 @@ class MatchDetails(CamelModel):
     is_forfeit: bool
     ignored_due_ban: bool
     maps: List[MapResult]
+
+
+class PlayerMapStats(CamelModel):
+    round_index: int
+    map_id: Optional[int]
+    map_name: Optional[str]
+    player_id: str
+    nickname: Optional[str]
+    team_id: Optional[str]
+    opponent_team_id: Optional[str]
+    is_forfeit_map: bool
+    stats: Dict[str, Any]
 
 
 class MatchListResponse(CamelModel):
@@ -126,3 +138,13 @@ async def get_match_details(match_id: str):
             for row in map_rows
         ],
     )
+
+
+@router.get("/{match_id}/players", response_model=List[PlayerMapStats])
+async def get_match_player_stats(match_id: str):
+    try:
+        rows = await matches_service.get_match_player_stats(match_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return [PlayerMapStats(**row) for row in rows]

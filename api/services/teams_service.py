@@ -179,6 +179,8 @@ async def fetch_team_matches(team_id: str, championship_id: Optional[str] = None
             "t1_avatar": left.get("avatar"),
             "t2_avatar": right.get("avatar"),
             "faceit_url": match.get("faceit_url"),
+            "is_forfeit": match.get("is_forfeit"),
+            "winner_team_id": match.get("winner_team_id"),
             "maps": match.get("maps", [])
         })
     
@@ -410,39 +412,47 @@ async def fetch_team_players_comprehensive(team_id: str, championship_id: Option
     rows = await query_async(
         """
         SELECT
-            player_id, maps_played, rounds_played, kills, deaths, assists, mvps, 
-            sniper_kills, utility_damage, enemies_flashed, flash_count, flash_successes,
-            mk_2k, mk_3k, mk_4k, mk_5k, clutch_kills, cl_1v1_attempts, cl_1v1_wins,
-            cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins, pistol_kills,
-            adr, kr, kd, rating, hs_pct, damage
-        FROM player_season_totals
-        WHERE season = :season AND division_num = :div AND team_id = :team_id
-        ORDER BY maps_played DESC, rating DESC
+            pst.player_id,
+            pst.maps_played,
+            pst.rounds_played,
+            pst.kills,
+            pst.deaths,
+            pst.assists,
+            pst.mvps,
+            pst.sniper_kills,
+            pst.utility_damage,
+            pst.enemies_flashed,
+            pst.flash_count,
+            pst.flash_successes,
+            pst.mk_2k,
+            pst.mk_3k,
+            pst.mk_4k,
+            pst.mk_5k,
+            pst.clutch_kills,
+            pst.cl_1v1_attempts,
+            pst.cl_1v1_wins,
+            pst.cl_1v2_attempts,
+            pst.cl_1v2_wins,
+            pst.entry_count,
+            pst.entry_wins,
+            pst.pistol_kills,
+            pst.adr,
+            pst.kr,
+            pst.kd,
+            pst.rating,
+            pst.hs_pct,
+            pst.damage,
+            p.nickname
+        FROM player_season_totals pst
+        LEFT JOIN players p ON p.player_id = pst.player_id
+        WHERE pst.season = :season AND pst.division_num = :div AND pst.team_id = :team_id
+        ORDER BY pst.maps_played DESC, pst.rating DESC
         """,
         {"season": season, "div": division_num, "team_id": team_id}
     )
     
     if not rows:
         raise NotFoundError(f"No players found for team '{team_id}' in championship {championship_id}")
-    
-    # Get player names
-    player_ids = [r["player_id"] for r in rows]
-    if player_ids:
-        player_names = await query_async(
-            f"""
-            SELECT player_id, nickname
-            FROM players
-            WHERE player_id IN ({','.join([':p' + str(i) for i in range(len(player_ids))])})
-            """,
-            {f"p{i}": pid for i, pid in enumerate(player_ids)}
-        )
-        name_map = {p["player_id"]: p["nickname"] for p in player_names}
-        
-        for row in rows:
-            row["nickname"] = name_map.get(row["player_id"], "Unknown")
-    else:
-        for row in rows:
-            row["nickname"] = "Unknown"
     
     return rows
 

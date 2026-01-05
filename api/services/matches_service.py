@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from typing import Any, Dict, Tuple
 
 from db_async import query_async
@@ -124,3 +125,58 @@ async def get_match_details(match_id: str) -> dict[str, Any]:
         "match": match,
         "maps": map_rows,
     }
+
+
+async def get_match_player_stats(match_id: str) -> list[dict[str, Any]]:
+    match_rows = await query_async(
+        "SELECT match_id FROM matches WHERE match_id = :match_id",
+        {"match_id": match_id},
+    )
+    if not match_rows:
+        raise NotFoundError(f"Match '{match_id}' not found")
+
+    rows = await query_async(
+        """
+        SELECT
+            ps.round_index,
+            ps.map_id,
+            mp.map_name,
+            ps.player_id,
+            p.nickname,
+            ps.team_id,
+            ps.opponent_team_id,
+            ps.is_forfeit_map,
+            ps.stats_json
+        FROM player_stats ps
+        LEFT JOIN players p ON p.player_id = ps.player_id
+        LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+        WHERE ps.match_id = :match_id
+        ORDER BY ps.round_index, ps.player_id
+        """,
+        {"match_id": match_id},
+    )
+
+    normalized: list[dict[str, Any]] = []
+    for row in rows:
+        stats_raw = row.get("stats_json")
+        if isinstance(stats_raw, str):
+            try:
+                stats_raw = json.loads(stats_raw)
+            except Exception:
+                stats_raw = {}
+        elif stats_raw is None:
+            stats_raw = {}
+        normalized.append(
+            {
+                "round_index": int(row.get("round_index") or 0),
+                "map_id": row.get("map_id"),
+                "map_name": row.get("map_name"),
+                "player_id": row.get("player_id"),
+                "nickname": row.get("nickname"),
+                "team_id": row.get("team_id"),
+                "opponent_team_id": row.get("opponent_team_id"),
+                "is_forfeit_map": bool(row.get("is_forfeit_map")),
+                "stats": stats_raw or {},
+            }
+        )
+    return normalized

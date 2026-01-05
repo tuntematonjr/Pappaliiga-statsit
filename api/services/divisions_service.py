@@ -224,16 +224,16 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
         ),
         player_totals AS (
             SELECT
-                ps.team_id,
-                SUM(ps.kills) AS kills,
-                SUM(ps.deaths) AS deaths,
-                SUM(ps.damage) AS damage
-            FROM player_stats ps
-            JOIN matches m ON m.match_id = ps.match_id
-            WHERE m.championship_id = :champ_id
-              AND COALESCE(ps.is_forfeit_map, 0) = 0
-              AND ps.team_id IS NOT NULL
-            GROUP BY ps.team_id
+                                ps.team_id,
+                                SUM(ps.kills) AS kills,
+                                SUM(ps.deaths) AS deaths,
+                                SUM(ps.damage) AS damage
+                        FROM player_stats ps
+                        JOIN matches m ON m.match_id = ps.match_id
+                        WHERE m.championship_id = :champ_id
+                            AND COALESCE(ps.is_forfeit_map, 0) = 0
+                            AND ps.team_id IS NOT NULL
+                        GROUP BY ps.team_id
         )
         SELECT DISTINCT t.team_id, t.name AS team_name, t.name AS display_name, t.avatar,
                COALESCE(mt.matches_played, 0) AS matches_played,

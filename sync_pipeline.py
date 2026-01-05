@@ -105,6 +105,46 @@ def safe_float(value: Any, default: Optional[float] = 0.0) -> Optional[float]:
         return default
 
 
+def _normalise_faceit_stat_value(value: Any) -> Any:
+    """Keep Faceit stats values but coerce numeric-looking strings to numbers."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return value
+
+    try:
+        raw = str(value).strip()
+    except Exception:
+        return value
+
+    if not raw:
+        return None
+
+    # Strip trailing percent sign and normalise decimal separator
+    if raw.endswith("%"):
+        raw = raw[:-1]
+    candidate = raw.replace(",", ".")
+
+    try:
+        if re.fullmatch(r"[-+]?\d+", candidate):
+            return int(candidate)
+        return float(candidate)
+    except Exception:
+        return raw
+
+
+def _normalise_player_stats(stats: Mapping[str, Any]) -> Dict[str, Any]:
+    """Return a JSON-ready dict that preserves Faceit keys and coerces values."""
+    if not isinstance(stats, Mapping):
+        return {}
+    cleaned: Dict[str, Any] = {}
+    for key, value in stats.items():
+        cleaned[key] = _normalise_faceit_stat_value(value)
+    return cleaned
+
+
 def derive_slug_base(slug: str) -> str:
     """Strip playoff/runko suffixes from slug to get base slug."""
     if not slug:
@@ -310,7 +350,8 @@ def _extract_player_rows(
         for team in rnd.get("teams", []) or []:
             tid = team.get("team_id") or team.get("id") or team.get("faction_id")
             for player in team.get("players", []) or []:
-                ps = player.get("player_stats") or player.get("stats") or {}
+                ps_raw = player.get("player_stats") or player.get("stats") or {}
+                ps = _normalise_player_stats(ps_raw)
                 player_id = player.get("player_id") or player.get("id")
                 rows.append(
                     {
@@ -320,32 +361,7 @@ def _extract_player_rows(
                         "team_id": tid,
                         "opponent_team_id": None,
                         "nickname": player.get("nickname") or player.get("name"),
-                        "kills": safe_int(ps.get("Kills")),
-                        "deaths": safe_int(ps.get("Deaths")),
-                        "assists": safe_int(ps.get("Assists")),
-                        "kd": safe_float(ps.get("K/D Ratio")),
-                        "kr": safe_float(ps.get("K/R Ratio")),
-                        "adr": safe_float(ps.get("ADR")),
-                        "hs_pct": safe_float(ps.get("Headshots %") or ps.get("HS %")),
-                        "mvps": safe_int(ps.get("MVPs")),
-                        "sniper_kills": safe_int(ps.get("Sniper Kills")),
-                        "utility_damage": safe_int(ps.get("Utility Damage")),
-                        "enemies_flashed": safe_int(ps.get("Enemies Flashed")),
-                        "flash_count": safe_int(ps.get("Flash Count") or ps.get("Flashbangs Thrown")),
-                        "flash_successes": safe_int(ps.get("Flash Successes") or ps.get("Successful Flashes")),
-                        "mk_2k": safe_int(ps.get("Double Kills")),
-                        "mk_3k": safe_int(ps.get("Triple Kills")),
-                        "mk_4k": safe_int(ps.get("Quadro Kills")),
-                        "mk_5k": safe_int(ps.get("Penta Kills")),
-                        "clutch_kills": safe_int(ps.get("Clutch Kills")),
-                        "cl_1v1_attempts": safe_int(ps.get("1v1Count") or ps.get("1v1 Attempts")),
-                        "cl_1v1_wins": safe_int(ps.get("1v1Wins") or ps.get("1v1 Wins")),
-                        "cl_1v2_attempts": safe_int(ps.get("1v2Count") or ps.get("1v2 Attempts")),
-                        "cl_1v2_wins": safe_int(ps.get("1v2Wins") or ps.get("1v2 Wins")),
-                        "entry_count": safe_int(ps.get("Entry Count") or ps.get("Entry Duels")),
-                        "entry_wins": safe_int(ps.get("Entry Wins")),
-                        "pistol_kills": safe_int(ps.get("Pistol Kills")),
-                        "damage": safe_int(ps.get("Damage")),
+                        "stats_json": ps,
                     }
                 )
     for row in rows:

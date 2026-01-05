@@ -336,6 +336,8 @@ function normalizeMatch(match, teamId = null) {
     const matchId = match.match_id || match.matchId || match.id;
     const playedFlag = toNumber(match.played);
     const bestOf = toNumber(match.best_of ?? match.bestOf ?? match.bo ?? 0);
+    const matchWinnerId = match.winner_team_id || match.winnerTeamId || null;
+    const matchIsForfeit = !!(match.is_forfeit ?? match.isForfeit);
     const rawMaps = Array.isArray(match.maps) ? match.maps : [];
     const left = match.left || {
         team_id: match.team1_id,
@@ -361,14 +363,26 @@ function normalizeMatch(match, teamId = null) {
     let forfeitedMaps = 0;
     rawMaps.forEach((m, idx) => {
         if (m.is_forfeit) {
-            forfeitedMaps += 1;
-            return; // never render forfeit as map
+            const winnerId = m.winner_team_id || m.winnerTeamId || null;
+            if (winnerId && String(winnerId) !== String(teamId)) {
+                forfeitedMaps += 1;
+            }
         }
         const rawMapName = m.map || m.map_name || m.name || `Map ${idx + 1}`;
         const displayName = beautifyMapName(rawMapName);
-        if (!displayName) return; // skip forfeit or invalid entries
-        const scoreFor = toNumber(m.rf ?? m.score_for ?? m.score_team1 ?? 0);
-        const scoreAgainst = toNumber(m.ra ?? m.score_against ?? m.score_team2 ?? 0);
+        if (!displayName) return; // skip invalid entries
+        let scoreFor = toNumber(m.rf ?? m.score_for ?? m.score_team1 ?? 0);
+        let scoreAgainst = toNumber(m.ra ?? m.score_against ?? m.score_team2 ?? 0);
+        const mapWinnerId = m.winner_team_id || m.winnerTeamId || null;
+        if (m.is_forfeit && mapWinnerId && scoreFor === 0 && scoreAgainst === 0) {
+            if (String(mapWinnerId) === String(teamId)) {
+                scoreFor = 13;
+                scoreAgainst = 0;
+            } else {
+                scoreFor = 0;
+                scoreAgainst = 13;
+            }
+        }
         const leftStats = m.left || {};
         const rightStats = m.right || {};
         const myStats = meOnLeft ? leftStats : rightStats;
@@ -380,6 +394,8 @@ function normalizeMatch(match, teamId = null) {
             scoreFor,
             scoreAgainst,
             pickTeamId: m.pick_team_id || m.pickTeamId || null,
+            isForfeit: !!m.is_forfeit,
+            winnerTeamId: mapWinnerId,
             adr: toNumber(myStats.adr),
             kd: toNumber(myStats.kd),
             kills: toNumber(myStats.kills),
@@ -415,6 +431,8 @@ function normalizeMatch(match, teamId = null) {
         bestOf: bestOf || Math.max(1, maps.length),
         played,
         forfeitedMaps,
+        isForfeit: matchIsForfeit,
+        winnerTeamId: matchWinnerId,
         teamScore,
         oppScore,
         mapDraws,
@@ -448,6 +466,9 @@ function normalizeVeto(entry) {
 
 function getMatchResult(match) {
     if (!match) return 'pending';
+    if (match.isForfeit && match.winnerTeamId) {
+        return String(match.winnerTeamId) === String(match.me?.team_id || match.teamId) ? 'win' : 'loss';
+    }
     if (match.teamScore > match.oppScore) return 'win';
     if (match.teamScore < match.oppScore) return 'loss';
     if (match.roundDiff && match.roundDiff > 0) return 'win';
@@ -529,7 +550,13 @@ window.TeamDetail = {
             return this.seasonOptions[0]?.value || null;
         },
         seasonData() {
-            return normalizeSeasonData(this.pageData) || null;
+            const data = normalizeSeasonData(this.pageData) || null;
+            if (!data) return null;
+            const dataChamp = data.championshipId || data.championship_id || null;
+            if (this.currentChampionshipId && dataChamp && String(dataChamp) !== String(this.currentChampionshipId)) {
+                return null;
+            }
+            return data;
         },
         teamStats() {
             return this.seasonData?.teamStats || this.seasonData?.stats || this.seasonData?.team_stats || {};
@@ -784,14 +811,46 @@ window.TeamDetail = {
             const avgRating = this.players.length
                 ? (this.players.reduce((acc, p) => acc + (p.rating || 0), 0) / this.players.length)
                 : toNumber(s.rating ?? s.rating_2 ?? s.hltv_rating ?? this.mapTotals.avgRating);
-            const mapsPlayed = playedMatches.reduce((acc, m) => acc + (m.maps?.length || 0), 0);
-            const mapWins = playedMatches.reduce((acc, m) => acc + (m.maps || []).filter(mp => mp.scoreFor > mp.scoreAgainst).length, 0);
-            const mapLosses = playedMatches.reduce((acc, m) => acc + (m.maps || []).filter(mp => mp.scoreFor < mp.scoreAgainst).length, 0);
+            const mapsPlayed = playedMatches.reduce((acc, m) => {
+                if (!m.maps?.length && m.isForfeit && m.winnerTeamId) {
+                    return acc + Math.max(1, m.bestOf || 2);
+                }
+                return acc + (m.maps?.length || 0);
+            }, 0);
+            const mapWins = playedMatches.reduce((acc, m) => {
+                if (!m.maps?.length && m.isForfeit && m.winnerTeamId) {
+                    return acc + (String(m.winnerTeamId) === String(this.teamId) ? Math.max(1, m.bestOf || 2) : 0);
+                }
+                return acc + (m.maps || []).filter(mp => {
+                    if (mp.isForfeit && mp.winnerTeamId) {
+                        return String(mp.winnerTeamId) === String(this.teamId);
+                    }
+                    return mp.scoreFor > mp.scoreAgainst;
+                }).length;
+            }, 0);
+            const mapLosses = playedMatches.reduce((acc, m) => {
+                if (!m.maps?.length && m.isForfeit && m.winnerTeamId) {
+                    return acc + (String(m.winnerTeamId) !== String(this.teamId) ? Math.max(1, m.bestOf || 2) : 0);
+                }
+                return acc + (m.maps || []).filter(mp => {
+                    if (mp.isForfeit && mp.winnerTeamId) {
+                        return String(mp.winnerTeamId) !== String(this.teamId);
+                    }
+                    return mp.scoreFor < mp.scoreAgainst;
+                }).length;
+            }, 0);
             const activePlayers = this.players.filter(p => (p.mapsPlayed || 0) > 0).length;
-            const forfeitedMaps = playedMatches.reduce((acc, m) => acc + (m.forfeitedMaps || 0), 0);
-            const roundsWon = toNumber(s.rounds_won ?? s.roundsWon ?? playedMatches.reduce((acc, m) => acc + (m.roundsFor || 0), 0));
-            const roundsLost = toNumber(s.rounds_lost ?? s.roundsLost ?? playedMatches.reduce((acc, m) => acc + (m.roundsAgainst || 0), 0));
-            const roundsDiff = toNumber(s.rounds_diff ?? s.round_diff ?? s.roundsDiff ?? (roundsWon - roundsLost));
+            const forfeitedMaps = playedMatches.reduce((acc, m) => {
+                let total = acc + (m.forfeitedMaps || 0);
+                if (!m.maps?.length && m.isForfeit && m.winnerTeamId && String(m.winnerTeamId) !== String(this.teamId)) {
+                    // Forfeit without per-map data: count a single map unless best-of explicitly says more.
+                    total += Math.max(1, m.bestOf || 1);
+                }
+                return total;
+            }, 0);
+            const roundsWon = playedMatches.reduce((acc, m) => acc + (m.roundsFor || 0), 0);
+            const roundsLost = playedMatches.reduce((acc, m) => acc + (m.roundsAgainst || 0), 0);
+            const roundsDiff = roundsWon - roundsLost;
 
             const hasMapData = (this.mapTotals.games || this.mapTotals.played || this.mapTotals.wins || this.mapTotals.losses);
             const hasRating = (this.players.length && Number.isFinite(avgRating)) || (hasMapData && avgRating > 0);
@@ -932,8 +991,14 @@ window.TeamDetail = {
                     const bucket = ensureFallback(map.mapName);
                     if (!bucket) return;
                     bucket.games += 1;
-                    if (map.scoreFor > map.scoreAgainst) bucket.wins += 1;
-                    else if (map.scoreFor < map.scoreAgainst) bucket.losses += 1;
+                    if (map.isForfeit && map.winnerTeamId) {
+                        if (String(map.winnerTeamId) === String(this.teamId)) bucket.wins += 1;
+                        else bucket.losses += 1;
+                    } else if (map.scoreFor > map.scoreAgainst) {
+                        bucket.wins += 1;
+                    } else if (map.scoreFor < map.scoreAgainst) {
+                        bucket.losses += 1;
+                    }
                     bucket.adrSum += toNumber(map.adr);
                     bucket.kdSum += toNumber(map.kd);
                     const key = mapKey(bucket.mapName);
@@ -953,15 +1018,29 @@ window.TeamDetail = {
                     agg.rd += (map.scoreFor - map.scoreAgainst);
                     agg.adrSum += toNumber(map.adr);
                     agg.kdSum += toNumber(map.kd);
-                    if (map.scoreFor > map.scoreAgainst) agg.wins += 1;
-                    else if (map.scoreFor < map.scoreAgainst) agg.losses += 1;
+                    if (map.isForfeit && map.winnerTeamId) {
+                        if (String(map.winnerTeamId) === String(this.teamId)) agg.wins += 1;
+                        else agg.losses += 1;
+                    } else if (map.scoreFor > map.scoreAgainst) {
+                        agg.wins += 1;
+                    } else if (map.scoreFor < map.scoreAgainst) {
+                        agg.losses += 1;
+                    }
                     if (map.pickTeamId) {
                         if (String(map.pickTeamId) === String(this.teamId)) {
                             agg.picks += 1;
-                            if (map.scoreFor > map.scoreAgainst) agg.pickWins += 1;
+                            if (map.isForfeit && map.winnerTeamId) {
+                                if (String(map.winnerTeamId) === String(this.teamId)) agg.pickWins += 1;
+                            } else if (map.scoreFor > map.scoreAgainst) {
+                                agg.pickWins += 1;
+                            }
                         } else {
                             agg.oppPicks += 1;
-                            if (map.scoreFor > map.scoreAgainst) agg.oppPickWins += 1;
+                            if (map.isForfeit && map.winnerTeamId) {
+                                if (String(map.winnerTeamId) === String(this.teamId)) agg.oppPickWins += 1;
+                            } else if (map.scoreFor > map.scoreAgainst) {
+                                agg.oppPickWins += 1;
+                            }
                         }
                     } else {
                         const counts = decovAgg.get(key) || { decider: 0, overflow: 0 };

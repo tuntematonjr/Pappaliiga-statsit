@@ -27,6 +27,7 @@ else is kept in source control.
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 import logging
 import os
@@ -741,54 +742,19 @@ _MAP_UPSERT_SQL = """
 """
 
 _PLAYER_STAT_UPSERT_SQL = """
-    INSERT INTO player_stats (
-      season, division_num, match_id, round_index, map_id, player_id, team_id, opponent_team_id,
-      is_forfeit_map, kills, deaths, assists, kd, kr, adr, hs_pct, mvps, sniper_kills,
-      utility_damage, enemies_flashed, flash_count, flash_successes,
-      mk_2k, mk_3k, mk_4k, mk_5k,
-      clutch_kills, cl_1v1_attempts, cl_1v1_wins,
-      cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
-      pistol_kills, damage
-    )
-    VALUES (
-      %(season)s, %(division_num)s, %(match_id)s, %(round_index)s, %(map_id)s, %(player_id)s, %(team_id)s, %(opponent_team_id)s,
-      %(is_forfeit_map)s, %(kills)s, %(deaths)s, %(assists)s, %(kd)s, %(kr)s, %(adr)s, %(hs_pct)s, %(mvps)s, %(sniper_kills)s,
-      %(utility_damage)s, %(enemies_flashed)s, %(flash_count)s, %(flash_successes)s,
-      %(mk_2k)s, %(mk_3k)s, %(mk_4k)s, %(mk_5k)s,
-      %(clutch_kills)s, %(cl_1v1_attempts)s, %(cl_1v1_wins)s,
-      %(cl_1v2_attempts)s, %(cl_1v2_wins)s, %(entry_count)s, %(entry_wins)s,
-      %(pistol_kills)s, %(damage)s
-    )
-    ON DUPLICATE KEY UPDATE
-      team_id = VALUES(team_id),
-      opponent_team_id = VALUES(opponent_team_id),
-      is_forfeit_map = VALUES(is_forfeit_map),
-      kills = VALUES(kills),
-      deaths = VALUES(deaths),
-      assists = VALUES(assists),
-      kd = VALUES(kd),
-      kr = VALUES(kr),
-      adr = VALUES(adr),
-      hs_pct = VALUES(hs_pct),
-      mvps = VALUES(mvps),
-      sniper_kills = VALUES(sniper_kills),
-      utility_damage = VALUES(utility_damage),
-      enemies_flashed = VALUES(enemies_flashed),
-      flash_count = VALUES(flash_count),
-      flash_successes = VALUES(flash_successes),
-      mk_2k = VALUES(mk_2k),
-      mk_3k = VALUES(mk_3k),
-      mk_4k = VALUES(mk_4k),
-      mk_5k = VALUES(mk_5k),
-      clutch_kills = VALUES(clutch_kills),
-      cl_1v1_attempts = VALUES(cl_1v1_attempts),
-      cl_1v1_wins = VALUES(cl_1v1_wins),
-      cl_1v2_attempts = VALUES(cl_1v2_attempts),
-      cl_1v2_wins = VALUES(cl_1v2_wins),
-      entry_count = VALUES(entry_count),
-      entry_wins = VALUES(entry_wins),
-      pistol_kills = VALUES(pistol_kills),
-      damage = VALUES(damage)
+        INSERT INTO player_stats (
+            season, division_num, match_id, round_index, map_id, player_id, team_id, opponent_team_id,
+            is_forfeit_map, stats_json
+        )
+        VALUES (
+            %(season)s, %(division_num)s, %(match_id)s, %(round_index)s, %(map_id)s, %(player_id)s, %(team_id)s, %(opponent_team_id)s,
+            %(is_forfeit_map)s, %(stats_json)s
+        )
+        ON DUPLICATE KEY UPDATE
+            team_id = VALUES(team_id),
+            opponent_team_id = VALUES(opponent_team_id),
+            is_forfeit_map = VALUES(is_forfeit_map),
+            stats_json = VALUES(stats_json)
 """
 
 _TEAM_STAT_UPSERT_SQL = """
@@ -1143,6 +1109,14 @@ async def upsert_player_stats_bulk_async(
     for row in player_rows:
         round_index = int(row.get("round_index") or 0)
         map_id = map_lookup.get(round_index)
+        stats_payload = row.get("stats_json") if isinstance(row, Mapping) else None
+        if stats_payload is None:
+            stats_payload = {}
+        if not isinstance(stats_payload, (str, bytes)):
+            try:
+                stats_payload = json.dumps(stats_payload or {}, separators=(",", ":"))
+            except Exception:
+                stats_payload = "{}"
         rows.append(
             {
                 "season": season,
@@ -1152,6 +1126,7 @@ async def upsert_player_stats_bulk_async(
                 "round_index": round_index,
                 "is_forfeit_map": 1 if forfeit_lookup.get(round_index) else 0,
                 **row,
+                "stats_json": stats_payload,
             }
         )
 
@@ -2165,7 +2140,7 @@ async def get_team_matches_mirror_async(
     WITH my_matches AS (
       SELECT
         m.match_id, m.championship_id, m.team1_id, m.team2_id,
-        m.best_of, m.status,
+        m.best_of, m.status, m.is_forfeit, m.winner_team_id,
         COALESCE(m.started_at, m.scheduled_at, m.configured_at, 0) AS ts,
         CASE WHEN m.finished_at IS NOT NULL THEN 1 ELSE 0 END AS played
       FROM matches m
@@ -2174,8 +2149,9 @@ async def get_team_matches_mirror_async(
     mp AS (
       SELECT
         mm.match_id, mm.team1_id, mm.team2_id,
-        mm.best_of, mm.status, mm.ts, mm.played,
-        ma.round_index, ma.map_name, ma.score_team1, ma.score_team2,
+        mm.best_of, mm.status, mm.is_forfeit AS match_is_forfeit, mm.winner_team_id AS match_winner_team_id,
+        mm.ts, mm.played,
+        ma.round_index, ma.map_name, ma.score_team1, ma.score_team2, ma.winner_team_id AS map_winner_team_id,
         COALESCE(ma.is_forfeit, 0) AS map_is_forfeit
       FROM my_matches mm
       LEFT JOIN maps ma ON ma.match_id = mm.match_id
@@ -2201,11 +2177,12 @@ async def get_team_matches_mirror_async(
     )
     SELECT
       mp.match_id, mp.ts, mp.status, mp.best_of, mp.played,
+      mp.match_is_forfeit, mp.match_winner_team_id,
       mp.team1_id, mp.team2_id,
       t1.name AS team1_name, t2.name AS team2_name,
       t1.avatar AS t1_avatar, t2.avatar AS t2_avatar,
       mp.round_index, mp.map_name, mp.score_team1, mp.score_team2,
-      mp.map_is_forfeit,
+      mp.map_is_forfeit, mp.map_winner_team_id,
       pk.pick_team_id,
       COALESCE(ps1.kills, 0)      AS t1_kills,
       COALESCE(ps1.deaths, 0)     AS t1_deaths,
@@ -2242,6 +2219,8 @@ async def get_team_matches_mirror_async(
                 "best_of": r["best_of"],
                 "ts": r["ts"],
                 "played": int(r["played"] or 0),
+                "is_forfeit": bool(r["match_is_forfeit"]),
+                "winner_team_id": r["match_winner_team_id"],
                 "left": {"team_id": team_id, "team_name": my_name or "", "avatar": (r["t1_avatar"] if me_on_left else r["t2_avatar"])},
                 "right": {"team_id": opp_id, "team_name": opp_name or "", "avatar": opp_avatar},
                 "faceit_url": f"https://www.faceit.com/cs2/room/{mid}" if mid else "",
@@ -2275,6 +2254,7 @@ async def get_team_matches_mirror_async(
                 "rf": rf if rf is not None else 0,
                 "ra": ra if ra is not None else 0,
                 "is_forfeit": bool(r["map_is_forfeit"]),
+                "winner_team_id": r["map_winner_team_id"],
                 "pick_team_id": r["pick_team_id"],
                 "left": {"adr": me_adr, "kd": float(me_kd), "dmg": me_damage, "kills": me_kills, "deaths": me_deaths},
                 "right": {"adr": opp_adr, "kd": float(opp_kd), "dmg": opp_damage, "kills": opp_kills, "deaths": opp_deaths},
