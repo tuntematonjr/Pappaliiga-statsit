@@ -1,5 +1,4 @@
 const PLAYER_KPI_SCHEMA = [
-    { key: 'rating', label: 'Rating', decimals: 2, max: 2 },
     { key: 'adr', label: 'ADR', decimals: 1, max: 120 },
     { key: 'kd', label: 'K/D', decimals: 2, max: 2 },
     { key: 'entry', label: 'Entry %', decimals: 1, max: 100, percent: true },
@@ -27,7 +26,6 @@ function formatValue(value, options = {}) {
 
 function buildKpis(season) {
     if (!season) return [];
-    const rating = toNumber(season.rating ?? season.rating_2 ?? season.hltv_rating);
     const adr = toNumber(season.adr ?? season.average_damage);
     const kd = toNumber(season.kd ?? season.kd_ratio);
     const entrySource = season.entry_success ?? season.entry_percent ?? season.entry_rate;
@@ -41,7 +39,7 @@ function buildKpis(season) {
     const utilSource = season.utility_per_round ?? season.utility;
     const util = toNumber(utilSource ?? 0);
 
-    const base = { rating, adr, kd, entry, clutch, util };
+    const base = { adr, kd, entry, clutch, util };
     return PLAYER_KPI_SCHEMA.map(def => ({
         key: def.key,
         label: def.label,
@@ -58,17 +56,16 @@ function buildLineSeries(seasons) {
     const sorted = [...seasons].sort((a, b) => toNumber(a.season) - toNumber(b.season));
     return sorted.map(item => ({
         label: `S${item.season} · D${item.division_num}`,
-        rating: toNumber(item.rating ?? item.rating_2 ?? item.hltv_rating),
         kd: toNumber(item.kd),
         adr: toNumber(item.adr)
     }));
 }
 
-function buildSparklinePoints(series, key = 'rating') {
+function buildSparklinePoints(series, key = 'kd') {
     return series.map(item => {
         const value = Number(item[key]);
         if (!Number.isFinite(value)) return 0;
-        if (key === 'rating') {
+        if (key === 'kd') {
             const normalized = Math.max(0.4, Math.min(2.0, value));
             return (normalized - 1) / 1; // roughly -0.6..1.0 -> -1..1
         }
@@ -186,7 +183,7 @@ window.PlayerView = {
             return buildLineSeries(this.seasonsSegment.data || []);
         },
         sparklinePoints() {
-            return buildSparklinePoints(this.lineSeries, 'rating');
+            return buildSparklinePoints(this.lineSeries, 'kd');
         },
         radarMetrics() {
             return buildRadarMetrics(this.kpiMetrics);
@@ -368,7 +365,7 @@ window.PlayerView = {
 
                 <section class="player-charts">
                     <article class="player-chart glass-card">
-                        <h3 class="title-accent titleUnderlineCard">Rating trendi</h3>
+                        <h3 class="title-accent titleUnderlineCard">K/D trendi</h3>
                         <sparkline-chart
                             v-if="sparklinePoints.length"
                             :points="sparklinePoints"

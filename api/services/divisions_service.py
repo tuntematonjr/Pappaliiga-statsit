@@ -345,7 +345,6 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
             pst.adr,
             pst.kr,
             pst.kd,
-            pst.rating,
             pst.hs_pct,
             pst.damage,
             p.nickname,
@@ -392,7 +391,6 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
                 "adr": float(row.get("adr") or 0.0),
                 "kr": float(row.get("kr") or 0.0),
                 "kd": float(row.get("kd") or 0.0),
-                "rating": float(row.get("rating") or 0.0),
                 "hs_pct": float(row.get("hs_pct") or 0.0),
                 "damage": int(row.get("damage") or 0),
             }
@@ -700,7 +698,7 @@ async def _get_division_leaders(championship_id: str, season: int, division_num:
             pt.deaths,
             pt.adr,
             pt.kr,
-            pt.kd AS rating,
+            pt.kd,
             pt.mvps,
             pt.utility_damage,
             p.nickname,
@@ -725,7 +723,7 @@ async def _get_division_leaders(championship_id: str, season: int, division_num:
                 "deaths": int(row.get("deaths") or 0),
                 "adr": float(row.get("adr") or 0.0),
                 "kr": float(row.get("kr") or 0.0),
-                "rating": float(row.get("rating") or 0.0),
+                "kd": float(row.get("kd") or 0.0),
                 "mvps": int(row.get("mvps") or 0),
                 "utility_damage": int(row.get("utility_damage") or 0),
             }

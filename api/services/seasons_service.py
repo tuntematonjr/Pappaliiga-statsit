@@ -372,7 +372,7 @@ async def _fetch_division_winners_map(championship_ids: List[str]) -> Dict[str, 
 
 
 async def _fetch_best_players_map(season: int) -> Dict[tuple[int, int], Dict[str, Any]]:
-    """Fetch best player (by rating) for each division in a season."""
+    """Fetch best player (by KD) for each division in a season."""
     rows = await query_async(
         """
         SELECT 
@@ -380,13 +380,13 @@ async def _fetch_best_players_map(season: int) -> Dict[tuple[int, int], Dict[str
             pst.division_num,
             pst.player_id,
             p.nickname,
-            pst.rating
+            pst.kd
         FROM player_season_totals pst
         JOIN players p ON p.player_id = pst.player_id
         WHERE pst.season = :season
         AND pst.maps_played >= 3
-        AND pst.rating = (
-            SELECT MAX(pst2.rating)
+        AND pst.kd = (
+            SELECT MAX(pst2.kd)
             FROM player_season_totals pst2
             WHERE pst2.season = pst.season
             AND pst2.division_num = pst.division_num
@@ -401,7 +401,7 @@ async def _fetch_best_players_map(season: int) -> Dict[tuple[int, int], Dict[str
         key = (int(row["season"]), int(row["division_num"]))
         result[key] = {
             "name": row["nickname"],
-            "rating": float(row["rating"]),
+            "rating": float(row["kd"]),
         }
     
     return result
@@ -527,8 +527,7 @@ async def get_division_detailed_stats(season: int, division_id: str) -> Dict[str
             pst.team_id,
             COALESCE(SUM(pst.kills), 0) AS kills,
             COALESCE(SUM(pst.deaths), 0) AS deaths,
-            COALESCE(AVG(NULLIF(pst.adr, 0)), 0) AS adr,
-            COALESCE(AVG(NULLIF(pst.rating, 0)), 0) AS rating
+            COALESCE(AVG(NULLIF(pst.adr, 0)), 0) AS adr
         FROM player_season_totals pst
         WHERE pst.season = :season 
         AND pst.division_num = :division_num
@@ -557,7 +556,6 @@ async def get_division_detailed_stats(season: int, division_id: str) -> Dict[str
             "kills": kills,
             "deaths": deaths,
             "adr": float(agg.get("adr", 0.0)),
-            "rating": float(agg.get("rating", 0.0)),
         })
     
     # Get player leaderboards

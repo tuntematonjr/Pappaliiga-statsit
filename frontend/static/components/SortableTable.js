@@ -275,7 +275,12 @@ window.SortableTable = {
                             @click="handleSort(column)"
                             v-bind:data-sortable="column.sortable !== false ? true : null"
                             v-bind:data-sort-dir="(currentSort && currentSort.column === column.key) ? currentSort.order : null"
-                            :title="column.sortable !== false ? 'Click to sort' : ''"
+                            :aria-sort="(currentSort && currentSort.column === column.key) 
+                                ? (currentSort.order === 'asc' ? 'ascending' : 'descending') 
+                                : (column.sortable !== false ? 'none' : null)"
+                            :title="column.sortable !== false 
+                                ? ('Sort by ' + column.label + ', click to toggle' + (column.tooltip ? ' · ' + column.tooltip : ''))
+                                : (column.tooltip || '')"
                         >
                             <span class="th-content">
                                 {{ column.label }}

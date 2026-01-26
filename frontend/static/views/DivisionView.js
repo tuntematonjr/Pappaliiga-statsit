@@ -166,14 +166,6 @@ const SANKARI_CARD_GROUPS = [
                 maxEntries: 4
             },
             {
-                id: 'tilastopappa',
-                title: 'Tilastopappa',
-                description: 'Kaikki numerot kunnossa, vaikka crosshair ei ole.<br>Paras Rating 1.0.',
-                metricKey: 'rating',
-                sortDirection: 'desc',
-                maxEntries: 4
-            },
-            {
                 id: 'taysmaito',
                 title: 'Täysmaito',
                 description: 'Kerran flash osuu muualle kuin omaan tiimiin.<br>Eniten onnistuneita flashbangheittoja.',
@@ -240,7 +232,6 @@ const SANKARI_METRIC_META = {
     mvps: { decimals: 0 },
     clutchKills: { decimals: 0 },
     clutchWinRate: { decimals: 1, percent: true },
-    rating: { decimals: 2 },
     flashAssistPercent: { decimals: 1, percent: true },
     utilityDamage: { decimals: 0 },
     survivalPercent: { decimals: 1, percent: true },
@@ -839,7 +830,6 @@ window.DivisionView = {
                 adr: this.toNumber(row.adr, null),
                 kr: this.toNumber(row.kr, null),
                 kd: this.toNumber(row.kd, null),
-                rating: this.toNumber(row.rating, null),
                 hsPct: this.toNumber(row.hs_pct ?? row.hsPercent ?? row.hs, null),
                 mvps: safe(row.mvps),
                 pistolKills: safe(row.pistol_kills ?? row.pistolKills),
@@ -954,8 +944,6 @@ window.DivisionView = {
                     if (!attempts) return null;
                     return this.percentValue(wins / attempts);
                 }
-                case 'rating':
-                    return player.rating != null && !Number.isNaN(player.rating) ? player.rating : player.kd;
                 case 'flashAssistPercent':
                     if (!player.flashCount) return null;
                     return this.percentValue(player.flashSuccesses / player.flashCount);

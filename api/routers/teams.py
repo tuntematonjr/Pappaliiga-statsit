@@ -70,6 +70,21 @@ class TeamMapStats(CamelModel):
     utility_damage: int
     winrate: Optional[float] = None
     pick_rate: Optional[float] = None
+    udpr: Optional[float] = None
+    # Player stats aggregated by map
+    assists: Optional[int] = None
+    kr: Optional[float] = None
+    hs_pct: Optional[float] = None
+    sniper_kills: Optional[int] = None
+    pistol_kills: Optional[int] = None
+    multi_2k: Optional[int] = None
+    multi_3k: Optional[int] = None
+    multi_4k: Optional[int] = None
+    multi_5k: Optional[int] = None
+    clutch_kills: Optional[int] = None
+    enemies_flashed: Optional[int] = None
+    flash_count: Optional[int] = None
+    flash_successes: Optional[int] = None
 
 
 class MatchFull(CamelModel):
@@ -120,7 +135,6 @@ class PlayerStats(CamelModel):
     adr: float
     kr: float
     kd: float
-    rating: float
     hs_pct: float
     damage: int
 
@@ -135,6 +149,28 @@ class VetoBanAggregate(CamelModel):
     pick_win_rate: Optional[float] = None
 
 
+class DivisionAverages(CamelModel):
+    avg_win_rate: float
+    avg_round_diff: float
+    avg_map_win_rate: float
+
+
+class PlayerRoleStats(CamelModel):
+    awp_rate: float
+    entry_success: float
+    assist_rate: float
+    clutch_success: float
+
+
+class PlayerWithRole(CamelModel):
+    player_id: str
+    nickname: Optional[str]
+    maps_played: int
+    roles: List[str]
+    primary_role: str
+    role_stats: PlayerRoleStats
+
+
 class ComprehensiveTeamSeasonData(CamelModel):
     championship_id: str
     season: int
@@ -145,6 +181,9 @@ class ComprehensiveTeamSeasonData(CamelModel):
     player_stats: List[PlayerStats] = []
     veto_history: List[MapVeto] = []
     veto_aggregates: List[VetoBanAggregate] = []
+    # Phase 1 enhancements
+    division_averages: Optional[DivisionAverages] = None
+    player_roles: Optional[List[PlayerWithRole]] = None
 
 
 class TeamPageResponse(CamelModel):

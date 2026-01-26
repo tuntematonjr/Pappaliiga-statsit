@@ -33,7 +33,6 @@ class PlayerSeasonStats(CamelModel):
     assists: int
     kd: float
     adr: float
-    rating: float
     hs_pct: float
     mvps: int
 

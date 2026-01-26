@@ -18,6 +18,7 @@
 - Keep routers thin; business logic in `api/services/*`; cache expensive aggregations with `AsyncTTLCache` when results are reused.
 - Faceit access: `faceit_client_async.py` enforces 10k/hr + adaptive backoff (max 8 concurrent HTTP requests); avoid extra loops that skip the limiter.
 - Pool sizing: asyncmy pool defaults min 2 / max 30; sync workers expect `DB_CONNECTIONS_PER_WORKER` (default 3) and `MAX_DB_WRITER_CONCURRENCY` (default 6) to fit inside that pool; `DB_POOL_DEBUG` controls pool tracing.
+- Standings logic: Use `standings_utils.calculate_standings()` for all rankings; follows official Pappaliiga tiebreakers (matches won → round diff → h2h maps → h2h round diff → alphabetical); `_calculate_h2h_stats()` in `teams_service.py` computes head-to-head stats for tied teams.
 
 ## Data & Schema Notes
 - Championships include `is_playoffs`, `slug`, `parent_championship_id`, `winner_team_id`; playoffs auto-link to regular-season parents by slug match in `sync_pipeline.py`.
@@ -43,6 +44,7 @@
 ## Key Files
 - Data sync: `sync.py`, `sync_pipeline.py`, `division_registry.py`, `faceit_client_async.py`, `division_overrides.json`.
 - DB layer: `db_async.py`, `mariadb_schema.sql`.
+- Standings: `standings_utils.py` (official Pappaliiga tiebreaker logic with h2h support).
 - API: `api/main.py`, routers `api/routers/{seasons,season_view,divisions,championships,teams,players,matches,stats,maps_catalog}.py`, services `api/services/{seasons_service,season_view_service,stats_service,teams_service}.py`.
 - Frontend: `frontend/static/app-main.js`, `frontend/static/api-client.js`, views `frontend/static/views/{HomeView.js,SeasonsView.js,DivisionView.js,TeamDetailView.js,PlayerView.js}`, components under `frontend/static/components/`.
 

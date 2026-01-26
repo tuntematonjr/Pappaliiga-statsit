@@ -4,6 +4,7 @@ from typing import Any, Collection, Dict, Optional
 from datetime import datetime, timezone
 
 from db_async import compute_team_map_deltas_async, get_team_matches_mirror_async, query_async
+from standings_utils import calculate_standings, get_team_position
 
 from api.exceptions import NotFoundError
 
@@ -336,7 +337,7 @@ async def fetch_team_page(team_id: str, championship_id: Optional[str] = None) -
 
 
 async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str) -> list[dict[str, Any]]:
-    """Fetch comprehensive map statistics for a team in a championship."""
+    """Fetch comprehensive map statistics for a team in a championship with player metrics aggregated by map."""
     champ_rows = await query_async(
         "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
         {"champ_id": championship_id},
@@ -348,8 +349,8 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
     season = champ["season"]
     division_num = champ["division_num"]
     
-    # Get team map totals
-    rows = await query_async(
+    # Get team map totals from team_map_season_totals
+    team_map_rows = await query_async(
         """
         SELECT
             map_name, played, picks, opp_picks, wins, games, ban1, ban2, opp_ban, 
@@ -361,12 +362,46 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
         {"season": season, "div": division_num, "team_id": team_id}
     )
     
-    if not rows:
+    if not team_map_rows:
         raise NotFoundError(f"No map stats found for team '{team_id}' in championship {championship_id}")
     
-    # Add calculated fields
+    # Enhance with per-player stats aggregated by map
+    player_stats_by_map = await query_async(
+        """
+        SELECT
+            m.map_name,
+            COUNT(DISTINCT ps.player_stat_id) as stat_count,
+            SUM(ps.assists) as assists,
+            AVG(ps.kr) as kr,
+            AVG(ps.hs_pct) as hs_pct,
+            SUM(ps.sniper_kills) as sniper_kills,
+            SUM(ps.pistol_kills) as pistol_kills,
+            SUM(ps.mk_2k) as multi_2k,
+            SUM(ps.mk_3k) as multi_3k,
+            SUM(ps.mk_4k) as multi_4k,
+            SUM(ps.mk_5k) as multi_5k,
+            SUM(ps.clutch_kills) as clutch_kills,
+            SUM(ps.enemies_flashed) as enemies_flashed,
+            SUM(ps.flash_count) as flash_count,
+            SUM(ps.flash_successes) as flash_successes
+        FROM maps m
+        INNER JOIN matches mt ON m.match_id = mt.match_id 
+        LEFT JOIN player_stats ps ON m.map_id = ps.map_id AND ps.team_id = :team_id AND ps.is_forfeit_map = 0
+        WHERE mt.season = :season 
+            AND mt.division_num = :div 
+            AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
+            AND m.is_forfeit = 0
+        GROUP BY m.map_name
+        """,
+        {"season": season, "div": division_num, "team_id": team_id}
+    )
+    
+    # Create lookup dict for player stats
+    player_stats_map = {row["map_name"]: dict(row) for row in player_stats_by_map}
+    
+    # Merge data
     result = []
-    for row in rows:
+    for row in team_map_rows:
         data = dict(row)
         played = data.get("played") or 0
         picks = data.get("picks") or 0
@@ -374,6 +409,33 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
         
         data["winrate"] = (wins / played * 100) if played > 0 else 0.0
         data["pick_rate"] = (picks / played * 100) if played > 0 else 0.0
+        
+        # Calculate metrics from damage if ADR is 0 (estimate 30 rounds per map)
+        estimated_rounds = played * 30
+        if data.get("adr", 0) == 0 and estimated_rounds > 0:
+            data["adr"] = data.get("damage", 0) / estimated_rounds
+        
+        # Calculate UDPR
+        if estimated_rounds > 0:
+            data["udpr"] = data.get("utility_damage", 0) / estimated_rounds
+        else:
+            data["udpr"] = 0
+        
+        # Merge player stats if available
+        map_name = data.get("map_name")
+        if map_name and map_name in player_stats_map:
+            player_data = player_stats_map[map_name]
+            for key, value in player_data.items():
+                if key != "map_name" and key != "stat_count":
+                    # Convert Decimal to float/int
+                    if value is not None:
+                        if key in ("kr", "hs_pct"):  # Float fields
+                            data[key] = float(value) if value is not None else 0
+                        else:  # Integer fields
+                            data[key] = int(float(value)) if value is not None else 0
+                    else:
+                        data[key] = 0
+        
         result.append(data)
     
     return result
@@ -439,14 +501,13 @@ async def fetch_team_players_comprehensive(team_id: str, championship_id: Option
             pst.adr,
             pst.kr,
             pst.kd,
-            pst.rating,
             pst.hs_pct,
             pst.damage,
             p.nickname
         FROM player_season_totals pst
         LEFT JOIN players p ON p.player_id = pst.player_id
         WHERE pst.season = :season AND pst.division_num = :div AND pst.team_id = :team_id
-        ORDER BY pst.maps_played DESC, pst.rating DESC
+        ORDER BY pst.maps_played DESC
         """,
         {"season": season, "div": division_num, "team_id": team_id}
     )
@@ -570,6 +631,289 @@ async def fetch_team_veto_aggregates(team_id: str, championship_id: str) -> list
     return result
 
 
+async def _calculate_h2h_stats(
+    championship_id: str,
+    team_ids: list[str]
+) -> dict[str, dict[str, Any]]:
+    """
+    Calculate head-to-head stats between specified teams.
+    
+    Returns dict mapping team_id to {h2h_maps_won, h2h_round_diff}
+    based only on matches between the specified teams.
+    """
+    if len(team_ids) < 2:
+        return {}
+    
+    # Get all matches between these teams
+    placeholders = ', '.join([f':team{i}' for i in range(len(team_ids))])
+    params = {"champ_id": championship_id}
+    for i, tid in enumerate(team_ids):
+        params[f'team{i}'] = tid
+    
+    matches = await query_async(
+        f"""
+        SELECT
+            match_id,
+            team1_id,
+            team2_id,
+            winner_team_id,
+            status,
+            best_of
+        FROM matches
+        WHERE championship_id = :champ_id
+          AND status = 'FINISHED'
+          AND team1_id IN ({placeholders})
+          AND team2_id IN ({placeholders})
+        """,
+        params
+    )
+    
+    # Get map results for these matches
+    match_ids = [m['match_id'] for m in matches]
+    if not match_ids:
+        return {tid: {'h2h_maps_won': 0, 'h2h_round_diff': 0} for tid in team_ids}
+    
+    map_placeholders = ', '.join([f':mid{i}' for i in range(len(match_ids))])
+    map_params = {}
+    for i, mid in enumerate(match_ids):
+        map_params[f'mid{i}'] = mid
+    
+    maps = await query_async(
+        f"""
+        SELECT
+            match_id,
+            winner_team_id,
+            is_forfeit,
+            score_team1,
+            score_team2
+        FROM maps
+        WHERE match_id IN ({map_placeholders})
+        """,
+        map_params
+    )
+    
+    # Build match lookup
+    match_lookup = {m['match_id']: m for m in matches}
+    
+    # Calculate h2h stats per team
+    h2h_stats = {tid: {'h2h_maps_won': 0, 'h2h_round_diff': 0} for tid in team_ids}
+    
+    for map_row in maps:
+        match = match_lookup.get(map_row['match_id'])
+        if not match:
+            continue
+        
+        team1_id = match['team1_id']
+        team2_id = match['team2_id']
+        winner_id = map_row['winner_team_id']
+        
+        # Count map win
+        if winner_id and winner_id in h2h_stats:
+            h2h_stats[winner_id]['h2h_maps_won'] += 1
+        
+        # Count rounds
+        if map_row['is_forfeit']:
+            # Forfeit: 13-0
+            if winner_id == team1_id:
+                h2h_stats[team1_id]['h2h_round_diff'] += 13
+                h2h_stats[team2_id]['h2h_round_diff'] -= 13
+            elif winner_id == team2_id:
+                h2h_stats[team2_id]['h2h_round_diff'] += 13
+                h2h_stats[team1_id]['h2h_round_diff'] -= 13
+        else:
+            # Actual score
+            t1_score = int(map_row['score_team1'] or 0)
+            t2_score = int(map_row['score_team2'] or 0)
+            h2h_stats[team1_id]['h2h_round_diff'] += (t1_score - t2_score)
+            h2h_stats[team2_id]['h2h_round_diff'] += (t2_score - t1_score)
+    
+    return h2h_stats
+
+
+async def get_division_standings(championship_id: str) -> list[dict[str, Any]]:
+    """
+    Get division standings following official Pappaliiga rules:
+    1. Matches won
+    2. Round differential  
+    3. Head-to-head maps (between tied teams)
+    4. Head-to-head round differential (between tied teams)
+    5. Alphabetical
+    """
+    champ_rows = await query_async(
+        "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
+        {"champ_id": championship_id},
+    )
+    if not champ_rows:
+        raise NotFoundError(f"Championship {championship_id} not found")
+    
+    champ = champ_rows[0]
+    season = champ["season"]
+    division_num = champ["division_num"]
+    
+    rows = await query_async(
+        """
+        SELECT
+            tst.team_id,
+            t.name AS team_name,
+            tst.matches_played,
+            tst.matches_won,
+            GREATEST(CAST(tst.matches_played AS SIGNED) - CAST(tst.matches_won AS SIGNED), 0) AS matches_lost,
+            tst.maps_played,
+            tst.maps_won,
+            GREATEST(CAST(tst.maps_played AS SIGNED) - CAST(tst.maps_won AS SIGNED), 0) AS maps_lost,
+            tst.rounds_won,
+            tst.rounds_lost,
+            (CAST(tst.rounds_won AS SIGNED) - CAST(tst.rounds_lost AS SIGNED)) AS round_diff,
+            CASE WHEN tst.matches_played > 0 THEN (tst.matches_won / tst.matches_played) * 100 ELSE 0 END AS win_rate
+        FROM team_season_totals tst
+        JOIN teams t ON t.team_id = tst.team_id
+        WHERE tst.season = :season AND tst.division_num = :div
+        """,
+        {"season": season, "div": division_num}
+    )
+    
+    if not rows:
+        return []
+    
+    # Convert to list of dicts
+    teams = [dict(row) for row in rows]
+    
+    # Calculate h2h stats for potential tiebreakers
+    # Only calculated between teams - used when tied on wins and round_diff
+    team_ids = [t['team_id'] for t in teams]
+    h2h_data = await _calculate_h2h_stats(championship_id, team_ids)
+    
+    # Use standings utility with official Pappaliiga tiebreakers
+    sorted_teams = calculate_standings(
+        teams,
+        primary_key='matches_won',
+        tiebreakers=['round_diff', 'h2h_maps', 'h2h_round_diff', 'team_name'],
+        h2h_data=h2h_data
+    )
+    
+    return sorted_teams
+
+
+async def get_division_averages(championship_id: str) -> dict[str, float]:
+    """Get division-wide averages for comparison."""
+    champ_rows = await query_async(
+        "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
+        {"champ_id": championship_id},
+    )
+    if not champ_rows:
+        return {}
+    
+    champ = champ_rows[0]
+    season = champ["season"]
+    division_num = champ["division_num"]
+    
+    rows = await query_async(
+        """
+        SELECT
+            AVG(CASE WHEN tst.matches_played > 0 THEN (tst.matches_won / tst.matches_played) * 100 ELSE 0 END) AS avg_win_rate,
+            AVG(CAST(tst.rounds_won AS SIGNED) - CAST(tst.rounds_lost AS SIGNED)) AS avg_round_diff,
+            AVG(CASE WHEN tst.maps_played > 0 THEN (tst.maps_won / tst.maps_played) * 100 ELSE 0 END) AS avg_map_win_rate
+        FROM team_season_totals tst
+        WHERE tst.season = :season AND tst.division_num = :div
+        """,
+        {"season": season, "div": division_num}
+    )
+    
+    if not rows:
+        return {}
+    
+    row = rows[0]
+    return {
+        "avg_win_rate": float(row.get("avg_win_rate") or 0.0),
+        "avg_round_diff": float(row.get("avg_round_diff") or 0.0),
+        "avg_map_win_rate": float(row.get("avg_map_win_rate") or 0.0)
+    }
+
+
+async def detect_player_roles(championship_id: str, team_id: str) -> list[dict[str, Any]]:
+    """Detect player roles based on statistical patterns."""
+    champ_rows = await query_async(
+        "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
+        {"champ_id": championship_id},
+    )
+    if not champ_rows:
+        return []
+    
+    champ = champ_rows[0]
+    season = champ["season"]
+    division_num = champ["division_num"]
+    
+    rows = await query_async(
+        """
+        SELECT
+            pst.player_id,
+            p.nickname,
+            pst.maps_played,
+            pst.sniper_kills,
+            pst.entry_count,
+            pst.entry_wins,
+            pst.assists,
+            pst.utility_damage,
+            pst.enemies_flashed,
+            pst.clutch_kills,
+            pst.cl_1v1_attempts,
+            pst.cl_1v1_wins,
+            pst.kills,
+            pst.rounds_played,
+            CASE WHEN pst.rounds_played > 0 THEN pst.sniper_kills / pst.rounds_played ELSE 0 END AS awp_rate,
+            CASE WHEN pst.entry_count > 0 THEN pst.entry_wins / pst.entry_count ELSE 0 END AS entry_success,
+            CASE WHEN pst.rounds_played > 0 THEN pst.assists / pst.rounds_played ELSE 0 END AS assist_rate,
+            CASE WHEN pst.cl_1v1_attempts > 0 THEN pst.cl_1v1_wins / pst.cl_1v1_attempts ELSE 0 END AS clutch_success
+        FROM player_season_totals pst
+        LEFT JOIN players p ON p.player_id = pst.player_id
+        WHERE pst.season = :season AND pst.division_num = :div AND pst.team_id = :team_id
+        ORDER BY pst.maps_played DESC
+        """,
+        {"season": season, "div": division_num, "team_id": team_id}
+    )
+    
+    players_with_roles = []
+    for row in rows:
+        awp_rate = float(row.get("awp_rate") or 0.0)
+        entry_success = float(row.get("entry_success") or 0.0)
+        assist_rate = float(row.get("assist_rate") or 0.0)
+        clutch_success = float(row.get("clutch_success") or 0.0)
+        entry_count = int(row.get("entry_count") or 0)
+        utility_damage = int(row.get("utility_damage") or 0)
+        enemies_flashed = int(row.get("enemies_flashed") or 0)
+        
+        # Role detection logic
+        roles = []
+        if awp_rate > 0.15:  # More than 15% of rounds using AWP
+            roles.append("AWPer")
+        if entry_count > 50 and entry_success > 0.45:  # High entry attempts with decent success
+            roles.append("Entry Fragger")
+        if assist_rate > 0.15 or (utility_damage > 1000 and enemies_flashed > 100):
+            roles.append("Support")
+        if clutch_success > 0.35 and row.get("cl_1v1_attempts", 0) > 10:
+            roles.append("Clutcher")
+        
+        # Default to Rifler if no specific role identified
+        if not roles:
+            roles.append("Rifler")
+        
+        players_with_roles.append({
+            "player_id": row["player_id"],
+            "nickname": row["nickname"],
+            "maps_played": int(row["maps_played"] or 0),
+            "roles": roles,
+            "primary_role": roles[0] if roles else "Rifler",
+            "role_stats": {
+                "awp_rate": round(awp_rate * 100, 1),
+                "entry_success": round(entry_success * 100, 1),
+                "assist_rate": round(assist_rate * 100, 1),
+                "clutch_success": round(clutch_success * 100, 1)
+            }
+        })
+    
+    return players_with_roles
+
+
 async def fetch_comprehensive_team_season(team_id: str, championship_id: str) -> dict[str, Any]:
     """Fetch all comprehensive team season data in one call."""
     champ_rows = await query_async(
@@ -633,6 +977,19 @@ async def fetch_comprehensive_team_season(team_id: str, championship_id: str) ->
     except NotFoundError:
         veto_aggregates = []
     
+    # Fetch Phase 1 enhancements (division averages and player roles)
+    try:
+        division_averages = await get_division_averages(championship_id)
+    except Exception as e:
+        print(f"Error fetching division averages: {e}")
+        division_averages = {}
+    
+    try:
+        player_roles = await detect_player_roles(championship_id, team_id)
+    except Exception as e:
+        print(f"Error fetching player roles: {e}")
+        player_roles = []
+    
     return {
         "championship_id": championship_id,
         "season": season,
@@ -642,6 +999,8 @@ async def fetch_comprehensive_team_season(team_id: str, championship_id: str) ->
         "match_history": matches,
         "player_stats": players,
         "veto_history": veto_history,
-        "veto_aggregates": veto_aggregates
+        "veto_aggregates": veto_aggregates,
+        # Phase 1 enhancements
+
     }
 

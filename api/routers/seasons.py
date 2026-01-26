@@ -94,7 +94,6 @@ class TeamStats(CamelModel):
     kills: int
     deaths: int
     adr: float
-    rating: float
 
 
 class PlayerLeader(CamelModel):

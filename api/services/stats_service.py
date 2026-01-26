@@ -144,7 +144,6 @@ async def get_overview_stats() -> dict[str, int]:
 _STAT_COLUMN_MAP = {
     "kd": "kd",
     "adr": "adr",
-    "rating": "rating",
     "hs_pct": "hs_pct",
     "kills": "kills",
     "mvps": "mvps",
@@ -217,7 +216,7 @@ async def get_division_averages(championship_id: int) -> dict[str, float]:
     rows = await query_async(
         f"""
         SELECT AVG(pst.kd) AS avg_kd, AVG(pst.adr) AS avg_adr,
-               AVG(pst.rating) AS avg_rating, AVG(pst.hs_pct) AS avg_hs_pct,
+               AVG(pst.hs_pct) AS avg_hs_pct,
                AVG(pst.kr) AS avg_kr
         FROM player_season_totals pst
         WHERE {where_clause} AND pst.maps_played >= 3
@@ -228,7 +227,6 @@ async def get_division_averages(championship_id: int) -> dict[str, float]:
         return {
             "avg_kd": 0.0,
             "avg_adr": 0.0,
-            "avg_rating": 0.0,
             "avg_hs_pct": 0.0,
             "avg_kr": 0.0,
         }
@@ -236,7 +234,6 @@ async def get_division_averages(championship_id: int) -> dict[str, float]:
     return {
         "avg_kd": float(row.get("avg_kd") or 0.0),
         "avg_adr": float(row.get("avg_adr") or 0.0),
-        "avg_rating": float(row.get("avg_rating") or 0.0),
         "avg_hs_pct": float(row.get("avg_hs_pct") or 0.0),
         "avg_kr": float(row.get("avg_kr") or 0.0),
     }

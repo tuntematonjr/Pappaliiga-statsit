@@ -1183,7 +1183,10 @@ async def upsert_team_season_totals_async(
     snapshot_ts: int | None = None,
     label: str = "team-season-totals",
 ) -> None:
-    """Upsert aggregated season totals for a team (inline, no stored proc)."""
+    """Upsert aggregated season totals for a team (inline, no stored proc).
+    
+    Note: Aggregates ONLY regular season matches (is_playoffs=0), not playoffs.
+    """
     async with connection(label=label) as conn:
         async with conn.cursor() as cur:
             await cur.execute(
@@ -1196,7 +1199,7 @@ async def upsert_team_season_totals_async(
                 SELECT
                   %s AS season, %s AS division_num, %s AS team_id,
                   COUNT(DISTINCT m.match_id) AS matches_played,
-                  SUM(CASE WHEN m.winner_team_id = %s THEN 1 ELSE 0 END) AS matches_won,
+                  COUNT(DISTINCT CASE WHEN m.winner_team_id = %s THEN m.match_id END) AS matches_won,
                   COUNT(mp.map_id) AS maps_played,
                   SUM(CASE WHEN mp.winner_team_id = %s THEN 1 ELSE 0 END) AS maps_won,
                   SUM(
@@ -1210,10 +1213,12 @@ async def upsert_team_season_totals_async(
                          ELSE 0 END
                   ) AS rounds_lost
                 FROM matches m
+                JOIN championships c ON m.championship_id = c.championship_id
                 LEFT JOIN maps mp ON mp.match_id = m.match_id
                 WHERE m.season = %s
                   AND m.division_num = %s
                   AND (m.team1_id = %s OR m.team2_id = %s)
+                  AND c.is_playoffs = 0
                 GROUP BY season, division_num, team_id
                 ON DUPLICATE KEY UPDATE
                   matches_played = VALUES(matches_played),
@@ -1262,7 +1267,7 @@ async def upsert_player_season_totals_async(
                   flash_count, flash_successes, mk_2k, mk_3k, mk_4k, mk_5k,
                   clutch_kills, cl_1v1_attempts, cl_1v1_wins,
                   cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
-                  pistol_kills, adr, kr, kd, rating, hs_pct, damage
+                  pistol_kills, adr, kr, kd, hs_pct, damage
                 )
                 SELECT
                   %s AS season, %s AS division_num, %s AS player_id,
@@ -1293,7 +1298,6 @@ async def upsert_player_season_totals_async(
                   COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
                   COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
                   COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                  0 AS rating,
                   AVG(ps.hs_pct) AS hs_pct,
                   SUM(ps.damage) AS damage
                 FROM player_stats ps
@@ -1329,7 +1333,6 @@ async def upsert_player_season_totals_async(
                   adr = VALUES(adr),
                   kr = VALUES(kr),
                   kd = VALUES(kd),
-                  rating = VALUES(rating),
                   hs_pct = VALUES(hs_pct),
                   damage = VALUES(damage)
                 """,

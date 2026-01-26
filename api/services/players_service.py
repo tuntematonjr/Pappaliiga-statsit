@@ -33,7 +33,7 @@ async def fetch_player_season_stats(player_id: str) -> list[dict[str, Any]]:
         SELECT pst.season, pst.division_num, c.championship_id,
                pst.team_id, t.name AS team_name,
                pst.maps_played, pst.rounds_played, pst.kills, pst.deaths, pst.assists,
-               pst.kd, pst.adr, pst.rating, pst.hs_pct, pst.mvps
+               pst.kd, pst.adr, pst.hs_pct, pst.mvps
         FROM player_season_totals pst
         JOIN championships c ON c.season = pst.season AND c.division_num = pst.division_num
         LEFT JOIN teams t ON t.team_id = pst.team_id

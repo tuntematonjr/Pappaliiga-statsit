@@ -137,7 +137,6 @@ async def recompute_for_championship(championship_id: str) -> None:
                     season,
                     division_num,
                     tid,
-                    conn=conn,
                 )
                 updated_teams += 1
             except Exception as exc:
@@ -149,7 +148,6 @@ async def recompute_for_championship(championship_id: str) -> None:
                     season,
                     division_num,
                     pid,
-                    conn=conn,
                 )
                 updated_players += 1
             except Exception as exc:

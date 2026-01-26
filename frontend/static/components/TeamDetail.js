@@ -7,7 +7,6 @@ const PLAYER_COLUMNS = [
     { key: 'nickname', label: 'Pelaaja', sortable: true, colClass: 'col-name' },
     { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true },
     { key: 'roundsPlayed', label: 'R', sortable: true, numeric: true },
-    { key: 'rating', label: 'Rating', sortable: true, numeric: true, decimals: 2, colClass: 'col-rating' },
     { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd' },
     { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 2 },
     { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr' },
@@ -33,44 +32,81 @@ const PLAYER_COLUMNS = [
 ];
 
 const MAP_COLUMNS = [
-    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '210px' },
-    { key: 'played', label: 'Pelattu', sortable: true, numeric: true },
-    { key: 'games', label: 'Maps', sortable: true, numeric: true },
-    { key: 'wins', label: 'W', sortable: true, numeric: true },
-    { key: 'losses', label: 'L', sortable: true, numeric: true },
-    { key: 'winrate', label: 'Win%', sortable: true, numeric: true, decimals: 1, colClass: 'col-winrate' },
-    { key: 'rating', label: 'Rating', sortable: true, numeric: true, decimals: 2 },
-    { key: 'picks', label: 'Picks', sortable: true, numeric: true },
-    { key: 'oppPicks', label: 'Opp Picks', sortable: true, numeric: true },
-    { key: 'pickRate', label: 'Pick%', sortable: true, numeric: true, decimals: 1 },
-    { key: 'ban1', label: 'Ban1', sortable: true, numeric: true },
-    { key: 'ban2', label: 'Ban2', sortable: true, numeric: true },
-    { key: 'oppBan', label: 'Opp Ban', sortable: true, numeric: true },
-    { key: 'totalOwnBan', label: 'Own Bans', sortable: true, numeric: true },
-    { key: 'decov', label: 'Dec/OV', sortable: true, numeric: true },
-    { key: 'rd', label: 'RD', sortable: true, numeric: true },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd' },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr' },
-    { key: 'ctWr', label: 'CT%', sortable: true, numeric: true, decimals: 1 },
-    { key: 'tWr', label: 'T%', sortable: true, numeric: true, decimals: 1 },
-    { key: 'damage', label: 'Dmg', sortable: true, numeric: true },
-    { key: 'utilityDamage', label: 'U-Dmg', sortable: true, numeric: true },
-    { key: 'mvps', label: 'MVP', sortable: true, numeric: true },
-    { key: 'kills', label: 'Kills', sortable: true, numeric: true },
-    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true }
+    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '210px', tooltip: 'Kartta' },
+    { key: 'totalRoundsPlayed', label: 'Erät pelattu', sortable: true, numeric: true, decimals: 0, colClass: 'mono-num', tooltip: 'Arvioidut erät: pelatut kartat × 30' },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', tooltip: 'Average Damage per Round' },
+    { key: 'kr', label: 'KR', sortable: true, numeric: true, decimals: 3, colClass: 'mono-num', tooltip: 'Kills per round' },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', tooltip: 'Kills / Deaths' },
+    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Headshot %' },
+    { key: 'kills', label: 'Tappoja', sortable: true, numeric: true, colClass: 'mono-num col-kills', tooltip: 'Kills (total)' },
+    { key: 'deaths', label: 'Kuolemia', sortable: true, numeric: true, colClass: 'mono-num col-deaths', tooltip: 'Deaths (total)' },
+    { key: 'assists', label: 'Assist', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Assists (total)' },
+    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Utility damage per round' },
+    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, colClass: 'mono-num col-mvps', tooltip: 'MVP:t (total)' },
+    { key: 'enemiesFlashed', label: 'Enemies flashed', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Vastustajat väläytettynä (total)' },
+    { key: 'flashSuccessPct', label: 'Flash%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Flash-succes % (flash_successes / flash_count)' },
+    { key: 'flashCount', label: 'Flashbangit', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Heitetyt flashbangit (total)' },
+    { key: 'multi2k', label: '2k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '2K (total)' },
+    { key: 'multi3k', label: '3k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '3K (total)' },
+    { key: 'multi4k', label: '4k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '4K (total)' },
+    { key: 'multi5k', label: 'Ace', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Ace (5K, total)' },
+    { key: 'pistolKills', label: 'Pistooli', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Pistoolitapot (total)' },
+    { key: 'sniperKills', label: 'Sniper', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Sniper-tapot (total)' },
+    { key: 'totalDamage', label: 'Vahinko', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Damage (total)' },
+    { key: 'clutchKills', label: 'Clutch', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Clutch-kills (total)' }
 ];
 
+// Dynamically compute groups from MAP_COLUMNS to ensure alignment
+function computeMapColumnGroups(columns) {
+    // Map column keys to their group labels
+    const groupMap = {
+        'mapName': '',
+        'totalRoundsPlayed': 'Erät',
+        'adr': 'Taistelu', 'kr': 'Taistelu', 'kd': 'Taistelu', 'hsPct': 'Taistelu',
+        'kills': 'Tappiot/Assist', 'deaths': 'Tappiot/Assist', 'assists': 'Tappiot/Assist',
+        'udpr': 'Utility',
+        'mvps': 'MVP',
+        'enemiesFlashed': 'Flashbangit', 'flashSuccessPct': 'Flashbangit', 'flashCount': 'Flashbangit',
+        'multi2k': 'Multi-kills', 'multi3k': 'Multi-kills', 'multi4k': 'Multi-kills', 'multi5k': 'Multi-kills',
+        'pistolKills': 'Aseet', 'sniperKills': 'Aseet',
+        'totalDamage': 'Vahinko',
+        'clutchKills': 'Clutch'
+    };
+
+    const groups = [];
+    let currentGroup = null;
+    
+    columns.forEach((col) => {
+        const groupLabel = groupMap[col.key] || '';
+        if (!currentGroup || currentGroup.label !== groupLabel) {
+            if (currentGroup) groups.push(currentGroup);
+            currentGroup = { 
+                label: groupLabel, 
+                colSpan: 1, 
+                className: groupLabel ? `group-${groupLabel.toLowerCase().replace(/[^\w]/g, '')} group-divider` : 'group-map'
+            };
+        } else {
+            currentGroup.colSpan += 1;
+        }
+    });
+    
+    if (currentGroup) groups.push(currentGroup);
+    return groups;
+}
+
+const MAP_COLUMN_GROUPS = computeMapColumnGroups(MAP_COLUMNS);
+
 const SCOUT_MAP_COLUMNS = [
-    { key: 'mapName', label: 'Map', sortable: true, colClass: 'col-name col-map-name', width: '200px' },
+    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px' },
     { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played' },
     { key: 'picks', label: 'Omat pickit', sortable: true, numeric: true, colClass: 'mono-num col-picks' },
     { key: 'oppPicks', label: 'Vastustajan pickit', sortable: true, numeric: true, colClass: 'mono-num col-opp-picks' },
     { key: 'winrate', label: 'Win %', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate' },
     { key: 'pickWinRate', label: 'Win % (oma pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-own' },
     { key: 'oppPickWinRate', label: 'Win % (vastustajan pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-opp' },
+    { key: 'rd', label: 'Eräero', sortable: true, numeric: true, colClass: 'mono-num col-rd' },
     { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd' },
     { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr' },
-    { key: 'rd', label: 'Eräero', sortable: true, numeric: true, colClass: 'mono-num col-rd' },
     { key: 'ban1', label: '1. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban1' },
     { key: 'ban2', label: '2. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban2' },
     { key: 'oppBan', label: 'Vastustajan banni', sortable: true, numeric: true, colClass: 'mono-num col-opp-ban' },
@@ -78,14 +114,38 @@ const SCOUT_MAP_COLUMNS = [
     { key: 'decov', label: 'Decider / overflow', sortable: true, numeric: true, colClass: 'mono-num col-decov' }
 ];
 
-const SCOUT_MAP_GROUPS = [
-    { label: '', colSpan: 1, className: 'group-map' },
-    { label: 'Pelattu', colSpan: 3, className: 'group-usage group-divider' },
-    { label: 'Tulokset', colSpan: 3, className: 'group-results group-divider' },
-    { label: 'Suorituskyky', colSpan: 3, className: 'group-performance group-divider' },
-    { label: 'Bannit', colSpan: 4, className: 'group-veto group-divider' },
-    { label: '', colSpan: 1, className: 'group-series group-divider' }
-];
+function computeScoutMapColumnGroups(columns) {
+    const groupMap = {
+        'mapName': '',
+        'played': 'Pelattu', 'picks': 'Pelattu', 'oppPicks': 'Pelattu',
+        'winrate': 'Tulokset', 'pickWinRate': 'Tulokset', 'oppPickWinRate': 'Tulokset',
+        'rd': 'Suorituskyky', 'kd': 'Suorituskyky', 'adr': 'Suorituskyky',
+        'ban1': 'Bannit', 'ban2': 'Bannit', 'oppBan': 'Bannit', 'totalOwnBan': 'Bannit',
+        'decov': 'Decider/OT'
+    };
+
+    const groups = [];
+    let currentGroup = null;
+    
+    columns.forEach((col) => {
+        const groupLabel = groupMap[col.key] || '';
+        if (!currentGroup || currentGroup.label !== groupLabel) {
+            if (currentGroup) groups.push(currentGroup);
+            currentGroup = { 
+                label: groupLabel, 
+                colSpan: 1, 
+                className: groupLabel ? `group-${groupLabel.toLowerCase().replace(/[^\w]/g, '')} group-divider` : 'group-map'
+            };
+        } else {
+            currentGroup.colSpan += 1;
+        }
+    });
+    
+    if (currentGroup) groups.push(currentGroup);
+    return groups;
+}
+
+const SCOUT_MAP_GROUPS = computeScoutMapColumnGroups(SCOUT_MAP_COLUMNS);
 
 const VETO_COLUMNS = [
     { key: 'mapName', label: 'Kartta', sortable: true },
@@ -121,6 +181,13 @@ function formatNumber(value, decimals = 0) {
     const numeric = toNumber(value);
     if (!Number.isFinite(numeric)) return '-';
     return decimals > 0 ? numeric.toFixed(decimals) : numeric.toLocaleString('fi-FI');
+}
+
+function formatPerRound(value, decimals = 3) {
+    const numeric = toNumber(value);
+    if (!Number.isFinite(numeric)) return '-';
+    if (numeric === 0) return '0';
+    return numeric.toFixed(decimals);
 }
 
 function formatPercent(value, decimals = 1) {
@@ -203,8 +270,6 @@ function normalizeMap(entry) {
     const kdRaw = toNumber(entry.kd ?? entry.kd_ratio);
     const kd = kdRaw || (deaths ? kills / deaths : kills);
     const adr = toNumber(entry.adr ?? entry.average_damage ?? (entry.damage && games ? entry.damage / (games * 30) : 0));
-    let rating = toNumber(entry.rating ?? entry.rating_2 ?? entry.map_rating ?? entry.hltv_rating);
-    if (!rating && kd) rating = kd;
     const damage = toNumber(entry.damage);
     const utilityDamage = toNumber(entry.utility_damage ?? entry.utilityDamage);
     const mvps = toNumber(entry.mvps ?? entry.mvp);
@@ -219,10 +284,59 @@ function normalizeMap(entry) {
     const pickRate = Number.isFinite(pickRateRaw) && pickRateRaw !== 0
         ? (Math.abs(pickRateRaw) <= 1 ? pickRateRaw * 100 : pickRateRaw)
         : (totalPicks ? (picks / totalPicks) * 100 : (played ? (picks / played) * 100 : 0));
-    const ctWr = toNumber(entry.ct_wr ?? entry.ct_wr_pct ?? entry.ctWinrate ?? 0);
-    const tWr = toNumber(entry.t_wr ?? entry.t_wr_pct ?? entry.tWinrate ?? 0);
+    
+    // Pick win rates
+    const pickWins = toNumber(entry.pickWins ?? entry.pick_wins);
+    const oppPickWins = toNumber(entry.oppPickWins ?? entry.opp_pick_wins);
+    const pickWinRateRaw = toNumber(entry.pickWinRate ?? entry.pick_win_rate);
+    const oppPickWinRateRaw = toNumber(entry.oppPickWinRate ?? entry.opp_pick_win_rate);
+    const pickWinRate = Number.isFinite(pickWinRateRaw) && pickWinRateRaw !== 0
+        ? (Math.abs(pickWinRateRaw) <= 1 ? pickWinRateRaw * 100 : pickWinRateRaw)
+        : (picks && pickWins ? (pickWins / picks) * 100 : null);
+    const oppPickWinRate = Number.isFinite(oppPickWinRateRaw) && oppPickWinRateRaw !== 0
+        ? (Math.abs(oppPickWinRateRaw) <= 1 ? oppPickWinRateRaw * 100 : oppPickWinRateRaw)
+        : (oppPicks && oppPickWins ? (oppPickWins / oppPicks) * 100 : null);
 
     const identifier = entry.mapId || entry.map_id || rawName;
+
+    // Player performance metrics - parse all fields that come from backend
+    const assists = toNumber(entry.assists);
+    const kr = toNumber(entry.kr ?? (kills ? kills / Math.max(1, kills + deaths) : 0));
+    const hsPct = toNumber(entry.hs_pct ?? entry.hsPercent);
+    const totalDamage = toNumber(entry.total_damage ?? entry.damage ?? entry.totalDamage);
+    const enemiesFlashed = toNumber(entry.enemies_flashed ?? entry.enemiesFlashed);
+    const flashCount = toNumber(entry.flash_count ?? entry.flashCount);
+    const flashSuccesses = toNumber(entry.flash_successes ?? entry.flashSuccesses);
+    const flashSuccessPct = flashCount ? (flashSuccesses / flashCount) * 100 : 0;
+    const multi2k = toNumber(entry.multi_2k ?? entry.multi2k);
+    const multi3k = toNumber(entry.multi_3k ?? entry.multi3k);
+    const multi4k = toNumber(entry.multi_4k ?? entry.multi4k);
+    const multi5k = toNumber(entry.multi_5k ?? entry.multi5k);
+    const pistolKills = toNumber(entry.pistol_kills ?? entry.pistolKills);
+    const sniperKills = toNumber(entry.sniper_kills ?? entry.sniperKills);
+    const clutchKills = toNumber(entry.clutch_kills ?? entry.clutchKills);
+    const totalUtilityDamage = toNumber(entry.utility_damage ?? entry.utilityDamage ?? entry.total_utility_damage);
+    
+    // Estimated totals (use average * matches as proxy when exact totals not available)
+    const estimatedRoundsPerMap = played * 30; // CS2 standard 30 rounds per map
+    const totalRoundsPlayed = estimatedRoundsPerMap;
+    const roundsPerMapAvg = 30; // Standard
+    const udpr = toNumber(entry.udpr ?? (totalUtilityDamage && totalRoundsPlayed ? totalUtilityDamage / totalRoundsPlayed : 0));
+    const totalMaps = played || games || 0;
+    const multi2kPerRound = totalRoundsPlayed ? multi2k / totalRoundsPlayed : 0;
+    const multi3kPerRound = totalRoundsPlayed ? multi3k / totalRoundsPlayed : 0;
+    const multi4kPerRound = totalRoundsPlayed ? multi4k / totalRoundsPlayed : 0;
+    const multi5kPerRound = totalRoundsPlayed ? multi5k / totalRoundsPlayed : 0;
+    const pistolKillsPerRound = totalRoundsPlayed ? pistolKills / totalRoundsPlayed : 0;
+    const sniperKillsPerRound = totalRoundsPlayed ? sniperKills / totalRoundsPlayed : 0;
+    const totalDamagePerRound = totalRoundsPlayed ? totalDamage / totalRoundsPlayed : 0;
+    const multi2kPerMap = totalMaps ? multi2k / totalMaps : 0;
+    const multi3kPerMap = totalMaps ? multi3k / totalMaps : 0;
+    const multi4kPerMap = totalMaps ? multi4k / totalMaps : 0;
+    const multi5kPerMap = totalMaps ? multi5k / totalMaps : 0;
+    const pistolKillsPerMap = totalMaps ? pistolKills / totalMaps : 0;
+    const sniperKillsPerMap = totalMaps ? sniperKills / totalMaps : 0;
+    const totalDamagePerMap = totalMaps ? totalDamage / totalMaps : 0;
 
     return {
         id: identifier,
@@ -232,10 +346,13 @@ function normalizeMap(entry) {
         wins,
         losses,
         winrate,
-        rating,
         picks,
         oppPicks,
         pickRate,
+        pickWinRate,
+        oppPickWinRate,
+        pickWins,
+        oppPickWins,
         ban1,
         ban2,
         oppBan,
@@ -243,14 +360,44 @@ function normalizeMap(entry) {
         decov,
         rd,
         kd,
+        kr,
         adr,
-        ctWr,
-        tWr,
+        hsPct,
         damage,
         utilityDamage,
+        totalDamage,
+        totalDamagePerRound,
+        totalDamagePerMap,
         mvps,
         kills,
-        deaths
+        deaths,
+        assists,
+        udpr,
+        enemiesFlashed,
+        flashCount,
+        flashSuccesses,
+        flashSuccessPct,
+        multi2k,
+        multi2kPerRound,
+        multi2kPerMap,
+        multi3k,
+        multi3kPerRound,
+        multi3kPerMap,
+        multi4k,
+        multi4kPerRound,
+        multi4kPerMap,
+        multi5k,
+        multi5kPerRound,
+        multi5kPerMap,
+        pistolKills,
+        pistolKillsPerRound,
+        pistolKillsPerMap,
+        sniperKills,
+        sniperKillsPerRound,
+        sniperKillsPerMap,
+        clutchKills,
+        totalRoundsPlayed,
+        roundsPerMapAvg
     };
 }
 
@@ -280,7 +427,6 @@ function normalizePlayer(player, idx = 0) {
     const mk4k = toNumber(player.mk4k ?? player.mk_4k ?? player['4k']);
     const mk5k = toNumber(player.mk5k ?? player.mk_5k ?? player['5k']);
     const clutchKills = toNumber(player.clutchKills ?? player.clutch_kills ?? player.clutches ?? player.clutch_wins);
-    let rating = toNumber(player.rating ?? player.rating2 ?? player.rating_2 ?? player.hltv_rating);
     const kdRaw = toNumber(player.kd ?? player.kdRatio ?? player.kd_ratio);
     const kd = kdRaw || (deaths ? kills / deaths : kills);
     const adr = toNumber(player.adr ?? player.average_damage ?? (roundsPlayed ? damage / roundsPlayed : 0));
@@ -290,14 +436,12 @@ function normalizePlayer(player, idx = 0) {
     const clutch1v1Pct = cl1v1Attempts ? (cl1v1Wins / cl1v1Attempts) * 100 : 0;
     const clutch1v2Pct = cl1v2Attempts ? (cl1v2Wins / cl1v2Attempts) * 100 : 0;
     const flashSuccessPct = flashCount ? (flashSuccesses / flashCount) * 100 : 0;
-    if (!rating && kd) rating = kd;
 
     return {
         playerId: player.player_id || player.id || `player-${idx}`,
         nickname: player.nickname || player.name || 'Pelaaja',
         mapsPlayed,
         roundsPlayed,
-        rating,
         kd,
         adr,
         kr,
@@ -496,16 +640,21 @@ window.TeamDetail = {
         return {
             teamStore,
             selectedChampionship: this.championshipId ? String(this.championshipId) : null,
-            activeTab: 'overview',
+            activeTab: this.$route?.query?.tab || 'overview',
+            mapViewMode: 'compact', // 'compact' or 'detailed'
+            vetoMapOrder: 'usage', // 'usage' or 'alphabetical'
+            mapSubMetricMode: 'perRound', // 'perRound' or 'perMap'
             matchMetric: 'roundDiff',
             mapMetric: 'winrate',
             matchesPage: 1,
             SCOUT_MAP_COLUMNS,
             SCOUT_MAP_GROUPS,
             MAP_COLUMNS,
+            MAP_COLUMN_GROUPS,
             PLAYER_COLUMNS,
             VETO_COLUMNS,
             scoutTableKey: 0,
+            detailedTableKey: 0,
             scoutLogKey: null
         };
     },
@@ -549,6 +698,11 @@ window.TeamDetail = {
             if (this.selectedChampionship) return String(this.selectedChampionship);
             return this.seasonOptions[0]?.value || null;
         },
+        currentSeasonOption() {
+            const current = this.currentChampionshipId;
+            if (!current) return this.seasonOptions[0] || null;
+            return this.seasonOptions.find(s => String(s.value) === String(current)) || this.seasonOptions[0] || null;
+        },
         seasonData() {
             const data = normalizeSeasonData(this.pageData) || null;
             if (!data) return null;
@@ -568,7 +722,7 @@ window.TeamDetail = {
 
             const lookup = {};
             normalized.forEach(m => {
-                const key = String(m.id || m.mapName).toLowerCase();
+                const key = mapKey(m.mapName || m.id);
                 lookup[key] = m;
             });
 
@@ -659,7 +813,6 @@ window.TeamDetail = {
                             decov,
                             rd,
                             adr,
-                            rating,
                             kd
                         });
                     } else {
@@ -676,7 +829,6 @@ window.TeamDetail = {
                         wins: agg?.wins || 0,
                         losses: agg?.losses || 0,
                         winrate: agg?.games ? (agg.wins / agg.games) * 100 : 0,
-                        rating: agg?.games ? safeDivide(agg.kdSum, agg.games) : 0,
                         picks: agg?.picks || 0,
                         oppPicks: agg?.oppPicks || 0,
                         pickRate: (() => {
@@ -692,8 +844,6 @@ window.TeamDetail = {
                         rd: agg?.rd || 0,
                         kd: agg?.games ? safeDivide(agg.kdSum, agg.games) : 0,
                         adr: agg?.games ? agg.adrSum / agg.games : 0,
-                        ctWr: 0,
-                        tWr: 0,
                         damage: 0,
                         utilityDamage: 0,
                         mvps: 0,
@@ -724,12 +874,9 @@ window.TeamDetail = {
                 damage: 0,
                 utilityDamage: 0,
                 mvps: 0,
-                adrWeighted: 0,
-                ratingWeighted: 0,
-                ctWrWeighted: 0,
-                tWrWeighted: 0
+                adrWeighted: 0
             };
-            if (!this.mapStats.length) return { ...totals, avgAdr: 0, avgRating: 0, kd: 0, winrate: 0, pickRate: 0, ctWr: 0, tWr: 0 };
+            if (!this.mapStats.length) return { ...totals, avgAdr: 0, kd: 0, winrate: 0, pickRate: 0 };
             this.mapStats.forEach(map => {
                 const games = map.games || map.played || (map.wins + map.losses) || 0;
                 totals.played += map.played || games;
@@ -750,20 +897,14 @@ window.TeamDetail = {
                 totals.utilityDamage += map.utilityDamage || 0;
                 totals.mvps += map.mvps || 0;
                 totals.adrWeighted += (map.adr || 0) * (games || 1);
-                totals.ratingWeighted += (map.rating || 0) * (games || 1);
-                totals.ctWrWeighted += (map.ctWr || 0) * (games || 1);
-                totals.tWrWeighted += (map.tWr || 0) * (games || 1);
             });
             const games = totals.games || totals.played || 1;
             const kd = totals.deaths ? totals.kills / totals.deaths : totals.kills || 0;
             const avgAdr = totals.adrWeighted / games;
-            const avgRating = totals.ratingWeighted / games;
             const winrate = games ? (totals.wins / games) * 100 : 0;
             const totalPicks = totals.picks + totals.oppPicks;
             const pickRate = totalPicks ? (totals.picks / totalPicks) * 100 : 0;
-            const ctWr = games ? (totals.ctWrWeighted / games) : 0;
-            const tWr = games ? (totals.tWrWeighted / games) : 0;
-            return { ...totals, kd, avgAdr, avgRating, winrate, pickRate, ctWr, tWr };
+            return { ...totals, kd, avgAdr, winrate, pickRate };
         },
         seasonStatCards() {
             const s = this.teamStats || {};
@@ -779,9 +920,6 @@ window.TeamDetail = {
             const mapsWon = toNumber(s.maps_won ?? this.mapTotals.wins);
             let mapWinRate = mapsPlayed ? (mapsWon / Math.max(1, mapsPlayed)) * 100 : this.mapTotals.winrate;
             if (mapWinRate <= 1) mapWinRate = mapWinRate * 100;
-            const avgRating = this.players.length
-                ? (this.players.reduce((acc, p) => acc + (p.rating || 0), 0) / this.players.length)
-                : toNumber(s.rating ?? s.rating_2 ?? s.hltv_rating ?? this.mapTotals.avgRating);
             const prevSeason = (this.pageData?.seasons || []).find(sea => String(sea.championship_id || sea.championshipId) !== String(this.currentChampionshipId));
             let prevWinRate = prevSeason ? toNumber(prevSeason.win_rate) : null;
             if (prevWinRate != null && prevWinRate <= 1) prevWinRate *= 100;
@@ -796,7 +934,6 @@ window.TeamDetail = {
                 { key: 'adr', label: 'ADR', value: formatNumber(this.mapTotals.avgAdr, 1), caption: `Damage ${formatNumber(this.mapTotals.damage)}` },
                 { key: 'kd', label: 'K/D', value: formatNumber(this.mapTotals.kd, 2), caption: `${formatNumber(this.mapTotals.kills)} / ${formatNumber(this.mapTotals.deaths)}` },
                 { key: 'mvps', label: 'MVP:t', value: formatNumber(this.mapTotals.mvps), caption: 'Karttakohtaiset MVP:t' },
-                { key: 'rating', label: 'Rating', value: avgRating ? formatNumber(avgRating, 2) : '-', caption: `Karttojen rating-keskiarvo ${formatNumber(this.mapTotals.avgRating, 2)}` },
                 { key: 'clutch', label: 'Clutch', value: formatNumber(totalClutch), caption: 'Joukkueen clutch-killat (summa)' }
             ];
         },
@@ -808,9 +945,6 @@ window.TeamDetail = {
             const matchLosses = playedMatches.filter(m => getMatchResult(m) === 'loss').length;
             const matches = playedMatches.length;
             const winRate = matches ? (matchWins / matches) * 100 : normalizePercent(s.win_rate ?? s.match_win_rate ?? this.mapTotals.winrate ?? 0);
-            const avgRating = this.players.length
-                ? (this.players.reduce((acc, p) => acc + (p.rating || 0), 0) / this.players.length)
-                : toNumber(s.rating ?? s.rating_2 ?? s.hltv_rating ?? this.mapTotals.avgRating);
             const mapsPlayed = playedMatches.reduce((acc, m) => {
                 if (!m.maps?.length && m.isForfeit && m.winnerTeamId) {
                     return acc + Math.max(1, m.bestOf || 2);
@@ -850,77 +984,135 @@ window.TeamDetail = {
                 const fallbackCount = shouldFallback ? Math.max(1, m.bestOf || 2) : 0;
                 return acc + forfeitsFromMaps + fallbackCount;
             }, 0);
-            const roundsWon = playedMatches.reduce((acc, m) => acc + (m.roundsFor || 0), 0);
-            const roundsLost = playedMatches.reduce((acc, m) => acc + (m.roundsAgainst || 0), 0);
+            const roundsWon = playedMatches.reduce((acc, m) => {
+                // Handle forfeit matches without map data - each forfeited map counts as 13-0
+                if (!m.maps?.length && m.isForfeit && m.winnerTeamId) {
+                    const mapsCount = Math.max(1, m.bestOf || 2);
+                    return acc + (String(m.winnerTeamId) === String(this.teamId) ? mapsCount * 13 : 0);
+                }
+                return acc + (m.roundsFor || 0);
+            }, 0);
+            const roundsLost = playedMatches.reduce((acc, m) => {
+                // Handle forfeit matches without map data - each forfeited map counts as 0-13
+                if (!m.maps?.length && m.isForfeit && m.winnerTeamId) {
+                    const mapsCount = Math.max(1, m.bestOf || 2);
+                    return acc + (String(m.winnerTeamId) !== String(this.teamId) ? mapsCount * 13 : 0);
+                }
+                return acc + (m.roundsAgainst || 0);
+            }, 0);
             const roundsDiff = roundsWon - roundsLost;
 
-            const hasMapData = (this.mapTotals.games || this.mapTotals.played || this.mapTotals.wins || this.mapTotals.losses);
-            const hasRating = (this.players.length && Number.isFinite(avgRating)) || (hasMapData && avgRating > 0);
-            const hasWinRate = matches > 0;
-            const missingTip = 'Data not available for this season';
+            const divAvgs = this.divisionAverages || {};
+            const mapWinRate = mapsPlayed ? (mapWins / mapsPlayed) * 100 : 0;
 
-            return [
-                {
-                    key: 'activePlayers',
-                    label: 'Aktiiviset pelaajat',
-                    value: formatNumber(activePlayers),
-                    sub: 'Vähintään 1 kartta',
-                    tone: 'stat-neutral'
-                },
-                {
-                    key: 'matches',
-                    label: 'Ottelut',
-                    value: formatNumber(matches),
-                    sub: '',
-                    tone: 'stat-neutral'
-                },
-                {
-                    key: 'maps',
-                    label: 'Pelatut kartat',
-                    value: formatNumber(mapsPlayed),
-                    sub: `${formatNumber(mapWins)}W – ${formatNumber(mapLosses)}L`,
-                    tone: 'stat-neutral'
-                },
-                {
-                    key: 'forfeits',
-                    label: 'Luovutetut kartat',
-                    value: formatNumber(forfeitedMaps),
-                    sub: 'Kausi yhteensä',
-                    tone: 'stat-neutral'
-                },
+            const hasWinRate = matches > 0;
+            const missingTip = 'No data for this season';
+
+            // Tier 1 (Primary emphasis): Win %, Map win %, Round diff, Matches
+            const tier1 = [
                 {
                     key: 'winrate',
-                    label: 'Voittoprosentti',
+                    label: 'Win %',
                     value: hasWinRate ? formatPercent(winRate, 1) : '—',
-                    sub: '',
-                    tone: 'stat-neutral',
+                    sub: hasWinRate ? `${formatNumber(matchWins)}–${formatNumber(matchLosses)}` : '',
+                    tone: 'stat-primary',
+                    tier: 1,
                     missing: !hasWinRate,
-                    tooltip: !hasWinRate ? missingTip : ''
+                    tooltip: !hasWinRate ? missingTip : 'Wins / Matches played · includes forfeits',
+                    trendValue: hasWinRate ? winRate : null,
+                    divAvg: divAvgs.avgWinRate || null
                 },
                 {
-                    key: 'upcoming',
-                    label: 'Tulevat ottelut',
-                    value: formatNumber(upcomingMatches),
-                    sub: 'Tulevat',
-                    tone: 'stat-neutral'
+                    key: 'mapWinRate',
+                    label: 'Map win %',
+                    value: mapsPlayed > 0 ? formatPercent(mapWinRate, 1) : '—',
+                    sub: mapsPlayed > 0 ? `${formatNumber(mapWins)}–${formatNumber(mapLosses)}` : '',
+                    tone: 'stat-primary',
+                    tier: 1,
+                    missing: mapsPlayed === 0,
+                    tooltip: mapsPlayed === 0 ? missingTip : 'Map wins / Maps played · includes forfeits',
+                    trendValue: mapsPlayed > 0 ? mapWinRate : null,
+                    divAvg: divAvgs.avgMapWinRate || null
                 },
                 {
                     key: 'rounds',
-                    label: 'Eräero',
-                    value: formatNumber(roundsDiff),
+                    label: 'Round diff',
+                    value: formatNumber(roundsDiff, 0),
                     sub: `${formatNumber(roundsWon)}–${formatNumber(roundsLost)}`,
-                    tone: 'stat-neutral'
+                    tone: 'stat-primary',
+                    tier: 1,
+                    tooltip: 'Rounds won - rounds lost · forfeits count as 13-0',
+                    trendValue: roundsDiff,
+                    divAvg: divAvgs.avgRoundDiff || null
                 },
                 {
-                    key: 'rating',
-                    label: 'Keskiarvo rating',
-                    value: hasRating ? formatNumber(avgRating, 2) : '—',
-                    sub: 'Joukkueen keskiarvo',
-                    tone: 'stat-neutral',
-                    missing: !hasRating,
-                    tooltip: !hasRating ? missingTip : ''
+                    key: 'matches',
+                    label: 'Matches',
+                    value: formatNumber(matches),
+                    sub: '',
+                    tone: 'stat-primary',
+                    tier: 1,
+                    tooltip: 'Total matches played this season',
+                    trendValue: null,
+                    divAvg: null
                 }
             ];
+
+            // Tier 2 (Secondary emphasis): Active players, Maps (W–L), Forfeited maps, Upcoming matches
+            const tier2 = [
+                {
+                    key: 'activePlayers',
+                    label: 'Active players',
+                    value: formatNumber(activePlayers),
+                    sub: 'At least 1 map',
+                    tone: 'stat-secondary',
+                    tier: 2,
+                    tooltip: 'Players who played at least one map this season',
+                    trendValue: null,
+                    divAvg: null
+                },
+                {
+                    key: 'maps',
+                    label: 'Maps (W–L)',
+                    value: `${formatNumber(mapWins)}–${formatNumber(mapLosses)}`,
+                    sub: `${formatNumber(mapsPlayed)} total`,
+                    tone: 'stat-secondary',
+                    tier: 2,
+                    tooltip: 'Map-level record for the season',
+                    trendValue: null,
+                    divAvg: null
+                },
+                {
+                    key: 'forfeits',
+                    label: 'Forfeited maps',
+                    value: formatNumber(forfeitedMaps),
+                    sub: 'Lost by forfeit',
+                    tone: 'stat-secondary',
+                    tier: 2,
+                    tooltip: 'Maps forfeited (lost without playing) · affects total stats',
+                    trendValue: null,
+                    divAvg: null
+                },
+                {
+                    key: 'upcoming',
+                    label: 'Upcoming matches',
+                    value: formatNumber(upcomingMatches),
+                    sub: 'Scheduled',
+                    tone: 'stat-secondary',
+                    tier: 2,
+                    tooltip: 'Matches scheduled but not yet played',
+                    trendValue: null,
+                    divAvg: null
+                }
+            ];
+
+            return { tier1, tier2, all: [...tier1, ...tier2] };
+        },
+        seasonSnapshotTier1() {
+            return this.seasonSnapshotStats.tier1;
+        },
+        seasonSnapshotTier2() {
+            return this.seasonSnapshotStats.tier2;
         },
         seasonDetailStats() {
             return [];
@@ -1228,7 +1420,15 @@ window.TeamDetail = {
                     pickRate: pickLookup[mapKey(row.mapName)] || 0,
                     played: playedLookup[mapKey(row.mapName)] || 0
                 }))
-                .sort((a, b) => (b.played || 0) - (a.played || 0) || a.mapName.localeCompare(b.mapName));
+                .sort((a, b) => {
+                    if (this.vetoMapOrder === 'usage') {
+                        // Sort by played count (most used first)
+                        return (b.played || 0) - (a.played || 0) || a.mapName.localeCompare(b.mapName);
+                    } else {
+                        // Alphabetical
+                        return a.mapName.localeCompare(b.mapName);
+                    }
+                });
         },
         vetoTrendRows() {
             if (!this.vetoTrendMatches.length) return [];
@@ -1379,7 +1579,7 @@ window.TeamDetail = {
             }));
         },
         mapDefaultSort() {
-            return { column: 'played', order: 'desc', numeric: true };
+            return { column: 'totalRoundsPlayed', order: 'desc', numeric: true };
         },
         mapMaxPlayed() {
             return Math.max(...this.mapStats.map(m => m.played || 0), 1);
@@ -1452,7 +1652,7 @@ window.TeamDetail = {
             return Array.isArray(players) ? players.map((p, idx) => normalizePlayer(p, idx)).filter(Boolean) : [];
         },
         playerDefaultSort() {
-            return { column: 'rating', order: 'desc', numeric: true };
+            return { column: 'kd', order: 'desc', numeric: true };
         },
         playersByRating() {
             return [...this.players].sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -1613,6 +1813,22 @@ window.TeamDetail = {
             });
             return lookup;
         },
+        // Phase 1: Division averages for comparison
+        divisionAverages() {
+            return this.seasonData?.divisionAverages || {};
+        },
+        // Phase 1: Player roles
+        playerRoles() {
+            const roles = this.seasonData?.playerRoles || [];
+            const lookup = {};
+            roles.forEach(pr => {
+                lookup[pr.playerId] = {
+                    roles: pr.roles || [],
+                    primaryRole: pr.primaryRole || null
+                };
+            });
+            return lookup;
+        },
         loading() {
             return this.pageSegment.loading;
         },
@@ -1652,6 +1868,30 @@ window.TeamDetail = {
         }
     },
     methods: {
+        formatPerRound(value, decimals = 3) {
+            return formatPerRound(value, decimals);
+        },
+        formatSubMetric(perRound, perMap, decimals = 3) {
+            if (this.mapSubMetricMode === 'perMap') {
+                return formatPerRound(perMap, decimals);
+            }
+            return formatPerRound(perRound, decimals);
+        },
+        subMetricLabelShort() {
+            return this.mapSubMetricMode === 'perMap' ? '/kartta' : '/erä';
+        },
+        subMetricValue(perRound, perMap, decimals = 3) {
+            return this.formatSubMetric(perRound, perMap, decimals);
+        },
+        shouldShowSubMetric(perRound, perMap) {
+            const value = this.mapSubMetricMode === 'perMap'
+                ? toNumber(perMap)
+                : toNumber(perRound);
+            return value > 0;
+        },
+        subMetricLabel() {
+            return this.mapSubMetricMode === 'perMap' ? 'per-kartta' : 'per-erä';
+        },
         async bootstrap() {
             if (!this.teamStore || !this.teamId) return;
             try {
@@ -1703,9 +1943,16 @@ window.TeamDetail = {
             if (tab === 'matches') {
                 this.matchesPage = 1;
             }
+            // Persist tab in URL
+            if (this.$router && this.$route) {
+                const query = { ...(this.$route.query || {}) };
+                query.tab = tab;
+                this.$router.replace({ query }).catch(() => {});
+            }
         },
-        resetScoutSort() {
+        resetMapSort() {
             this.scoutTableKey += 1;
+            this.detailedTableKey += 1;
         },
         formatWinLoss(wins, losses) {
             return `${formatNumber(wins)}–${formatNumber(losses)}`;
@@ -1717,6 +1964,111 @@ window.TeamDetail = {
             return {
                 background: `linear-gradient(90deg, ${color}, transparent)`
             };
+        },
+        kdHeatStyle(value) {
+            const kd = toNumber(value);
+            const pct = Math.min(100, Math.max(0, (kd / 2) * 100));
+            const hue = (pct / 100) * 120;
+            const color = `hsla(${hue.toFixed(1)}, 70%, 45%, 0.35)`;
+            return {
+                background: `linear-gradient(90deg, ${color}, transparent)`
+            };
+        },
+        adrHeatStyle(value) {
+            const adr = toNumber(value);
+            const pct = Math.min(100, Math.max(0, (adr / 120) * 100));
+            const hue = (pct / 100) * 120;
+            const color = `hsla(${hue.toFixed(1)}, 70%, 45%, 0.35)`;
+            return {
+                background: `linear-gradient(90deg, ${color}, transparent)`
+            };
+        },
+        rdHeatStyle(value) {
+            const rd = toNumber(value);
+            // Normalize round diff to -30 to +30 range for color scale
+            const normalized = Math.max(-30, Math.min(30, rd));
+            const pct = ((normalized + 30) / 60) * 100;
+            const hue = (pct / 100) * 120;
+            const color = `hsla(${hue.toFixed(1)}, 70%, 45%, 0.35)`;
+            return {
+                background: `linear-gradient(90deg, ${color}, transparent)`
+            };
+        },
+        isHeatmapColumn(columnKey) {
+            // Strong heatmap only for: Win %, Round diff, ADR, K/D
+            const heatmapColumns = ['winrate', 'pickWinRate', 'oppPickWinRate', 'rd', 'adr', 'kd'];
+            return heatmapColumns.includes(columnKey);
+        },
+        getHeatTooltip(column, row) {
+            if (!this.isHeatmapColumn(column.key)) return column.tooltip || '';
+            const value = row[column.key];
+            const scaling = 'Scaled across this team\'s maps for the selected season';
+            
+            if (column.key === 'winrate' && row.wins != null && row.losses != null) {
+                return `${column.label}: ${formatPercent(value, 1)} (${row.wins}–${row.losses}) · ${scaling}`;
+            }
+            if (column.key === 'pickWinRate' && row.pickWins != null && row.picks != null) {
+                const losses = Math.max(0, row.picks - row.pickWins);
+                return `${column.label}: ${formatPercent(value, 1)} (${row.pickWins}–${losses}) · ${scaling}`;
+            }
+            if (column.key === 'oppPickWinRate' && row.oppPickWins != null && row.oppPicks != null) {
+                const losses = Math.max(0, row.oppPicks - row.oppPickWins);
+                return `${column.label}: ${formatPercent(value, 1)} (${row.oppPickWins}–${losses}) · ${scaling}`;
+            }
+            
+            return `${column.label}: ${formatNumber(value, column.decimals || 0)} · ${scaling}`;
+        },
+        getVetoCellTooltip(step, match) {
+            const opponent = match?.opponentName || match?.team2Name || 'Opponent';
+            const result = match ? getMatchResult(match) : null;
+            const action = step.action || 'unknown';
+            const actor = step.actor === 'team' ? 'Team' : (step.actor === 'opponent' ? 'Opponent' : 'System');
+            const date = match?.ts ? formatDate(match.ts) : '';
+            
+            let tooltip = `${opponent}`;
+            if (date) tooltip += ` · ${date}`;
+            tooltip += ` · ${step.mapName} · ${actor} ${action}`;
+            if (result) tooltip += ` · ${result}`;
+            
+            return tooltip;
+        },
+        isHeatmapColumn(columnKey) {
+            // Strong heatmap only for: Win %, Round diff, ADR, K/D
+            const heatmapColumns = ['winrate', 'pickWinRate', 'oppPickWinRate', 'rd', 'adr', 'kd'];
+            return heatmapColumns.includes(columnKey);
+        },
+        getHeatTooltip(column, row) {
+            if (!this.isHeatmapColumn(column.key)) return column.tooltip || '';
+            const value = row[column.key];
+            const scaling = 'Scaled across this team\'s maps for the selected season';
+            
+            if (column.key === 'winrate' && row.wins != null && row.losses != null) {
+                return `${column.label}: ${formatPercent(value, 1)} (${row.wins}–${row.losses}) · ${scaling}`;
+            }
+            if (column.key === 'pickWinRate' && row.pickWins != null && row.picks != null) {
+                const losses = row.picks - row.pickWins;
+                return `${column.label}: ${formatPercent(value, 1)} (${row.pickWins}–${losses}) · ${scaling}`;
+            }
+            if (column.key === 'oppPickWinRate' && row.oppPickWins != null && row.oppPicks != null) {
+                const losses = row.oppPicks - row.oppPickWins;
+                return `${column.label}: ${formatPercent(value, 1)} (${row.oppPickWins}–${losses}) · ${scaling}`;
+            }
+            
+            return `${column.label}: ${formatNumber(value, column.decimals || 0)} · ${scaling}`;
+        },
+        getVetoCellTooltip(step, match) {
+            const opponent = match?.opponentName || match?.team2Name || 'Opponent';
+            const result = match ? getMatchResult(match) : null;
+            const action = step.action || 'unknown';
+            const actor = step.actor === 'team' ? 'Team' : (step.actor === 'opponent' ? 'Opponent' : 'System');
+            const date = match?.ts ? formatDate(match.ts) : '';
+            
+            let tooltip = `${opponent}`;
+            if (date) tooltip += ` · ${date}`;
+            tooltip += ` · ${step.mapName} · ${actor} ${action}`;
+            if (result) tooltip += ` · Result: ${result}`;
+            
+            return tooltip;
         },
         detectSeriesFormat(bestOf, steps = []) {
             if (Number(bestOf) === 2) return 'bo2';
@@ -1813,6 +2165,28 @@ window.TeamDetail = {
         getMatchResult,
         teamLogo() {
             return this.teamInfo?.logo || this.teamInfo?.avatar || this.teamInfo?.image || '';
+        },
+        // Phase 1: Trend indicator vs division average
+        getTrendIndicator(teamValue, divAvg) {
+            if (!divAvg || teamValue == null) return '';
+            const diff = teamValue - divAvg;
+            if (Math.abs(diff) < 0.5) return '→';
+            return diff > 0 ? '↑' : '↓';
+        },
+        getTrendClass(teamValue, divAvg) {
+            if (!divAvg || teamValue == null) return '';
+            const diff = teamValue - divAvg;
+            if (Math.abs(diff) < 0.5) return 'trend-neutral';
+            return diff > 0 ? 'trend-positive' : 'trend-negative';
+        },
+        // Phase 1: Format player role badges
+        getPlayerRoleBadges(playerId) {
+            const roleData = this.playerRoles[playerId];
+            if (!roleData || !roleData.roles || roleData.roles.length === 0) return [];
+            return roleData.roles.map(role => ({
+                label: role,
+                isPrimary: role === roleData.primaryRole
+            }));
         }
     },
     template: `
@@ -1829,9 +2203,9 @@ window.TeamDetail = {
                             {{ teamInfo?.displayName || teamInfo?.teamName || 'Joukkue' }}
                         </h1>
                         <div class="team-hero__season" v-if="seasonOptions.length">
-                            <span class="pill">Kausi {{ seasonOptions[0]?.season }}</span>
-                            <span class="pill">Div {{ seasonOptions[0]?.division }}</span>
-                            <span class="pill pill--accent" v-if="seasonOptions[0]?.isPlayoffs">Playoffs</span>
+                            <span class="pill" :title="currentSeasonOption ? '' : 'No season data'">Kausi {{ currentSeasonOption?.season || '—' }}</span>
+                            <span class="pill" :title="currentSeasonOption ? '' : 'No division data'">Div {{ currentSeasonOption?.division || '—' }}</span>
+                            <span class="pill pill--accent" v-if="currentSeasonOption?.isPlayoffs">Playoffs</span>
                             <a v-if="teamInfo?.faceit_url || teamInfo?.faceitUrl" class="pill pill--link" :href="teamInfo?.faceit_url || teamInfo?.faceitUrl" target="_blank" rel="noopener">Faceit</a>
                         </div>
                     </div>
@@ -1852,7 +2226,7 @@ window.TeamDetail = {
 
                 <nav class="team-tabs" role="tablist">
                     <button
-                        v-for="tab in ['overview', 'maps', 'matches', 'players', 'veto']"
+                        v-for="tab in ['overview', 'matches', 'players', 'veto']"
                         :key="tab"
                         type="button"
                         class="team-tab"
@@ -1860,7 +2234,7 @@ window.TeamDetail = {
                         @click="selectTab(tab)"
                         role="tab"
                     >
-                        {{ { overview: 'Yleiskuva', maps: 'Kartat', matches: 'Ottelut', players: 'Pelaajat', veto: 'Veto/Nosto' }[tab] }}
+                        {{ { overview: 'Yleiskuva', matches: 'Ottelut', players: 'Pelaajat', veto: 'Veto/Nosto' }[tab] }}
                     </button>
                 </nav>
 
@@ -1872,18 +2246,26 @@ window.TeamDetail = {
                             <span class="section-sub">Valittu kausi · ydintilastot</span>
                             </div>
                         </div>
-                        <div class="scout-snapshot-row">
-                            <div v-for="stat in seasonSnapshotStats" :key="stat.key" class="scout-snapshot-item">
-                                <div class="snapshot-label">{{ stat.label }}</div>
-                                <div class="snapshot-value mono-num" :class="stat.tone" :title="stat.tooltip || ''">{{ stat.value }}</div>
+                        <div class="scout-snapshot-row scout-snapshot-row--tier1">
+                            <div v-for="stat in seasonSnapshotTier1" :key="stat.key" class="scout-snapshot-item scout-snapshot-item--primary">
+                                <div class="snapshot-label">
+                                    {{ stat.label }}
+                                    <span
+                                        v-if="divisionAverages && stat.trendValue != null && stat.divAvg != null"
+                                        class="trend-indicator trend-indicator--subtle"
+                                        :class="getTrendClass(stat.trendValue, stat.divAvg)"
+                                        :title="'Compared to division average for this season: ' + formatNumber(stat.divAvg, 1)"
+                                    >{{ getTrendIndicator(stat.trendValue, stat.divAvg) }}</span>
+                                </div>
+                                <div class="snapshot-value snapshot-value--large mono-num" :class="stat.tone" :title="stat.tooltip || ''">{{ stat.value }}</div>
                                 <div class="snapshot-sub">{{ stat.sub }}</div>
                             </div>
                         </div>
-                        <div v-if="seasonDetailStats.length" class="scout-snapshot-extra">
-                            <div v-for="stat in seasonDetailStats" :key="stat.key" class="snapshot-mini">
-                                <div class="snapshot-mini__label">{{ stat.label }}</div>
-                                <div class="snapshot-mini__value mono-num">{{ stat.value }}</div>
-                                <div class="snapshot-mini__sub">{{ stat.sub }}</div>
+                        <div class="scout-snapshot-row scout-snapshot-row--tier2">
+                            <div v-for="stat in seasonSnapshotTier2" :key="stat.key" class="scout-snapshot-item scout-snapshot-item--secondary">
+                                <div class="snapshot-label snapshot-label--secondary">{{ stat.label }}</div>
+                                <div class="snapshot-value mono-num" :class="stat.tone" :title="stat.tooltip || ''">{{ stat.value }}</div>
+                                <div class="snapshot-sub">{{ stat.sub }}</div>
                             </div>
                         </div>
                     </div>
@@ -1893,6 +2275,25 @@ window.TeamDetail = {
                             <div>
                         <h3 class="section-title titleUnderline">Veto-historia</h3>
                         <span class="section-sub">Pick/Ban otteluittain (uusin → vanhin)</span>
+                            </div>
+                            <div class="veto-order-controls" v-if="vetoTrendMapPool.length > 0">
+                                <span class="veto-order-controls__label">Järjestys:</span>
+                                <button
+                                    class="veto-order-btn"
+                                    :class="{ active: vetoMapOrder === 'usage' }"
+                                    @click="vetoMapOrder = 'usage'"
+                                    title="Järjestä käyttömäärän mukaan"
+                                >
+                                    Pelimäärä
+                                </button>
+                                <button
+                                    class="veto-order-btn"
+                                    :class="{ active: vetoMapOrder === 'alphabetical' }"
+                                    @click="vetoMapOrder = 'alphabetical'"
+                                    title="Järjestä aakkosittain"
+                                >
+                                    A–Ö
+                                </button>
                             </div>
                         </div>
                         <div class="veto-heatmap-legend veto-heatmap-legend--detailed">
@@ -1925,7 +2326,7 @@ window.TeamDetail = {
                                         :key="row.mapName + '-' + idx"
                                         class="veto-heatmap__cell"
                                         :class="[cell.className, ((idx + 1) % 4 === 0) ? 'veto-heatmap__cell--divider' : '']"
-                                        :title="cell.title"
+                                        :title="cell.step && cell.match ? getVetoCellTooltip(cell.step, cell.match) : cell.title"
                                     >
                                     </div>
                                 </div>
@@ -1943,11 +2344,39 @@ window.TeamDetail = {
                         <div class="section-heading">
                             <div>
                         <h3 class="section-title titleUnderline">Karttakohtainen suorituskyky (kausi)</h3>
-                        <span class="section-sub">Oletusjärjestys: Pelattu (laskeva)</span>
+                        <span class="section-sub">{{ mapViewMode === 'compact' ? 'Tiivistelmä: Voitot, pickit, bannit, RD · Pelattu (laskeva)' : 'Yksityiskohdat: Pelaajan suorituskykytilastot kartalta' }}</span>
+                        <div v-if="mapViewMode === 'detailed'" class="section-legend">Pääarvo = total · Sulkeissa = {{ subMetricLabel() }}</div>
                             </div>
-                            <button type="button" class="btn-reset-sort" @click="resetScoutSort">Reset sort</button>
+                            <div class="section-heading-actions">
+                                <div v-if="mapViewMode === 'detailed'" class="submetric-toggle">
+                                    <button
+                                        type="button"
+                                        class="btn-submetric"
+                                        :class="mapSubMetricMode === 'perRound' ? 'active' : ''"
+                                        @click="mapSubMetricMode = 'perRound'"
+                                    >Per-erä</button>
+                                    <button
+                                        type="button"
+                                        class="btn-submetric"
+                                        :class="mapSubMetricMode === 'perMap' ? 'active' : ''"
+                                        @click="mapSubMetricMode = 'perMap'"
+                                    >Per-kartta</button>
+                                </div>
+                                <button 
+                                    type="button" 
+                                    class="btn-toggle-view" 
+                                    @click="mapViewMode = mapViewMode === 'compact' ? 'detailed' : 'compact'"
+                                    :title="mapViewMode === 'compact' ? 'Näytä pelaajan suorituskyky kartalta' : 'Näytä voitto/häviö ja pick/ban tilastot'"
+                                >
+                                    <span v-if="mapViewMode === 'compact'">🎯 Pelaajan suorituskyky</span>
+                                    <span v-else>📊 Voitot & Pickit</span>
+                                </button>
+                            </div>
                         </div>
-                        <div class="table-wrapper">
+                        <div>
+                            <button type="button" class="btn-reset-sort" @click="resetMapSort">Reset sort</button>
+                        </div>
+                        <div v-if="mapViewMode === 'compact'" class="table-wrapper">
                             <sortable-table
                                 :key="scoutTableKey"
                                 :columns="SCOUT_MAP_COLUMNS"
@@ -1963,167 +2392,174 @@ window.TeamDetail = {
                                     </div>
                                 </template>
                                 <template #cell-played="{ row }">
-                                    <span class="mono-num" :class="row.played <= 2 ? 'mono-muted' : ''">{{ row.played }}</span>
+                                    <div class="scout-cell mono-num" :class="row.played <= 2 ? 'mono-muted' : ''">{{ row.played }}</div>
                                 </template>
                                 <template #cell-picks="{ row }">
-                                    <span class="mono-num">{{ row.picks }}</span>
+                                    <div class="scout-cell mono-num">{{ row.picks }}</div>
                                 </template>
                                 <template #cell-oppPicks="{ row }">
-                                    <span class="mono-num">{{ row.oppPicks }}</span>
+                                    <div class="scout-cell mono-num">{{ row.oppPicks }}</div>
                                 </template>
                                 <template #cell-winrate="{ row }">
-                                    <div v-if="row.played > 0" class="scout-cell mono-num" :style="winHeatStyle(row.winrate)">
+                                    <div v-if="row.played > 0" class="scout-cell mono-num" :style="winHeatStyle(row.winrate)" :title="getHeatTooltip({ key: 'winrate', label: 'Voitto-%' }, row)">
                                         {{ formatPercent(row.winrate || 0, 1) }} ({{ formatWinLoss(row.wins || 0, row.losses || 0) }})
                                     </div>
                                     <span v-else class="cell-muted mono-num" title="Not played this season">—</span>
                                 </template>
                                 <template #cell-pickWinRate="{ row }">
-                                    <div v-if="row.picks > 0" class="scout-cell mono-num" :style="winHeatStyle(row.pickWinRate)">
+                                    <div v-if="row.picks > 0" class="scout-cell mono-num" :style="winHeatStyle(row.pickWinRate)" :title="getHeatTooltip({ key: 'pickWinRate', label: 'Pick voitto-%' }, row)">
                                         {{ formatPercent(row.pickWinRate || 0, 1) }} ({{ formatWinLoss(row.pickWins || 0, Math.max(0, (row.picks || 0) - (row.pickWins || 0))) }})
                                     </div>
                                     <span v-else class="cell-muted mono-num" title="Not played this season">—</span>
                                 </template>
                                 <template #cell-oppPickWinRate="{ row }">
-                                    <div v-if="row.oppPicks > 0" class="scout-cell mono-num" :style="winHeatStyle(row.oppPickWinRate)">
+                                    <div v-if="row.oppPicks > 0" class="scout-cell mono-num" :style="winHeatStyle(row.oppPickWinRate)" :title="getHeatTooltip({ key: 'oppPickWinRate', label: 'Opp pick voitto-%' }, row)">
                                         {{ formatPercent(row.oppPickWinRate || 0, 1) }} ({{ formatWinLoss(row.oppPickWins || 0, Math.max(0, (row.oppPicks || 0) - (row.oppPickWins || 0))) }})
                                     </div>
                                     <span v-else class="cell-muted mono-num" title="Not played this season">—</span>
                                 </template>
                                 <template #cell-kd="{ row }">
-                                    <span v-if="row.played > 0" class="mono-num">{{ formatNumber(row.kd, 2) }}</span>
+                                    <div v-if="row.played > 0" class="scout-cell mono-num">{{ formatNumber(row.kd, 2) }}</div>
                                     <span v-else class="cell-muted mono-num">—</span>
                                 </template>
                                 <template #cell-adr="{ row }">
-                                    <span v-if="row.played > 0" class="mono-num">{{ formatNumber(row.adr, 1) }}</span>
+                                    <div v-if="row.played > 0" class="scout-cell mono-num">{{ formatNumber(row.adr, 1) }}</div>
                                     <span v-else class="cell-muted mono-num">—</span>
                                 </template>
                                 <template #cell-rd="{ row }">
-                                    <span v-if="row.played > 0" class="mono-num">{{ formatNumber(row.rd, 0) }}</span>
+                                    <div v-if="row.played > 0" class="scout-cell mono-num" :title="getHeatTooltip({ key: 'rd', label: 'Eräero' }, row)">{{ formatNumber(row.rd, 0) }}</div>
                                     <span v-else class="cell-muted mono-num">—</span>
                                 </template>
                             </sortable-table>
                         </div>
-                    </div>
 
-                </section>
-
-                <section v-if="activeTab === 'maps'" class="team-section">
-                    <div class="section-heading">
-                        <h2 class="section-title titleUnderline">Kartat - Yksityiskohtainen analyysi</h2>
-                        <span class="section-sub">Kaikki karttakohtaiset kentät (peli-, pick-, ban-, damage-, MVP-, decider/overflow)</span>
-                    </div>
-                    <div v-if="mapStats.length" class="table-wrapper">
-                        <sortable-table
-                            :columns="MAP_COLUMNS"
-                            :data="mapStats"
-                            :default-sort="mapDefaultSort"
-                            :colorize-columns="['winrate','kd','adr']"
-                            :sticky-header="true"
-                            :compact="true"
-                        >
-                            <template #cell-mapName="{ row }">
-                                <div class="map-name">
-                                    <span class="map-name-text">{{ row.mapName }}</span>
-                                </div>
-                            </template>
-                            <template #cell-played="{ row }">
-                                <div class="cell-with-bar">
-                                    <span>{{ row.played }}</span>
-                                    <div class="inline-bar inline-bar--thin">
-                                        <div class="inline-bar__fill" :style="{ width: ((row.played / mapMaxPlayed) * 100).toFixed(1) + '%' }"></div>
+                        <div v-if="mapViewMode === 'detailed'" class="table-wrapper">
+                            <sortable-table
+                                v-if="mapStats.length"
+                                :key="detailedTableKey"
+                                :columns="MAP_COLUMNS"
+                                :header-groups="MAP_COLUMN_GROUPS"
+                                :data="mapStats"
+                                :default-sort="mapDefaultSort"
+                                :sticky-header="true"
+                                :compact="true"
+                            >
+                                <template #cell-mapName="{ row }">
+                                    <div class="map-name">
+                                        <span class="map-name-text">{{ row.mapName }}</span>
                                     </div>
-                                </div>
-                            </template>
-                            <template #cell-winrate="{ row }">
-                                <div class="cell-with-bar">
-                                    <span>{{ formatPercent(row.winrate, 1) }}</span>
-                                    <div class="inline-bar inline-bar--thin">
-                                        <div class="inline-bar__fill inline-bar__fill--accent" :style="{ width: Math.min(100, row.winrate) + '%' }"></div>
+                                </template>
+                                <template #cell-totalRoundsPlayed="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.totalRoundsPlayed, 0) }}</div>
+                                </template>
+                                <template #cell-roundsPerMapAvg="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.roundsPerMapAvg, 1) }}</div>
+                                </template>
+                                <template #cell-adr="{ row }">
+                                    <div class="scout-cell mono-num" :style="adrHeatStyle(row.adr)">{{ formatNumber(row.adr, 1) }}</div>
+                                </template>
+                                <template #cell-kr="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.kr, 3) }}</div>
+                                </template>
+                                <template #cell-kd="{ row }">
+                                    <div class="scout-cell mono-num" :style="kdHeatStyle(row.kd)">{{ formatNumber(row.kd, 2) }}</div>
+                                </template>
+                                <template #cell-hsPct="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.hsPct, 1) }}</div>
+                                </template>
+                                <template #cell-kills="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.kills, 0) }}</div>
+                                </template>
+                                <template #cell-deaths="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.deaths, 0) }}</div>
+                                </template>
+                                <template #cell-assists="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.assists, 0) }}</div>
+                                </template>
+                                <template #cell-udpr="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.udpr, 1) }}</div>
+                                </template>
+                                <template #cell-mvps="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.mvps, 0) }}</div>
+                                </template>
+                                <template #cell-enemiesFlashed="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.enemiesFlashed, 0) }}</div>
+                                </template>
+                                <template #cell-flashSuccessPct="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.flashSuccessPct, 1) }}</div>
+                                </template>
+                                <template #cell-flashCount="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.flashCount, 0) }}</div>
+                                </template>
+                                <template #cell-multi2k="{ row }">
+                                    <div class="scout-cell scout-cell--stacked mono-num">
+                                        <div>{{ formatNumber(row.multi2k, 0) }}</div>
+                                        <div v-if="shouldShowSubMetric(row.multi2kPerRound, row.multi2kPerMap)" class="sub-metric-line">
+                                            ({{ subMetricValue(row.multi2kPerRound, row.multi2kPerMap, 3) }} {{ subMetricLabelShort() }})
+                                        </div>
                                     </div>
-                                </div>
-                            </template>
-                            <template #cell-picks="{ row }">
-                                <div class="cell-with-bar">
-                                    <span>{{ row.picks }}</span>
-                                    <div class="inline-bar inline-bar--thin">
-                                        <div class="inline-bar__fill" :style="{ width: ((row.picks + row.oppPicks) ? ((row.picks + row.oppPicks) / mapMaxPicks * 100) : 0) + '%' }"></div>
+                                </template>
+                                <template #cell-multi3k="{ row }">
+                                    <div class="scout-cell scout-cell--stacked mono-num">
+                                        <div>{{ formatNumber(row.multi3k, 0) }}</div>
+                                        <div v-if="shouldShowSubMetric(row.multi3kPerRound, row.multi3kPerMap)" class="sub-metric-line">
+                                            ({{ subMetricValue(row.multi3kPerRound, row.multi3kPerMap, 3) }} {{ subMetricLabelShort() }})
+                                        </div>
                                     </div>
-                                </div>
-                            </template>
-                            <template #cell-oppPicks="{ row }">
-                                <span>{{ row.oppPicks }}</span>
-                            </template>
-                            <template #cell-ban1="{ row }">
-                                <div class="micro-stack micro-stack--row">
-                                    <span class="micro-chip">1st {{ row.ban1 }}</span>
-                                    <span class="micro-chip">2nd {{ row.ban2 }}</span>
-                                </div>
-                            </template>
-                            <template #cell-oppBan="{ row }">
-                                <div class="cell-with-bar">
-                                    <span>{{ row.oppBan }}</span>
-                                    <div class="inline-bar inline-bar--thin">
-                                        <div class="inline-bar__fill inline-bar__fill--danger" :style="{ width: ((row.totalOwnBan + row.oppBan) ? ((row.totalOwnBan + row.oppBan) / mapMaxBans * 100) : 0) + '%' }"></div>
+                                </template>
+                                <template #cell-multi4k="{ row }">
+                                    <div class="scout-cell scout-cell--stacked mono-num">
+                                        <div>{{ formatNumber(row.multi4k, 0) }}</div>
+                                        <div v-if="shouldShowSubMetric(row.multi4kPerRound, row.multi4kPerMap)" class="sub-metric-line">
+                                            ({{ subMetricValue(row.multi4kPerRound, row.multi4kPerMap, 3) }} {{ subMetricLabelShort() }})
+                                        </div>
                                     </div>
-                                </div>
-                            </template>
-                            <template #cell-totalOwnBan="{ row }">
-                                <span>{{ row.totalOwnBan }}</span>
-                            </template>
-                            <template #cell-rating="{ row }">
-                                <span class="stat-strong">{{ formatNumber(row.rating, 2) }}</span>
-                            </template>
-                            <template #cell-kd="{ row }">
-                                <span class="stat-strong">{{ formatNumber(row.kd, 2) }}</span>
-                            </template>
-                            <template #cell-adr="{ row }">
-                                <div class="cell-with-bar">
-                                    <span class="stat-strong">{{ formatNumber(row.adr, 1) }}</span>
-                                    <div class="inline-bar inline-bar--thin">
-                                        <div class="inline-bar__fill" :style="{ width: Math.min(100, row.adr / 120 * 100) + '%' }"></div>
+                                </template>
+                                <template #cell-multi5k="{ row }">
+                                    <div class="scout-cell scout-cell--stacked mono-num">
+                                        <div>{{ formatNumber(row.multi5k, 0) }}</div>
+                                        <div v-if="shouldShowSubMetric(row.multi5kPerRound, row.multi5kPerMap)" class="sub-metric-line">
+                                            ({{ subMetricValue(row.multi5kPerRound, row.multi5kPerMap, 3) }} {{ subMetricLabelShort() }})
+                                        </div>
                                     </div>
+                                </template>
+                                <template #cell-pistolKills="{ row }">
+                                    <div class="scout-cell scout-cell--stacked mono-num">
+                                        <div>{{ formatNumber(row.pistolKills, 0) }}</div>
+                                        <div v-if="shouldShowSubMetric(row.pistolKillsPerRound, row.pistolKillsPerMap)" class="sub-metric-line">
+                                            ({{ subMetricValue(row.pistolKillsPerRound, row.pistolKillsPerMap, 3) }} {{ subMetricLabelShort() }})
+                                        </div>
+                                    </div>
+                                </template>
+                                <template #cell-sniperKills="{ row }">
+                                    <div class="scout-cell scout-cell--stacked mono-num">
+                                        <div>{{ formatNumber(row.sniperKills, 0) }}</div>
+                                        <div v-if="shouldShowSubMetric(row.sniperKillsPerRound, row.sniperKillsPerMap)" class="sub-metric-line">
+                                            ({{ subMetricValue(row.sniperKillsPerRound, row.sniperKillsPerMap, 3) }} {{ subMetricLabelShort() }})
+                                        </div>
+                                    </div>
+                                </template>
+                                <template #cell-totalDamage="{ row }">
+                                    <div class="scout-cell scout-cell--stacked mono-num">
+                                        <div>{{ formatNumber(row.totalDamage, 0) }}</div>
+                                        <div v-if="shouldShowSubMetric(row.totalDamagePerRound, row.totalDamagePerMap)" class="sub-metric-line">
+                                            ({{ subMetricValue(row.totalDamagePerRound, row.totalDamagePerMap, 1) }} {{ subMetricLabelShort() }})
+                                        </div>
+                                    </div>
+                                </template>
+                                <template #cell-clutchKills="{ row }">
+                                    <div class="scout-cell mono-num">{{ formatNumber(row.clutchKills, 0) }}</div>
+                                </template>
+                            </sortable-table>
+                            <div v-else class="empty-state-container">
+                                <div class="empty-state-card">
+                                    <h3 class="empty-state-title">No map data</h3>
+                                    <p class="empty-state-description">Map statistics are not available for this season.</p>
                                 </div>
-                            </template>
-                            <template #cell-ctWr="{ row }">
-                                <span>{{ formatPercent(row.ctWr || 0, 1) }}</span>
-                            </template>
-                            <template #cell-tWr="{ row }">
-                                <span>{{ formatPercent(row.tWr || 0, 1) }}</span>
-                            </template>
-                            <template #cell-damage="{ row }">
-                                <span>{{ formatNumber(row.damage) }}</span>
-                            </template>
-                            <template #cell-utilityDamage="{ row }">
-                                <span>{{ formatNumber(row.utilityDamage) }}</span>
-                            </template>
-                        </sortable-table>
-                    </div>
-                    <div v-else class="empty-state-container">
-                        <div class="empty-state-card">
-                            <div class="empty-state-icon">📊</div>
-                            <h3 class="empty-state-title">Ei karttatietoja</h3>
-                            <p class="empty-state-description">Tälle kaudelle ei ole karttastatistiikkaa saatavilla.</p>
-                        </div>
-                    </div>
-                    <div class="glass-card" v-if="mapWinLossStack.length">
-                        <div class="section-heading">
-                            <h3>Karttakohtainen W/L jakauma</h3>
-                            <span class="section-sub">Stacked bar - voitetut vs hävityt kartat</span>
-                        </div>
-                        <div class="stacked-bars">
-                            <div v-for="row in mapWinLossStack" :key="row.label" class="stacked-bars__row">
-                                <span class="stacked-bars__label">{{ row.label }}</span>
-                                <split-bar :wins="row.wins" :losses="row.losses" height="18px" :showLabels="true" :showPercent="true" :showShimmer="false" />
                             </div>
                         </div>
                     </div>
-                    <div class="glass-card" v-if="mapRadarMetrics.length">
-                        <div class="section-heading">
-                            <h3>Kartta strength radar</h3>
-                            <span class="section-sub">Win% per kartta</span>
-                        </div>
-                        <radar-chart :metrics="mapRadarMetrics" :radius="80" />
-                    </div>
+
                 </section>
 
                 <section v-if="activeTab === 'matches'" class="team-section">
@@ -2151,8 +2587,7 @@ window.TeamDetail = {
                         </div>
                         <div v-else class="empty-state-container compact">
                             <div class="empty-state-card">
-                                <div class="empty-state-icon">📈</div>
-                                <p class="empty-state-description">Ei tarpeeksi otteluita trendille.</p>
+                                <p class="empty-state-description">Not enough matches for trend analysis.</p>
                             </div>
                         </div>
                     </div>
@@ -2203,9 +2638,8 @@ window.TeamDetail = {
                     </div>
                     <div v-else class="empty-state-container">
                         <div class="empty-state-card">
-                            <div class="empty-state-icon">🎮</div>
-                            <h3 class="empty-state-title">Ei otteluita</h3>
-                            <p class="empty-state-description">Tälle kaudelle ei ole otteluhistoriaa saatavilla.</p>
+                            <h3 class="empty-state-title">No matches</h3>
+                            <p class="empty-state-description">Match history is not available for this season.</p>
                         </div>
                     </div>
                 </section>
@@ -2225,7 +2659,10 @@ window.TeamDetail = {
                                 <div class="player-cell">
                                     <div class="avatar-placeholder">{{ row.nickname ? row.nickname.slice(0, 2).toUpperCase() : 'PL' }}</div>
                                     <div>
-                                        <div class="player-name">{{ row.nickname }}</div>
+                                        <div class="player-name">
+                                            {{ row.nickname }}
+                                            <span v-for="badge in getPlayerRoleBadges(row.playerId)" :key="badge.label" class="role-badge" :class="{ 'role-badge--primary': badge.isPrimary }" :title="badge.isPrimary ? 'Primary role' : ''">{{ badge.label }}</span>
+                                        </div>
                                         <div class="player-sub">Maps {{ row.mapsPlayed }} · Rnds {{ row.roundsPlayed }}</div>
                                     </div>
                                 </div>
@@ -2263,9 +2700,8 @@ window.TeamDetail = {
                     </div>
                     <div v-else class="empty-state-container">
                         <div class="empty-state-card">
-                            <div class="empty-state-icon">👤</div>
-                            <h3 class="empty-state-title">Ei pelaajatietoja</h3>
-                            <p class="empty-state-description">Tälle kaudelle ei ole pelaajatietoja saatavilla.</p>
+                            <h3 class="empty-state-title">No player data</h3>
+                            <p class="empty-state-description">Player statistics are not available for this season.</p>
                         </div>
                     </div>
                     <div class="players-charts" v-if="playersByRating.length">
@@ -2351,9 +2787,8 @@ window.TeamDetail = {
                     </div>
                     <div v-else class="empty-state-container">
                         <div class="empty-state-card">
-                            <div class="empty-state-icon">🗳️</div>
-                            <h3 class="empty-state-title">Ei ban/nosto historiaa</h3>
-                            <p class="empty-state-description">Tälle kaudelle ei ole ban/nosto historiatietoja saatavilla.</p>
+                            <h3 class="empty-state-title">No ban/pick history</h3>
+                            <p class="empty-state-description">Ban/pick history data is not available for this season.</p>
                         </div>
                     </div>
                     <div class="glass-card" v-if="enhancedVetoAggregates.length">

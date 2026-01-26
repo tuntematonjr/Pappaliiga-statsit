@@ -132,7 +132,6 @@ class DivisionPlayerTotals(CamelModel):
     adr: float
     kr: float
     kd: float
-    rating: float
     hs_pct: float
     mvps: int
     pistol_kills: int
@@ -158,7 +157,6 @@ class DivisionLeader(CamelModel):
     deaths: int
     adr: float
     kr: float
-    rating: float
     mvps: int
     utility_damage: int
 

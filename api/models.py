@@ -103,7 +103,6 @@ class SeasonTableRow(CamelModel):
     kills: int
     deaths: int
     adr: Optional[float] = None
-    rating: Optional[float] = None
 
 
 class PlayerLeader(CamelModel):
