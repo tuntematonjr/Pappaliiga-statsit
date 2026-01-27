@@ -71,6 +71,9 @@ class TeamMapStats(CamelModel):
     winrate: Optional[float] = None
     pick_rate: Optional[float] = None
     udpr: Optional[float] = None
+    total_rounds_played: Optional[int] = None
+    rounds_won: Optional[int] = None
+    rounds_lost: Optional[int] = None
     # Player stats aggregated by map
     assists: Optional[int] = None
     kr: Optional[float] = None
@@ -246,11 +249,21 @@ async def get_team_page(
                 season_data = await teams_service.fetch_comprehensive_team_season(team_id, selected_champ)
             except NotFoundError:
                 season_data = None
+
+        current_season = None
+        current_division = None
+        if selected_champ:
+            selected_row = next((s for s in seasons if s.get("championship_id") == selected_champ), None)
+            if selected_row:
+                current_season = selected_row.get("season")
+                current_division = selected_row.get("division_num")
         
         return {
             "team": team,
             "seasons": seasons,
             "current_championship_id": selected_champ,
+            "current_season": current_season,
+            "current_division": current_division,
             "season_data": season_data,
         }
         

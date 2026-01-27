@@ -1388,7 +1388,9 @@ async def upsert_team_map_season_totals_async(
                   ON ps.match_id = ts.match_id
                  AND ps.round_index = ts.round_index
                  AND ps.team_id = ts.team_id
-                WHERE m.season = %s AND m.division_num = %s AND ts.team_id = %s
+                                WHERE m.season = %s AND m.division_num = %s AND ts.team_id = %s
+                                    AND ts.is_forfeit_map = 0
+                                    AND mp.is_forfeit = 0
                 { "AND mp.map_name = %s" if map_name else "" }
                 GROUP BY mp.map_name
                 ON DUPLICATE KEY UPDATE

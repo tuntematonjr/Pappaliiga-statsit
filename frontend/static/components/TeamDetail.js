@@ -1,8 +1,6 @@
 // Team detail view that renders stats, maps, matches, players and veto aggregates.
 // Every DB-backed field is surfaced as a stat, column, chart point or tooltip.
 
-const isDevEnv = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
-
 const PLAYER_COLUMNS = [
     { key: 'nickname', label: 'Pelaaja', sortable: true, colClass: 'col-name' },
     { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true },
@@ -31,121 +29,87 @@ const PLAYER_COLUMNS = [
     { key: 'flashSuccessLine', label: 'Flash%', sortable: true, numeric: true }
 ];
 
-const MAP_COLUMNS = [
-    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '210px', tooltip: 'Kartta' },
-    { key: 'totalRoundsPlayed', label: 'Erät pelattu', sortable: true, numeric: true, decimals: 0, colClass: 'mono-num', tooltip: 'Arvioidut erät: pelatut kartat × 30' },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', tooltip: 'Average Damage per Round' },
-    { key: 'kr', label: 'KR', sortable: true, numeric: true, decimals: 3, colClass: 'mono-num', tooltip: 'Kills per round' },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', tooltip: 'Kills / Deaths' },
-    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Headshot %' },
-    { key: 'kills', label: 'Tappoja', sortable: true, numeric: true, colClass: 'mono-num col-kills', tooltip: 'Kills (total)' },
-    { key: 'deaths', label: 'Kuolemia', sortable: true, numeric: true, colClass: 'mono-num col-deaths', tooltip: 'Deaths (total)' },
-    { key: 'assists', label: 'Assist', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Assists (total)' },
-    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Utility damage per round' },
-    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, colClass: 'mono-num col-mvps', tooltip: 'MVP:t (total)' },
-    { key: 'enemiesFlashed', label: 'Enemies flashed', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Vastustajat väläytettynä (total)' },
-    { key: 'flashSuccessPct', label: 'Flash%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Flash-succes % (flash_successes / flash_count)' },
-    { key: 'flashCount', label: 'Flashbangit', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Heitetyt flashbangit (total)' },
-    { key: 'multi2k', label: '2k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '2K (total)' },
-    { key: 'multi3k', label: '3k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '3K (total)' },
-    { key: 'multi4k', label: '4k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '4K (total)' },
-    { key: 'multi5k', label: 'Ace', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Ace (5K, total)' },
-    { key: 'pistolKills', label: 'Pistooli', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Pistoolitapot (total)' },
-    { key: 'sniperKills', label: 'Sniper', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Sniper-tapot (total)' },
-    { key: 'totalDamage', label: 'Vahinko', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Damage (total)' },
-    { key: 'clutchKills', label: 'Clutch', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Clutch-kills (total)' }
-];
+const MAP_GROUP_META = {
+    map: { label: '', className: 'group-map' },
+    rounds: { label: 'Erät', className: 'group-rounds group-divider' },
+    combat: { label: 'Taistelu', className: 'group-combat group-divider' },
+    kills: { label: 'Tappiot/Assist', className: 'group-kills group-divider' },
+    utility: { label: 'Utility', className: 'group-utility group-divider' },
+    awards: { label: 'MVP', className: 'group-awards group-divider' },
+    flash: { label: 'Flashbangit', className: 'group-flash group-divider' },
+    multikill: { label: 'Multi-kills', className: 'group-multikill group-divider' },
+    weapons: { label: 'Aseet', className: 'group-weapons group-divider' },
+    damage: { label: 'Vahinko', className: 'group-damage group-divider' },
+    clutch: { label: 'Clutch', className: 'group-clutch group-divider' }
+};
 
-// Dynamically compute groups from MAP_COLUMNS to ensure alignment
-function computeMapColumnGroups(columns) {
-    // Map column keys to their group labels
-    const groupMap = {
-        'mapName': '',
-        'totalRoundsPlayed': 'Erät',
-        'adr': 'Taistelu', 'kr': 'Taistelu', 'kd': 'Taistelu', 'hsPct': 'Taistelu',
-        'kills': 'Tappiot/Assist', 'deaths': 'Tappiot/Assist', 'assists': 'Tappiot/Assist',
-        'udpr': 'Utility',
-        'mvps': 'MVP',
-        'enemiesFlashed': 'Flashbangit', 'flashSuccessPct': 'Flashbangit', 'flashCount': 'Flashbangit',
-        'multi2k': 'Multi-kills', 'multi3k': 'Multi-kills', 'multi4k': 'Multi-kills', 'multi5k': 'Multi-kills',
-        'pistolKills': 'Aseet', 'sniperKills': 'Aseet',
-        'totalDamage': 'Vahinko',
-        'clutchKills': 'Clutch'
-    };
+const SCOUT_GROUP_META = {
+    map: { label: '', className: 'group-map' },
+    usage: { label: 'Pelattu', className: 'group-usage group-divider' },
+    results: { label: 'Tulokset', className: 'group-results group-divider' },
+    performance: { label: 'Suorituskyky', className: 'group-performance group-divider' },
+    veto: { label: 'Bannit', className: 'group-veto group-divider' },
+    series: { label: 'Decider/OT', className: 'group-series group-divider' }
+};
 
+function buildColumnGroups(columns, groupMeta) {
+    if (!Array.isArray(columns)) return [];
     const groups = [];
-    let currentGroup = null;
-    
-    columns.forEach((col) => {
-        const groupLabel = groupMap[col.key] || '';
-        if (!currentGroup || currentGroup.label !== groupLabel) {
-            if (currentGroup) groups.push(currentGroup);
-            currentGroup = { 
-                label: groupLabel, 
-                colSpan: 1, 
-                className: groupLabel ? `group-${groupLabel.toLowerCase().replace(/[^\w]/g, '')} group-divider` : 'group-map'
-            };
+    columns.forEach(column => {
+        const key = column.group || 'misc';
+        const meta = groupMeta[key] || { label: key, className: '' };
+        const last = groups[groups.length - 1];
+        if (!last || last.key !== key) {
+            groups.push({ key, label: meta.label || '', className: meta.className || '', colSpan: 1 });
         } else {
-            currentGroup.colSpan += 1;
+            last.colSpan += 1;
         }
     });
-    
-    if (currentGroup) groups.push(currentGroup);
     return groups;
 }
 
-const MAP_COLUMN_GROUPS = computeMapColumnGroups(MAP_COLUMNS);
+const MAP_COLUMNS = [
+    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '210px', tooltip: 'Kartta', group: 'map' },
+    { key: 'totalRoundsPlayed', label: 'Erät pelattu', sortable: true, numeric: true, decimals: 0, colClass: 'mono-num', tooltip: 'Todellinen pelattujen erien määrä', group: 'rounds' },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', tooltip: 'Average Damage per Round', group: 'combat' },
+    { key: 'kr', label: 'KR', sortable: true, numeric: true, decimals: 3, colClass: 'mono-num', tooltip: 'Kills per round', group: 'combat' },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', tooltip: 'Kills / Deaths', group: 'combat' },
+    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Headshot %', group: 'combat' },
+    { key: 'kills', label: 'Tappoja', sortable: true, numeric: true, colClass: 'mono-num col-kills', tooltip: 'Kills (total)', group: 'kills' },
+    { key: 'deaths', label: 'Kuolemia', sortable: true, numeric: true, colClass: 'mono-num col-deaths', tooltip: 'Deaths (total)', group: 'kills' },
+    { key: 'assists', label: 'Assist', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Assists (total)', group: 'kills' },
+    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Utility damage per round', group: 'utility' },
+    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, colClass: 'mono-num col-mvps', tooltip: 'MVP:t (total)', group: 'awards' },
+    { key: 'enemiesFlashed', label: 'Enemies flashed', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Vastustajat väläytettynä (total)', group: 'flash' },
+    { key: 'flashSuccessPct', label: 'Flash%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', tooltip: 'Flash-succes % (flash_successes / flash_count)', group: 'flash' },
+    { key: 'flashCount', label: 'Flashbangit', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Heitetyt flashbangit (total)', group: 'flash' },
+    { key: 'multi2k', label: '2k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '2K (total)', group: 'multikill' },
+    { key: 'multi3k', label: '3k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '3K (total)', group: 'multikill' },
+    { key: 'multi4k', label: '4k', sortable: true, numeric: true, colClass: 'mono-num', tooltip: '4K (total)', group: 'multikill' },
+    { key: 'multi5k', label: 'Ace', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Ace (5K, total)', group: 'multikill' },
+    { key: 'pistolKills', label: 'Pistooli', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Pistoolitapot (total)', group: 'weapons' },
+    { key: 'sniperKills', label: 'Sniper', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Sniper-tapot (total)', group: 'weapons' },
+    { key: 'totalDamage', label: 'Vahinko', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Damage (total)', group: 'damage' },
+    { key: 'clutchKills', label: 'Clutch', sortable: true, numeric: true, colClass: 'mono-num', tooltip: 'Clutch-kills (total)', group: 'clutch' }
+];
 
 const SCOUT_MAP_COLUMNS = [
-    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px' },
-    { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played' },
-    { key: 'picks', label: 'Omat pickit', sortable: true, numeric: true, colClass: 'mono-num col-picks' },
-    { key: 'oppPicks', label: 'Vastustajan pickit', sortable: true, numeric: true, colClass: 'mono-num col-opp-picks' },
-    { key: 'winrate', label: 'Win %', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate' },
-    { key: 'pickWinRate', label: 'Win % (oma pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-own' },
-    { key: 'oppPickWinRate', label: 'Win % (vastustajan pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-opp' },
-    { key: 'rd', label: 'Eräero', sortable: true, numeric: true, colClass: 'mono-num col-rd' },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd' },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr' },
-    { key: 'ban1', label: '1. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban1' },
-    { key: 'ban2', label: '2. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban2' },
-    { key: 'oppBan', label: 'Vastustajan banni', sortable: true, numeric: true, colClass: 'mono-num col-opp-ban' },
-    { key: 'totalOwnBan', label: 'Banneja yhteensä', sortable: true, numeric: true, colClass: 'mono-num col-ban-total' },
-    { key: 'decov', label: 'Decider / overflow', sortable: true, numeric: true, colClass: 'mono-num col-decov' }
+    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px', group: 'map' },
+    { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played', group: 'usage' },
+    { key: 'picks', label: 'Omat pickit', sortable: true, numeric: true, colClass: 'mono-num col-picks', group: 'usage' },
+    { key: 'oppPicks', label: 'Vastustajan pickit', sortable: true, numeric: true, colClass: 'mono-num col-opp-picks', group: 'usage' },
+    { key: 'winrate', label: 'Win %', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate', group: 'results' },
+    { key: 'pickWinRate', label: 'Win % (oma pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-own', group: 'results' },
+    { key: 'oppPickWinRate', label: 'Win % (vastustajan pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-opp', group: 'results' },
+    { key: 'rd', label: 'Eräero', sortable: true, numeric: true, colClass: 'mono-num col-rd', group: 'performance' },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', group: 'performance' },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', group: 'performance' },
+    { key: 'ban1', label: '1. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban1', group: 'veto' },
+    { key: 'ban2', label: '2. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban2', group: 'veto' },
+    { key: 'oppBan', label: 'Vastustajan banni', sortable: true, numeric: true, colClass: 'mono-num col-opp-ban', group: 'veto' },
+    { key: 'totalOwnBan', label: 'Banneja yhteensä', sortable: true, numeric: true, colClass: 'mono-num col-ban-total', group: 'veto' },
+    { key: 'decov', label: 'Decider / overflow', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series' }
 ];
-
-function computeScoutMapColumnGroups(columns) {
-    const groupMap = {
-        'mapName': '',
-        'played': 'Pelattu', 'picks': 'Pelattu', 'oppPicks': 'Pelattu',
-        'winrate': 'Tulokset', 'pickWinRate': 'Tulokset', 'oppPickWinRate': 'Tulokset',
-        'rd': 'Suorituskyky', 'kd': 'Suorituskyky', 'adr': 'Suorituskyky',
-        'ban1': 'Bannit', 'ban2': 'Bannit', 'oppBan': 'Bannit', 'totalOwnBan': 'Bannit',
-        'decov': 'Decider/OT'
-    };
-
-    const groups = [];
-    let currentGroup = null;
-    
-    columns.forEach((col) => {
-        const groupLabel = groupMap[col.key] || '';
-        if (!currentGroup || currentGroup.label !== groupLabel) {
-            if (currentGroup) groups.push(currentGroup);
-            currentGroup = { 
-                label: groupLabel, 
-                colSpan: 1, 
-                className: groupLabel ? `group-${groupLabel.toLowerCase().replace(/[^\w]/g, '')} group-divider` : 'group-map'
-            };
-        } else {
-            currentGroup.colSpan += 1;
-        }
-    });
-    
-    if (currentGroup) groups.push(currentGroup);
-    return groups;
-}
-
-const SCOUT_MAP_GROUPS = computeScoutMapColumnGroups(SCOUT_MAP_COLUMNS);
 
 const VETO_COLUMNS = [
     { key: 'mapName', label: 'Kartta', sortable: true },
@@ -157,8 +121,6 @@ const VETO_COLUMNS = [
     { key: 'pickWinRate', label: 'Win pick', sortable: true, numeric: true, decimals: 1 },
     { key: 'deciderWinRate', label: 'Win decider', sortable: true, numeric: true, decimals: 1 }
 ];
-
-const MATCHES_PAGE_SIZE = 8;
 
 function createSegment() {
     return { data: null, loading: false, error: null, fetchedAt: null };
@@ -223,106 +185,71 @@ function formatDate(ts) {
     return d.toLocaleDateString('fi-FI', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function paginate(items, page, pageSize) {
-    if (!Array.isArray(items) || !items.length) {
-        return { items: [], total: 0, totalPages: 0, page: 1 };
-    }
-    const total = items.length;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const safePage = Math.min(Math.max(page, 1), totalPages);
-    const start = (safePage - 1) * pageSize;
-    return {
-        items: items.slice(start, start + pageSize),
-        total,
-        totalPages,
-        page: safePage
-    };
-}
-
 function normalizeSeasonData(pageData) {
     if (!pageData) return null;
-    return pageData.seasonData || pageData.season_data || pageData.season || null;
+    return pageData.seasonData || null;
 }
 
 function normalizeMap(entry) {
     if (!entry) return null;
-    const prettyName = entry.mapPretty || entry.map_pretty || entry.pretty_name || null;
-    const rawName = entry.mapName || entry.map_name || entry.map || prettyName || 'Kartta';
+    const rawName = entry.mapName || 'Kartta';
     const lowerRaw = String(rawName || '').toLowerCase();
-    if (lowerRaw === 'forfeit' || (prettyName && String(prettyName).toLowerCase() === 'forfeit')) {
+    if (lowerRaw === 'forfeit') {
         return null; // never include forfeit entries as maps
     }
-    const beautified = prettyName || beautifyMapName(rawName) || rawName;
-    const playedRaw = toNumber(entry.played ?? entry.matches ?? entry.maps ?? entry.maps_played);
-    const games = toNumber(entry.games ?? entry.games_played ?? playedRaw ?? (entry.wins + entry.losses));
-    const played = playedRaw || games;
-    const wins = toNumber(entry.wins ?? entry.maps_won);
-    const losses = toNumber(entry.losses ?? entry.maps_lost ?? Math.max(0, (games || played) - wins));
-    const picks = toNumber(entry.picks ?? entry.times_picked ?? entry.timesPicked);
-    const oppPicks = toNumber(entry.opp_picks ?? entry.oppPicks);
+    const beautified = beautifyMapName(rawName) || rawName;
+    const games = toNumber(entry.games);
+    const played = games || toNumber(entry.played);
+    const wins = toNumber(entry.wins);
+    const losses = toNumber(entry.losses || Math.max(0, played - wins));
+    const picks = toNumber(entry.picks);
+    const oppPicks = toNumber(entry.oppPicks);
     const ban1 = toNumber(entry.ban1);
     const ban2 = toNumber(entry.ban2);
-    const oppBan = toNumber(entry.opp_ban ?? entry.oppBan);
-    const totalOwnBan = toNumber(entry.total_own_ban ?? entry.totalOwnBan ?? (ban1 + ban2));
+    const oppBan = toNumber(entry.oppBan);
+    const totalOwnBan = toNumber(entry.totalOwnBan || (ban1 + ban2));
     const decov = toNumber(entry.decov);
     const kills = toNumber(entry.kills);
     const deaths = toNumber(entry.deaths);
-    const kdRaw = toNumber(entry.kd ?? entry.kd_ratio);
-    const kd = kdRaw || (deaths ? kills / deaths : kills);
-    const adr = toNumber(entry.adr ?? entry.average_damage ?? (entry.damage && games ? entry.damage / (games * 30) : 0));
+    const kd = toNumber(entry.kd || (deaths ? kills / deaths : kills));
+    const adr = toNumber(entry.adr);
     const damage = toNumber(entry.damage);
-    const utilityDamage = toNumber(entry.utility_damage ?? entry.utilityDamage);
-    const mvps = toNumber(entry.mvps ?? entry.mvp);
-    const rd = toNumber(entry.rd ?? entry.round_diff ?? entry.rounds_diff);
-    const totalGames = games || played || wins + losses;
-    const winrateRaw = toNumber(entry.winrate ?? entry.win_rate ?? entry.winRate ?? entry.wr);
-    const winrate = Number.isFinite(winrateRaw) && winrateRaw !== 0
-        ? (Math.abs(winrateRaw) <= 1 ? winrateRaw * 100 : winrateRaw)
-        : (totalGames ? (wins / totalGames) * 100 : 0);
-    const totalPicks = picks + oppPicks;
-    const pickRateRaw = toNumber(entry.pick_rate ?? entry.pickRate);
-    const pickRate = Number.isFinite(pickRateRaw) && pickRateRaw !== 0
-        ? (Math.abs(pickRateRaw) <= 1 ? pickRateRaw * 100 : pickRateRaw)
-        : (totalPicks ? (picks / totalPicks) * 100 : (played ? (picks / played) * 100 : 0));
-    
-    // Pick win rates
-    const pickWins = toNumber(entry.pickWins ?? entry.pick_wins);
-    const oppPickWins = toNumber(entry.oppPickWins ?? entry.opp_pick_wins);
-    const pickWinRateRaw = toNumber(entry.pickWinRate ?? entry.pick_win_rate);
-    const oppPickWinRateRaw = toNumber(entry.oppPickWinRate ?? entry.opp_pick_win_rate);
-    const pickWinRate = Number.isFinite(pickWinRateRaw) && pickWinRateRaw !== 0
-        ? (Math.abs(pickWinRateRaw) <= 1 ? pickWinRateRaw * 100 : pickWinRateRaw)
-        : (picks && pickWins ? (pickWins / picks) * 100 : null);
-    const oppPickWinRate = Number.isFinite(oppPickWinRateRaw) && oppPickWinRateRaw !== 0
-        ? (Math.abs(oppPickWinRateRaw) <= 1 ? oppPickWinRateRaw * 100 : oppPickWinRateRaw)
-        : (oppPicks && oppPickWins ? (oppPickWins / oppPicks) * 100 : null);
+    const utilityDamage = toNumber(entry.utilityDamage);
+    const mvps = toNumber(entry.mvps);
+    const rd = toNumber(entry.rd);
+    const winrate = toNumber(entry.winrate);
+    const pickRate = toNumber(entry.pickRate);
 
-    const identifier = entry.mapId || entry.map_id || rawName;
+    const pickWins = toNumber(entry.pickWins);
+    const oppPickWins = toNumber(entry.oppPickWins);
+    const pickWinRate = picks ? (pickWins / picks) * 100 : null;
+    const oppPickWinRate = oppPicks ? (oppPickWins / oppPicks) * 100 : null;
 
-    // Player performance metrics - parse all fields that come from backend
+    const identifier = entry.mapId || rawName;
+
     const assists = toNumber(entry.assists);
-    const kr = toNumber(entry.kr ?? (kills ? kills / Math.max(1, kills + deaths) : 0));
-    const hsPct = toNumber(entry.hs_pct ?? entry.hsPercent);
-    const totalDamage = toNumber(entry.total_damage ?? entry.damage ?? entry.totalDamage);
-    const enemiesFlashed = toNumber(entry.enemies_flashed ?? entry.enemiesFlashed);
-    const flashCount = toNumber(entry.flash_count ?? entry.flashCount);
-    const flashSuccesses = toNumber(entry.flash_successes ?? entry.flashSuccesses);
+    const kr = toNumber(entry.kr);
+    const hsPct = toNumber(entry.hsPct);
+    const totalDamage = toNumber(entry.damage);
+    const enemiesFlashed = toNumber(entry.enemiesFlashed);
+    const flashCount = toNumber(entry.flashCount);
+    const flashSuccesses = toNumber(entry.flashSuccesses);
     const flashSuccessPct = flashCount ? (flashSuccesses / flashCount) * 100 : 0;
-    const multi2k = toNumber(entry.multi_2k ?? entry.multi2k);
-    const multi3k = toNumber(entry.multi_3k ?? entry.multi3k);
-    const multi4k = toNumber(entry.multi_4k ?? entry.multi4k);
-    const multi5k = toNumber(entry.multi_5k ?? entry.multi5k);
-    const pistolKills = toNumber(entry.pistol_kills ?? entry.pistolKills);
-    const sniperKills = toNumber(entry.sniper_kills ?? entry.sniperKills);
-    const clutchKills = toNumber(entry.clutch_kills ?? entry.clutchKills);
-    const totalUtilityDamage = toNumber(entry.utility_damage ?? entry.utilityDamage ?? entry.total_utility_damage);
-    
-    // Estimated totals (use average * matches as proxy when exact totals not available)
-    const estimatedRoundsPerMap = played * 30; // CS2 standard 30 rounds per map
-    const totalRoundsPlayed = estimatedRoundsPerMap;
-    const roundsPerMapAvg = 30; // Standard
-    const udpr = toNumber(entry.udpr ?? (totalUtilityDamage && totalRoundsPlayed ? totalUtilityDamage / totalRoundsPlayed : 0));
-    const totalMaps = played || games || 0;
+    const multi2k = toNumber(entry.multi2k);
+    const multi3k = toNumber(entry.multi3k);
+    const multi4k = toNumber(entry.multi4k);
+    const multi5k = toNumber(entry.multi5k);
+    const pistolKills = toNumber(entry.pistolKills);
+    const sniperKills = toNumber(entry.sniperKills);
+    const clutchKills = toNumber(entry.clutchKills);
+    const totalUtilityDamage = toNumber(entry.utilityDamage);
+
+    const roundsWon = toNumber(entry.roundsWon);
+    const roundsLost = toNumber(entry.roundsLost);
+    const totalRoundsPlayed = roundsWon + roundsLost;
+    const roundsPerMapAvg = totalRoundsPlayed && played ? totalRoundsPlayed / played : 0;
+    const udpr = toNumber(entry.udpr);
+    const totalMaps = games || played || 0;
     const multi2kPerRound = totalRoundsPlayed ? multi2k / totalRoundsPlayed : 0;
     const multi3kPerRound = totalRoundsPlayed ? multi3k / totalRoundsPlayed : 0;
     const multi4kPerRound = totalRoundsPlayed ? multi4k / totalRoundsPlayed : 0;
@@ -368,6 +295,8 @@ function normalizeMap(entry) {
         totalDamage,
         totalDamagePerRound,
         totalDamagePerMap,
+        roundsWon,
+        roundsLost,
         mvps,
         kills,
         deaths,
@@ -403,46 +332,47 @@ function normalizeMap(entry) {
 
 function normalizePlayer(player, idx = 0) {
     if (!player) return null;
-    const mapsPlayed = toNumber(player.mapsPlayed ?? player.maps_played ?? player.maps ?? player.map_count);
-    const roundsPlayed = toNumber(player.roundsPlayed ?? player.rounds_played ?? player.rounds ?? 0);
+    const mapsPlayed = toNumber(player.mapsPlayed);
+    const roundsPlayed = toNumber(player.roundsPlayed);
     const kills = toNumber(player.kills);
     const deaths = toNumber(player.deaths);
     const assists = toNumber(player.assists);
     const damage = toNumber(player.damage);
-    const utilityDamage = toNumber(player.utilityDamage ?? player.utility_damage);
+    const utilityDamage = toNumber(player.utilityDamage);
     const mvps = toNumber(player.mvps);
-    const sniperKills = toNumber(player.sniperKills ?? player.sniper_kills);
-    const pistolKills = toNumber(player.pistolKills ?? player.pistol_kills);
-    const enemiesFlashed = toNumber(player.enemiesFlashed ?? player.enemies_flashed);
-    const flashCount = toNumber(player.flashCount ?? player.flash_count);
-    const flashSuccesses = toNumber(player.flashSuccesses ?? player.flash_successes);
-    const entryCount = toNumber(player.entryCount ?? player.entry_count);
-    const entryWins = toNumber(player.entryWins ?? player.entry_wins);
-    const cl1v1Attempts = toNumber(player.cl1v1Attempts ?? player.cl_1v1_attempts);
-    const cl1v1Wins = toNumber(player.cl1v1Wins ?? player.cl_1v1_wins);
-    const cl1v2Attempts = toNumber(player.cl1v2Attempts ?? player.cl_1v2_attempts);
-    const cl1v2Wins = toNumber(player.cl1v2Wins ?? player.cl_1v2_wins);
-    const mk2k = toNumber(player.mk2k ?? player.mk_2k ?? player['2k']);
-    const mk3k = toNumber(player.mk3k ?? player.mk_3k ?? player['3k']);
-    const mk4k = toNumber(player.mk4k ?? player.mk_4k ?? player['4k']);
-    const mk5k = toNumber(player.mk5k ?? player.mk_5k ?? player['5k']);
-    const clutchKills = toNumber(player.clutchKills ?? player.clutch_kills ?? player.clutches ?? player.clutch_wins);
-    const kdRaw = toNumber(player.kd ?? player.kdRatio ?? player.kd_ratio);
-    const kd = kdRaw || (deaths ? kills / deaths : kills);
-    const adr = toNumber(player.adr ?? player.average_damage ?? (roundsPlayed ? damage / roundsPlayed : 0));
-    const kr = toNumber(player.kr ?? player.killsPerRound ?? player.kills_per_round ?? (roundsPlayed ? kills / roundsPlayed : 0));
-    const hsPct = toNumber(player.hsPct ?? player.hs_pct ?? player.hs_percent ?? player.headshot_percent);
+    const sniperKills = toNumber(player.sniperKills);
+    const pistolKills = toNumber(player.pistolKills);
+    const enemiesFlashed = toNumber(player.enemiesFlashed);
+    const flashCount = toNumber(player.flashCount);
+    const flashSuccesses = toNumber(player.flashSuccesses);
+    const entryCount = toNumber(player.entryCount);
+    const entryWins = toNumber(player.entryWins);
+    const cl1v1Attempts = toNumber(player.cl1v1Attempts);
+    const cl1v1Wins = toNumber(player.cl1v1Wins);
+    const cl1v2Attempts = toNumber(player.cl1v2Attempts);
+    const cl1v2Wins = toNumber(player.cl1v2Wins);
+    const mk2k = toNumber(player.mk2k);
+    const mk3k = toNumber(player.mk3k);
+    const mk4k = toNumber(player.mk4k);
+    const mk5k = toNumber(player.mk5k);
+    const clutchKills = toNumber(player.clutchKills);
+    const kd = toNumber(player.kd || (deaths ? kills / deaths : kills));
+    const rating = kd;
+    const adr = toNumber(player.adr);
+    const kr = toNumber(player.kr);
+    const hsPct = toNumber(player.hsPct);
     const entryWinPct = entryCount ? (entryWins / entryCount) * 100 : 0;
     const clutch1v1Pct = cl1v1Attempts ? (cl1v1Wins / cl1v1Attempts) * 100 : 0;
     const clutch1v2Pct = cl1v2Attempts ? (cl1v2Wins / cl1v2Attempts) * 100 : 0;
     const flashSuccessPct = flashCount ? (flashSuccesses / flashCount) * 100 : 0;
 
     return {
-        playerId: player.player_id || player.id || `player-${idx}`,
-        nickname: player.nickname || player.name || 'Pelaaja',
+        playerId: player.playerId || `player-${idx}`,
+        nickname: player.nickname || 'Pelaaja',
         mapsPlayed,
         roundsPlayed,
         kd,
+        rating,
         adr,
         kr,
         hsPct,
@@ -477,47 +407,42 @@ function normalizePlayer(player, idx = 0) {
 
 function normalizeMatch(match, teamId = null) {
     if (!match) return null;
-    const matchId = match.match_id || match.matchId || match.id;
+    const matchId = match.matchId;
     const playedFlag = toNumber(match.played);
-    const bestOf = toNumber(match.best_of ?? match.bestOf ?? match.bo ?? 0);
-    const matchWinnerId = match.winner_team_id || match.winnerTeamId || null;
-    const matchIsForfeit = !!(match.is_forfeit ?? match.isForfeit);
+    const bestOf = toNumber(match.bestOf);
+    const matchWinnerId = match.winnerTeamId || null;
+    const matchIsForfeit = !!match.isForfeit;
     const rawMaps = Array.isArray(match.maps) ? match.maps : [];
     const left = match.left || {
-        team_id: match.team1_id,
-        team_name: match.team1_name,
-        avatar: match.t1_avatar
+        team_id: match.team1Id,
+        team_name: match.team1Name,
+        avatar: match.t1Avatar
     };
     const right = match.right || {
-        team_id: match.team2_id,
-        team_name: match.team2_name,
-        avatar: match.t2_avatar
+        team_id: match.team2Id,
+        team_name: match.team2Name,
+        avatar: match.t2Avatar
     };
     const meOnLeft = teamId ? String(left?.team_id) === String(teamId) : true;
     const mySide = meOnLeft ? left : right;
     const oppSide = meOnLeft ? right : left;
-    const myName = mySide?.team_name || mySide?.team || match.team1_name || match.team2_name || match.team;
-    const oppName = oppSide?.team_name
-        || oppSide?.team
-        || match.opponent_name
-        || match.opponent
-        || (meOnLeft ? (match.team2_name || match.team2) : (match.team1_name || match.team1))
-        || '';
+    const myName = mySide?.team_name || '';
+    const oppName = oppSide?.team_name || '';
     const maps = [];
     let forfeitedMaps = 0;
     rawMaps.forEach((m, idx) => {
         if (m.is_forfeit) {
-            const winnerId = m.winner_team_id || m.winnerTeamId || null;
+            const winnerId = m.winner_team_id || null;
             if (winnerId && String(winnerId) !== String(teamId)) {
                 forfeitedMaps += 1;
             }
         }
-        const rawMapName = m.map || m.map_name || m.name || `Map ${idx + 1}`;
+        const rawMapName = m.map || `Map ${idx + 1}`;
         const displayName = beautifyMapName(rawMapName);
-        if (!displayName) return; // skip invalid entries
-        let scoreFor = toNumber(m.rf ?? m.score_for ?? m.score_team1 ?? 0);
-        let scoreAgainst = toNumber(m.ra ?? m.score_against ?? m.score_team2 ?? 0);
-        const mapWinnerId = m.winner_team_id || m.winnerTeamId || null;
+        if (!displayName) return;
+        let scoreFor = toNumber(m.rf ?? 0);
+        let scoreAgainst = toNumber(m.ra ?? 0);
+        const mapWinnerId = m.winner_team_id || null;
         if (m.is_forfeit && mapWinnerId && scoreFor === 0 && scoreAgainst === 0) {
             if (String(mapWinnerId) === String(teamId)) {
                 scoreFor = 13;
@@ -534,10 +459,10 @@ function normalizeMatch(match, teamId = null) {
         maps.push({
             id: `${matchId}-map-${idx}`,
             mapName: displayName,
-            roundIndex: toNumber(m.round_index ?? m.roundIndex ?? idx),
+            roundIndex: toNumber(m.round_index ?? idx),
             scoreFor,
             scoreAgainst,
-            pickTeamId: m.pick_team_id || m.pickTeamId || null,
+            pickTeamId: m.pick_team_id || null,
             isForfeit: !!m.is_forfeit,
             winnerTeamId: mapWinnerId,
             adr: toNumber(myStats.adr),
@@ -556,21 +481,15 @@ function normalizeMatch(match, teamId = null) {
     const mapDraws = maps.length - mapWins - mapLosses;
     const roundsFor = maps.reduce((sum, m) => sum + m.scoreFor, 0);
     const roundsAgainst = maps.reduce((sum, m) => sum + m.scoreAgainst, 0);
-    let roundDiff = toNumber(match.round_diff ?? match.roundDiff);
-    if (!Number.isFinite(roundDiff)) {
-        roundDiff = roundsFor - roundsAgainst;
-    }
-    // parenthesize fallbacks to avoid ?? precedence issues with ||
-    const played = maps.length || toNumber(match.map_count ?? match.played ?? 0);
+    const roundDiff = roundsFor - roundsAgainst;
+    const played = maps.length || playedFlag;
     const matchRating = maps.length ? safeDivide(maps.reduce((sum, m) => sum + (m.kd || 0), 0), maps.length) : 0;
-    const rawTeamScore = match.team_score ?? match.teamScore ?? match.series_wins;
-    const rawOppScore = match.opp_score ?? match.oppScore ?? match.series_losses;
-    const teamScore = rawTeamScore != null ? toNumber(rawTeamScore) : mapWins;
-    const oppScore = rawOppScore != null ? toNumber(rawOppScore) : mapLosses;
+    const teamScore = mapWins;
+    const oppScore = mapLosses;
 
     return {
         matchId,
-        ts: toNumber(match.ts ?? match.started_at ?? match.start_ts ?? match.date),
+        ts: toNumber(match.ts),
         status: match.status || (playedFlag ? 'finished' : 'scheduled'),
         bestOf: bestOf || Math.max(1, maps.length),
         played,
@@ -584,34 +503,72 @@ function normalizeMatch(match, teamId = null) {
         roundsAgainst,
         roundDiff,
         matchRating,
-        team1Name: match.team1_name || match.team1 || myName,
-        team2Name: match.team2_name || match.opponent_name || oppName,
+        team1Name: match.team1Name || myName,
+        team2Name: match.team2Name || oppName,
         opponentName: oppName,
         me: mySide,
         opponent: oppSide,
-        faceitUrl: match.faceit_url || match.faceitUrl || '',
+        faceitUrl: match.faceitUrl || '',
         maps
+    };
+}
+
+function recomputeMapDerived(entry) {
+    const roundsWon = toNumber(entry.roundsWon);
+    const roundsLost = toNumber(entry.roundsLost);
+    const totalRoundsPlayed = roundsWon + roundsLost;
+    const totalMaps = toNumber(entry.games || entry.played);
+    const totalRounds = totalRoundsPlayed || 0;
+    const maps = totalMaps || 0;
+    const totalDamage = toNumber(entry.totalDamage || entry.damage || 0);
+    const multi2k = toNumber(entry.multi2k);
+    const multi3k = toNumber(entry.multi3k);
+    const multi4k = toNumber(entry.multi4k);
+    const multi5k = toNumber(entry.multi5k);
+    const pistolKills = toNumber(entry.pistolKills);
+    const sniperKills = toNumber(entry.sniperKills);
+
+    return {
+        ...entry,
+        roundsWon,
+        roundsLost,
+        totalRoundsPlayed: totalRoundsPlayed || entry.totalRoundsPlayed || 0,
+        roundsPerMapAvg: maps ? totalRounds / maps : 0,
+        multi2kPerRound: totalRounds ? multi2k / totalRounds : 0,
+        multi3kPerRound: totalRounds ? multi3k / totalRounds : 0,
+        multi4kPerRound: totalRounds ? multi4k / totalRounds : 0,
+        multi5kPerRound: totalRounds ? multi5k / totalRounds : 0,
+        pistolKillsPerRound: totalRounds ? pistolKills / totalRounds : 0,
+        sniperKillsPerRound: totalRounds ? sniperKills / totalRounds : 0,
+        totalDamagePerRound: totalRounds ? totalDamage / totalRounds : 0,
+        multi2kPerMap: maps ? multi2k / maps : 0,
+        multi3kPerMap: maps ? multi3k / maps : 0,
+        multi4kPerMap: maps ? multi4k / maps : 0,
+        multi5kPerMap: maps ? multi5k / maps : 0,
+        pistolKillsPerMap: maps ? pistolKills / maps : 0,
+        sniperKillsPerMap: maps ? sniperKills / maps : 0,
+        totalDamagePerMap: maps ? totalDamage / maps : 0
     };
 }
 
 function normalizeVeto(entry) {
     if (!entry) return null;
-    const pretty = beautifyMapName(entry.map_name || entry.mapName || entry.selected_map_name);
+    const pretty = beautifyMapName(entry.mapName);
     return {
         mapName: pretty || 'Kartta',
-        timesPicked: toNumber(entry.times_picked ?? entry.picked),
-        timesBanned: toNumber(entry.times_banned ?? entry.banned),
-        timesOpponentPicked: toNumber(entry.times_opponent_picked ?? entry.timesOpponentPicked),
-        pickRate: toNumber(entry.pick_rate ?? entry.pickRate),
-        banRate: toNumber(entry.ban_rate ?? entry.banRate),
-        pickWinRate: toNumber(entry.pick_win_rate ?? entry.pickWinRate)
+        timesPicked: toNumber(entry.timesPicked),
+        timesBanned: toNumber(entry.timesBanned),
+        timesOpponentPicked: toNumber(entry.timesOpponentPicked),
+        pickRate: toNumber(entry.pickRate),
+        banRate: toNumber(entry.banRate),
+        pickWinRate: toNumber(entry.pickWinRate)
     };
 }
 
 function getMatchResult(match) {
     if (!match) return 'pending';
     if (match.isForfeit && match.winnerTeamId) {
-        return String(match.winnerTeamId) === String(match.me?.team_id || match.teamId) ? 'win' : 'loss';
+        return String(match.winnerTeamId) === String(match.me?.team_id) ? 'win' : 'loss';
     }
     if (match.teamScore > match.oppScore) return 'win';
     if (match.teamScore < match.oppScore) return 'loss';
@@ -620,14 +577,18 @@ function getMatchResult(match) {
     return 'draw';
 }
 
+function resolveTabFromQuery(route) {
+    const tab = route?.query?.tab;
+    const allowed = new Set(['overview', 'matches', 'players', 'veto']);
+    return allowed.has(tab) ? tab : 'overview';
+}
+
 window.TeamDetail = {
     name: 'TeamDetail',
     components: {
         get LoadingSpinner() { return window.LoadingSpinner; },
         get ErrorMessage() { return window.ErrorMessage; },
         get SortableTable() { return window.SortableTable; },
-        get ProgressBar() { return window.ProgressBar; },
-        get SplitBar() { return window.SplitBar; },
         get SparklineChart() { return window.SparklineChart; },
         get RadarChart() { return window.RadarChart; }
     },
@@ -640,22 +601,16 @@ window.TeamDetail = {
         return {
             teamStore,
             selectedChampionship: this.championshipId ? String(this.championshipId) : null,
-            activeTab: this.$route?.query?.tab || 'overview',
-            mapViewMode: 'compact', // 'compact' or 'detailed'
-            vetoMapOrder: 'usage', // 'usage' or 'alphabetical'
+            activeTab: resolveTabFromQuery(this.$route),
+            mapViewMode: 'summary', // 'summary' or 'full'
             mapSubMetricMode: 'perRound', // 'perRound' or 'perMap'
             matchMetric: 'roundDiff',
-            mapMetric: 'winrate',
-            matchesPage: 1,
             SCOUT_MAP_COLUMNS,
-            SCOUT_MAP_GROUPS,
             MAP_COLUMNS,
-            MAP_COLUMN_GROUPS,
             PLAYER_COLUMNS,
             VETO_COLUMNS,
             scoutTableKey: 0,
-            detailedTableKey: 0,
-            scoutLogKey: null
+            detailedTableKey: 0
         };
     },
     computed: {
@@ -670,18 +625,18 @@ window.TeamDetail = {
             return this.pageSegment.data || null;
         },
         teamInfo() {
-            return this.pageData?.team || this.pageData?.profile || null;
+            return this.pageData?.team || null;
         },
         seasonOptions() {
             const seasons = Array.isArray(this.pageData?.seasons) ? this.pageData.seasons : [];
             const normalized = seasons.map(season => {
-                const value = season.championship_id || season.championshipId || season.id;
+                const value = season.championshipId;
                 return {
                     value: value ? String(value) : null,
-                    label: season.name || `Kausi ${season.season} · Div ${season.division_num}`,
+                    label: season.name || `Kausi ${season.season} · Div ${season.divisionNum}`,
                     season: toNumber(season.season),
-                    division: season.division_num,
-                    isPlayoffs: season.is_playoffs
+                    division: season.divisionNum,
+                    isPlayoffs: season.isPlayoffs
                 };
             }).filter(option => option.value);
             return normalized.sort((a, b) => {
@@ -693,167 +648,41 @@ window.TeamDetail = {
                 return 0;
             });
         },
+        selectedSeasonOption() {
+            if (!this.seasonOptions.length) return null;
+            const current = this.currentChampionshipId ? String(this.currentChampionshipId) : null;
+            const match = this.seasonOptions.find(opt => String(opt.value) === String(current));
+            if (match) return match;
+            return this.seasonOptions[0] || null;
+        },
+        heroPlayoffsFlag() {
+            const option = this.selectedSeasonOption;
+            return !!(option?.isPlayoffs);
+        },
         currentChampionshipId() {
             if (this.pageData?.currentChampionshipId) return String(this.pageData.currentChampionshipId);
             if (this.selectedChampionship) return String(this.selectedChampionship);
             return this.seasonOptions[0]?.value || null;
         },
-        currentSeasonOption() {
-            const current = this.currentChampionshipId;
-            if (!current) return this.seasonOptions[0] || null;
-            return this.seasonOptions.find(s => String(s.value) === String(current)) || this.seasonOptions[0] || null;
-        },
         seasonData() {
-            const data = normalizeSeasonData(this.pageData) || null;
+            const data = normalizeSeasonData(this.pageData);
             if (!data) return null;
-            const dataChamp = data.championshipId || data.championship_id || null;
-            if (this.currentChampionshipId && dataChamp && String(dataChamp) !== String(this.currentChampionshipId)) {
+            if (this.currentChampionshipId && data.championshipId && String(data.championshipId) !== String(this.currentChampionshipId)) {
                 return null;
             }
             return data;
         },
         teamStats() {
-            return this.seasonData?.teamStats || this.seasonData?.stats || this.seasonData?.team_stats || {};
+            return this.seasonData?.teamStats || {};
         },
-        // Map stats cover all DB fields: played/games/wins/losses/winrate/picks/oppPicks/pickRate/ban1/ban2/oppBan/totalOwnBan/decov/rd/kd/adr/rating/ct/t splits/damage/utilityDamage/mvps/kills/deaths
+        // Map stats (from API only, no fallbacks)
         mapStats() {
-            const maps = Array.isArray(this.seasonData?.mapStats) ? this.seasonData.mapStats : (Array.isArray(this.seasonData?.map_stats) ? this.seasonData.map_stats : []);
-            const normalized = maps.map(normalizeMap).filter(Boolean);
-
-            const lookup = {};
-            normalized.forEach(m => {
-                const key = mapKey(m.mapName || m.id);
-                lookup[key] = m;
-            });
-
-            // Fallback aggregation from match maps to avoid missing data
-            const matchAgg = {};
-            this.matchesList.forEach(match => {
-                (match.maps || []).forEach(map => {
-                    const name = beautifyMapName(map.mapName);
-                    if (!name) return;
-                    const key = mapKey(name);
-                    const bucket = matchAgg[key] || {
-                        id: key,
-                        mapName: name,
-                        games: 0,
-                        wins: 0,
-                        losses: 0,
-                        picks: 0,
-                        oppPicks: 0,
-                        decov: 0,
-                        rd: 0,
-                        adrSum: 0,
-                        kdSum: 0
-                    };
-                    bucket.games += 1;
-                    if (map.scoreFor > map.scoreAgainst) bucket.wins += 1;
-                    else if (map.scoreFor < map.scoreAgainst) bucket.losses += 1;
-                    if (map.pickTeamId) {
-                        if (String(map.pickTeamId) === String(this.teamId)) bucket.picks += 1;
-                        else bucket.oppPicks += 1;
-                    } else {
-                        bucket.decov += 1;
-                    }
-                    bucket.rd += (map.scoreFor - map.scoreAgainst);
-                    bucket.adrSum += toNumber(map.adr);
-                    bucket.kdSum += toNumber(map.kd);
-                    matchAgg[key] = bucket;
-                });
-            });
-
-            // Build pool only from season data, match maps, and season veto list (season-level pool).
-            const poolNames = new Set();
-            normalized.forEach(m => poolNames.add(m.mapName));
-            this.matchesList.forEach(match => {
-                (match.maps || []).forEach(map => {
-                    if (map.mapName) poolNames.add(map.mapName);
-                });
-            });
-            const vetoPool = Array.isArray(this.seasonData?.vetoHistory) ? this.seasonData.vetoHistory
-                : (Array.isArray(this.seasonData?.veto_history) ? this.seasonData.veto_history : []);
-            vetoPool.forEach(entry => {
-                const raw = entry.map_name || entry.mapName;
-                const pretty = entry.selected_map_name || entry.pretty_name;
-                const name = beautifyMapName(pretty || raw);
-                if (name) poolNames.add(name);
-            });
-
-            const finalMaps = [];
-            poolNames.forEach(name => {
-                const key = String(name).toLowerCase();
-                const existing = lookup[key];
-                if (existing) {
-                    // Enrich existing entry with aggregated match data if missing
-                    const agg = matchAgg[key];
-                    if (agg) {
-                        const games = existing.games || existing.played || agg.games;
-                        const wins = existing.wins || agg.wins;
-                        const losses = existing.losses || agg.losses;
-                        const winrate = games ? (wins / games) * 100 : existing.winrate;
-                        const picks = existing.picks || agg.picks;
-                        const oppPicks = existing.oppPicks || agg.oppPicks;
-                        const totalPicks = picks + oppPicks;
-                        const pickRate = totalPicks ? (picks / totalPicks) * 100 : existing.pickRate;
-                        const decov = existing.decov || agg.decov;
-                        const rd = existing.rd || agg.rd;
-                        const adr = existing.adr || (agg.games ? agg.adrSum / agg.games : 0);
-                        const rating = existing.rating || (agg.games ? safeDivide(agg.kdSum, agg.games) : existing.rating);
-                        const kd = existing.kd || (agg.games ? safeDivide(agg.kdSum, agg.games) : existing.kd);
-                        finalMaps.push({
-                            ...existing,
-                            games,
-                            played: existing.played || games,
-                            wins,
-                            losses,
-                            winrate,
-                            picks,
-                            oppPicks,
-                            pickRate,
-                            decov,
-                            rd,
-                            adr,
-                            kd
-                        });
-                    } else {
-                        finalMaps.push(existing);
-                    }
-                } else {
-                    const display = beautifyMapName(name) || name;
-                    const agg = matchAgg[key];
-                    finalMaps.push({
-                        id: name,
-                        mapName: display,
-                        played: agg?.games || 0,
-                        games: agg?.games || 0,
-                        wins: agg?.wins || 0,
-                        losses: agg?.losses || 0,
-                        winrate: agg?.games ? (agg.wins / agg.games) * 100 : 0,
-                        picks: agg?.picks || 0,
-                        oppPicks: agg?.oppPicks || 0,
-                        pickRate: (() => {
-                            const total = (agg?.picks || 0) + (agg?.oppPicks || 0);
-                            const picks = agg?.picks || 0;
-                            return total ? (picks / total) * 100 : 0;
-                        })(),
-                        ban1: 0,
-                        ban2: 0,
-                        oppBan: 0,
-                        totalOwnBan: 0,
-                        decov: agg?.decov || 0,
-                        rd: agg?.rd || 0,
-                        kd: agg?.games ? safeDivide(agg.kdSum, agg.games) : 0,
-                        adr: agg?.games ? agg.adrSum / agg.games : 0,
-                        damage: 0,
-                        utilityDamage: 0,
-                        mvps: 0,
-                        kills: 0,
-                        deaths: 0
-                    });
-                }
-            });
-
-            return finalMaps.sort((a, b) => (b.played || 0) - (a.played || 0) || String(a.mapName).localeCompare(String(b.mapName)));
+            const maps = Array.isArray(this.seasonData?.mapStats) ? this.seasonData.mapStats : [];
+            return maps
+                .map(normalizeMap)
+                .filter(Boolean)
+                .map(recomputeMapDerived)
+                .sort((a, b) => (b.played || 0) - (a.played || 0) || String(a.mapName).localeCompare(String(b.mapName)));
         },
         mapTotals() {
             const totals = {
@@ -879,7 +708,8 @@ window.TeamDetail = {
             if (!this.mapStats.length) return { ...totals, avgAdr: 0, kd: 0, winrate: 0, pickRate: 0 };
             this.mapStats.forEach(map => {
                 const games = map.games || map.played || (map.wins + map.losses) || 0;
-                totals.played += map.played || games;
+                const played = games || map.played || 0;
+                totals.played += played;
                 totals.games += games;
                 totals.wins += map.wins || 0;
                 totals.losses += map.losses || 0;
@@ -906,37 +736,6 @@ window.TeamDetail = {
             const pickRate = totalPicks ? (totals.picks / totalPicks) * 100 : 0;
             return { ...totals, kd, avgAdr, winrate, pickRate };
         },
-        seasonStatCards() {
-            const s = this.teamStats || {};
-            const wins = toNumber(s.wins ?? s.matches_won ?? s.maps_won ?? 0);
-            const losses = toNumber(s.losses ?? s.matches_lost ?? s.maps_lost ?? 0);
-            const matches = toNumber(s.matches ?? s.matches_played ?? s.series_played ?? (wins + losses));
-            let winRate = matches ? (wins / matches) * 100 : toNumber(s.win_rate ?? s.match_win_rate ?? 0);
-            if (winRate <= 1) winRate = winRate * 100;
-            const roundsWon = toNumber(s.rounds_won);
-            const roundsLost = toNumber(s.rounds_lost);
-            const roundsDiff = toNumber(s.rounds_diff ?? s.round_diff ?? (roundsWon - roundsLost));
-            const mapsPlayed = toNumber(s.maps_played ?? this.mapTotals.played);
-            const mapsWon = toNumber(s.maps_won ?? this.mapTotals.wins);
-            let mapWinRate = mapsPlayed ? (mapsWon / Math.max(1, mapsPlayed)) * 100 : this.mapTotals.winrate;
-            if (mapWinRate <= 1) mapWinRate = mapWinRate * 100;
-            const prevSeason = (this.pageData?.seasons || []).find(sea => String(sea.championship_id || sea.championshipId) !== String(this.currentChampionshipId));
-            let prevWinRate = prevSeason ? toNumber(prevSeason.win_rate) : null;
-            if (prevWinRate != null && prevWinRate <= 1) prevWinRate *= 100;
-            const winTrend = prevWinRate != null ? (winRate - prevWinRate) : null;
-            const totalClutch = this.players.reduce((acc, p) => acc + (p.clutchKills || 0), 0);
-
-            return [
-                { key: 'matches', label: 'Ottelut', value: formatNumber(matches), caption: `${formatNumber(wins)} - ${formatNumber(losses)} · ${formatPercent(winRate || 0, 1)}${winTrend != null ? ` (${winTrend >= 0 ? '+' : ''}${formatNumber(winTrend, 1)} vs ed. kausi)` : ''}` },
-                { key: 'maps', label: 'Kartat', value: formatNumber(mapsPlayed || this.mapTotals.games), caption: `${formatNumber(this.mapTotals.wins)} - ${formatNumber(this.mapTotals.losses)} · ${formatPercent(mapWinRate || this.mapTotals.winrate, 1)}` },
-                { key: 'rounds', label: 'Rundit', value: `${formatNumber(roundsWon)}/${formatNumber(roundsLost)}`, caption: `Ero ${roundsDiff > 0 ? '+' : ''}${formatNumber(roundsDiff)}` },
-                { key: 'pickban', label: 'Pick/Ban', value: `${formatNumber(this.mapTotals.picks)}/${formatNumber(this.mapTotals.totalOwnBan)}`, caption: `Vast. pickit ${formatNumber(this.mapTotals.oppPicks)} · Bannit ${formatNumber(this.mapTotals.oppBan)}` },
-                { key: 'adr', label: 'ADR', value: formatNumber(this.mapTotals.avgAdr, 1), caption: `Damage ${formatNumber(this.mapTotals.damage)}` },
-                { key: 'kd', label: 'K/D', value: formatNumber(this.mapTotals.kd, 2), caption: `${formatNumber(this.mapTotals.kills)} / ${formatNumber(this.mapTotals.deaths)}` },
-                { key: 'mvps', label: 'MVP:t', value: formatNumber(this.mapTotals.mvps), caption: 'Karttakohtaiset MVP:t' },
-                { key: 'clutch', label: 'Clutch', value: formatNumber(totalClutch), caption: 'Joukkueen clutch-killat (summa)' }
-            ];
-        },
         seasonSnapshotStats() {
             const s = this.teamStats || {};
             const playedMatches = this.matchesList.filter(m => m.played);
@@ -944,7 +743,7 @@ window.TeamDetail = {
             const matchWins = playedMatches.filter(m => getMatchResult(m) === 'win').length;
             const matchLosses = playedMatches.filter(m => getMatchResult(m) === 'loss').length;
             const matches = playedMatches.length;
-            const winRate = matches ? (matchWins / matches) * 100 : normalizePercent(s.win_rate ?? s.match_win_rate ?? this.mapTotals.winrate ?? 0);
+            const winRate = matches ? (matchWins / matches) * 100 : normalizePercent(s.winRate ?? this.mapTotals.winrate ?? 0);
             const mapsPlayed = playedMatches.reduce((acc, m) => {
                 if (!m.maps?.length && m.isForfeit && m.winnerTeamId) {
                     return acc + Math.max(1, m.bestOf || 2);
@@ -1002,343 +801,114 @@ window.TeamDetail = {
             }, 0);
             const roundsDiff = roundsWon - roundsLost;
 
+            // Phase 1: Division averages for trend indicators
             const divAvgs = this.divisionAverages || {};
             const mapWinRate = mapsPlayed ? (mapWins / mapsPlayed) * 100 : 0;
 
             const hasWinRate = matches > 0;
-            const missingTip = 'No data for this season';
-
-            // Tier 1 (Primary emphasis): Win %, Map win %, Round diff, Matches
-            const tier1 = [
-                {
-                    key: 'winrate',
-                    label: 'Win %',
-                    value: hasWinRate ? formatPercent(winRate, 1) : '—',
-                    sub: hasWinRate ? `${formatNumber(matchWins)}–${formatNumber(matchLosses)}` : '',
-                    tone: 'stat-primary',
-                    tier: 1,
-                    missing: !hasWinRate,
-                    tooltip: !hasWinRate ? missingTip : 'Wins / Matches played · includes forfeits',
-                    trendValue: hasWinRate ? winRate : null,
-                    divAvg: divAvgs.avgWinRate || null
-                },
-                {
-                    key: 'mapWinRate',
-                    label: 'Map win %',
-                    value: mapsPlayed > 0 ? formatPercent(mapWinRate, 1) : '—',
-                    sub: mapsPlayed > 0 ? `${formatNumber(mapWins)}–${formatNumber(mapLosses)}` : '',
-                    tone: 'stat-primary',
-                    tier: 1,
-                    missing: mapsPlayed === 0,
-                    tooltip: mapsPlayed === 0 ? missingTip : 'Map wins / Maps played · includes forfeits',
-                    trendValue: mapsPlayed > 0 ? mapWinRate : null,
-                    divAvg: divAvgs.avgMapWinRate || null
-                },
-                {
-                    key: 'rounds',
-                    label: 'Round diff',
-                    value: formatNumber(roundsDiff, 0),
-                    sub: `${formatNumber(roundsWon)}–${formatNumber(roundsLost)}`,
-                    tone: 'stat-primary',
-                    tier: 1,
-                    tooltip: 'Rounds won - rounds lost · forfeits count as 13-0',
-                    trendValue: roundsDiff,
-                    divAvg: divAvgs.avgRoundDiff || null
-                },
-                {
-                    key: 'matches',
-                    label: 'Matches',
-                    value: formatNumber(matches),
-                    sub: '',
-                    tone: 'stat-primary',
-                    tier: 1,
-                    tooltip: 'Total matches played this season',
-                    trendValue: null,
-                    divAvg: null
-                }
-            ];
-
-            // Tier 2 (Secondary emphasis): Active players, Maps (W–L), Forfeited maps, Upcoming matches
-            const tier2 = [
-                {
-                    key: 'activePlayers',
-                    label: 'Active players',
-                    value: formatNumber(activePlayers),
-                    sub: 'At least 1 map',
-                    tone: 'stat-secondary',
-                    tier: 2,
-                    tooltip: 'Players who played at least one map this season',
-                    trendValue: null,
-                    divAvg: null
-                },
-                {
-                    key: 'maps',
-                    label: 'Maps (W–L)',
-                    value: `${formatNumber(mapWins)}–${formatNumber(mapLosses)}`,
-                    sub: `${formatNumber(mapsPlayed)} total`,
-                    tone: 'stat-secondary',
-                    tier: 2,
-                    tooltip: 'Map-level record for the season',
-                    trendValue: null,
-                    divAvg: null
-                },
-                {
-                    key: 'forfeits',
-                    label: 'Forfeited maps',
-                    value: formatNumber(forfeitedMaps),
-                    sub: 'Lost by forfeit',
-                    tone: 'stat-secondary',
-                    tier: 2,
-                    tooltip: 'Maps forfeited (lost without playing) · affects total stats',
-                    trendValue: null,
-                    divAvg: null
-                },
-                {
-                    key: 'upcoming',
-                    label: 'Upcoming matches',
-                    value: formatNumber(upcomingMatches),
-                    sub: 'Scheduled',
-                    tone: 'stat-secondary',
-                    tier: 2,
-                    tooltip: 'Matches scheduled but not yet played',
-                    trendValue: null,
-                    divAvg: null
-                }
-            ];
-
-            return { tier1, tier2, all: [...tier1, ...tier2] };
-        },
-        seasonSnapshotTier1() {
-            return this.seasonSnapshotStats.tier1;
-        },
-        seasonSnapshotTier2() {
-            return this.seasonSnapshotStats.tier2;
-        },
-        seasonDetailStats() {
-            return [];
+            const missingTip = 'Ei dataa valitulle kaudelle.';
+            return {
+                primary: [
+                    {
+                        key: 'mapWinRate',
+                        label: 'Kartta voitto-%',
+                        value: mapsPlayed > 0 ? formatPercent(mapWinRate, 1) : '—',
+                        sub: '',
+                        tone: 'stat-primary',
+                        missing: mapsPlayed === 0,
+                        tooltip: mapsPlayed > 0
+                            ? 'Voitetut kartat / pelatut kartat. Luovutukset mukana.'
+                            : missingTip,
+                        trendValue: mapsPlayed > 0 ? mapWinRate : null,
+                        divAvg: divAvgs.avgMapWinRate || null,
+                        trendTooltip: mapsPlayed > 0 ? `Verrattuna divisioonan kauden keskiarvoon · ${formatPercent(divAvgs.avgMapWinRate || 0, 1)}` : ''
+                    },
+                    {
+                        key: 'rounds',
+                        label: 'Eräero',
+                        value: formatNumber(roundsDiff),
+                        sub: `${formatNumber(roundsWon)}–${formatNumber(roundsLost)}`,
+                        tone: 'stat-primary',
+                        tooltip: 'Voitetut erät − hävityt erät. Luovutukset mukana (13–0/0–13).',
+                        trendValue: roundsDiff,
+                        divAvg: divAvgs.avgRoundDiff || null,
+                        trendTooltip: `Verrattuna divisioonan kauden keskiarvoon · ${formatNumber(divAvgs.avgRoundDiff || 0, 1)}`
+                    },
+                    {
+                        key: 'matches',
+                        label: 'Ottelut',
+                        value: formatNumber(matches),
+                        sub: `${formatNumber(matchWins)}–${formatNumber(matchLosses)}`,
+                        tone: 'stat-primary',
+                        tooltip: `Pelatut ottelut. Voitot–tappiot: ${formatNumber(matchWins)}–${formatNumber(matchLosses)}.`,
+                        trendValue: null,
+                        divAvg: null
+                    }
+                ],
+                secondary: [
+                    {
+                        key: 'activePlayers',
+                        label: 'Aktiiviset pelaajat',
+                        value: formatNumber(activePlayers),
+                        sub: 'Vähintään 1 ottelu',
+                        tone: 'stat-secondary',
+                        tooltip: 'Pelaaja, joka on pelannut vähintään yhden ottelun tällä kaudella.',
+                        trendValue: null,
+                        divAvg: null
+                    },
+                    {
+                        key: 'maps',
+                        label: 'Kartat (W–L)',
+                        value: formatNumber(mapsPlayed),
+                        sub: `${formatNumber(mapWins)}–${formatNumber(mapLosses)}`,
+                        tone: 'stat-secondary',
+                        tooltip: 'Karttakohtainen tulos (voitot–tappiot).',
+                        trendValue: null,
+                        divAvg: null
+                    },
+                    {
+                        key: 'forfeits',
+                        label: 'Luovutetut kartat',
+                        value: formatNumber(forfeitedMaps),
+                        sub: 'Kausi yhteensä',
+                        tone: 'stat-secondary',
+                        tooltip: 'Luovutuksena päättyneet kartat, jotka vaikuttavat kokonaislukuihin.',
+                        trendValue: null,
+                        divAvg: null
+                    },
+                    {
+                        key: 'upcoming',
+                        label: 'Tulevat ottelut',
+                        value: formatNumber(upcomingMatches),
+                        sub: 'Aikataulussa',
+                        tone: 'stat-secondary',
+                        tooltip: 'Ottelut, joita ei ole vielä pelattu.',
+                        trendValue: null,
+                        divAvg: null
+                    }
+                ]
+            };
         },
         scoutMapRows() {
-            const fallbackAgg = new Map();
-            const statsAgg = new Map();
-            const banAgg = new Map();
-            const decovAgg = new Map();
-            const hasMapStats = this.mapStats.length > 0;
-            const hasMatches = this.matchesList.length > 0;
-            const hasVeto = this.vetoByMatch.length > 0;
-
-            const ensureFallback = (rawName) => {
-                const name = beautifyMapName(rawName) || rawName;
-                if (!name) return null;
-                const key = mapKey(name);
-                if (!fallbackAgg.has(key)) {
-                    fallbackAgg.set(key, {
-                        mapName: name,
-                        games: 0,
-                        wins: 0,
-                        losses: 0,
-                        adrSum: 0,
-                        kdSum: 0
-                    });
-                }
-                return fallbackAgg.get(key);
-            };
-
-            this.vetoByMatch.forEach(entry => {
-                const steps = Array.isArray(entry.steps) ? entry.steps : [];
-                let teamBanCount = 0;
-                steps.forEach(step => {
-                    if (!step.mapName) return;
-                    if (step.action !== 'pick' && step.action !== 'ban') return;
-                    ensureFallback(step.mapName);
-                });
-                steps.forEach(step => {
-                    if (!step.mapName) return;
-                    const key = mapKey(step.mapName);
-                    if (step.action === 'ban') {
-                        const bans = banAgg.get(key) || { ban1: 0, ban2: 0, oppBan: 0 };
-                        if (step.actor === 'team') {
-                            teamBanCount += 1;
-                            if (teamBanCount === 1) bans.ban1 += 1;
-                            else if (teamBanCount === 2) bans.ban2 += 1;
-                            else bans.ban2 += 1;
-                        } else if (step.actor === 'opponent') {
-                            bans.oppBan += 1;
-                        }
-                        banAgg.set(key, bans);
-                    }
-                    if (step.action === 'decider' || step.action === 'overflow') {
-                        const counts = decovAgg.get(key) || { decider: 0, overflow: 0 };
-                        if (step.action === 'decider') counts.decider += 1;
-                        if (step.action === 'overflow') counts.overflow += 1;
-                        decovAgg.set(key, counts);
-                    }
-                });
-            });
-
-            this.vetoHistory.forEach(entry => {
-                if (!entry.mapName) return;
-                ensureFallback(entry.mapName);
-            });
-
-            this.matchesList.forEach(match => {
-                (match.maps || []).forEach(map => {
-                    const bucket = ensureFallback(map.mapName);
-                    if (!bucket) return;
-                    bucket.games += 1;
-                    if (map.isForfeit && map.winnerTeamId) {
-                        if (String(map.winnerTeamId) === String(this.teamId)) bucket.wins += 1;
-                        else bucket.losses += 1;
-                    } else if (map.scoreFor > map.scoreAgainst) {
-                        bucket.wins += 1;
-                    } else if (map.scoreFor < map.scoreAgainst) {
-                        bucket.losses += 1;
-                    }
-                    bucket.adrSum += toNumber(map.adr);
-                    bucket.kdSum += toNumber(map.kd);
-                    const key = mapKey(bucket.mapName);
-                    const agg = statsAgg.get(key) || {
-                        played: 0,
-                        wins: 0,
-                        losses: 0,
-                        rd: 0,
-                        adrSum: 0,
-                        kdSum: 0,
-                        picks: 0,
-                        oppPicks: 0,
-                        pickWins: 0,
-                        oppPickWins: 0
-                    };
-                    agg.played += 1;
-                    agg.rd += (map.scoreFor - map.scoreAgainst);
-                    agg.adrSum += toNumber(map.adr);
-                    agg.kdSum += toNumber(map.kd);
-                    if (map.isForfeit && map.winnerTeamId) {
-                        if (String(map.winnerTeamId) === String(this.teamId)) agg.wins += 1;
-                        else agg.losses += 1;
-                    } else if (map.scoreFor > map.scoreAgainst) {
-                        agg.wins += 1;
-                    } else if (map.scoreFor < map.scoreAgainst) {
-                        agg.losses += 1;
-                    }
-                    if (map.pickTeamId) {
-                        if (String(map.pickTeamId) === String(this.teamId)) {
-                            agg.picks += 1;
-                            if (map.isForfeit && map.winnerTeamId) {
-                                if (String(map.winnerTeamId) === String(this.teamId)) agg.pickWins += 1;
-                            } else if (map.scoreFor > map.scoreAgainst) {
-                                agg.pickWins += 1;
-                            }
-                        } else {
-                            agg.oppPicks += 1;
-                            if (map.isForfeit && map.winnerTeamId) {
-                                if (String(map.winnerTeamId) === String(this.teamId)) agg.oppPickWins += 1;
-                            } else if (map.scoreFor > map.scoreAgainst) {
-                                agg.oppPickWins += 1;
-                            }
-                        }
-                    } else {
-                        const counts = decovAgg.get(key) || { decider: 0, overflow: 0 };
-                        if (Number(match.bestOf) === 3) counts.decider += 1;
-                        else if (Number(match.bestOf) === 2) counts.overflow += 1;
-                        decovAgg.set(key, counts);
-                    }
-                    statsAgg.set(key, agg);
-                });
-            });
-
-            const fallbackMaps = Array.from(fallbackAgg.values()).map(entry => {
-                const games = entry.games || 0;
-                return {
-                    mapName: entry.mapName,
-                    games,
-                    played: games,
-                    wins: entry.wins,
-                    losses: entry.losses,
-                    winrate: games ? (entry.wins / games) * 100 : 0,
-                    adr: games ? entry.adrSum / games : 0,
-                    rating: games ? safeDivide(entry.kdSum, games) : 0,
-                    picks: 0,
-                    oppPicks: 0,
-                    totalOwnBan: 0,
-                    oppBan: 0
-                };
-            });
-
-            const baseMaps = this.mapStats.length
-                ? [...this.mapStats]
-                : (fallbackMaps.length ? fallbackMaps : this.vetoTrendMapPool.map(map => ({
-                    mapName: map.mapName,
-                    games: 0,
-                    played: 0,
-                    wins: 0,
-                    losses: 0,
-                    winrate: 0,
-                    adr: 0,
-                    rating: 0,
-                    picks: 0,
-                    oppPicks: 0,
-                    totalOwnBan: 0,
-                    oppBan: 0
-                })));
-            if (this.mapStats.length && fallbackMaps.length) {
-                const baseKeys = new Set(baseMaps.map(map => mapKey(map.mapName)));
-                fallbackMaps.forEach(map => {
-                    if (!baseKeys.has(mapKey(map.mapName))) baseMaps.push(map);
-                });
-            }
-
-            return baseMaps.map(map => {
-                const key = mapKey(map.mapName);
-                const agg = statsAgg.get(key) || {
-                    played: 0,
-                    wins: 0,
-                    losses: 0,
-                    rd: 0,
-                    adrSum: 0,
-                    kdSum: 0,
-                    picks: 0,
-                    oppPicks: 0,
-                    pickWins: 0,
-                    oppPickWins: 0
-                };
-                const played = hasMatches ? agg.played : (map.games || map.played || 0);
-                const wins = hasMatches ? agg.wins : (map.wins || 0);
-                const losses = hasMatches ? agg.losses : (map.losses || 0);
-                const winrate = played ? (wins / played) * 100 : 0;
-                const adr = hasMatches ? (played ? safeDivide(agg.adrSum, played) : 0) : toNumber(map.adr);
-                const bans = banAgg.get(key) || { ban1: 0, ban2: 0, oppBan: 0 };
-                const decov = decovAgg.get(key) || { decider: 0, overflow: 0 };
-                const picksOwn = hasMatches ? agg.picks : (map.picks || 0);
-                const picksOpp = hasMatches ? agg.oppPicks : (map.oppPicks || 0);
-                const ban1 = hasVeto ? bans.ban1 : (map.ban1 || 0);
-                const ban2 = hasVeto ? bans.ban2 : (map.ban2 || 0);
-                const oppBan = hasVeto ? bans.oppBan : (map.oppBan || 0);
-                const totalOwnBan = hasVeto ? (bans.ban1 + bans.ban2) : (map.totalOwnBan || 0);
-
+            return this.mapStats.map(map => {
+                const played = map.games || map.played || 0;
+                const wins = map.wins || 0;
+                const losses = map.losses || 0;
+                const winrate = Number.isFinite(map.winrate) ? map.winrate : (played ? (wins / played) * 100 : 0);
                 return {
                     ...map,
                     played,
-                    picks: picksOwn,
-                    oppPicks: picksOpp,
-                    winrate,
                     wins,
                     losses,
-                    pickWinRate: picksOwn ? (agg.pickWins / picksOwn) * 100 : null,
-                    oppPickWinRate: picksOpp ? (agg.oppPickWins / picksOpp) * 100 : null,
-                    pickWins: agg.pickWins,
-                    oppPickWins: agg.oppPickWins,
-                    kd: hasMatches ? (played ? safeDivide(agg.kdSum, played) : 0) : toNumber(map.kd),
-                    adr,
-                    rd: hasMatches ? agg.rd : toNumber(map.rd),
-                    ban1,
-                    ban2,
-                    oppBan,
-                    totalOwnBan,
-                    decov: decov.decider + decov.overflow,
-                    deciderCount: decov.decider,
-                    overflowCount: decov.overflow
+                    winrate
                 };
             });
+        },
+        scoutHeaderGroups() {
+            return buildColumnGroups(this.SCOUT_MAP_COLUMNS, SCOUT_GROUP_META);
+        },
+        mapHeaderGroups() {
+            return buildColumnGroups(this.MAP_COLUMNS, MAP_GROUP_META);
         },
         scoutMapDefaultSort() {
             return { column: 'played', order: 'desc', numeric: true };
@@ -1366,10 +936,13 @@ window.TeamDetail = {
         vetoTrendColumns() {
             return this.vetoTrendMatches.map((match, idx) => {
                 const dateLabel = formatDate(match.ts);
-                const opponent = match.opponentName || match.team2Name || match.opponent?.team_name || 'Vastustaja';
+                const opponent = match.opponentName || match.team2Name || 'Vastustaja';
+                const resultKey = getMatchResult(match);
+                const resultLabel = resultKey === 'win' ? 'W' : resultKey === 'loss' ? 'L' : resultKey === 'draw' ? 'D' : 'Kesken';
+                const scoreLabel = (match.teamScore != null && match.oppScore != null) ? `${match.teamScore}-${match.oppScore}` : '';
                 const meta = this.vetoMatchMeta[match.matchId] || {};
                 const badgeTitle = meta.decider
-                    ? `Decider: ${meta.decider}`
+                    ? `Ratkaisukartta: ${meta.decider}`
                     : meta.overflow
                         ? `Overflow: ${meta.overflow}`
                         : '';
@@ -1381,6 +954,7 @@ window.TeamDetail = {
                         label,
                         dateLabel,
                         opponent ? `vs ${opponent}` : '',
+                        scoreLabel ? `Tulos ${scoreLabel} (${resultLabel})` : `Tulos ${resultLabel}`,
                         meta.seriesType ? meta.seriesType : '',
                         badgeTitle
                     ].filter(Boolean).join(' · ')
@@ -1414,21 +988,14 @@ window.TeamDetail = {
                     if (!pool.has(key)) pool.set(key, { mapName: step.mapName });
                 });
             });
-            return Array.from(pool.values())
+            const rows = Array.from(pool.values())
                 .map(row => ({
                     ...row,
                     pickRate: pickLookup[mapKey(row.mapName)] || 0,
                     played: playedLookup[mapKey(row.mapName)] || 0
-                }))
-                .sort((a, b) => {
-                    if (this.vetoMapOrder === 'usage') {
-                        // Sort by played count (most used first)
-                        return (b.played || 0) - (a.played || 0) || a.mapName.localeCompare(b.mapName);
-                    } else {
-                        // Alphabetical
-                        return a.mapName.localeCompare(b.mapName);
-                    }
-                });
+                }));
+
+            return rows.sort((a, b) => a.mapName.localeCompare(b.mapName));
         },
         vetoTrendRows() {
             if (!this.vetoTrendMatches.length) return [];
@@ -1463,57 +1030,56 @@ window.TeamDetail = {
                     const actionPick = veto?.actions?.[key]?.pick || null;
                     const actionBan = veto?.actions?.[key]?.ban || null;
                     const actionInfo = actionPick || actionBan;
-                    const opponent = match.opponentName || match.team2Name || match.opponent?.team_name || 'Vastustaja';
+                    const opponent = match.opponentName || match.team2Name || 'Vastustaja';
                     const dateLabel = formatDate(match.ts);
                     const resultKey = getMatchResult(match);
-                    const resultLabel = resultKey === 'win' ? 'W' : resultKey === 'loss' ? 'L' : resultKey === 'draw' ? 'D' : 'Pending';
+                    const resultLabel = resultKey === 'win' ? 'W' : resultKey === 'loss' ? 'L' : resultKey === 'draw' ? 'D' : 'Kesken';
+                    const scoreLabel = (match.teamScore != null && match.oppScore != null) ? `${match.teamScore}-${match.oppScore}` : '';
                     const meta = this.vetoMatchMeta[match.matchId] || {};
                     let className = 'veto-heatmap__cell--none';
-                    let actionLabel = 'Not present';
-                    let phaseLabel = '';
+                    let actionLabel = 'Ei vetoa';
                     let byLabel = '';
 
                     if (actionPick) {
-                        actionLabel = 'Pick';
                         if (actionPick.actor === 'team') {
                             className = 'veto-heatmap__cell--team-pick';
-                            byLabel = this.teamInfo?.teamName || 'Team';
+                            actionLabel = 'Oma pick';
+                            byLabel = this.teamInfo?.teamName || 'Oma joukkue';
                         } else if (actionPick.actor === 'opponent') {
                             className = 'veto-heatmap__cell--opp-pick';
+                            actionLabel = 'Vastustajan pick';
                             byLabel = opponent;
                         }
                     } else if (actionBan) {
-                        actionLabel = 'Ban';
                         if (actionBan.actor === 'team') {
                             if (actionBan.order === 1) {
-                                className = 'veto-heatmap__cell--opp-ban';
-                                phaseLabel = 'Team first ban';
+                                className = 'veto-heatmap__cell--team-ban1';
+                                actionLabel = 'Oma banni (1.)';
                             } else if (actionBan.order === 2) {
-                                className = 'veto-heatmap__cell--team-ban1';
-                                phaseLabel = 'Team second ban';
+                                className = 'veto-heatmap__cell--team-ban2';
+                                actionLabel = 'Oma banni (2.)';
                             } else {
-                                className = 'veto-heatmap__cell--team-ban1';
-                                phaseLabel = 'Team ban';
+                                className = 'veto-heatmap__cell--team-ban2';
+                                actionLabel = 'Oma banni';
                             }
-                            byLabel = this.teamInfo?.teamName || 'Team';
+                            byLabel = this.teamInfo?.teamName || 'Oma joukkue';
                         } else if (actionBan.actor === 'opponent') {
-                            className = 'veto-heatmap__cell--team-ban2';
-                            phaseLabel = 'Opponent ban';
+                            className = 'veto-heatmap__cell--opp-ban';
+                            actionLabel = 'Vastustajan banni';
                             byLabel = opponent;
                         }
                     }
 
                     const title = [
                         map.mapName,
-                        `Match ${match.matchId}`,
-                        opponent ? `vs ${opponent}` : '',
+                        `Ottelu ${match.matchId}`,
                         dateLabel,
+                        opponent ? `vs ${opponent}` : '',
+                        scoreLabel ? `Tulos ${scoreLabel} (${resultLabel})` : `Tulos ${resultLabel}`,
                         meta.seriesType ? meta.seriesType : '',
-                        `Result ${resultLabel}`,
                         actionLabel,
-                        phaseLabel,
-                        byLabel ? `By ${byLabel}` : '',
-                        meta.decider ? `Decider: ${meta.decider}` : '',
+                        byLabel ? `Tekijä ${byLabel}` : '',
+                        meta.decider ? `Ratkaisukartta: ${meta.decider}` : '',
                         meta.overflow ? `Overflow: ${meta.overflow}` : ''
                     ].filter(Boolean).join(' · ');
 
@@ -1530,83 +1096,60 @@ window.TeamDetail = {
         vetoLegendEntries() {
             const buildCell = (className, label) => ({ className, label });
             return [
-                buildCell('veto-heatmap__cell--team-pick', 'Team pick'),
-                buildCell('veto-heatmap__cell--opp-pick', 'Opp pick'),
-                buildCell('veto-heatmap__cell--opp-ban', 'Team ban (1st)'),
-                buildCell('veto-heatmap__cell--team-ban1', 'Team ban (2nd)'),
-                buildCell('veto-heatmap__cell--team-ban2', 'Opp ban'),
-                buildCell('veto-heatmap__cell--none', 'Not present')
+                buildCell('veto-heatmap__cell--team-pick', 'Oma pick'),
+                buildCell('veto-heatmap__cell--opp-pick', 'Vastustajan pick'),
+                buildCell('veto-heatmap__cell--team-ban1', 'Oma banni (1.)'),
+                buildCell('veto-heatmap__cell--team-ban2', 'Oma banni (2.)'),
+                buildCell('veto-heatmap__cell--opp-ban', 'Vastustajan banni'),
+                buildCell('veto-heatmap__cell--none', 'Ei vetoa')
             ];
-        },
-        mapComparisonCards() {
-            return [...this.mapStats].sort((a, b) => (b.played || 0) - (a.played || 0) || (b.winrate || 0) - (a.winrate || 0)).slice(0, 6);
-        },
-        mapWinrateSeries() {
-            const maxWin = Math.max(...this.mapStats.map(m => toNumber(m.winrate || 0)), 1);
-            return this.mapStats.map(map => {
-                const winrate = toNumber(map.winrate || 0);
-                return {
-                    label: map.mapName,
-                    winrate,
-                    adr: toNumber(map.adr || 0),
-                    rating: toNumber(map.rating || map.kd || 0),
-                    height: Math.max(10, (winrate / maxWin) * 100),
-                    games: map.games || map.played || 0,
-                    picks: map.picks || 0
-                };
-            });
-        },
-        mapPerformanceSeries() {
-            const metric = this.mapMetric;
-            const series = this.mapWinrateSeries.map(item => {
-                const value = metric === 'adr' ? item.adr : metric === 'rating' ? item.rating : item.winrate;
-                return { ...item, value };
-            });
-            const maxValue = Math.max(...series.map(i => i.value || 0), 1);
-            return series.map(item => ({
-                ...item,
-                height: Math.max(10, (item.value / maxValue) * 100)
-            }));
-        },
-        hasMapPerformanceData() {
-            return this.mapStats.some(map => (map.games || map.played || map.wins || map.losses || map.picks || map.oppPicks));
-        },
-        mapWinLossStack() {
-            return this.mapStats.filter(map => (map.games || map.played || map.wins || map.losses)).map(map => ({
-                label: map.mapName,
-                wins: map.wins,
-                losses: map.losses
-            }));
         },
         mapDefaultSort() {
             return { column: 'totalRoundsPlayed', order: 'desc', numeric: true };
         },
-        mapMaxPlayed() {
-            return Math.max(...this.mapStats.map(m => m.played || 0), 1);
+        mapMaxRoundDiff() {
+            return Math.max(...this.scoutMapRows.map(m => Math.abs(m.rd || 0)), 1);
         },
-        mapMaxPicks() {
-            return Math.max(...this.mapStats.map(m => (m.picks || 0) + (m.oppPicks || 0)), 1);
-        },
-        mapMaxBans() {
-            return Math.max(...this.mapStats.map(m => (m.totalOwnBan || 0) + (m.oppBan || 0)), 1);
-        },
-        mapRadarMetrics() {
-            const withGames = this.mapStats.filter(map => map.games || map.played);
-            if (!withGames.length) return [];
-            const top = [...withGames].sort((a, b) => (b.winrate || 0) - (a.winrate || 0)).slice(0, 7);
-            return top.map(map => ({
-                label: map.mapName,
-                value: (() => {
-                    const wr = toNumber(map.winrate || 0);
-                    return Math.abs(wr) <= 1 ? wr * 100 : wr;
-                })(),
-                max: 100
-            }));
+        performanceRadarMetrics() {
+            const s = this.teamStats || {};
+            const playedMatches = this.matchesList.filter(m => m.played);
+            const matchWins = playedMatches.filter(m => getMatchResult(m) === 'win').length;
+            const matches = playedMatches.length;
+            const winRate = matches ? (matchWins / matches) * 100 : 0;
+            const divAvgs = this.divisionAverages || {};
+            
+            const avgKd = this.players.length ? 
+                this.players.reduce((sum, p) => sum + (p.kd || 0), 0) / this.players.length : 
+                this.mapTotals.kd;
+            const avgAdr = this.players.length ?
+                this.players.reduce((sum, p) => sum + (p.adr || 0), 0) / this.players.length :
+                this.mapTotals.avgAdr;
+            
+            const clutchSuccesses = this.players.reduce((sum, p) => {
+                const attempts = (p.cl1v1Attempts || 0) + (p.cl1v2Attempts || 0);
+                const wins = (p.cl1v1Wins || 0) + (p.cl1v2Wins || 0);
+                return sum + wins;
+            }, 0);
+            const clutchAttempts = this.players.reduce((sum, p) => 
+                sum + (p.cl1v1Attempts || 0) + (p.cl1v2Attempts || 0), 0);
+            const clutchRate = clutchAttempts ? (clutchSuccesses / clutchAttempts) * 100 : 0;
+            
+            const entryWins = this.players.reduce((sum, p) => sum + (p.entryWins || 0), 0);
+            const entryAttempts = this.players.reduce((sum, p) => sum + (p.entryCount || 0), 0);
+            const entryRate = entryAttempts ? (entryWins / entryAttempts) * 100 : 0;
+            
+            return [
+                { label: 'Voitto-%', value: winRate, max: 100 },
+                { label: 'K/D', value: Math.min(100, (avgKd / 2) * 100), max: 100 },
+                { label: 'ADR', value: Math.min(100, (avgAdr / 120) * 100), max: 100 },
+                { label: 'Clutch %', value: clutchRate, max: 100 },
+                { label: 'Entry %', value: entryRate, max: 100 }
+            ];
         },
         // Match history uses every field: status/best_of/played/opponent info/avatars/maps scores/picks/forfeit/ADR/KD plus Faceit URL
         matchesList() {
-            const matches = this.seasonData?.matchHistory || this.seasonData?.match_history || this.seasonData?.matches || [];
-            const normalized = Array.isArray(matches) ? matches.map(m => normalizeMatch(m, this.teamId)).filter(Boolean) : [];
+            const matches = Array.isArray(this.seasonData?.matchHistory) ? this.seasonData.matchHistory : [];
+            const normalized = matches.map(m => normalizeMatch(m, this.teamId)).filter(Boolean);
             return normalized.sort((a, b) => {
                 const at = a.ts ?? 0;
                 const bt = b.ts ?? 0;
@@ -1614,15 +1157,6 @@ window.TeamDetail = {
                 if (at && !bt) return -1;
                 return bt - at; // newest first for tables
             });
-        },
-        paginatedMatches() {
-            const total = this.matchesList.length;
-            return {
-                items: this.matchesList,
-                total,
-                totalPages: 1,
-                page: 1
-            };
         },
         matchesPerformanceSeries() {
             const sorted = [...this.matchesList].sort((a, b) => (a.ts || 0) - (b.ts || 0));
@@ -1635,9 +1169,9 @@ window.TeamDetail = {
                 return {
                     label: formatDate(match.ts) || match.matchId,
                     value,
-                    opponent: match.opponentName || match.team2Name || match.opponent?.team_name,
+                    opponent: match.opponentName || match.team2Name || '',
                     result: getMatchResult(match),
-                    tooltip: `${match.teamScore}-${match.oppScore} vs ${match.opponentName || match.team2Name || match.opponent?.team_name}`
+                    tooltip: `${match.teamScore}-${match.oppScore} vs ${match.opponentName || match.team2Name || ''}`
                 };
             });
         },
@@ -1648,11 +1182,11 @@ window.TeamDetail = {
         },
         // Player stats table uses every DB field: maps/rounds/kills/deaths/assists/mvps/sniper_kills/utility_damage/enemies_flashed/flash_count/flash_successes/entry_count/entry_wins/clutch fields/pistol_kills/adr/kr/kd/rating/hs_pct/damage/multi-kills
         players() {
-            const players = this.seasonData?.playerStats || this.seasonData?.player_stats || this.seasonData?.players || this.seasonData?.roster || [];
-            return Array.isArray(players) ? players.map((p, idx) => normalizePlayer(p, idx)).filter(Boolean) : [];
+            const players = Array.isArray(this.seasonData?.playerStats) ? this.seasonData.playerStats : [];
+            return players.map((p, idx) => normalizePlayer(p, idx)).filter(Boolean);
         },
         playerDefaultSort() {
-            return { column: 'kd', order: 'desc', numeric: true };
+            return { column: 'adr', order: 'desc', numeric: true };
         },
         playersByRating() {
             return [...this.players].sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -1670,100 +1204,11 @@ window.TeamDetail = {
         },
         // Veto aggregates: times_banned, times_picked, times_opponent_picked, pick/ban rate, pick_win_rate (derived)
         vetoAggregatesData() {
-            const raw = this.seasonData?.vetoAggregates || this.seasonData?.veto_aggregates || [];
-            return Array.isArray(raw) ? raw.map(normalizeVeto).filter(Boolean) : [];
-        },
-        derivedVetoCounts() {
-            const counts = {};
-            this.vetoByMatch.forEach(entry => {
-                entry.steps.forEach(step => {
-                    if (step.action !== 'pick' && step.action !== 'ban') return;
-                    if (step.actor === 'system') return;
-                    const key = mapKey(step.mapName);
-                    if (!key) return;
-                    const bucket = counts[key] || { mapName: step.mapName, timesPicked: 0, timesOpponentPicked: 0, timesBanned: 0 };
-                    if (step.action === 'pick') {
-                        if (step.actor === 'team') bucket.timesPicked += 1;
-                        if (step.actor === 'opponent') bucket.timesOpponentPicked += 1;
-                    }
-                    if (step.action === 'ban' && step.actor === 'team') {
-                        bucket.timesBanned += 1;
-                    }
-                    counts[key] = bucket;
-                });
-            });
-            return counts;
+            const raw = Array.isArray(this.seasonData?.vetoAggregates) ? this.seasonData.vetoAggregates : [];
+            return raw.map(normalizeVeto).filter(Boolean);
         },
         enhancedVetoAggregates() {
-            const pickOutcomes = {};
-            this.matchesList.forEach(match => {
-                match.maps.forEach(map => {
-                    const name = beautifyMapName(map.mapName);
-                    const key = mapKey(name);
-                    if (!key) return;
-                    if (map.pickTeamId && String(map.pickTeamId) === String(this.teamId)) {
-                        pickOutcomes[key] = pickOutcomes[key] || { mapName: name, wins: 0, total: 0 };
-                        pickOutcomes[key].total += 1;
-                        if (map.scoreFor > map.scoreAgainst) pickOutcomes[key].wins += 1;
-                    }
-                });
-            });
-
-            const deciderOutcomes = {};
-            this.matchesList.forEach(match => {
-                match.maps.forEach(map => {
-                    if (map.pickTeamId) return;
-                    const name = beautifyMapName(map.mapName);
-                    const key = mapKey(name);
-                    if (!key) return;
-                    deciderOutcomes[key] = deciderOutcomes[key] || { mapName: name, wins: 0, total: 0 };
-                    deciderOutcomes[key].total += 1;
-                    if (map.scoreFor > map.scoreAgainst) deciderOutcomes[key].wins += 1;
-                });
-            });
-
-            const aggregates = this.vetoAggregatesData.map(row => {
-                const key = mapKey(row.mapName);
-                const derived = this.derivedVetoCounts[key] || {};
-                const pickData = pickOutcomes[key] || { wins: 0, total: 0 };
-                const deciderData = deciderOutcomes[key] || { wins: 0, total: 0 };
-                const timesPicked = derived.timesPicked || row.timesPicked || 0;
-                const timesOpponentPicked = derived.timesOpponentPicked || row.timesOpponentPicked || 0;
-                const timesBanned = derived.timesBanned || row.timesBanned || 0;
-                const totalActions = timesPicked + timesOpponentPicked + timesBanned;
-                const pickRate = totalActions ? (timesPicked / totalActions) * 100 : (row.pickRate || 0);
-                const banRate = totalActions ? (timesBanned / totalActions) * 100 : (row.banRate || 0);
-                const derivedWinRate = pickData.total ? (pickData.wins / pickData.total) * 100 : row.pickWinRate || 0;
-                const deciderWinRate = deciderData.total ? (deciderData.wins / deciderData.total) * 100 : 0;
-                return {
-                    ...row,
-                    mapName: row.mapName,
-                    timesPicked,
-                    timesOpponentPicked,
-                    timesBanned,
-                    pickRate,
-                    banRate,
-                    pickWinRate: derivedWinRate,
-                    deciderWinRate
-                };
-            });
-
-            Object.entries(this.derivedVetoCounts).forEach(([key, derived]) => {
-                const existing = aggregates.find(row => mapKey(row.mapName) === key);
-                if (existing) return;
-                const totalActions = derived.timesPicked + derived.timesOpponentPicked + derived.timesBanned;
-                aggregates.push({
-                    mapName: derived.mapName,
-                    timesPicked: derived.timesPicked,
-                    timesOpponentPicked: derived.timesOpponentPicked,
-                    timesBanned: derived.timesBanned,
-                    pickRate: totalActions ? (derived.timesPicked / totalActions) * 100 : 0,
-                    banRate: totalActions ? (derived.timesBanned / totalActions) * 100 : 0,
-                    pickWinRate: 0,
-                    deciderWinRate: 0
-                });
-            });
-
+            const aggregates = this.vetoAggregatesData;
             const maxPick = Math.max(...aggregates.map(e => e.timesPicked || 0), 0);
             const maxBan = Math.max(...aggregates.map(e => e.timesBanned || 0), 0);
             return aggregates.map(e => ({
@@ -1777,16 +1222,16 @@ window.TeamDetail = {
         },
         // Veto history: match_id/map_name/status/selected_by_team_id/_name/round_num/order -> rendered as BO2/BO3 step timeline
         vetoHistory() {
-            const raw = this.seasonData?.vetoHistory || this.seasonData?.veto_history || [];
-            return Array.isArray(raw) ? raw.map(entry => ({
-                matchId: entry.match_id || entry.matchId,
-                mapName: beautifyMapName(entry.map_name || entry.mapName) || 'Kartta',
+            const raw = Array.isArray(this.seasonData?.vetoHistory) ? this.seasonData.vetoHistory : [];
+            return raw.map(entry => ({
+                matchId: entry.matchId,
+                mapName: beautifyMapName(entry.mapName) || 'Kartta',
                 status: (entry.status || '').toLowerCase(),
-                selectedByTeamId: entry.selected_by_team_id || entry.selectedByTeamId,
-                selectedByTeamName: entry.selected_by_team_name || entry.selectedByTeamName,
-                roundNum: toNumber(entry.round_num ?? entry.roundNum ?? entry.order),
-                order: toNumber(entry.order ?? entry.order_in_match ?? entry.round_num ?? entry.roundNum)
-            })) : [];
+                selectedByTeamId: entry.selectedByTeamId,
+                selectedByTeamName: entry.selectedByTeamName,
+                roundNum: toNumber(entry.roundNum ?? entry.order),
+                order: toNumber(entry.order ?? entry.roundNum)
+            }));
         },
         vetoByMatch() {
             if (!this.vetoHistory.length) return [];
@@ -1844,41 +1289,66 @@ window.TeamDetail = {
                 this.bootstrap();
             }
         },
+        '$route.query.tab'(newVal) {
+            const nextTab = resolveTabFromQuery({ query: { tab: newVal } });
+            if (nextTab !== this.activeTab) {
+                this.activeTab = nextTab;
+            }
+        },
         championshipId(newVal) {
             if (newVal) {
                 this.selectedChampionship = String(newVal);
                 this.fetchSeason(String(newVal), { force: true });
             }
         },
-        matchesList() {
-            this.matchesPage = 1;
-        },
-        seasonData() {
-            if (!isDevEnv) return;
-            const key = `${this.currentChampionshipId || 'none'}-${this.matchesList.length}-${this.vetoHistory.length}`;
-            if (this.scoutLogKey === key) return;
-            this.scoutLogKey = key;
-            const sampleRow = this.scoutMapRows[0] || null;
-            console.debug('[MapPerformance] season debug', {
-                seasonId: this.currentChampionshipId,
-                matches: this.matchesList.length,
-                vetoEvents: this.vetoHistory.length,
-                sampleRow
+        mapViewMode() {
+            this.$nextTick(() => {
+                this.setupMapTableScroll();
             });
         }
     },
+    mounted() {
+        this.$nextTick(() => {
+            this.setupMapTableScroll();
+        });
+    },
+    beforeUnmount() {
+        this.teardownMapTableScroll();
+    },
     methods: {
-        formatPerRound(value, decimals = 3) {
-            return formatPerRound(value, decimals);
+        heatTooltip(metricLabel, value, extra = '') {
+            const parts = [metricLabel, `Arvo ${value}`];
+            if (extra) parts.push(extra);
+            parts.push('Skaalattu tämän joukkueen kartoista valitulla kaudella.');
+            return parts.join(' · ');
+        },
+        setupMapTableScroll() {
+            this.teardownMapTableScroll();
+            const wrapper = this.mapViewMode === 'summary' ? this.$refs.mapSummaryWrapper : this.$refs.mapFullWrapper;
+            if (!wrapper) return;
+            const update = () => {
+                const maxScroll = wrapper.scrollWidth - wrapper.clientWidth;
+                wrapper.classList.toggle('scroll-shadow', maxScroll > 5);
+                wrapper.classList.toggle('scroll-shadow-left', wrapper.scrollLeft > 6);
+                wrapper.classList.toggle('scroll-shadow-right', wrapper.scrollLeft < maxScroll - 6);
+            };
+            wrapper.addEventListener('scroll', update, { passive: true });
+            window.addEventListener('resize', update);
+            update();
+            this._mapScrollHandler = { wrapper, update };
+        },
+        teardownMapTableScroll() {
+            if (!this._mapScrollHandler) return;
+            const { wrapper, update } = this._mapScrollHandler;
+            wrapper.removeEventListener('scroll', update);
+            window.removeEventListener('resize', update);
+            this._mapScrollHandler = null;
         },
         formatSubMetric(perRound, perMap, decimals = 3) {
             if (this.mapSubMetricMode === 'perMap') {
                 return formatPerRound(perMap, decimals);
             }
             return formatPerRound(perRound, decimals);
-        },
-        subMetricLabelShort() {
-            return this.mapSubMetricMode === 'perMap' ? '/kartta' : '/erä';
         },
         subMetricValue(perRound, perMap, decimals = 3) {
             return this.formatSubMetric(perRound, perMap, decimals);
@@ -1898,7 +1368,7 @@ window.TeamDetail = {
                 const data = await this.teamStore.fetchTeamPage(this.teamId, this.selectedChampionship);
                 if (data?.currentChampionshipId) {
                     this.selectedChampionship = String(data.currentChampionshipId);
-                    this.updateRoute(this.selectedChampionship);
+                    this.updateRoute(this.selectedChampionship, this.activeTab);
                 }
             } catch (err) {
                 console.error('TeamDetail bootstrap failed', err);
@@ -1916,9 +1386,9 @@ window.TeamDetail = {
             if (!championshipId || championshipId === this.currentChampionshipId) return;
             this.selectedChampionship = championshipId;
             this.fetchSeason(championshipId);
-            this.updateRoute(championshipId);
+            this.updateRoute(championshipId, this.activeTab);
         },
-        updateRoute(championshipId) {
+        updateRoute(championshipId, tab) {
             if (!this.$router || !this.$route) return;
             const params = { ...(this.$route.params || {}), teamId: this.teamId };
             const query = { ...(this.$route.query || {}) };
@@ -1927,28 +1397,21 @@ window.TeamDetail = {
             } else {
                 delete query.championship;
             }
+            const normalizedTab = tab || this.activeTab;
+            if (normalizedTab && normalizedTab !== 'overview') {
+                query.tab = normalizedTab;
+            } else {
+                delete query.tab;
+            }
             this.$router.replace({
                 name: this.$route.name || 'team',
                 params,
                 query
             }).catch(() => {});
         },
-        changeMatchesPage(page) {
-            const total = this.paginatedMatches.totalPages || 1;
-            const next = Math.min(Math.max(page, 1), total);
-            this.matchesPage = next;
-        },
         selectTab(tab) {
             this.activeTab = tab;
-            if (tab === 'matches') {
-                this.matchesPage = 1;
-            }
-            // Persist tab in URL
-            if (this.$router && this.$route) {
-                const query = { ...(this.$route.query || {}) };
-                query.tab = tab;
-                this.$router.replace({ query }).catch(() => {});
-            }
+            this.updateRoute(this.currentChampionshipId, tab);
         },
         resetMapSort() {
             this.scoutTableKey += 1;
@@ -1960,7 +1423,7 @@ window.TeamDetail = {
         winHeatStyle(value) {
             const pct = Math.min(100, Math.max(0, normalizePercent(value)));
             const hue = (pct / 100) * 120;
-            const color = `hsla(${hue.toFixed(1)}, 70%, 45%, 0.35)`;
+            const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
             return {
                 background: `linear-gradient(90deg, ${color}, transparent)`
             };
@@ -1969,7 +1432,7 @@ window.TeamDetail = {
             const kd = toNumber(value);
             const pct = Math.min(100, Math.max(0, (kd / 2) * 100));
             const hue = (pct / 100) * 120;
-            const color = `hsla(${hue.toFixed(1)}, 70%, 45%, 0.35)`;
+            const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
             return {
                 background: `linear-gradient(90deg, ${color}, transparent)`
             };
@@ -1978,97 +1441,20 @@ window.TeamDetail = {
             const adr = toNumber(value);
             const pct = Math.min(100, Math.max(0, (adr / 120) * 100));
             const hue = (pct / 100) * 120;
-            const color = `hsla(${hue.toFixed(1)}, 70%, 45%, 0.35)`;
+            const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
             return {
                 background: `linear-gradient(90deg, ${color}, transparent)`
             };
         },
         rdHeatStyle(value) {
             const rd = toNumber(value);
-            // Normalize round diff to -30 to +30 range for color scale
-            const normalized = Math.max(-30, Math.min(30, rd));
-            const pct = ((normalized + 30) / 60) * 100;
-            const hue = (pct / 100) * 120;
-            const color = `hsla(${hue.toFixed(1)}, 70%, 45%, 0.35)`;
+            const maxAbs = this.mapMaxRoundDiff || 1;
+            const pct = Math.min(1, Math.max(0, (rd + maxAbs) / (maxAbs * 2)));
+            const hue = pct * 120;
+            const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
             return {
                 background: `linear-gradient(90deg, ${color}, transparent)`
             };
-        },
-        isHeatmapColumn(columnKey) {
-            // Strong heatmap only for: Win %, Round diff, ADR, K/D
-            const heatmapColumns = ['winrate', 'pickWinRate', 'oppPickWinRate', 'rd', 'adr', 'kd'];
-            return heatmapColumns.includes(columnKey);
-        },
-        getHeatTooltip(column, row) {
-            if (!this.isHeatmapColumn(column.key)) return column.tooltip || '';
-            const value = row[column.key];
-            const scaling = 'Scaled across this team\'s maps for the selected season';
-            
-            if (column.key === 'winrate' && row.wins != null && row.losses != null) {
-                return `${column.label}: ${formatPercent(value, 1)} (${row.wins}–${row.losses}) · ${scaling}`;
-            }
-            if (column.key === 'pickWinRate' && row.pickWins != null && row.picks != null) {
-                const losses = Math.max(0, row.picks - row.pickWins);
-                return `${column.label}: ${formatPercent(value, 1)} (${row.pickWins}–${losses}) · ${scaling}`;
-            }
-            if (column.key === 'oppPickWinRate' && row.oppPickWins != null && row.oppPicks != null) {
-                const losses = Math.max(0, row.oppPicks - row.oppPickWins);
-                return `${column.label}: ${formatPercent(value, 1)} (${row.oppPickWins}–${losses}) · ${scaling}`;
-            }
-            
-            return `${column.label}: ${formatNumber(value, column.decimals || 0)} · ${scaling}`;
-        },
-        getVetoCellTooltip(step, match) {
-            const opponent = match?.opponentName || match?.team2Name || 'Opponent';
-            const result = match ? getMatchResult(match) : null;
-            const action = step.action || 'unknown';
-            const actor = step.actor === 'team' ? 'Team' : (step.actor === 'opponent' ? 'Opponent' : 'System');
-            const date = match?.ts ? formatDate(match.ts) : '';
-            
-            let tooltip = `${opponent}`;
-            if (date) tooltip += ` · ${date}`;
-            tooltip += ` · ${step.mapName} · ${actor} ${action}`;
-            if (result) tooltip += ` · ${result}`;
-            
-            return tooltip;
-        },
-        isHeatmapColumn(columnKey) {
-            // Strong heatmap only for: Win %, Round diff, ADR, K/D
-            const heatmapColumns = ['winrate', 'pickWinRate', 'oppPickWinRate', 'rd', 'adr', 'kd'];
-            return heatmapColumns.includes(columnKey);
-        },
-        getHeatTooltip(column, row) {
-            if (!this.isHeatmapColumn(column.key)) return column.tooltip || '';
-            const value = row[column.key];
-            const scaling = 'Scaled across this team\'s maps for the selected season';
-            
-            if (column.key === 'winrate' && row.wins != null && row.losses != null) {
-                return `${column.label}: ${formatPercent(value, 1)} (${row.wins}–${row.losses}) · ${scaling}`;
-            }
-            if (column.key === 'pickWinRate' && row.pickWins != null && row.picks != null) {
-                const losses = row.picks - row.pickWins;
-                return `${column.label}: ${formatPercent(value, 1)} (${row.pickWins}–${losses}) · ${scaling}`;
-            }
-            if (column.key === 'oppPickWinRate' && row.oppPickWins != null && row.oppPicks != null) {
-                const losses = row.oppPicks - row.oppPickWins;
-                return `${column.label}: ${formatPercent(value, 1)} (${row.oppPickWins}–${losses}) · ${scaling}`;
-            }
-            
-            return `${column.label}: ${formatNumber(value, column.decimals || 0)} · ${scaling}`;
-        },
-        getVetoCellTooltip(step, match) {
-            const opponent = match?.opponentName || match?.team2Name || 'Opponent';
-            const result = match ? getMatchResult(match) : null;
-            const action = step.action || 'unknown';
-            const actor = step.actor === 'team' ? 'Team' : (step.actor === 'opponent' ? 'Opponent' : 'System');
-            const date = match?.ts ? formatDate(match.ts) : '';
-            
-            let tooltip = `${opponent}`;
-            if (date) tooltip += ` · ${date}`;
-            tooltip += ` · ${step.mapName} · ${actor} ${action}`;
-            if (result) tooltip += ` · Result: ${result}`;
-            
-            return tooltip;
         },
         detectSeriesFormat(bestOf, steps = []) {
             if (Number(bestOf) === 2) return 'bo2';
@@ -2164,22 +1550,8 @@ window.TeamDetail = {
         formatDate,
         getMatchResult,
         teamLogo() {
-            return this.teamInfo?.logo || this.teamInfo?.avatar || this.teamInfo?.image || '';
+            return this.teamInfo?.avatar || '';
         },
-        // Phase 1: Trend indicator vs division average
-        getTrendIndicator(teamValue, divAvg) {
-            if (!divAvg || teamValue == null) return '';
-            const diff = teamValue - divAvg;
-            if (Math.abs(diff) < 0.5) return '→';
-            return diff > 0 ? '↑' : '↓';
-        },
-        getTrendClass(teamValue, divAvg) {
-            if (!divAvg || teamValue == null) return '';
-            const diff = teamValue - divAvg;
-            if (Math.abs(diff) < 0.5) return 'trend-neutral';
-            return diff > 0 ? 'trend-positive' : 'trend-negative';
-        },
-        // Phase 1: Format player role badges
         getPlayerRoleBadges(playerId) {
             const roleData = this.playerRoles[playerId];
             if (!roleData || !roleData.roles || roleData.roles.length === 0) return [];
@@ -2187,7 +1559,19 @@ window.TeamDetail = {
                 label: role,
                 isPrimary: role === roleData.primaryRole
             }));
-        }
+        },
+        getPerformanceBadge(teamValue, divAvg, metricKey) {
+            if (!divAvg || teamValue == null) return null;
+            // Skip badges for zero-sum metrics where avg is always ~50%
+            if (metricKey === 'winrate' || metricKey === 'mapWinRate') return null;
+            const diff = teamValue - divAvg;
+            if (Math.abs(diff) < 0.5) return null;
+            const pct = ((Math.abs(diff) / divAvg) * 100).toFixed(0);
+            return {
+                type: diff > 0 ? 'positive' : 'negative',
+                label: `${diff > 0 ? '+' : ''}${pct}%`
+            };
+        },
     },
     template: `
         <div class="team-detail">
@@ -2202,11 +1586,9 @@ window.TeamDetail = {
                         <h1 class="team-hero__title title-accent titleUnderlinePage">
                             {{ teamInfo?.displayName || teamInfo?.teamName || 'Joukkue' }}
                         </h1>
-                        <div class="team-hero__season" v-if="seasonOptions.length">
-                            <span class="pill" :title="currentSeasonOption ? '' : 'No season data'">Kausi {{ currentSeasonOption?.season || '—' }}</span>
-                            <span class="pill" :title="currentSeasonOption ? '' : 'No division data'">Div {{ currentSeasonOption?.division || '—' }}</span>
-                            <span class="pill pill--accent" v-if="currentSeasonOption?.isPlayoffs">Playoffs</span>
-                            <a v-if="teamInfo?.faceit_url || teamInfo?.faceitUrl" class="pill pill--link" :href="teamInfo?.faceit_url || teamInfo?.faceitUrl" target="_blank" rel="noopener">Faceit</a>
+                        <div class="team-hero__season" v-if="seasonOptions.length || heroPlayoffsFlag || teamInfo?.faceitUrl">
+                            <span class="pill pill--accent" v-if="heroPlayoffsFlag">Playoffs</span>
+                            <a v-if="teamInfo?.faceitUrl" class="pill pill--link" :href="teamInfo?.faceitUrl" target="_blank" rel="noopener">Faceit</a>
                         </div>
                     </div>
                     <div v-if="seasonOptions.length" class="team-season-selector">
@@ -2233,12 +1615,14 @@ window.TeamDetail = {
                         :class="{ 'team-tab--active': activeTab === tab }"
                         @click="selectTab(tab)"
                         role="tab"
+                        :aria-selected="activeTab === tab"
+                        :aria-controls="'team-tab-' + tab"
                     >
                         {{ { overview: 'Yleiskuva', matches: 'Ottelut', players: 'Pelaajat', veto: 'Veto/Nosto' }[tab] }}
                     </button>
                 </nav>
 
-                <section v-if="activeTab === 'overview'" class="team-section scout-view">
+                <section v-if="activeTab === 'overview'" class="team-section scout-view" id="team-tab-overview" role="tabpanel">
                     <div class="scout-panel scout-snapshot">
                         <div class="section-heading">
                             <div>
@@ -2246,27 +1630,37 @@ window.TeamDetail = {
                             <span class="section-sub">Valittu kausi · ydintilastot</span>
                             </div>
                         </div>
-                        <div class="scout-snapshot-row scout-snapshot-row--tier1">
-                            <div v-for="stat in seasonSnapshotTier1" :key="stat.key" class="scout-snapshot-item scout-snapshot-item--primary">
+                        <div class="scout-snapshot-tier scout-snapshot-tier--primary">
+                            <div v-for="stat in seasonSnapshotStats.primary" :key="stat.key" class="scout-snapshot-item scout-snapshot-item--primary">
                                 <div class="snapshot-label">
                                     {{ stat.label }}
                                     <span
-                                        v-if="divisionAverages && stat.trendValue != null && stat.divAvg != null"
-                                        class="trend-indicator trend-indicator--subtle"
-                                        :class="getTrendClass(stat.trendValue, stat.divAvg)"
-                                        :title="'Compared to division average for this season: ' + formatNumber(stat.divAvg, 1)"
-                                    >{{ getTrendIndicator(stat.trendValue, stat.divAvg) }}</span>
+                                        v-if="getPerformanceBadge(stat.trendValue, stat.divAvg, stat.key)"
+                                        class="performance-badge"
+                                        :class="'performance-badge--' + getPerformanceBadge(stat.trendValue, stat.divAvg, stat.key).type"
+                                        :title="'Ero divisioonan keskiarvoon'"
+                                    >{{ getPerformanceBadge(stat.trendValue, stat.divAvg, stat.key).label }}</span>
                                 </div>
-                                <div class="snapshot-value snapshot-value--large mono-num" :class="stat.tone" :title="stat.tooltip || ''">{{ stat.value }}</div>
-                                <div class="snapshot-sub">{{ stat.sub }}</div>
-                            </div>
-                        </div>
-                        <div class="scout-snapshot-row scout-snapshot-row--tier2">
-                            <div v-for="stat in seasonSnapshotTier2" :key="stat.key" class="scout-snapshot-item scout-snapshot-item--secondary">
-                                <div class="snapshot-label snapshot-label--secondary">{{ stat.label }}</div>
                                 <div class="snapshot-value mono-num" :class="stat.tone" :title="stat.tooltip || ''">{{ stat.value }}</div>
                                 <div class="snapshot-sub">{{ stat.sub }}</div>
                             </div>
+                        </div>
+                        <div class="scout-snapshot-tier scout-snapshot-tier--secondary">
+                            <div v-for="stat in seasonSnapshotStats.secondary" :key="stat.key" class="scout-snapshot-item scout-snapshot-item--secondary">
+                                <div class="snapshot-label">{{ stat.label }}</div>
+                                <div class="snapshot-value mono-num" :class="stat.tone" :title="stat.tooltip || ''">{{ stat.value }}</div>
+                                <div class="snapshot-sub">{{ stat.sub }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="scout-panel scout-performance-radar" v-if="performanceRadarMetrics.length">
+                        <div class="section-heading">
+                            <h3 class="section-title titleUnderline">Suorituskyvyn jakauma</h3>
+                            <span class="section-sub">Joukkueen vahvuudet visuaalisesti</span>
+                        </div>
+                        <div class="radar-container">
+                            <radar-chart :metrics="performanceRadarMetrics"></radar-chart>
                         </div>
                     </div>
 
@@ -2276,36 +1670,12 @@ window.TeamDetail = {
                         <h3 class="section-title titleUnderline">Veto-historia</h3>
                         <span class="section-sub">Pick/Ban otteluittain (uusin → vanhin)</span>
                             </div>
-                            <div class="veto-order-controls" v-if="vetoTrendMapPool.length > 0">
-                                <span class="veto-order-controls__label">Järjestys:</span>
-                                <button
-                                    class="veto-order-btn"
-                                    :class="{ active: vetoMapOrder === 'usage' }"
-                                    @click="vetoMapOrder = 'usage'"
-                                    title="Järjestä käyttömäärän mukaan"
-                                >
-                                    Pelimäärä
-                                </button>
-                                <button
-                                    class="veto-order-btn"
-                                    :class="{ active: vetoMapOrder === 'alphabetical' }"
-                                    @click="vetoMapOrder = 'alphabetical'"
-                                    title="Järjestä aakkosittain"
-                                >
-                                    A–Ö
-                                </button>
-                            </div>
-                        </div>
-                        <div class="veto-heatmap-legend veto-heatmap-legend--detailed">
-                            <div v-for="entry in vetoLegendEntries" :key="entry.label" class="veto-legend-item">
-                                <div class="veto-heatmap__cell veto-legend-cell" :class="entry.className">
-                                </div>
-                                <span class="veto-legend-label">{{ entry.label }}</span>
+                            <div class="section-heading-actions">
                             </div>
                         </div>
                         <div v-if="vetoTrendRows.length" class="veto-heatmap">
                             <div class="veto-heatmap__header">
-                                <div class="veto-heatmap__corner">Map</div>
+                                <div class="veto-heatmap__corner">Kartta</div>
                                 <div class="veto-heatmap__cols">
                                 <div
                                     v-for="(col, idx) in vetoTrendColumns"
@@ -2326,16 +1696,25 @@ window.TeamDetail = {
                                         :key="row.mapName + '-' + idx"
                                         class="veto-heatmap__cell"
                                         :class="[cell.className, ((idx + 1) % 4 === 0) ? 'veto-heatmap__cell--divider' : '']"
-                                        :title="cell.step && cell.match ? getVetoCellTooltip(cell.step, cell.match) : cell.title"
+                                        :title="cell.title"
                                     >
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        <div v-if="vetoTrendRows.length" class="veto-heatmap-legend veto-heatmap-legend--section">
+                            <div class="veto-legend-title">Selite</div>
+                            <div class="veto-legend-grid">
+                                <div v-for="entry in vetoLegendEntries" :key="entry.label" class="veto-legend-item">
+                                    <div class="veto-heatmap__cell veto-legend-cell" :class="entry.className"></div>
+                                    <span class="veto-legend-label">{{ entry.label }}</span>
+                                </div>
+                            </div>
+                        </div>
                         <div v-else class="empty-state-container compact">
                             <div class="empty-state-card">
-                                <div class="empty-state-icon">🗳️</div>
-                                <p class="empty-state-description">Ei vetoa kaudella.</p>
+                                <h3 class="empty-state-title">Ei vetoa</h3>
+                                <p class="empty-state-description">Tälle kaudelle ei ole veto-historiaa.</p>
                             </div>
                         </div>
                     </div>
@@ -2344,11 +1723,11 @@ window.TeamDetail = {
                         <div class="section-heading">
                             <div>
                         <h3 class="section-title titleUnderline">Karttakohtainen suorituskyky (kausi)</h3>
-                        <span class="section-sub">{{ mapViewMode === 'compact' ? 'Tiivistelmä: Voitot, pickit, bannit, RD · Pelattu (laskeva)' : 'Yksityiskohdat: Pelaajan suorituskykytilastot kartalta' }}</span>
-                        <div v-if="mapViewMode === 'detailed'" class="section-legend">Pääarvo = total · Sulkeissa = {{ subMetricLabel() }}</div>
+                        <span class="section-sub">{{ mapViewMode === 'summary' ? 'Yhteenveto: Voitot, pickit, bannit, eräero' : 'Laaja: Karttakohtaiset pelaajatilastot' }}</span>
+                        <div v-if="mapViewMode === 'full'" class="section-legend">📊 <strong>Pääarvo</strong> = kokonaisluku · <strong>Sulkeissa</strong> = {{ subMetricLabel() }}</div>
                             </div>
                             <div class="section-heading-actions">
-                                <div v-if="mapViewMode === 'detailed'" class="submetric-toggle">
+                                <div v-if="mapViewMode === 'full'" class="submetric-toggle">
                                     <button
                                         type="button"
                                         class="btn-submetric"
@@ -2365,22 +1744,22 @@ window.TeamDetail = {
                                 <button 
                                     type="button" 
                                     class="btn-toggle-view" 
-                                    @click="mapViewMode = mapViewMode === 'compact' ? 'detailed' : 'compact'"
-                                    :title="mapViewMode === 'compact' ? 'Näytä pelaajan suorituskyky kartalta' : 'Näytä voitto/häviö ja pick/ban tilastot'"
+                                    @click="mapViewMode = mapViewMode === 'summary' ? 'full' : 'summary'"
+                                    :title="mapViewMode === 'summary' ? 'Näytä karttakohtaiset pelaajatilastot' : 'Näytä voitto/pick/ban yhteenveto'"
                                 >
-                                    <span v-if="mapViewMode === 'compact'">🎯 Pelaajan suorituskyky</span>
-                                    <span v-else>📊 Voitot & Pickit</span>
+                                    <span v-if="mapViewMode === 'summary'">Laaja näkymä</span>
+                                    <span v-else>Yhteenveto</span>
                                 </button>
                             </div>
                         </div>
                         <div>
-                            <button type="button" class="btn-reset-sort" @click="resetMapSort">Reset sort</button>
+                            <button type="button" class="btn-reset-sort" @click="resetMapSort">Nollaa lajittelu</button>
                         </div>
-                        <div v-if="mapViewMode === 'compact'" class="table-wrapper">
+                        <div v-if="mapViewMode === 'summary'" ref="mapSummaryWrapper" class="table-wrapper table-wrapper--scroll">
                             <sortable-table
                                 :key="scoutTableKey"
                                 :columns="SCOUT_MAP_COLUMNS"
-                                :header-groups="SCOUT_MAP_GROUPS"
+                                :header-groups="scoutHeaderGroups"
                                 :data="scoutMapRows"
                                 :default-sort="scoutMapDefaultSort"
                                 :sticky-header="true"
@@ -2401,44 +1780,74 @@ window.TeamDetail = {
                                     <div class="scout-cell mono-num">{{ row.oppPicks }}</div>
                                 </template>
                                 <template #cell-winrate="{ row }">
-                                    <div v-if="row.played > 0" class="scout-cell mono-num" :style="winHeatStyle(row.winrate)" :title="getHeatTooltip({ key: 'winrate', label: 'Voitto-%' }, row)">
+                                    <div
+                                        v-if="row.played > 0"
+                                        class="scout-cell mono-num"
+                                        :style="winHeatStyle(row.winrate)"
+                                        :title="heatTooltip('Win %', formatPercent(row.winrate || 0, 1), 'W–L ' + formatWinLoss(row.wins || 0, row.losses || 0))"
+                                    >
                                         {{ formatPercent(row.winrate || 0, 1) }} ({{ formatWinLoss(row.wins || 0, row.losses || 0) }})
                                     </div>
-                                    <span v-else class="cell-muted mono-num" title="Not played this season">—</span>
+                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
                                 </template>
                                 <template #cell-pickWinRate="{ row }">
-                                    <div v-if="row.picks > 0" class="scout-cell mono-num" :style="winHeatStyle(row.pickWinRate)" :title="getHeatTooltip({ key: 'pickWinRate', label: 'Pick voitto-%' }, row)">
+                                    <div
+                                        v-if="row.picks > 0"
+                                        class="scout-cell mono-num"
+                                        :style="winHeatStyle(row.pickWinRate)"
+                                        :title="heatTooltip('Win % (oma pick)', formatPercent(row.pickWinRate || 0, 1), 'W–L ' + formatWinLoss(row.pickWins || 0, Math.max(0, (row.picks || 0) - (row.pickWins || 0))))"
+                                    >
                                         {{ formatPercent(row.pickWinRate || 0, 1) }} ({{ formatWinLoss(row.pickWins || 0, Math.max(0, (row.picks || 0) - (row.pickWins || 0))) }})
                                     </div>
-                                    <span v-else class="cell-muted mono-num" title="Not played this season">—</span>
+                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
                                 </template>
                                 <template #cell-oppPickWinRate="{ row }">
-                                    <div v-if="row.oppPicks > 0" class="scout-cell mono-num" :style="winHeatStyle(row.oppPickWinRate)" :title="getHeatTooltip({ key: 'oppPickWinRate', label: 'Opp pick voitto-%' }, row)">
+                                    <div
+                                        v-if="row.oppPicks > 0"
+                                        class="scout-cell mono-num"
+                                        :style="winHeatStyle(row.oppPickWinRate)"
+                                        :title="heatTooltip('Win % (vastustajan pick)', formatPercent(row.oppPickWinRate || 0, 1), 'W–L ' + formatWinLoss(row.oppPickWins || 0, Math.max(0, (row.oppPicks || 0) - (row.oppPickWins || 0))))"
+                                    >
                                         {{ formatPercent(row.oppPickWinRate || 0, 1) }} ({{ formatWinLoss(row.oppPickWins || 0, Math.max(0, (row.oppPicks || 0) - (row.oppPickWins || 0))) }})
                                     </div>
-                                    <span v-else class="cell-muted mono-num" title="Not played this season">—</span>
+                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
                                 </template>
                                 <template #cell-kd="{ row }">
-                                    <div v-if="row.played > 0" class="scout-cell mono-num">{{ formatNumber(row.kd, 2) }}</div>
-                                    <span v-else class="cell-muted mono-num">—</span>
+                                    <div
+                                        v-if="row.played > 0"
+                                        class="scout-cell mono-num"
+                                        :style="kdHeatStyle(row.kd)"
+                                        :title="heatTooltip('K/D', formatNumber(row.kd, 2))"
+                                    >{{ formatNumber(row.kd, 2) }}</div>
+                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
                                 </template>
                                 <template #cell-adr="{ row }">
-                                    <div v-if="row.played > 0" class="scout-cell mono-num">{{ formatNumber(row.adr, 1) }}</div>
-                                    <span v-else class="cell-muted mono-num">—</span>
+                                    <div
+                                        v-if="row.played > 0"
+                                        class="scout-cell mono-num"
+                                        :style="adrHeatStyle(row.adr)"
+                                        :title="heatTooltip('ADR', formatNumber(row.adr, 1))"
+                                    >{{ formatNumber(row.adr, 1) }}</div>
+                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
                                 </template>
                                 <template #cell-rd="{ row }">
-                                    <div v-if="row.played > 0" class="scout-cell mono-num" :title="getHeatTooltip({ key: 'rd', label: 'Eräero' }, row)">{{ formatNumber(row.rd, 0) }}</div>
-                                    <span v-else class="cell-muted mono-num">—</span>
+                                    <div
+                                        v-if="row.played > 0"
+                                        class="scout-cell mono-num"
+                                        :style="rdHeatStyle(row.rd)"
+                                        :title="heatTooltip('Eräero', formatNumber(row.rd, 0))"
+                                    >{{ formatNumber(row.rd, 0) }}</div>
+                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
                                 </template>
                             </sortable-table>
                         </div>
 
-                        <div v-if="mapViewMode === 'detailed'" class="table-wrapper">
+                        <div v-if="mapViewMode === 'full'" ref="mapFullWrapper" class="table-wrapper table-wrapper--scroll">
                             <sortable-table
                                 v-if="mapStats.length"
                                 :key="detailedTableKey"
                                 :columns="MAP_COLUMNS"
-                                :header-groups="MAP_COLUMN_GROUPS"
+                                :header-groups="mapHeaderGroups"
                                 :data="mapStats"
                                 :default-sort="mapDefaultSort"
                                 :sticky-header="true"
@@ -2450,19 +1859,43 @@ window.TeamDetail = {
                                     </div>
                                 </template>
                                 <template #cell-totalRoundsPlayed="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.totalRoundsPlayed, 0) }}</div>
+                                    <div class="scout-cell scout-cell--stacked mono-num">
+                                        <div>{{ formatNumber(row.totalRoundsPlayed, 0) }}</div>
+                                        <div
+                                            v-if="row.roundsWon || row.roundsLost"
+                                            class="rounds-breakdown"
+                                        >
+                                            <span class="rounds-won">+{{ formatNumber(row.roundsWon, 0) }}</span>
+                                            <span class="rounds-sep">/</span>
+                                            <span class="rounds-lost">-{{ formatNumber(row.roundsLost, 0) }}</span>
+                                            <span
+                                                class="rounds-diff"
+                                                :class="(row.roundsWon - row.roundsLost) >= 0 ? 'rounds-diff--pos' : 'rounds-diff--neg'"
+                                            >
+                                                ({{ (row.roundsWon - row.roundsLost) >= 0 ? '+' : '' }}{{ formatNumber(row.roundsWon - row.roundsLost, 0) }})
+                                            </span>
+                                        </div>
+                                    </div>
                                 </template>
                                 <template #cell-roundsPerMapAvg="{ row }">
                                     <div class="scout-cell mono-num">{{ formatNumber(row.roundsPerMapAvg, 1) }}</div>
                                 </template>
                                 <template #cell-adr="{ row }">
-                                    <div class="scout-cell mono-num" :style="adrHeatStyle(row.adr)">{{ formatNumber(row.adr, 1) }}</div>
+                                    <div
+                                        class="scout-cell mono-num"
+                                        :style="adrHeatStyle(row.adr)"
+                                        :title="heatTooltip('ADR', formatNumber(row.adr, 1))"
+                                    >{{ formatNumber(row.adr, 1) }}</div>
                                 </template>
                                 <template #cell-kr="{ row }">
                                     <div class="scout-cell mono-num">{{ formatNumber(row.kr, 3) }}</div>
                                 </template>
                                 <template #cell-kd="{ row }">
-                                    <div class="scout-cell mono-num" :style="kdHeatStyle(row.kd)">{{ formatNumber(row.kd, 2) }}</div>
+                                    <div
+                                        class="scout-cell mono-num"
+                                        :style="kdHeatStyle(row.kd)"
+                                        :title="heatTooltip('K/D', formatNumber(row.kd, 2))"
+                                    >{{ formatNumber(row.kd, 2) }}</div>
                                 </template>
                                 <template #cell-hsPct="{ row }">
                                     <div class="scout-cell mono-num">{{ formatNumber(row.hsPct, 1) }}</div>
@@ -2495,7 +1928,7 @@ window.TeamDetail = {
                                     <div class="scout-cell scout-cell--stacked mono-num">
                                         <div>{{ formatNumber(row.multi2k, 0) }}</div>
                                         <div v-if="shouldShowSubMetric(row.multi2kPerRound, row.multi2kPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.multi2kPerRound, row.multi2kPerMap, 3) }} {{ subMetricLabelShort() }})
+                                            ({{ subMetricValue(row.multi2kPerRound, row.multi2kPerMap, 3) }})
                                         </div>
                                     </div>
                                 </template>
@@ -2503,7 +1936,7 @@ window.TeamDetail = {
                                     <div class="scout-cell scout-cell--stacked mono-num">
                                         <div>{{ formatNumber(row.multi3k, 0) }}</div>
                                         <div v-if="shouldShowSubMetric(row.multi3kPerRound, row.multi3kPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.multi3kPerRound, row.multi3kPerMap, 3) }} {{ subMetricLabelShort() }})
+                                            ({{ subMetricValue(row.multi3kPerRound, row.multi3kPerMap, 3) }})
                                         </div>
                                     </div>
                                 </template>
@@ -2511,7 +1944,7 @@ window.TeamDetail = {
                                     <div class="scout-cell scout-cell--stacked mono-num">
                                         <div>{{ formatNumber(row.multi4k, 0) }}</div>
                                         <div v-if="shouldShowSubMetric(row.multi4kPerRound, row.multi4kPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.multi4kPerRound, row.multi4kPerMap, 3) }} {{ subMetricLabelShort() }})
+                                            ({{ subMetricValue(row.multi4kPerRound, row.multi4kPerMap, 3) }})
                                         </div>
                                     </div>
                                 </template>
@@ -2519,7 +1952,7 @@ window.TeamDetail = {
                                     <div class="scout-cell scout-cell--stacked mono-num">
                                         <div>{{ formatNumber(row.multi5k, 0) }}</div>
                                         <div v-if="shouldShowSubMetric(row.multi5kPerRound, row.multi5kPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.multi5kPerRound, row.multi5kPerMap, 3) }} {{ subMetricLabelShort() }})
+                                            ({{ subMetricValue(row.multi5kPerRound, row.multi5kPerMap, 3) }})
                                         </div>
                                     </div>
                                 </template>
@@ -2527,7 +1960,7 @@ window.TeamDetail = {
                                     <div class="scout-cell scout-cell--stacked mono-num">
                                         <div>{{ formatNumber(row.pistolKills, 0) }}</div>
                                         <div v-if="shouldShowSubMetric(row.pistolKillsPerRound, row.pistolKillsPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.pistolKillsPerRound, row.pistolKillsPerMap, 3) }} {{ subMetricLabelShort() }})
+                                            ({{ subMetricValue(row.pistolKillsPerRound, row.pistolKillsPerMap, 3) }})
                                         </div>
                                     </div>
                                 </template>
@@ -2535,7 +1968,7 @@ window.TeamDetail = {
                                     <div class="scout-cell scout-cell--stacked mono-num">
                                         <div>{{ formatNumber(row.sniperKills, 0) }}</div>
                                         <div v-if="shouldShowSubMetric(row.sniperKillsPerRound, row.sniperKillsPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.sniperKillsPerRound, row.sniperKillsPerMap, 3) }} {{ subMetricLabelShort() }})
+                                            ({{ subMetricValue(row.sniperKillsPerRound, row.sniperKillsPerMap, 3) }})
                                         </div>
                                     </div>
                                 </template>
@@ -2543,7 +1976,7 @@ window.TeamDetail = {
                                     <div class="scout-cell scout-cell--stacked mono-num">
                                         <div>{{ formatNumber(row.totalDamage, 0) }}</div>
                                         <div v-if="shouldShowSubMetric(row.totalDamagePerRound, row.totalDamagePerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.totalDamagePerRound, row.totalDamagePerMap, 1) }} {{ subMetricLabelShort() }})
+                                            ({{ subMetricValue(row.totalDamagePerRound, row.totalDamagePerMap, 1) }})
                                         </div>
                                     </div>
                                 </template>
@@ -2553,8 +1986,8 @@ window.TeamDetail = {
                             </sortable-table>
                             <div v-else class="empty-state-container">
                                 <div class="empty-state-card">
-                                    <h3 class="empty-state-title">No map data</h3>
-                                    <p class="empty-state-description">Map statistics are not available for this season.</p>
+                                    <h3 class="empty-state-title">Ei karttadataa</h3>
+                                    <p class="empty-state-description">Tälle kaudelle ei ole karttakohtaisia tilastoja.</p>
                                 </div>
                             </div>
                         </div>
@@ -2562,9 +1995,9 @@ window.TeamDetail = {
 
                 </section>
 
-                <section v-if="activeTab === 'matches'" class="team-section">
+                <section v-if="activeTab === 'matches'" class="team-section" id="team-tab-matches" role="tabpanel">
                     <div class="section-heading">
-                        <h2 class="section-title titleUnderline">Ottelut ({{ paginatedMatches.total }} yhteensä)</h2>
+                    <h2 class="section-title titleUnderline">Ottelut ({{ matchesList.length }} yhteensä)</h2>
                     </div>
                     <div class="glass-card">
                         <div class="section-heading">
@@ -2587,11 +2020,12 @@ window.TeamDetail = {
                         </div>
                         <div v-else class="empty-state-container compact">
                             <div class="empty-state-card">
-                                <p class="empty-state-description">Not enough matches for trend analysis.</p>
+                                <h3 class="empty-state-title">Ei trendidataa</h3>
+                                <p class="empty-state-description">Tälle kaudelle ei ole riittävästi otteluita trendiä varten.</p>
                             </div>
                         </div>
                     </div>
-                    <div v-if="paginatedMatches.items.length" class="table-wrapper">
+                    <div v-if="matchesList.length" class="table-wrapper">
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -2607,12 +2041,12 @@ window.TeamDetail = {
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="match in paginatedMatches.items" :key="match.matchId">
+                                <tr v-for="match in matchesList" :key="match.matchId">
                                     <td>
                                         <span :class="['result-dot', 'result-dot--' + getMatchResult(match)]"></span>
                                     </td>
                                     <td>{{ formatDate(match.ts) }}</td>
-                                    <td :title="vetoSummaryLookup[match.matchId] || ''">{{ match.opponentName || match.team2Name || match.opponent?.team_name || 'Vastustaja' }}</td>
+                                    <td :title="vetoSummaryLookup[match.matchId] || ''">{{ match.opponentName || match.team2Name || 'Vastustaja' }}</td>
                                     <td>BO{{ match.bestOf }}</td>
                                     <td>{{ match.teamScore }} - {{ match.oppScore }}</td>
                                     <td :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'">{{ match.roundDiff }}</td>
@@ -2630,21 +2064,16 @@ window.TeamDetail = {
                                 </tr>
                             </tbody>
                         </table>
-                        <div class="table-pagination" v-if="paginatedMatches.totalPages > 1">
-                            <button type="button" class="pill" :disabled="paginatedMatches.page === 1" @click="changeMatchesPage(paginatedMatches.page - 1)">Edellinen</button>
-                            <span class="pagination-meta">Sivu {{ paginatedMatches.page }} / {{ paginatedMatches.totalPages }}</span>
-                            <button type="button" class="pill" :disabled="paginatedMatches.page === paginatedMatches.totalPages" @click="changeMatchesPage(paginatedMatches.page + 1)">Seuraava</button>
-                        </div>
                     </div>
                     <div v-else class="empty-state-container">
                         <div class="empty-state-card">
-                            <h3 class="empty-state-title">No matches</h3>
-                            <p class="empty-state-description">Match history is not available for this season.</p>
+                            <h3 class="empty-state-title">Ei otteluita</h3>
+                            <p class="empty-state-description">Tälle kaudelle ei ole otteluhistoriaa saatavilla.</p>
                         </div>
                     </div>
                 </section>
 
-                <section v-if="activeTab === 'players'" class="team-section">
+                <section v-if="activeTab === 'players'" class="team-section" id="team-tab-players" role="tabpanel">
                     <h2 class="section-title titleUnderline">Pelaajat</h2>
                     <div v-if="players.length" class="table-wrapper">
                         <sortable-table
@@ -2661,7 +2090,7 @@ window.TeamDetail = {
                                     <div>
                                         <div class="player-name">
                                             {{ row.nickname }}
-                                            <span v-for="badge in getPlayerRoleBadges(row.playerId)" :key="badge.label" class="role-badge" :class="{ 'role-badge--primary': badge.isPrimary }" :title="badge.isPrimary ? 'Primary role' : ''">{{ badge.label }}</span>
+                                            <span v-for="badge in getPlayerRoleBadges(row.playerId)" :key="badge.label" class="role-badge" :class="{ 'role-badge--primary': badge.isPrimary }" :title="badge.isPrimary ? 'Ensisijainen rooli' : ''">{{ badge.label }}</span>
                                         </div>
                                         <div class="player-sub">Maps {{ row.mapsPlayed }} · Rnds {{ row.roundsPlayed }}</div>
                                     </div>
@@ -2700,8 +2129,8 @@ window.TeamDetail = {
                     </div>
                     <div v-else class="empty-state-container">
                         <div class="empty-state-card">
-                            <h3 class="empty-state-title">No player data</h3>
-                            <p class="empty-state-description">Player statistics are not available for this season.</p>
+                            <h3 class="empty-state-title">Ei pelaajatietoja</h3>
+                            <p class="empty-state-description">Tälle kaudelle ei ole pelaajatietoja saatavilla.</p>
                         </div>
                     </div>
                     <div class="players-charts" v-if="playersByRating.length">
@@ -2737,7 +2166,7 @@ window.TeamDetail = {
                     </div>
                 </section>
 
-                <section v-if="activeTab === 'veto'" class="team-section">
+                <section v-if="activeTab === 'veto'" class="team-section" id="team-tab-veto" role="tabpanel">
                     <h2 class="section-title titleUnderline">Ban/Nosto Tilastot</h2>
                     <div v-if="enhancedVetoAggregates.length" class="table-wrapper">
                         <sortable-table
@@ -2787,8 +2216,8 @@ window.TeamDetail = {
                     </div>
                     <div v-else class="empty-state-container">
                         <div class="empty-state-card">
-                            <h3 class="empty-state-title">No ban/pick history</h3>
-                            <p class="empty-state-description">Ban/pick history data is not available for this season.</p>
+                            <h3 class="empty-state-title">Ei ban/nosto historiaa</h3>
+                            <p class="empty-state-description">Tälle kaudelle ei ole ban/nosto historiatietoja saatavilla.</p>
                         </div>
                     </div>
                     <div class="glass-card" v-if="enhancedVetoAggregates.length">

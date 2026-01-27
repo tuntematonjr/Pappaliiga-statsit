@@ -45,6 +45,14 @@ window.SortableTable = {
             type: Array,
             default: () => []
             // Format: [{ label: 'Group', colSpan: 3, className: 'group-class' }]
+        },
+        collapsedGroups: {
+            type: Set,
+            default: () => new Set()
+        },
+        onToggleGroup: {
+            type: Function,
+            default: null
         }
     },
     setup(props) {
@@ -54,6 +62,15 @@ window.SortableTable = {
         const { colorizeColumn, getCellStyle } = window.useCellColorization();
 
         const hasAppliedDefault = Vue.ref(false);
+        const hasDefaultColumn = Vue.computed(() => {
+            if (!props.defaultSort || !Array.isArray(props.columns)) return false;
+            return props.columns.some(col => col.key === props.defaultSort.column);
+        });
+
+        const visibleColumns = Vue.computed(() => {
+            if (!props.collapsedGroups || props.collapsedGroups.size === 0) return props.columns;
+            return props.columns.filter(col => !props.collapsedGroups.has(col.group));
+        });
 
         const runSortPipeline = (rows) => {
             if (!Array.isArray(rows)) {
@@ -68,7 +85,7 @@ window.SortableTable = {
                 return;
             }
 
-            if (!hasAppliedDefault.value && props.defaultSort) {
+            if (!hasAppliedDefault.value && props.defaultSort && hasDefaultColumn.value) {
                 console.debug('[SortableTable] runSortPipeline: applying default sort', props.defaultSort);
                 sortedData.value = applyDefaultSort(
                     [...rows],
@@ -136,7 +153,9 @@ window.SortableTable = {
             colorizeColumn,
             getCellStyle,
             sortedData,
-            hasAppliedDefault
+            hasAppliedDefault,
+            hasDefaultColumn,
+            visibleColumns
         };
     },
     computed: {
@@ -165,6 +184,25 @@ window.SortableTable = {
         }
     },
     methods: {
+        isDefaultSortColumn(column) {
+            if (!this.defaultSort || !column) return false;
+            return column.key === this.defaultSort.column;
+        },
+        getHeaderTooltip(column) {
+            if (!column) return '';
+            const base = column.tooltip || '';
+            if (column.sortable === false) return base;
+            const sortTip = `Lajittele: ${column.label}. Klikkaa vaihtaaksesi nouseva/laskeva.`;
+            if (base) return `${base} · ${sortTip}`;
+            return sortTip;
+        },
+        getAriaSort(column) {
+            if (!column || column.sortable === false) return null;
+            if (!this.currentSort || !this.currentSort.column || this.currentSort.column !== column.key) {
+                return 'none';
+            }
+            return this.currentSort.order === 'asc' ? 'ascending' : 'descending';
+        },
         handleSort(column) {
             if (column.sortable !== false) {
                 console.debug('[SortableTable] manual column sort', { column: column.key, numeric: column.numeric });
@@ -186,6 +224,7 @@ window.SortableTable = {
             if (column.sortable !== false) classes.push('sortable');
             // Guard: currentSort may be undefined while sorting initialises
             if (this.currentSort && this.currentSort.column === column.key) classes.push('active');
+            if (this.isDefaultSortColumn(column)) classes.push('is-default');
             return classes.join(' ');
         },
         getCellClass(column, row) {
@@ -240,6 +279,24 @@ window.SortableTable = {
             if (this.highlightRowId == null) return false;
             return String(rowId) === String(this.highlightRowId);
         },
+        isGroupCollapsed(groupKey) {
+            return this.collapsedGroups && this.collapsedGroups.has(groupKey);
+        },
+        handleGroupToggle(groupKey) {
+            if (this.onToggleGroup) {
+                this.onToggleGroup(groupKey);
+            }
+        },
+        getGroupClass(group) {
+            const classes = [group.className || ''];
+            if (group.key && this.isGroupCollapsed(group.key)) {
+                classes.push('table-group-header--collapsed');
+            }
+            if (group.key && this.onToggleGroup) {
+                classes.push('table-group-header--collapsible');
+            }
+            return classes.filter(Boolean).join(' ');
+        },
         getRowClass(row, idx) {
             const rowId = this.resolveRowId(row, idx);
             const classes = [];
@@ -253,7 +310,7 @@ window.SortableTable = {
         <div class="table-container">
             <table :class="tableClass">
                 <colgroup>
-                    <col v-for="column in columns" :key="column.key" :style="column.width ? ('width:' + column.width) : null" :class="column.colClass || ''" />
+                    <col v-for="column in visibleColumns" :key="column.key" :style="column.width ? ('width:' + column.width) : null" :class="column.colClass || ''" />
                 </colgroup>
                 <thead>
                     <tr v-if="headerGroups && headerGroups.length" class="table-group-header">
@@ -261,26 +318,31 @@ window.SortableTable = {
                             v-for="(group, idx) in headerGroups"
                             :key="group.label + '-' + idx"
                             :colspan="group.colSpan"
-                            :class="group.className || ''"
+                            :class="getGroupClass(group)"
+                            v-bind:data-group="group.key || null"
+                            @click="group.key && onToggleGroup ? handleGroupToggle(group.key) : null"
+                            :style="{ cursor: (group.key && onToggleGroup) ? 'pointer' : 'default' }"
                         >
-                            {{ group.label }}
+                            <span class="group-label-content">
+                                <span v-if="group.key && onToggleGroup" class="group-collapse-icon">
+                                    {{ isGroupCollapsed(group.key) ? '▶' : '▼' }}
+                                </span>
+                                {{ group.label }}
+                            </span>
                         </th>
                     </tr>
                     <tr>
                         <th 
-                            v-for="column in columns" 
+                            v-for="column in visibleColumns" 
                             :key="column.key"
                             :class="getHeaderClass(column)"
                             :style="{ textAlign: getCellAlign(column) }"
                             @click="handleSort(column)"
                             v-bind:data-sortable="column.sortable !== false ? true : null"
                             v-bind:data-sort-dir="(currentSort && currentSort.column === column.key) ? currentSort.order : null"
-                            :aria-sort="(currentSort && currentSort.column === column.key) 
-                                ? (currentSort.order === 'asc' ? 'ascending' : 'descending') 
-                                : (column.sortable !== false ? 'none' : null)"
-                            :title="column.sortable !== false 
-                                ? ('Sort by ' + column.label + ', click to toggle' + (column.tooltip ? ' · ' + column.tooltip : ''))
-                                : (column.tooltip || '')"
+                            v-bind:data-key="column.key"
+                            :title="getHeaderTooltip(column)"
+                            :aria-sort="getAriaSort(column)"
                         >
                             <span class="th-content">
                                 {{ column.label }}
@@ -299,7 +361,7 @@ window.SortableTable = {
                         :data-row-id="resolveRowId(row, idx)"
                     >
                         <td 
-                            v-for="column in columns" 
+                            v-for="column in visibleColumns" 
                             :key="column.key"
                             :class="[getCellClass(column, row), column.colClass || '']"
                             :style="{ textAlign: getCellAlign(column) }"

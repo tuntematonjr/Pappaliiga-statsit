@@ -349,21 +349,41 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
     season = champ["season"]
     division_num = champ["division_num"]
     
-    # Get team map totals from team_map_season_totals
-    team_map_rows = await query_async(
-        """
-        SELECT
-            map_name, played, picks, opp_picks, wins, games, ban1, ban2, opp_ban, 
-            total_own_ban, decov, kills, deaths, mvps, rd, kd, adr, damage, utility_damage
-        FROM team_map_season_totals
-        WHERE season = :season AND division_num = :div AND team_id = :team_id
-        ORDER BY played DESC, wins DESC
-        """,
-        {"season": season, "div": division_num, "team_id": team_id}
-    )
-    
-    if not team_map_rows:
+    # Base map stats derived from matches in this championship
+    map_deltas = await compute_team_map_deltas_async(championship_id, team_id)
+    if not map_deltas:
         raise NotFoundError(f"No map stats found for team '{team_id}' in championship {championship_id}")
+    team_map_rows = []
+    for map_name, payload in map_deltas.items():
+        curr = payload.get("curr") or {}
+        played = int(curr.get("played") or 0)
+        wins = int(curr.get("wins") or 0)
+        picks = int(curr.get("picks") or 0)
+        team_map_rows.append(
+            {
+                "map_name": map_name,
+                "played": played,
+                "picks": picks,
+                "opp_picks": int(curr.get("opp_picks") or 0),
+                "wins": wins,
+                "games": int(curr.get("games") or 0),
+                "ban1": int(curr.get("ban1") or 0),
+                "ban2": int(curr.get("ban2") or 0),
+                "opp_ban": int(curr.get("opp_ban") or 0),
+                "total_own_ban": int(curr.get("total_own_ban") or 0),
+                "decov": int(curr.get("decov") or 0),
+                "kills": 0,
+                "deaths": 0,
+                "mvps": 0,
+                "rd": int(curr.get("rd") or 0),
+                "kd": float(curr.get("kd") or 0),
+                "adr": float(curr.get("adr") or 0),
+                "damage": 0,
+                "utility_damage": 0,
+                "winrate": (wins / played * 100) if played > 0 else 0.0,
+                "pick_rate": (picks / played * 100) if played > 0 else 0.0,
+            }
+        )
     
     # Enhance with per-player stats aggregated by map
     player_stats_by_map = await query_async(
@@ -371,9 +391,14 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
         SELECT
             m.map_name,
             COUNT(DISTINCT ps.player_stat_id) as stat_count,
+            SUM(ps.kills) as kills,
+            SUM(ps.deaths) as deaths,
             SUM(ps.assists) as assists,
+            SUM(ps.mvps) as mvps,
+            SUM(ps.damage) as damage,
+            SUM(ps.utility_damage) as utility_damage,
             AVG(ps.kr) as kr,
-            AVG(ps.hs_pct) as hs_pct,
+            AVG(CAST(JSON_UNQUOTE(JSON_EXTRACT(ps.stats_json, :hs_key)) AS DECIMAL(10,3))) as hs_pct,
             SUM(ps.sniper_kills) as sniper_kills,
             SUM(ps.pistol_kills) as pistol_kills,
             SUM(ps.mk_2k) as multi_2k,
@@ -387,17 +412,50 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
         FROM maps m
         INNER JOIN matches mt ON m.match_id = mt.match_id 
         LEFT JOIN player_stats ps ON m.map_id = ps.map_id AND ps.team_id = :team_id AND ps.is_forfeit_map = 0
-        WHERE mt.season = :season 
-            AND mt.division_num = :div 
+        WHERE mt.championship_id = :champ_id
             AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
             AND m.is_forfeit = 0
         GROUP BY m.map_name
         """,
-        {"season": season, "div": division_num, "team_id": team_id}
+        {"champ_id": championship_id, "team_id": team_id, "hs_key": '$."Headshots %"'}
     )
     
     # Create lookup dict for player stats
     player_stats_map = {row["map_name"]: dict(row) for row in player_stats_by_map}
+    
+    # Get actual round counts by map (won + lost rounds)
+    rounds_by_map_rows = await query_async(
+        """
+        SELECT
+            m.map_name,
+            SUM(COALESCE(ts_team.final_score, 0)) as rounds_won,
+            SUM(COALESCE(ts_opp.final_score, 0)) as rounds_lost
+        FROM maps m
+        INNER JOIN matches mt ON m.match_id = mt.match_id
+        INNER JOIN team_stats ts_team
+            ON m.map_id = ts_team.map_id
+            AND ts_team.team_id = :team_id
+            AND ts_team.is_forfeit_map = 0
+        LEFT JOIN team_stats ts_opp
+            ON m.map_id = ts_opp.map_id
+            AND ts_opp.team_id <> :team_id
+            AND ts_opp.is_forfeit_map = 0
+        WHERE mt.championship_id = :champ_id
+            AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
+            AND m.is_forfeit = 0
+        GROUP BY m.map_name
+        """,
+        {"champ_id": championship_id, "team_id": team_id}
+    )
+    
+    # Create lookup dict for rounds by map
+    rounds_by_map = {
+        row["map_name"]: {
+            "rounds_won": int(row["rounds_won"] or 0),
+            "rounds_lost": int(row["rounds_lost"] or 0)
+        }
+        for row in rounds_by_map_rows
+    }
     
     # Merge data
     result = []
@@ -410,19 +468,30 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
         data["winrate"] = (wins / played * 100) if played > 0 else 0.0
         data["pick_rate"] = (picks / played * 100) if played > 0 else 0.0
         
-        # Calculate metrics from damage if ADR is 0 (estimate 30 rounds per map)
+        # Use actual round count from matches, fall back to estimate if not available
+        map_name = data.get("map_name")
+        round_bucket = rounds_by_map.get(map_name, {"rounds_won": 0, "rounds_lost": 0})
+        rounds_won = round_bucket.get("rounds_won", 0)
+        rounds_lost = round_bucket.get("rounds_lost", 0)
         estimated_rounds = played * 30
-        if data.get("adr", 0) == 0 and estimated_rounds > 0:
-            data["adr"] = data.get("damage", 0) / estimated_rounds
+        total_rounds = rounds_won + rounds_lost
+        
+        # Store actual round totals for display
+        data["rounds_won"] = rounds_won
+        data["rounds_lost"] = rounds_lost
+        data["total_rounds_played"] = total_rounds
+        
+        # Calculate metrics from damage using actual rounds
+        if data.get("adr", 0) == 0 and total_rounds > 0:
+            data["adr"] = data.get("damage", 0) / total_rounds
         
         # Calculate UDPR
-        if estimated_rounds > 0:
-            data["udpr"] = data.get("utility_damage", 0) / estimated_rounds
+        if total_rounds > 0:
+            data["udpr"] = data.get("utility_damage", 0) / total_rounds
         else:
             data["udpr"] = 0
         
         # Merge player stats if available
-        map_name = data.get("map_name")
         if map_name and map_name in player_stats_map:
             player_data = player_stats_map[map_name]
             for key, value in player_data.items():
@@ -435,6 +504,12 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
                             data[key] = int(float(value)) if value is not None else 0
                     else:
                         data[key] = 0
+
+        # Refresh KD after merging player totals if possible
+        kills_total = data.get("kills") or 0
+        deaths_total = data.get("deaths") or 0
+        if deaths_total:
+            data["kd"] = kills_total / deaths_total
         
         result.append(data)
     
@@ -1001,6 +1076,7 @@ async def fetch_comprehensive_team_season(team_id: str, championship_id: str) ->
         "veto_history": veto_history,
         "veto_aggregates": veto_aggregates,
         # Phase 1 enhancements
-
+        "division_averages": division_averages,
+        "player_roles": player_roles,
     }
 
