@@ -341,6 +341,7 @@ def _normalize_team_ref(ref: Any, team1_id: Optional[str], team2_id: Optional[st
     return str(ref)
 
 # Skip matches already finished in the database (saves API quota)?
+# Can be overridden with --force flag
 SKIP_FINISHED_IN_DB = True  
 
 def _db_match_snapshot(con: sqlite3.Connection, match_id: str) -> dict:
@@ -422,7 +423,7 @@ def _list_matches_all(championship_id: str) -> list[dict]:
         })
     return out
 
-def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
+def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict, force: bool = False) -> None:
     """
     One pass over all matches (type=all). Ongoing are handled like scheduled.
     Optimized to:
@@ -430,7 +431,8 @@ def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
       - Throttle progress bar updates (<=1 Hz) to cut stdout overhead
       - Use single DB snapshot query for skip logic
     """
-    matches = _list_matches_all(champ_row["championship_id"])
+    fetch_id = champ_row.get("_fetch_championship_id") or champ_row["championship_id"]
+    matches = _list_matches_all(fetch_id)
     div_title = champ_row.get("name") or champ_row.get("slug") or f"Div{champ_row.get('division_num','?')}-S{champ_row.get('season','?')}"
     title = f"{div_title} — All"
     total = len(matches)
@@ -465,7 +467,7 @@ def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
         snap = _db_match_snapshot(con, mid)
 
         # Skip finished+complete (maps+either player_stats or a 'forfeit' map)
-        if SKIP_FINISHED_IN_DB and (snap["status"] in {"finished", "played", "closed"}) and (
+        if not force and SKIP_FINISHED_IN_DB and (snap["status"] in {"finished", "played", "closed"}) and (
             snap["has_player_stats"] or (snap["has_any_map"] and snap["has_forfeit_map"])
         ):
             seen.add(mid); skipped += 1
@@ -476,7 +478,7 @@ def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict) -> None:
 
         # Non-past summary unchanged vs DB header → skip
         tgt = m.get("_target_kind") or "upcoming"
-        if tgt != "past" and snap["exists"]:
+        if tgt != "past" and snap["exists"] and not force:
             unchanged = (
                 (snap["status"] or "") == (m.get("status") or "").lower() and
                 (snap["scheduled_at"] or None) == (m.get("scheduled_at") or None) and
@@ -744,18 +746,95 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
 
 # ---- main sync --------------------------------------------------------------
 
-def main(db_path: str, division_num: int = None) -> None:
+def main(db_path: str, division_num: int = None, season: int = None, all_seasons: bool = False, playoffs_only: bool = False, clean: bool = False, vacuum: bool = False, cleanup_orphans: bool = False) -> None:
     con = get_conn(db_path)
     try:
         init_db(con)
+        
+        # If --cleanup-orphans, remove unused teams and players
+        if cleanup_orphans:
+            # Delete orphaned teams
+            orphaned_teams = con.execute("""
+                DELETE FROM teams WHERE team_id NOT IN (
+                    SELECT DISTINCT team_id FROM (
+                        SELECT team1_id as team_id FROM matches WHERE team1_id IS NOT NULL
+                        UNION
+                        SELECT team2_id FROM matches WHERE team2_id IS NOT NULL
+                    )
+                )
+            """)
+            teams_deleted = orphaned_teams.rowcount
+            
+            # Delete orphaned players
+            orphaned_players = con.execute("""
+                DELETE FROM players WHERE player_id NOT IN (
+                    SELECT DISTINCT player_id FROM player_stats WHERE player_id IS NOT NULL
+                )
+            """)
+            players_deleted = orphaned_players.rowcount
+            
+            # Delete old map pool data
+            map_pool_deleted = con.execute("""
+                DELETE FROM map_pool_seasons WHERE season NOT IN (
+                    SELECT DISTINCT season FROM championships
+                )
+            """)
+            pool_deleted = map_pool_deleted.rowcount
+            
+            con.commit()
+            print(f">> [CLEANUP] Removed {teams_deleted} orphaned teams, {players_deleted} orphaned players, {pool_deleted} old map pool entries")
+            return
+        
+        # If --vacuum, optimize database and exit
+        if vacuum:
+            db_path_obj = Path(db_path)
+            size_before = db_path_obj.stat().st_size if db_path_obj.exists() else 0
+            print(f">> [VACUUM] Starting optimization... (current size: {size_before / 1024 / 1024:.2f} MB)")
+            con.execute("VACUUM")
+            con.commit()
+            size_after = db_path_obj.stat().st_size
+            saved = size_before - size_after
+            print(f">> [VACUUM] Complete! New size: {size_after / 1024 / 1024:.2f} MB (saved {saved / 1024 / 1024:.2f} MB)")
+            return
+        
+        # If --clean, delete all championships not in divisions.json and exit
+        if clean:
+            valid_champ_ids = {d["championship_id"] for d in DIVISIONS}
+            cursor = con.execute("SELECT championship_id FROM championships WHERE championship_id NOT IN ({})".format(
+                ",".join("?" * len(valid_champ_ids)) if valid_champ_ids else "NULL"
+            ), list(valid_champ_ids) if valid_champ_ids else [])
+            to_delete = [row[0] for row in cursor.fetchall()]
+            if to_delete:
+                placeholders = ",".join("?" * len(to_delete))
+                con.execute(f"DELETE FROM championships WHERE championship_id IN ({placeholders})", to_delete)
+                con.commit()
+                print(f">> [CLEAN] Deleted {len(to_delete)} championship(s) not in divisions.json")
+            else:
+                print(f">> [CLEAN] Database already matches divisions.json")
+            return
 
         # Upsert championships from faceit_config.DIVISIONS
         champs = []
         for d in DIVISIONS:
-            if int(d.get("season", 0)) < CURRENT_SEASON:
-                continue  # skip older seasons
+            # Season filtering
+            d_season = int(d.get("season", 0))
+            if all_seasons:
+                pass  # include all seasons
+            elif season is not None:
+                if d_season != season:
+                    continue  # skip seasons not matching the filter
+            else:
+                if d_season < CURRENT_SEASON:
+                    continue  # skip older seasons (unless --season or --all-seasons is set)
+            
+            # Division filtering
             if division_num is not None and d.get("division_num") != division_num:
                 continue  # skip divisions not matching the filter
+            
+            # Playoff filtering
+            if playoffs_only and not d.get("is_playoffs"):
+                continue  # skip regular divisions when only playoffs requested
+            
             row = upsert_championship(con, {
                 "championship_id": d["championship_id"],
                 "season": d["season"],
@@ -764,11 +843,13 @@ def main(db_path: str, division_num: int = None) -> None:
                 "is_playoffs": d.get("is_playoffs", 0),
                 "slug": d["slug"],
             })
+            # Always fetch matches from the division list ID (even if DB has a legacy ID)
+            row["_fetch_championship_id"] = d["championship_id"]
             champs.append(row)
 
         # Walk through every division in a single pass per division
         for c in champs:
-            _sync_division_one_pass(con, c)
+            _sync_division_one_pass(con, c, force=args.force)
 
         print(">> [OK] Sync valmis")
     finally:
@@ -785,5 +866,19 @@ if __name__ == "__main__":
                    help="SQLite path (default: pappaliiga.db next to this file)")
     p.add_argument("--div", type=int, metavar="N",
                    help="Sync only division N (e.g., --div 1 for Division 1)")
+    p.add_argument("--season", type=int, metavar="N",
+                   help="Sync only season N (e.g., --season 11); requires --div or --all-seasons to be useful")
+    p.add_argument("--all-seasons", action="store_true",
+                   help="Sync all seasons (default: only current season)")
+    p.add_argument("--force", action="store_true",
+                   help="Force re-sync all matches, bypassing optimization checks (slower but complete refresh)")
+    p.add_argument("--po", dest="playoffs_only", action="store_true",
+                   help="Sync only playoffs (use with --div to sync playoff division only)")
+    p.add_argument("--clean", action="store_true",
+                   help="Delete all championships from DB not in divisions.json before syncing")
+    p.add_argument("--cleanup-orphans", action="store_true",
+                   help="Remove orphaned teams, players, and old map pool data")
+    p.add_argument("--vacuum", action="store_true",
+                   help="Optimize database file size by reclaiming unused space (run after --clean)")
     args = p.parse_args()
-    main(args.db, args.div)
+    main(args.db, args.div, args.season, args.all_seasons, args.playoffs_only, args.clean, args.vacuum, args.cleanup_orphans)

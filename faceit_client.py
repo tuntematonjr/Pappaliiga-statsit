@@ -164,9 +164,31 @@ def list_championship_matches(championship_id: str, match_type: str = "all", lim
 
     for mt in types:
         offset = 0
+        page_limit = limit
+        last_page_size: int | None = None
+        seen_ids: set[str] = set()
+        mt_items: list[dict] = []
         while True:
-            params = {"type": mt, "offset": offset, "limit": limit}
-            data = _get(base, HEADERS_OPEN, params=params)
+            params = {"type": mt, "offset": offset, "limit": page_limit}
+            try:
+                data = _get(base, HEADERS_OPEN, params=params)
+            except RuntimeError as e:
+                msg = str(e)
+                # Some endpoints reject non-multiple offsets; retry with smaller limit
+                if "400" in msg:
+                    if last_page_size and last_page_size < page_limit:
+                        page_limit = last_page_size
+                        offset = page_limit
+                        continue
+                    if page_limit > 20:
+                        page_limit = 20
+                        offset = 0
+                        seen_ids.clear()
+                        mt_items.clear()
+                        continue
+                print(f"[skip] championship {championship_id} list {mt} -> {e}", flush=True)
+                break
+
             if data is None:
                 print(f"[skip] championship {championship_id} list {mt} -> None (403/404)", flush=True)
                 break
@@ -174,11 +196,35 @@ def list_championship_matches(championship_id: str, match_type: str = "all", lim
             items = data.get("items") or []
             if not items:
                 break
+            last_page_size = len(items)
 
-            out.extend(items)
-            if len(items) < limit:
+            new_items = []
+            for it in items:
+                mid = it.get("match_id") or it.get("id")
+                if mid and mid in seen_ids:
+                    continue
+                if mid:
+                    seen_ids.add(mid)
+                new_items.append(it)
+
+            if not new_items:
                 break
-            offset += limit
+
+            mt_items.extend(new_items)
+
+            total = data.get("total") or data.get("total_items") or data.get("total_matches")
+            if isinstance(total, int):
+                if len(seen_ids) >= total:
+                    break
+                if last_page_size and last_page_size < page_limit:
+                    page_limit = last_page_size
+                offset += page_limit
+            else:
+                # Keep fetching until we get duplicate items (API repeating results)
+                # Don't use len(items) < page_limit since API may return smaller batches
+                offset += page_limit
+
+        out.extend(mt_items)
 
     return out
 

@@ -35,9 +35,19 @@ def parse_leading_divnum(name: str) -> Optional[int]:
         return 0
     return None
 
-def parse_season(name: str) -> int:
+def parse_season(name: str, description: str = "") -> int:
+    # Try to find season in name first
     m = SEASON_RX.search(name or "")
-    return int(m.group(1)) if m else 0
+    if m:
+        return int(m.group(1))
+    
+    # If not found in name, try description
+    m = SEASON_RX.search(description or "")
+    if m:
+        return int(m.group(1))
+    
+    # Default to 0 if not found anywhere
+    return 0
 
 
 def is_playoffs(name: str) -> bool:
@@ -45,12 +55,8 @@ def is_playoffs(name: str) -> bool:
 
 
 def is_cs_championship(ch: Dict[str, Any]) -> bool:
-    # Prefer explicit 'game'/'game_id'
-    game = (ch.get("game") or ch.get("game_id") or "").strip().lower()
-    if game in CS_TAGS:
-        return True
-
-    return False
+    # All championships in divisions.json are CS2-only
+    return True
 
 
 def base_slug(division_num: Optional[int], season: int, po: bool) -> str:
@@ -68,10 +74,11 @@ def make_unique_slug(proposed: str, cid: str, already: set[str]) -> str:
         s = f"{s}-{short}"
     return s
 
-def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[str, Any]]:
+def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> tuple[List[Dict[str, Any]], set[str]]:
     champs = list_championships_for_organizer(organizer_id)
     out: List[Dict[str, Any]] = []
     seen_cids: set[str] = set()
+    cancelled_ids: set[str] = set()
 
     for c in champs:
         cid  = c.get("championship_id") or c.get("id")
@@ -82,11 +89,15 @@ def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[s
             continue
         if not is_cs_championship(c):
             continue
+        status = (c.get("status") or "").strip().lower()
+        if status == "cancelled":
+            cancelled_ids.add(cid)
+            continue
         if not DIV_RX.search(name):
             continue
 
         dnum   = parse_leading_divnum(name)
-        season = parse_season(name)
+        season = parse_season(name, c.get("description", ""))
         po     = is_playoffs(name)
 
         # NEW: Mestaruussarja fallback (if parsing did not already return 0)
@@ -96,22 +107,19 @@ def discover_cs_divisions(organizer_id: str, min_season: int = 0) -> List[Dict[s
         if season < min_season:
             continue
 
-        game   = (c.get("game") or c.get("game_id") or "cs2").strip().lower() or "cs2"
-
         item = {
             "championship_id": cid,
             "name": name,
             "season": season,
             "division_num": dnum if dnum is not None else 0,
             "slug": base_slug(dnum if dnum is not None else 0, season, po),
-            "game": game if game in CS_TAGS else "cs2",
             "is_playoffs": 1 if po else 0,
         }
         out.append(item)
         seen_cids.add(cid)
 
     out.sort(key=lambda d: (-int(d.get("season", 0)), int(d.get("division_num", 0))))
-    return out
+    return out, cancelled_ids
 
 def load_existing(path: Path) -> List[Dict[str, Any]]:
     if not path.exists():
@@ -123,27 +131,21 @@ def load_existing(path: Path) -> List[Dict[str, Any]]:
         raise ValueError("divisions.json must be a JSON array")
 
 
-def next_unique_division_id(existing: List[Dict[str, Any]]) -> int:
-    nums = [int(e["division_id"]) for e in existing if isinstance(e.get("division_id"), int)]
-    return (max(nums) + 1) if nums else 101  # start at 101 to avoid clashing with historical small ints
-
-
 def non_destructive_merge(existing: List[Dict[str, Any]],
-                          discovered: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+                          discovered: List[Dict[str, Any]],
+                          cancelled_ids: set[str] | None = None,
+                          prune_cancelled: bool = False) -> List[Dict[str, Any]]:
     # Build maps for existing
     by_cid: Dict[str, Dict[str, Any]] = {}
     used_slugs: set[str] = set()
     for e in existing:
+        cid = e.get("championship_id")
+        if prune_cancelled and cancelled_ids and cid in cancelled_ids:
+            continue
         if "slug" in e and isinstance(e["slug"], str):
             used_slugs.add(e["slug"])
-        cid = e.get("championship_id")
         if cid:
             by_cid[cid] = dict(e)
-
-    # Helper for division_id allocation
-    def alloc_id() -> int:
-        cur = list(by_cid.values())
-        return next_unique_division_id(cur)
 
     # Merge discovered
     for d in discovered:
@@ -161,8 +163,6 @@ def non_destructive_merge(existing: List[Dict[str, Any]],
 
             # Complement only missing/empty fields (do NOT overwrite existing values)
             for k, v in d.items():
-                if k == "division_id":
-                    continue  # never alter existing division_id
                 if k not in cur:
                     cur[k] = v
                 else:
@@ -179,9 +179,8 @@ def non_destructive_merge(existing: List[Dict[str, Any]],
 
             by_cid[cid] = cur
         else:
-            # New championship → allocate unique division_id and finalize unique slug
+            # New championship → finalize unique slug
             new_row = dict(d)
-            new_row["division_id"] = alloc_id()
             uniq_slug = make_unique_slug(proposed_slug, cid, used_slugs)
             new_row["slug"] = uniq_slug
             used_slugs.add(uniq_slug)
@@ -189,16 +188,22 @@ def non_destructive_merge(existing: List[Dict[str, Any]],
 
     merged = list(by_cid.values())
     merged.sort(key=lambda x: (-int(x.get("season", 0)),
-                               int(x.get("division_num", 0)),
-                               int(x.get("division_id", 0)) if isinstance(x.get("division_id"), int) else 0))
+                               int(x.get("division_num", 0))))
     return merged
 
 
-def main(out_path: str, dry_run: bool, min_season: int) -> None:
+def main(out_path: str, dry_run: bool, min_season: int, max_season: int, prune_cancelled: bool) -> None:
     out = Path(out_path)
     existing = load_existing(out)
-    discovered = discover_cs_divisions(PAPPALIIGA_ORG_ID, min_season=min_season)
-    final = non_destructive_merge(existing, discovered)
+    discovered, cancelled_ids = discover_cs_divisions(PAPPALIIGA_ORG_ID, min_season=min_season)
+    
+    # Filter by max_season if specified
+    if max_season > 0:
+        discovered = [d for d in discovered if d.get("season", 0) <= max_season]
+    
+    final = non_destructive_merge(existing, discovered,
+                                 cancelled_ids=cancelled_ids,
+                                 prune_cancelled=prune_cancelled)
 
     if dry_run:
         print(json.dumps(final, ensure_ascii=False, indent=2))
@@ -214,9 +219,14 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Safely update divisions.json with CS divisions (non-destructive).")
     p.add_argument("--out", default="divisions.json", help="Output JSON path (default: divisions.json)")
     p.add_argument("--dry-run", action="store_true", help="Print result without writing the file")
-    p.add_argument("--min-season", type=int, default=11,
-                    help="Skip adding divisions older than this season (default: 11 = include all)")
-                    #    python gen_divisions_json.py --min-season 10
+    p.add_argument("--min-season", type=int, default=12,
+                    help="Skip adding divisions older than this season (default: 12 = include all)")
+    p.add_argument("--max-season", type=int, default=0,
+                    help="Skip adding divisions newer than this season (default: 0 = no limit)")
+    p.add_argument("--prune-cancelled", action="store_true",
+                    help="Remove cancelled championships from existing divisions.json")
+                    #    python gen_divisions_json.py --min-season 7 --max-season 7
     args = p.parse_args()
-    main(out_path=args.out, dry_run=args.dry_run, min_season=args.min_season)
+    main(out_path=args.out, dry_run=args.dry_run, min_season=args.min_season,
+         max_season=args.max_season, prune_cancelled=args.prune_cancelled)
 

@@ -9,7 +9,7 @@ import aiofiles.os
 import argparse
 from collections import defaultdict
 from typing import Optional
-from faceit_config import DIVISIONS, TOOL_VERSION
+from faceit_config import DIVISIONS, TOOL_VERSION, CURRENT_SEASON
 from html import escape
 import hashlib, tempfile, re
 import time
@@ -47,6 +47,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Generate HTML statistics for Pappaliiga divisions')
     parser.add_argument('--force', '-f', action='store_true', help='Force regeneration of all files')
     parser.add_argument('--div', type=int, help='Generate only specific division number (1-based)')
+    parser.add_argument('--all-seasons', action='store_true', help='Generate all seasons (default: current season only)')
     return parser.parse_args(argv)
 
 
@@ -57,7 +58,7 @@ def _set_runtime_args(parsed: argparse.Namespace) -> None:
 
 
 # Default arguments used when the module is imported (e.g., for testing)
-args = argparse.Namespace(force=False, div=None)
+args = argparse.Namespace(force=False, div=None, all_seasons=False)
 FORCE_REGEN = args.force
 
 HELSINKI_TZ = ZoneInfo("Europe/Helsinki")
@@ -450,8 +451,8 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
     Returns detailed stats for display on the index page.
     """
     stats = {
-        "current_season": 11,
-        "previous_season": 10,
+        "current_season": CURRENT_SEASON,
+        "previous_season": CURRENT_SEASON - 1,
         "total_divisions": 0,
         "total_regular_teams": 0,  # Only regular season teams
         "total_regular_players": 0,  # Only regular season players
@@ -485,8 +486,8 @@ async def _calculate_comprehensive_stats_async(pool: AsyncConnectionPool, divisi
             "matches_played": 0,
             "matches_total": 0,
             "playoffs_matches_played": 0,
-            # Always expect 7 playoff matches per regular division, even if none exist yet
-            "playoffs_matches_total": max(num_playoff_divs, num_regular_divs) * 7,
+            # Estimate playoffs as 7 matches per regular division (ignore PO divisions)
+            "playoffs_matches_total": num_regular_divs * 7,
             "regular_matches_played": 0,
             "regular_matches_total": 0,
             "maps_played": 0,
@@ -1685,16 +1686,27 @@ async def generate_all_async(force_regenerate: bool = False, division_filter: Op
 
     try:
         # Use the DIVISIONS constant from faceit_config (already imported at top)
-        divisions = DIVISIONS
+        all_divisions = DIVISIONS
+        divisions_to_render = DIVISIONS
         
         # Apply division filter if specified
         if division_filter is not None:
-            divisions = [div for div in divisions if div.get("division_num") == division_filter]
-            if not divisions:
+            all_divisions = [div for div in all_divisions if div.get("division_num") == division_filter]
+            divisions_to_render = all_divisions
+            if not all_divisions:
                 print(f"No division found with number {division_filter}")
                 return
         
-        print(f"Found {len(divisions)} divisions to process")
+        # Default: current season only for rendering (unless --all-seasons is specified)
+        # But index page always shows all seasons from all_divisions
+        if not getattr(args, 'all_seasons', False):
+            current_season = CURRENT_SEASON
+            divisions_to_render = [div for div in divisions_to_render if int(div.get("season", 0)) == current_season]
+            print(f"[default] Rendering current season only: Season {current_season} ({len(divisions_to_render)} divisions)")
+        else:
+            print(f"[all-seasons] Rendering all seasons ({len(divisions_to_render)} divisions)")
+        
+        print(f"Found {len(divisions_to_render)} divisions to render, {len(all_divisions)} total in index")
 
         # Copy static files
         await copy_static_files_async()
@@ -1707,7 +1719,7 @@ async def generate_all_async(force_regenerate: bool = False, division_filter: Op
             except Exception as e:
                 return div.get('slug', 'unknown'), e
 
-        tasks = [ _safe_render(div) for div in divisions ]
+        tasks = [ _safe_render(div) for div in divisions_to_render ]
 
         # Wait for all divisions to complete, collect errors instead of failing fast
         results = await asyncio.gather(*tasks, return_exceptions=False)
@@ -1717,8 +1729,8 @@ async def generate_all_async(force_regenerate: bool = False, division_filter: Op
             for slug, err in failures:
                 print(f"  - {slug}: {type(err).__name__}: {err}")
 
-        # Generate index page
-        await render_index_async(pool, divisions)
+        # Generate index page (always with all divisions for complete season/division listings)
+        await render_index_async(pool, all_divisions)
 
     finally:
         total_end = time.perf_counter()

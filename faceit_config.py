@@ -8,7 +8,7 @@ from pathlib import Path
 
 API_KEY = os.environ.get("FACEIT_API_KEY", "").strip()
 
-CURRENT_SEASON = 11
+CURRENT_SEASON = 12
 TOOL_VERSION = 0.5
 
 # Load .env only if the environment variable is missing
