@@ -1565,18 +1565,6 @@ window.TeamDetail = {
                 showXAxis: idx === charts.length - 1
             }));
         },
-        matchesVetoTimeline() {
-            const vetoMap = new Map(this.vetoByMatch.map(entry => [entry.matchId, entry]));
-            return this.matchesList.map(match => {
-                const veto = vetoMap.get(match.matchId) || null;
-                return {
-                    matchId: match.matchId,
-                    match,
-                    format: veto?.format || `bo${match.bestOf || 2}`,
-                    steps: veto?.steps || []
-                };
-            });
-        },
         // Player stats table uses every DB field: maps/rounds/kills/deaths/assists/mvps/sniper_kills/utility_damage/enemies_flashed/flash_count/flash_successes/entry_count/entry_wins/clutch fields/pistol_kills/adr/kr/kd/rating/hs_pct/damage/multi-kills
         players() {
             const players = Array.isArray(this.seasonData?.playerStats) ? this.seasonData.playerStats : [];
@@ -2017,25 +2005,6 @@ window.TeamDetail = {
         formatWinLoss(wins, losses) {
             return `${formatNumber(wins)}–${formatNumber(losses)}`;
         },
-        matchMapsSummary(match) {
-            if (!match || !Array.isArray(match.maps) || !match.maps.length) return '';
-            return match.maps
-                .map(map => `${map.mapName} ${formatNumber(map.scoreFor, 0)}-${formatNumber(map.scoreAgainst, 0)}`)
-                .join(' · ');
-        },
-        matchSummaryLine(match) {
-            if (!match) return '';
-            const parts = [];
-            if (match.teamScore != null && match.oppScore != null) {
-                parts.push(`Score ${formatNumber(match.teamScore, 0)}-${formatNumber(match.oppScore, 0)}`);
-            }
-            if (match.roundDiff != null) {
-                parts.push(`Eräero ${formatSignedNumber(match.roundDiff, 0)}`);
-            }
-            const maps = this.matchMapsSummary(match);
-            if (maps) parts.push(maps);
-            return parts.join(' · ');
-        },
         winHeatStyle(value) {
             const pct = Math.min(100, Math.max(0, normalizePercent(value)));
             const hue = (pct / 100) * 120;
@@ -2164,7 +2133,6 @@ window.TeamDetail = {
         formatPercent,
         formatNumber,
         formatDate,
-        formatSignedNumber,
         getMatchResult,
         teamLogo() {
             return this.teamInfo?.avatar || '';
@@ -2195,47 +2163,50 @@ window.TeamDetail = {
             <loading-spinner v-if="loading && !teamInfo" message="Joukkuetta ladataan..."></loading-spinner>
             <error-message v-else-if="loadError && !teamInfo" :message="loadError" @retry="bootstrap"></error-message>
             <div v-else>
-                                <span class="section-sub">Ottelukohtaiset tulokset, kartat ja veto-polku</span>
+                <header class="team-hero">
                     <div class="team-hero__logo" v-if="teamLogo()">
                         <img :src="teamLogo()" :alt="teamInfo?.teamName || 'Joukkue'" />
-                        <div v-if="matchesVetoTimeline.length" class="veto-timeline-list">
-                            <div
-                                class="veto-timeline"
-                                v-for="entry in matchesVetoTimeline"
-                                :key="entry.matchId"
-                            >
-                                <div class="veto-timeline__header">
-                                    <span class="pill">{{ formatDate(entry.match.ts) }}</span>
-                                    <span class="pill">BO{{ entry.match.bestOf }}</span>
-                                    <span class="pill" v-if="entry.match?.opponentName || entry.match?.team2Name">vs {{ entry.match?.opponentName || entry.match?.team2Name }}</span>
-                                    <span class="pill" v-if="entry.match.teamScore != null && entry.match.oppScore != null">Score {{ entry.match.teamScore }}-{{ entry.match.oppScore }}</span>
-                                    <span class="pill" v-if="entry.match.roundDiff != null">RD {{ formatSignedNumber(entry.match.roundDiff, 0) }}</span>
-                                    <a v-if="entry.match.faceitUrl" :href="entry.match.faceitUrl" target="_blank" rel="noopener" class="pill pill--link">Faceit</a>
-                                </div>
-                                <div class="section-sub" v-if="matchSummaryLine(entry.match)">
-                                    {{ matchSummaryLine(entry.match) }}
-                                </div>
-                                <div v-if="entry.steps.length" class="veto-steps">
-                                    <div
-                                        v-for="step in entry.steps"
-                                        :key="step.step + step.mapName"
-                                        class="veto-step"
-                                        :class="'veto-step--' + step.action"
-                                    >
-                                        <div class="veto-step__order">#{{ step.step }}</div>
-                                        <div class="veto-step__title">{{ step.label }}</div>
-                                        <div class="veto-step__map">{{ step.mapName }}</div>
-                                        <div class="veto-step__actor">{{ step.teamName || 'Järjestelmä' }}</div>
-                                    </div>
-                                </div>
-                                <div v-else class="empty-state-container compact">
-                                    <div class="empty-state-card">
-                                        <h3 class="empty-state-title">Ei vetoa</h3>
-                                        <p class="empty-state-description">Tälle ottelulle ei ole veto-polun tietoja.</p>
-                                    </div>
-                                </div>
-                            </div>
+                    </div>
+                    <div class="team-hero__content">
+                        <h1 class="team-hero__title title-accent titleUnderlinePage">
+                            {{ teamInfo?.displayName || teamInfo?.teamName || 'Joukkue' }}
+                        </h1>
+                        <div class="team-hero__season" v-if="seasonOptions.length || heroPlayoffsFlag || teamInfo?.faceitUrl">
+                            <span class="pill pill--accent" v-if="heroPlayoffsFlag">Playoffs</span>
+                            <a v-if="teamInfo?.faceitUrl" class="pill pill--link" :href="teamInfo?.faceitUrl" target="_blank" rel="noopener">Faceit</a>
                         </div>
+                    </div>
+                    <div v-if="seasonOptions.length" class="team-season-selector">
+                        <label class="season-select-label" for="season-select">Valitse kausi</label>
+                        <select
+                            id="season-select"
+                            class="season-select"
+                            :value="currentChampionshipId"
+                            @change="selectChampionship($event.target.value)"
+                        >
+                            <option v-for="season in seasonOptions" :key="season.value" :value="season.value">
+                                {{ season.label }}
+                            </option>
+                        </select>
+                    </div>
+                </header>
+
+                <nav class="team-tabs" role="tablist">
+                    <button
+                        v-for="tab in ['overview', 'matches', 'players', 'veto']"
+                        :key="tab"
+                        type="button"
+                        class="team-tab"
+                        :class="{ 'team-tab--active': activeTab === tab }"
+                        @click="selectTab(tab)"
+                        role="tab"
+                        :aria-selected="activeTab === tab"
+                        :aria-controls="'team-tab-' + tab"
+                    >
+                        {{ { overview: 'Yleiskuva', matches: 'Ottelut', players: 'Pelaajat', veto: 'Veto/Nosto' }[tab] }}
+                    </button>
+                </nav>
+
                 <section v-if="activeTab === 'overview'" class="team-section scout-view" id="team-tab-overview" role="tabpanel">
                     <div class="scout-panel scout-snapshot">
                         <div class="section-heading">
