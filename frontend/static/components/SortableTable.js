@@ -169,6 +169,7 @@ window.SortableTable = {
             const classes = ['table-sortable'];
             if (this.stickyHeader) classes.push('sticky-header');
             if (this.compact) classes.push('compact');
+            if (this.headerGroups && this.headerGroups.length) classes.push('has-group-header');
             return classes.join(' ');
         },
         // Pre-calculate colorization data for specified columns

@@ -29,6 +29,7 @@ window.TeamDetailView = {
                 v-else
                 message="Joukkuetta ei löytynyt"
             ></error-message>
+            <footer class="footer">Pappaliiga Stats</footer>
         </div>
     `
 };

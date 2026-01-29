@@ -30,7 +30,7 @@ const PLAYER_COLUMNS = [
 ];
 
 const MAP_GROUP_META = {
-    map: { label: '', className: 'group-map' },
+    map: { label: 'Kartta', className: 'group-map group-divider' },
     rounds: { label: 'Erät', className: 'group-rounds group-divider' },
     combat: { label: 'Taistelu', className: 'group-combat group-divider' },
     kills: { label: 'Tappiot/Assist', className: 'group-kills group-divider' },
@@ -44,7 +44,7 @@ const MAP_GROUP_META = {
 };
 
 const SCOUT_GROUP_META = {
-    map: { label: '', className: 'group-map' },
+    map: { label: 'Kartta', className: 'group-map group-divider' },
     usage: { label: 'Pelattu', className: 'group-usage group-divider' },
     results: { label: 'Tulokset', className: 'group-results group-divider' },
     performance: { label: 'Suorituskyky', className: 'group-performance group-divider' },
@@ -163,6 +163,92 @@ function normalizePercent(value) {
     if (!Number.isFinite(numeric)) return 0;
     return Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
 }
+
+function formatSignedNumber(value, decimals = 0) {
+    const numeric = toNumber(value);
+    if (!Number.isFinite(numeric)) return '-';
+    const absValue = Math.abs(numeric);
+    const rounded = decimals > 0 ? Number(absValue.toFixed(decimals)) : Math.round(absValue);
+    const formatted = decimals > 0 ? rounded.toFixed(decimals) : rounded.toLocaleString('fi-FI');
+    if (numeric > 0) return `+${formatted}`;
+    if (numeric < 0) return `-${formatted}`;
+    return decimals > 0 ? (0).toFixed(decimals) : '0';
+}
+
+function clampValue(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+function buildIndexGrid(count, maxTicks = 4) {
+    if (count <= 0) return [];
+    if (count <= maxTicks) return Array.from({ length: count }, (_, i) => i);
+    const step = Math.ceil((count - 1) / (maxTicks - 1));
+    const indices = [];
+    for (let i = 0; i < count; i += step) {
+        indices.push(i);
+    }
+    if (indices[indices.length - 1] !== count - 1) {
+        indices.push(count - 1);
+    }
+    return indices;
+}
+
+function computeTrendRange(values, refValue, options = {}) {
+    const numericValues = values.map(v => toNumber(v)).filter(v => Number.isFinite(v));
+    let min = numericValues.length ? Math.min(...numericValues) : 0;
+    let max = numericValues.length ? Math.max(...numericValues) : 0;
+    if (Number.isFinite(refValue)) {
+        min = Math.min(min, refValue);
+        max = Math.max(max, refValue);
+    }
+    if (min === max) {
+        const bump = options.bump || 1;
+        min -= bump;
+        max += bump;
+    }
+    const span = Math.max(1e-6, max - min);
+    const pad = span * (options.padPct ?? 0.12);
+    min -= pad;
+    max += pad;
+    if (options.clampMinZero) {
+        min = Math.max(0, min);
+    }
+    if (Number.isFinite(options.hardMin)) {
+        min = Math.max(options.hardMin, min);
+    }
+    if (Number.isFinite(options.hardMax)) {
+        max = Math.min(options.hardMax, max);
+    }
+    return { min, max };
+}
+
+const PERFORMANCE_TREND_METRICS = [
+    {
+        key: 'adr',
+        label: 'ADR',
+        decimals: 1,
+        lineClass: 'trend-line--adr',
+        pointClass: 'trend-point--adr',
+        format: value => formatNumber(value, 1)
+    },
+    {
+        key: 'rd',
+        label: 'RD+',
+        decimals: 0,
+        lineClass: 'trend-line--rd',
+        pointClass: 'trend-point--rd',
+        refKey: 'avgRoundDiff',
+        format: value => formatSignedNumber(value, 0)
+    },
+    {
+        key: 'kd',
+        label: 'K/D',
+        decimals: 2,
+        lineClass: 'trend-line--kd',
+        pointClass: 'trend-point--kd',
+        format: value => formatNumber(value, 2)
+    }
+];
 
 function beautifyMapName(raw) {
     if (!raw) return 'Kartta';
@@ -588,9 +674,7 @@ window.TeamDetail = {
     components: {
         get LoadingSpinner() { return window.LoadingSpinner; },
         get ErrorMessage() { return window.ErrorMessage; },
-        get SortableTable() { return window.SortableTable; },
-        get SparklineChart() { return window.SparklineChart; },
-        get RadarChart() { return window.RadarChart; }
+        get SortableTable() { return window.SortableTable; }
     },
     props: {
         teamId: { type: [String, Number], required: true },
@@ -610,7 +694,25 @@ window.TeamDetail = {
             PLAYER_COLUMNS,
             VETO_COLUMNS,
             scoutTableKey: 0,
-            detailedTableKey: 0
+            detailedTableKey: 0,
+            performanceTrendHover: {
+                key: null,
+                index: null,
+                x: 0,
+                y: 0
+            },
+            performanceTrendMode: 'map',
+            trendChartWidth: 640,
+            trendChartHeight: 140,
+            matchesTrendHover: {
+                index: null,
+                x: 0,
+                y: 0
+            },
+            matchesHoverMatchId: null,
+            matchesHoverSource: null,
+            matchesChartWidth: 640,
+            matchesChartHeight: 140
         };
     },
     computed: {
@@ -1110,41 +1212,206 @@ window.TeamDetail = {
         mapMaxRoundDiff() {
             return Math.max(...this.scoutMapRows.map(m => Math.abs(m.rd || 0)), 1);
         },
-        performanceRadarMetrics() {
-            const s = this.teamStats || {};
-            const playedMatches = this.matchesList.filter(m => m.played);
-            const matchWins = playedMatches.filter(m => getMatchResult(m) === 'win').length;
-            const matches = playedMatches.length;
-            const winRate = matches ? (matchWins / matches) * 100 : 0;
+        performanceTrendMetrics() {
+            return PERFORMANCE_TREND_METRICS;
+        },
+        performanceTrendSeries() {
+            const sortedMatches = [...this.matchesList]
+                .filter(match => match.played)
+                .sort((a, b) => {
+                    const at = a.ts || 0;
+                    const bt = b.ts || 0;
+                    if (!at && bt) return 1;
+                    if (at && !bt) return -1;
+                    return at - bt;
+                });
+
+            const points = [];
+            sortedMatches.forEach(match => {
+                const maps = Array.isArray(match.maps) ? match.maps : [];
+                const opponent = match.opponentName || match.team2Name || '';
+                if (!maps.length) {
+                    if (match.isForfeit && match.winnerTeamId) {
+                        const mapCount = Math.max(1, match.bestOf || 2);
+                        const teamWon = String(match.winnerTeamId) === String(this.teamId);
+                        for (let idx = 0; idx < mapCount; idx += 1) {
+                            const scoreFor = teamWon ? 13 : 0;
+                            const scoreAgainst = teamWon ? 0 : 13;
+                            const rdValue = clampValue(scoreFor - scoreAgainst, -13, 13);
+                            points.push({
+                                id: `${match.matchId}-ff-${idx}`,
+                                ts: match.ts,
+                                dateLabel: formatDate(match.ts),
+                                opponent,
+                                matchLabel: opponent || 'Vastustaja',
+                                mapLabel: 'Luovutus',
+                                result: teamWon ? 'win' : 'loss',
+                                scoreLabel: `${scoreFor}-${scoreAgainst}`,
+                                adr: null,
+                                rd: rdValue,
+                                kd: null,
+                                isForfeit: true
+                            });
+                        }
+                    }
+                    return;
+                }
+                maps.forEach((map, idx) => {
+                    const scoreFor = toNumber(map.scoreFor);
+                    const scoreAgainst = toNumber(map.scoreAgainst);
+                    const mapResult = scoreFor > scoreAgainst ? 'win' : scoreFor < scoreAgainst ? 'loss' : 'draw';
+                    const rdValue = clampValue(scoreFor - scoreAgainst, -13, 13);
+                    points.push({
+                        id: map.id || `${match.matchId}-map-${idx}`,
+                        ts: match.ts,
+                        dateLabel: formatDate(match.ts),
+                        opponent,
+                        matchLabel: opponent || 'Vastustaja',
+                        mapLabel: map.mapName || 'Kartta',
+                        result: mapResult,
+                        scoreLabel: (Number.isFinite(scoreFor) && Number.isFinite(scoreAgainst)) ? `${scoreFor}-${scoreAgainst}` : '',
+                        adr: toNumber(map.adr),
+                        rd: rdValue,
+                        kd: toNumber(map.kd),
+                        isForfeit: !!map.isForfeit
+                    });
+                });
+            });
+
+            return points;
+        },
+        performanceTrendCharts() {
+            const points = this.performanceTrendSeries;
+            if (!points.length) return [];
+            const layout = {
+                width: this.trendChartWidth || 640,
+                height: this.trendChartHeight || 140,
+                padding: { left: 46, right: 68, top: 16, bottom: 26 }
+            };
+            const plotWidth = layout.width - layout.padding.left - layout.padding.right;
+            const plotHeight = layout.height - layout.padding.top - layout.padding.bottom;
             const divAvgs = this.divisionAverages || {};
-            
-            const avgKd = this.players.length ? 
-                this.players.reduce((sum, p) => sum + (p.kd || 0), 0) / this.players.length : 
-                this.mapTotals.kd;
-            const avgAdr = this.players.length ?
-                this.players.reduce((sum, p) => sum + (p.adr || 0), 0) / this.players.length :
-                this.mapTotals.avgAdr;
-            
-            const clutchSuccesses = this.players.reduce((sum, p) => {
-                const attempts = (p.cl1v1Attempts || 0) + (p.cl1v2Attempts || 0);
-                const wins = (p.cl1v1Wins || 0) + (p.cl1v2Wins || 0);
-                return sum + wins;
-            }, 0);
-            const clutchAttempts = this.players.reduce((sum, p) => 
-                sum + (p.cl1v1Attempts || 0) + (p.cl1v2Attempts || 0), 0);
-            const clutchRate = clutchAttempts ? (clutchSuccesses / clutchAttempts) * 100 : 0;
-            
-            const entryWins = this.players.reduce((sum, p) => sum + (p.entryWins || 0), 0);
-            const entryAttempts = this.players.reduce((sum, p) => sum + (p.entryCount || 0), 0);
-            const entryRate = entryAttempts ? (entryWins / entryAttempts) * 100 : 0;
-            
-            return [
-                { label: 'Voitto-%', value: winRate, max: 100 },
-                { label: 'K/D', value: Math.min(100, (avgKd / 2) * 100), max: 100 },
-                { label: 'ADR', value: Math.min(100, (avgAdr / 120) * 100), max: 100 },
-                { label: 'Clutch %', value: clutchRate, max: 100 },
-                { label: 'Entry %', value: entryRate, max: 100 }
-            ];
+            const gridIndices = buildIndexGrid(points.length, 12);
+            const labelIndices = buildIndexGrid(points.length, Math.min(4, points.length));
+
+            return this.performanceTrendMetrics.map(metric => {
+                const baseValues = [];
+                const avgSourceValues = [];
+                let lastValidValue = 0;
+                points.forEach((point, idx) => {
+                    if (metric.key === 'rd') {
+                        const value = toNumber(point[metric.key]);
+                        baseValues[idx] = value;
+                        avgSourceValues[idx] = value;
+                        lastValidValue = value;
+                        return;
+                    }
+                    const raw = toNumber(point[metric.key], null);
+                    const isForfeit = !!point.isForfeit;
+                    if (!isForfeit && Number.isFinite(raw)) {
+                        lastValidValue = raw;
+                    }
+                    baseValues[idx] = (!isForfeit && Number.isFinite(raw)) ? raw : lastValidValue;
+                    avgSourceValues[idx] = (!isForfeit && Number.isFinite(raw)) ? raw : null;
+                });
+
+                const cumulativeValues = [];
+                let runningSum = 0;
+                let runningCount = 0;
+                baseValues.forEach((value, idx) => {
+                    if (metric.key === 'rd') {
+                        runningSum += value;
+                        cumulativeValues[idx] = runningSum;
+                    } else {
+                        const src = avgSourceValues[idx];
+                        if (src != null) {
+                            runningSum += src;
+                            runningCount += 1;
+                        }
+                        cumulativeValues[idx] = runningCount ? (runningSum / runningCount) : value;
+                    }
+                });
+                const values = this.performanceTrendMode === 'cumulative' ? cumulativeValues : baseValues;
+                const average = metric.key === 'rd'
+                    ? (baseValues.length ? baseValues.reduce((sum, v) => sum + v, 0) / baseValues.length : 0)
+                    : (() => {
+                        const valid = avgSourceValues.filter(v => v != null);
+                        if (!valid.length) return 0;
+                        return valid.reduce((sum, v) => sum + v, 0) / valid.length;
+                    })();
+                const hasRef = metric.refKey && Object.prototype.hasOwnProperty.call(divAvgs, metric.refKey);
+                const refCandidate = hasRef ? toNumber(divAvgs[metric.refKey]) : null;
+                const refValue = Number.isFinite(refCandidate) ? refCandidate : average;
+                const range = computeTrendRange(values, refValue, {
+                    clampMinZero: metric.key !== 'rd',
+                    bump: metric.key === 'kd' ? 0.2 : metric.key === 'adr' ? 5 : 3,
+                    hardMin: metric.key === 'rd' && this.performanceTrendMode === 'map' ? -13 : null,
+                    hardMax: metric.key === 'rd' && this.performanceTrendMode === 'map' ? 13 : null
+                });
+                const valueToY = value =>
+                    layout.padding.top + ((range.max - value) / (range.max - range.min)) * plotHeight;
+                const valueToX = idx =>
+                    layout.padding.left + (points.length === 1 ? 0 : (idx / (points.length - 1)) * plotWidth);
+                const chartPoints = points.map((point, idx) => {
+                    const value = values[idx];
+                    const delta = idx > 0 ? value - values[idx - 1] : null;
+                    return {
+                        ...point,
+                        value,
+                        delta,
+                        index: idx,
+                        x: valueToX(idx),
+                        y: valueToY(value)
+                    };
+                });
+                const path = chartPoints
+                    .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+                    .join(' ');
+                const ticks = [range.min, (range.min + range.max) / 2, range.max].map(value => ({
+                    value,
+                    y: valueToY(value)
+                }));
+                const gridLines = gridIndices.map(idx => ({
+                    index: idx,
+                    x: valueToX(idx)
+                }));
+                const xLabels = labelIndices.map(idx => ({
+                    index: idx,
+                    x: valueToX(idx),
+                    label: points[idx].dateLabel || `#${idx + 1}`
+                }));
+                const latest = chartPoints[chartPoints.length - 1] || null;
+                const refY = valueToY(refValue);
+                const zeroY = metric.key === 'rd' && range.min < 0 && range.max > 0 ? valueToY(0) : null;
+
+                return {
+                    ...metric,
+                    width: layout.width,
+                    height: layout.height,
+                    padding: layout.padding,
+                    plotWidth,
+                    plotHeight,
+                    baseValues,
+                    cumulativeValues,
+                    points: chartPoints,
+                    path,
+                    ticks,
+                    gridLines,
+                    xLabels,
+                    average,
+                    refValue,
+                    refY,
+                    zeroY,
+                    latest
+                };
+            });
+        },
+        performanceTrendVisibleCharts() {
+            const charts = this.performanceTrendCharts;
+            return charts.map((chart, idx) => ({
+                ...chart,
+                showXAxis: idx === charts.length - 1
+            }));
         },
         // Match history uses every field: status/best_of/played/opponent info/avatars/maps scores/picks/forfeit/ADR/KD plus Faceit URL
         matchesList() {
@@ -1158,27 +1425,157 @@ window.TeamDetail = {
                 return bt - at; // newest first for tables
             });
         },
-        matchesPerformanceSeries() {
-            const sorted = [...this.matchesList].sort((a, b) => (a.ts || 0) - (b.ts || 0));
-            return sorted.map(match => {
-                const value = this.matchMetric === 'adr'
-                    ? safeDivide(match.maps.reduce((sum, m) => sum + (m.adr || 0), 0), Math.max(match.maps.length, 1))
-                    : this.matchMetric === 'rating'
-                        ? match.matchRating || 0
-                    : (match.roundDiff ?? 0);
+        matchesTrendMetrics() {
+            return [
+                {
+                    key: 'rd',
+                    label: 'RD+',
+                    decimals: 0,
+                    lineClass: 'trend-line--rd',
+                    pointClass: 'trend-point--rd',
+                    refKey: 'avgRoundDiff',
+                    format: value => formatSignedNumber(value, 0)
+                },
+                {
+                    key: 'net',
+                    label: 'Win/Loss',
+                    decimals: 0,
+                    lineClass: 'trend-line--rd',
+                    pointClass: 'trend-point--rd',
+                    format: value => formatSignedNumber(value, 0)
+                }
+            ];
+        },
+        matchesTrendSeries() {
+            const points = this.performanceTrendSeries;
+            let net = 0;
+            return points.map(point => {
+                let delta = 0;
+                if (point.result === 'win') delta = 1;
+                if (point.result === 'loss') delta = -1;
+                net += delta;
                 return {
-                    label: formatDate(match.ts) || match.matchId,
-                    value,
-                    opponent: match.opponentName || match.team2Name || '',
-                    result: getMatchResult(match),
-                    tooltip: `${match.teamScore}-${match.oppScore} vs ${match.opponentName || match.team2Name || ''}`
+                    ...point,
+                    netDelta: delta,
+                    net
                 };
             });
         },
-        matchTrendPoints() {
-            if (!this.matchesPerformanceSeries.length) return [];
-            const maxAbs = Math.max(...this.matchesPerformanceSeries.map(p => Math.abs(p.value)), 1);
-            return this.matchesPerformanceSeries.map(p => p.value / maxAbs);
+        matchesTrendCharts() {
+            const points = this.matchesTrendSeries;
+            if (!points.length) return [];
+            const metrics = this.matchesTrendMetrics;
+            const layout = {
+                width: this.matchesChartWidth || 640,
+                height: this.trendChartHeight || 140,
+                padding: { left: 46, right: 68, top: 16, bottom: 26 }
+            };
+            const plotWidth = layout.width - layout.padding.left - layout.padding.right;
+            const plotHeight = layout.height - layout.padding.top - layout.padding.bottom;
+            const divAvgs = this.divisionAverages || {};
+            const gridIndices = buildIndexGrid(points.length, 12);
+            const labelIndices = buildIndexGrid(points.length, Math.min(4, points.length));
+
+            return metrics.map(metric => {
+                const baseValues = points.map(point => {
+                    if (metric.key === 'net') return toNumber(point.netDelta);
+                    return toNumber(point[metric.key]);
+                });
+                const cumulativeValues = [];
+                let runningSum = 0;
+                baseValues.forEach((value, idx) => {
+                    runningSum += value;
+                    cumulativeValues[idx] = runningSum;
+                });
+                const values = cumulativeValues;
+                const average = baseValues.length
+                    ? baseValues.reduce((sum, v) => sum + v, 0) / baseValues.length
+                    : 0;
+                const hasRef = metric.refKey && Object.prototype.hasOwnProperty.call(divAvgs, metric.refKey);
+                const refCandidate = hasRef ? toNumber(divAvgs[metric.refKey]) : null;
+                const refValue = metric.key === 'net'
+                    ? 0
+                    : (Number.isFinite(refCandidate) ? refCandidate : average);
+                const range = computeTrendRange(values, refValue, {
+                    clampMinZero: false,
+                    bump: 3,
+                    hardMin: null,
+                    hardMax: null
+                });
+                const valueToY = value =>
+                    layout.padding.top + ((range.max - value) / (range.max - range.min)) * plotHeight;
+                const valueToX = idx =>
+                    layout.padding.left + (points.length === 1 ? 0 : (idx / (points.length - 1)) * plotWidth);
+                const chartPoints = points.map((point, idx) => {
+                    const value = values[idx];
+                    const delta = idx > 0 ? value - values[idx - 1] : null;
+                    return {
+                        ...point,
+                        value,
+                        delta,
+                        index: idx,
+                        x: valueToX(idx),
+                        y: valueToY(value)
+                    };
+                });
+                const path = chartPoints
+                    .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
+                    .join(' ');
+                const ticks = [range.min, (range.min + range.max) / 2, range.max].map(value => ({
+                    value,
+                    y: valueToY(value)
+                }));
+                const gridLines = gridIndices.map(idx => ({
+                    index: idx,
+                    x: valueToX(idx)
+                }));
+                const xLabels = labelIndices.map(idx => ({
+                    index: idx,
+                    x: valueToX(idx),
+                    label: points[idx].dateLabel || `#${idx + 1}`
+                }));
+                const latest = chartPoints[chartPoints.length - 1] || null;
+                const refY = valueToY(refValue);
+                const zeroY = range.min < 0 && range.max > 0 ? valueToY(0) : null;
+
+                return {
+                    ...metric,
+                    width: layout.width,
+                    height: layout.height,
+                    padding: layout.padding,
+                    plotWidth,
+                    plotHeight,
+                    points: chartPoints,
+                    path,
+                    ticks,
+                    gridLines,
+                    xLabels,
+                    average,
+                    refValue,
+                    refY,
+                    zeroY,
+                    latest
+                };
+            });
+        },
+        matchesTrendVisibleCharts() {
+            const charts = this.matchesTrendCharts;
+            return charts.map((chart, idx) => ({
+                ...chart,
+                showXAxis: idx === charts.length - 1
+            }));
+        },
+        matchesVetoTimeline() {
+            const vetoMap = new Map(this.vetoByMatch.map(entry => [entry.matchId, entry]));
+            return this.matchesList.map(match => {
+                const veto = vetoMap.get(match.matchId) || null;
+                return {
+                    matchId: match.matchId,
+                    match,
+                    format: veto?.format || `bo${match.bestOf || 2}`,
+                    steps: veto?.steps || []
+                };
+            });
         },
         // Player stats table uses every DB field: maps/rounds/kills/deaths/assists/mvps/sniper_kills/utility_damage/enemies_flashed/flash_count/flash_successes/entry_count/entry_wins/clutch fields/pistol_kills/adr/kr/kd/rating/hs_pct/damage/multi-kills
         players() {
@@ -1295,6 +1692,18 @@ window.TeamDetail = {
                 this.activeTab = nextTab;
             }
         },
+        activeTab(newVal) {
+            if (newVal === 'overview') {
+                this.$nextTick(() => {
+                    this.setupTrendChartObserver();
+                });
+            }
+            if (newVal === 'matches') {
+                this.$nextTick(() => {
+                    this.setupMatchesChartObserver();
+                });
+            }
+        },
         championshipId(newVal) {
             if (newVal) {
                 this.selectedChampionship = String(newVal);
@@ -1305,15 +1714,29 @@ window.TeamDetail = {
             this.$nextTick(() => {
                 this.setupMapTableScroll();
             });
+        },
+        performanceTrendCharts() {
+            this.$nextTick(() => {
+                this.updateTrendChartWidth();
+            });
+        },
+        matchesTrendCharts() {
+            this.$nextTick(() => {
+                this.updateMatchesChartWidth();
+            });
         }
     },
     mounted() {
         this.$nextTick(() => {
             this.setupMapTableScroll();
+            this.setupTrendChartObserver();
+            this.setupMatchesChartObserver();
         });
     },
     beforeUnmount() {
         this.teardownMapTableScroll();
+        this.teardownTrendChartObserver();
+        this.teardownMatchesChartObserver();
     },
     methods: {
         heatTooltip(metricLabel, value, extra = '') {
@@ -1361,6 +1784,180 @@ window.TeamDetail = {
         },
         subMetricLabel() {
             return this.mapSubMetricMode === 'perMap' ? 'per-kartta' : 'per-erä';
+        },
+        setTrendMode(mode) {
+            if (mode !== 'map' && mode !== 'cumulative') return;
+            this.performanceTrendMode = mode;
+        },
+        updateTrendChartWidth() {
+            const panel = this.$refs.performanceTrendPanel;
+            if (!panel) return;
+            const styles = window.getComputedStyle(panel);
+            const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+            const paddingRight = parseFloat(styles.paddingRight) || 0;
+            const width = panel.clientWidth - paddingLeft - paddingRight;
+            if (width > 0 && Math.abs(width - this.trendChartWidth) > 1) {
+                this.trendChartWidth = width;
+            }
+        },
+        updateMatchesChartWidth() {
+            const panel = this.$refs.matchesTrendPanel;
+            if (!panel) return;
+            const styles = window.getComputedStyle(panel);
+            const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+            const paddingRight = parseFloat(styles.paddingRight) || 0;
+            const width = panel.clientWidth - paddingLeft - paddingRight;
+            if (width > 0 && Math.abs(width - this.matchesChartWidth) > 1) {
+                this.matchesChartWidth = width;
+            }
+        },
+        setupTrendChartObserver() {
+            if (this._trendResizeObserver || typeof ResizeObserver === 'undefined') return;
+            const panel = this.$refs.performanceTrendPanel;
+            if (!panel) return;
+            const update = () => window.requestAnimationFrame(() => this.updateTrendChartWidth());
+            this._trendResizeObserver = new ResizeObserver(update);
+            this._trendResizeObserver.observe(panel);
+            update();
+        },
+        setupMatchesChartObserver() {
+            if (this._matchesResizeObserver || typeof ResizeObserver === 'undefined') return;
+            const panel = this.$refs.matchesTrendPanel;
+            if (!panel) return;
+            const update = () => window.requestAnimationFrame(() => this.updateMatchesChartWidth());
+            this._matchesResizeObserver = new ResizeObserver(update);
+            this._matchesResizeObserver.observe(panel);
+            update();
+        },
+        teardownTrendChartObserver() {
+            if (!this._trendResizeObserver) return;
+            this._trendResizeObserver.disconnect();
+            this._trendResizeObserver = null;
+        },
+        teardownMatchesChartObserver() {
+            if (!this._matchesResizeObserver) return;
+            this._matchesResizeObserver.disconnect();
+            this._matchesResizeObserver = null;
+        },
+        handleTrendHover(event, chart) {
+            if (!chart || !chart.points?.length) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const scale = rect.width ? chart.width / rect.width : 1;
+            const xView = x * scale;
+            const ratio = clampValue((xView - chart.padding.left) / chart.plotWidth, 0, 1);
+            const index = Math.round(ratio * (chart.points.length - 1));
+            const point = chart.points[index];
+            if (!point) return;
+            this.performanceTrendHover = {
+                key: chart.key,
+                index,
+                x: point.x,
+                y: point.y
+            };
+        },
+        clearTrendHover() {
+            this.performanceTrendHover = { key: null, index: null, x: 0, y: 0 };
+        },
+        handleMatchesTrendHover(event) {
+            const chart = this.matchesWinLossChart;
+            if (!chart || !chart.basePoints?.length) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const scale = rect.width ? chart.width / rect.width : 1;
+            const xView = x * scale;
+            const ratio = clampValue((xView - chart.padding.left) / chart.plotWidth, 0, 1);
+            const index = Math.round(ratio * (chart.basePoints.length - 1));
+            const refSeries = chart.series?.[0];
+            const point = (refSeries?.points?.[index]) || chart.basePoints[index];
+            if (!point) return;
+            this.matchesTrendHover = { index, x: point.x, y: point.y };
+            this.matchesHoverMatchId = point.matchId;
+            this.matchesHoverSource = 'chart';
+        },
+        clearMatchesTrendHover() {
+            this.matchesTrendHover = { index: null, x: 0, y: 0 };
+            if (this.matchesHoverSource === 'chart') {
+                this.matchesHoverMatchId = null;
+                this.matchesHoverSource = null;
+            }
+        },
+        setMatchesHover(matchId) {
+            this.matchesHoverMatchId = matchId;
+            this.matchesHoverSource = 'table';
+        },
+        clearMatchesHover() {
+            if (this.matchesHoverSource === 'table') {
+                this.matchesHoverMatchId = null;
+                this.matchesHoverSource = null;
+            }
+        },
+        matchTooltipStyle(chart, point) {
+            if (!chart || !point) return {};
+            const left = (point.x / chart.width) * 100;
+            const top = (point.y / chart.height) * 100;
+            return {
+                left: `${left}%`,
+                top: `${top}%`
+            };
+        },
+        matchMetricLabel(metric, value) {
+            if (!metric) return formatNumber(value, 1);
+            return metric.format ? metric.format(value) : formatNumber(value, metric.decimals || 0);
+        },
+        trendTooltipStyle(chart, point) {
+            if (!chart || !point) return {};
+            const left = (point.x / chart.width) * 100;
+            const top = (point.y / chart.height) * 100;
+            return {
+                left: `${left}%`,
+                top: `${top}%`
+            };
+        },
+        getTrendHoverPoint(chart) {
+            if (!chart || this.performanceTrendHover.key !== chart.key) return null;
+            const idx = this.performanceTrendHover.index;
+            return chart.points?.[idx] || null;
+        },
+        formatTrendDelta(metric, value) {
+            if (!metric) return formatSignedNumber(value, 2);
+            if (metric.key === 'rd') return formatSignedNumber(value, 0);
+            if (metric.key === 'net') return formatSignedNumber(value, 0);
+            if (metric.key === 'adr') return formatSignedNumber(value, 1);
+            return formatSignedNumber(value, 2);
+        },
+        matchesTrendValueLabel(chart, point) {
+            if (!chart || !point) return '';
+            if (chart.key === 'rd' || chart.key === 'net') return `${chart.label} tilanne`;
+            return chart.label;
+        },
+        matchesTooltipTrendValue(chart, point) {
+            if (!chart || !point) return '-';
+            return this.formatTrendValue(chart, point.value);
+        },
+        trendValueLabel(chart, point) {
+            if (!chart || !point) return '';
+            if (this.performanceTrendMode === 'cumulative') {
+                if (chart.key === 'rd') return `${chart.label} tilanne`;
+                return `${chart.label} avg`;
+            }
+            return chart.label;
+        },
+        tooltipTrendValue(chart, point) {
+            if (!chart || !point) return '-';
+            if (chart.key !== 'rd' && point.isForfeit) return '—';
+            return this.formatTrendValue(chart, point.value);
+        },
+        mapResultLabel(point) {
+            if (!point) return '';
+            if (point.result === 'win') return 'Voitto';
+            if (point.result === 'loss') return 'Tappio';
+            if (point.result === 'draw') return 'Tasapeli';
+            return '';
+        },
+        formatTrendValue(metric, value) {
+            if (!metric) return formatNumber(value, 2);
+            return metric.format ? metric.format(value) : formatNumber(value, metric.decimals || 0);
         },
         async bootstrap() {
             if (!this.teamStore || !this.teamId) return;
@@ -1419,6 +2016,25 @@ window.TeamDetail = {
         },
         formatWinLoss(wins, losses) {
             return `${formatNumber(wins)}–${formatNumber(losses)}`;
+        },
+        matchMapsSummary(match) {
+            if (!match || !Array.isArray(match.maps) || !match.maps.length) return '';
+            return match.maps
+                .map(map => `${map.mapName} ${formatNumber(map.scoreFor, 0)}-${formatNumber(map.scoreAgainst, 0)}`)
+                .join(' · ');
+        },
+        matchSummaryLine(match) {
+            if (!match) return '';
+            const parts = [];
+            if (match.teamScore != null && match.oppScore != null) {
+                parts.push(`Score ${formatNumber(match.teamScore, 0)}-${formatNumber(match.oppScore, 0)}`);
+            }
+            if (match.roundDiff != null) {
+                parts.push(`Eräero ${formatSignedNumber(match.roundDiff, 0)}`);
+            }
+            const maps = this.matchMapsSummary(match);
+            if (maps) parts.push(maps);
+            return parts.join(' · ');
         },
         winHeatStyle(value) {
             const pct = Math.min(100, Math.max(0, normalizePercent(value)));
@@ -1548,6 +2164,7 @@ window.TeamDetail = {
         formatPercent,
         formatNumber,
         formatDate,
+        formatSignedNumber,
         getMatchResult,
         teamLogo() {
             return this.teamInfo?.avatar || '';
@@ -1578,50 +2195,47 @@ window.TeamDetail = {
             <loading-spinner v-if="loading && !teamInfo" message="Joukkuetta ladataan..."></loading-spinner>
             <error-message v-else-if="loadError && !teamInfo" :message="loadError" @retry="bootstrap"></error-message>
             <div v-else>
-                <header class="team-hero">
+                                <span class="section-sub">Ottelukohtaiset tulokset, kartat ja veto-polku</span>
                     <div class="team-hero__logo" v-if="teamLogo()">
                         <img :src="teamLogo()" :alt="teamInfo?.teamName || 'Joukkue'" />
-                    </div>
-                    <div class="team-hero__content">
-                        <h1 class="team-hero__title title-accent titleUnderlinePage">
-                            {{ teamInfo?.displayName || teamInfo?.teamName || 'Joukkue' }}
-                        </h1>
-                        <div class="team-hero__season" v-if="seasonOptions.length || heroPlayoffsFlag || teamInfo?.faceitUrl">
-                            <span class="pill pill--accent" v-if="heroPlayoffsFlag">Playoffs</span>
-                            <a v-if="teamInfo?.faceitUrl" class="pill pill--link" :href="teamInfo?.faceitUrl" target="_blank" rel="noopener">Faceit</a>
+                        <div v-if="matchesVetoTimeline.length" class="veto-timeline-list">
+                            <div
+                                class="veto-timeline"
+                                v-for="entry in matchesVetoTimeline"
+                                :key="entry.matchId"
+                            >
+                                <div class="veto-timeline__header">
+                                    <span class="pill">{{ formatDate(entry.match.ts) }}</span>
+                                    <span class="pill">BO{{ entry.match.bestOf }}</span>
+                                    <span class="pill" v-if="entry.match?.opponentName || entry.match?.team2Name">vs {{ entry.match?.opponentName || entry.match?.team2Name }}</span>
+                                    <span class="pill" v-if="entry.match.teamScore != null && entry.match.oppScore != null">Score {{ entry.match.teamScore }}-{{ entry.match.oppScore }}</span>
+                                    <span class="pill" v-if="entry.match.roundDiff != null">RD {{ formatSignedNumber(entry.match.roundDiff, 0) }}</span>
+                                    <a v-if="entry.match.faceitUrl" :href="entry.match.faceitUrl" target="_blank" rel="noopener" class="pill pill--link">Faceit</a>
+                                </div>
+                                <div class="section-sub" v-if="matchSummaryLine(entry.match)">
+                                    {{ matchSummaryLine(entry.match) }}
+                                </div>
+                                <div v-if="entry.steps.length" class="veto-steps">
+                                    <div
+                                        v-for="step in entry.steps"
+                                        :key="step.step + step.mapName"
+                                        class="veto-step"
+                                        :class="'veto-step--' + step.action"
+                                    >
+                                        <div class="veto-step__order">#{{ step.step }}</div>
+                                        <div class="veto-step__title">{{ step.label }}</div>
+                                        <div class="veto-step__map">{{ step.mapName }}</div>
+                                        <div class="veto-step__actor">{{ step.teamName || 'Järjestelmä' }}</div>
+                                    </div>
+                                </div>
+                                <div v-else class="empty-state-container compact">
+                                    <div class="empty-state-card">
+                                        <h3 class="empty-state-title">Ei vetoa</h3>
+                                        <p class="empty-state-description">Tälle ottelulle ei ole veto-polun tietoja.</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div v-if="seasonOptions.length" class="team-season-selector">
-                        <label class="season-select-label" for="season-select">Valitse kausi</label>
-                        <select
-                            id="season-select"
-                            class="season-select"
-                            :value="currentChampionshipId"
-                            @change="selectChampionship($event.target.value)"
-                        >
-                            <option v-for="season in seasonOptions" :key="season.value" :value="season.value">
-                                {{ season.label }}
-                            </option>
-                        </select>
-                    </div>
-                </header>
-
-                <nav class="team-tabs" role="tablist">
-                    <button
-                        v-for="tab in ['overview', 'matches', 'players', 'veto']"
-                        :key="tab"
-                        type="button"
-                        class="team-tab"
-                        :class="{ 'team-tab--active': activeTab === tab }"
-                        @click="selectTab(tab)"
-                        role="tab"
-                        :aria-selected="activeTab === tab"
-                        :aria-controls="'team-tab-' + tab"
-                    >
-                        {{ { overview: 'Yleiskuva', matches: 'Ottelut', players: 'Pelaajat', veto: 'Veto/Nosto' }[tab] }}
-                    </button>
-                </nav>
-
                 <section v-if="activeTab === 'overview'" class="team-section scout-view" id="team-tab-overview" role="tabpanel">
                     <div class="scout-panel scout-snapshot">
                         <div class="section-heading">
@@ -1651,16 +2265,6 @@ window.TeamDetail = {
                                 <div class="snapshot-value mono-num" :class="stat.tone" :title="stat.tooltip || ''">{{ stat.value }}</div>
                                 <div class="snapshot-sub">{{ stat.sub }}</div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="scout-panel scout-performance-radar" v-if="performanceRadarMetrics.length">
-                        <div class="section-heading">
-                            <h3 class="section-title titleUnderline">Suorituskyvyn jakauma</h3>
-                            <span class="section-sub">Joukkueen vahvuudet visuaalisesti</span>
-                        </div>
-                        <div class="radar-container">
-                            <radar-chart :metrics="performanceRadarMetrics"></radar-chart>
                         </div>
                     </div>
 
@@ -1722,7 +2326,7 @@ window.TeamDetail = {
                     <div class="scout-panel scout-table">
                         <div class="section-heading">
                             <div>
-                        <h3 class="section-title titleUnderline">Karttakohtainen suorituskyky (kausi)</h3>
+                        <h3 class="section-title titleUnderline">Karttakohtainen suorituskyky</h3>
                         <span class="section-sub">{{ mapViewMode === 'summary' ? 'Yhteenveto: Voitot, pickit, bannit, eräero' : 'Laaja: Karttakohtaiset pelaajatilastot' }}</span>
                         <div v-if="mapViewMode === 'full'" class="section-legend">📊 <strong>Pääarvo</strong> = kokonaisluku · <strong>Sulkeissa</strong> = {{ subMetricLabel() }}</div>
                             </div>
@@ -1764,6 +2368,7 @@ window.TeamDetail = {
                                 :default-sort="scoutMapDefaultSort"
                                 :sticky-header="true"
                                 :compact="true"
+                                class="map-summary-table"
                             >
                                 <template #cell-mapName="{ row }">
                                     <div class="map-name">
@@ -1852,6 +2457,7 @@ window.TeamDetail = {
                                 :default-sort="mapDefaultSort"
                                 :sticky-header="true"
                                 :compact="true"
+                                class="map-full-table"
                             >
                                 <template #cell-mapName="{ row }">
                                     <div class="map-name">
@@ -1993,82 +2599,517 @@ window.TeamDetail = {
                         </div>
                     </div>
 
-                </section>
-
-                <section v-if="activeTab === 'matches'" class="team-section" id="team-tab-matches" role="tabpanel">
-                    <div class="section-heading">
-                    <h2 class="section-title titleUnderline">Ottelut ({{ matchesList.length }} yhteensä)</h2>
-                    </div>
-                    <div class="glass-card">
-                        <div class="section-heading">
-                            <h3>Suoritus ajan yli</h3>
-                            <div class="toggle-group">
-                                <button class="pill" :class="{ 'pill--active': matchMetric === 'roundDiff' }" @click="matchMetric = 'roundDiff'">Eräero</button>
-                                <button class="pill" :class="{ 'pill--active': matchMetric === 'adr' }" @click="matchMetric = 'adr'">ADR</button>
-                                <button class="pill" :class="{ 'pill--active': matchMetric === 'rating' }" @click="matchMetric = 'rating'">Rating</button>
+                    <div class="scout-panel scout-performance-trends" ref="performanceTrendPanel">
+                        <div class="section-heading section-heading--split">
+                            <div class="section-heading__main">
+                                <h3 class="section-title titleUnderline">Kauden statsien kehitys</h3>
+                                <span class="section-sub">X-akseli: kartat ottelujärjestyksessä · ADR, RD+, K/D</span>
+                            </div>
+                            <div class="section-heading-actions" v-if="performanceTrendCharts.length">
+                                <div class="trend-toggles trend-toggles--mode">
+                                    <button
+                                        type="button"
+                                        class="trend-toggle"
+                                        :class="{ 'trend-toggle--active': performanceTrendMode === 'map' }"
+                                        @click="setTrendMode('map')"
+                                        :aria-pressed="performanceTrendMode === 'map' ? 'true' : 'false'"
+                                    >
+                                        Kartta
+                                    </button>
+                                    <button
+                                        type="button"
+                                        class="trend-toggle"
+                                        :class="{ 'trend-toggle--active': performanceTrendMode === 'cumulative' }"
+                                        @click="setTrendMode('cumulative')"
+                                        :aria-pressed="performanceTrendMode === 'cumulative' ? 'true' : 'false'"
+                                    >
+                                        Kausi
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        <div v-if="matchesPerformanceSeries.length" class="trend-wrapper">
-                            <sparkline-chart :points="matchTrendPoints" height="80" width="320" />
-                            <div class="trend-legend">
-                                <div v-for="point in matchesPerformanceSeries" :key="point.label" class="trend-pill" :class="'trend-pill--' + point.result">
-                                    <span class="pill-label">{{ point.label }}</span>
-                                    <span class="pill-value">{{ point.value.toFixed(1) }}</span>
-                                    <span class="pill-meta">{{ point.opponent }}</span>
+                        <div v-if="performanceTrendCharts.length" class="performance-trends">
+                            <div
+                                v-for="chart in performanceTrendVisibleCharts"
+                                :key="chart.key"
+                                class="trend-chart"
+                                :class="'trend-chart--' + chart.key"
+                            >
+                                <div
+                                    class="trend-chart__plot"
+                                    @mousemove="handleTrendHover($event, chart)"
+                                    @mouseleave="clearTrendHover"
+                                >
+                                    <svg
+                                        class="trend-chart__svg"
+                                        :viewBox="'0 0 ' + chart.width + ' ' + chart.height"
+                                        width="100%"
+                                        :height="chart.height"
+                                        role="img"
+                                        :aria-label="chart.label + ' trendi'"
+                                    >
+                                        <defs v-if="chart.zeroY != null">
+                                            <clipPath :id="'m-pos-' + chart.key">
+                                                <rect
+                                                    :x="chart.padding.left"
+                                                    :y="chart.padding.top"
+                                                    :width="chart.plotWidth"
+                                                    :height="Math.max(0, chart.zeroY - chart.padding.top)"
+                                                />
+                                            </clipPath>
+                                            <clipPath :id="'m-neg-' + chart.key">
+                                                <rect
+                                                    :x="chart.padding.left"
+                                                    :y="chart.zeroY"
+                                                    :width="chart.plotWidth"
+                                                    :height="Math.max(0, (chart.height - chart.padding.bottom) - chart.zeroY)"
+                                                />
+                                            </clipPath>
+                                        </defs>
+                                        <g class="trend-grid">
+                                            <line
+                                                v-for="line in chart.gridLines"
+                                                :key="'v-' + chart.key + '-' + line.index"
+                                                class="trend-grid__line trend-grid__line--vertical"
+                                                :x1="line.x"
+                                                :x2="line.x"
+                                                :y1="chart.padding.top"
+                                                :y2="chart.height - chart.padding.bottom"
+                                            />
+                                            <line
+                                                v-for="tick in chart.ticks"
+                                                :key="'h-' + chart.key + '-' + tick.y"
+                                                class="trend-grid__line"
+                                                :x1="chart.padding.left"
+                                                :x2="chart.width - chart.padding.right"
+                                                :y1="tick.y"
+                                                :y2="tick.y"
+                                            />
+                                        </g>
+                                        <line
+                                            v-if="chart.zeroY != null"
+                                            class="trend-zero-line"
+                                            :x1="chart.padding.left"
+                                            :x2="chart.width - chart.padding.right"
+                                            :y1="chart.zeroY"
+                                            :y2="chart.zeroY"
+                                        />
+                                        <line
+                                            class="trend-ref-line"
+                                            :x1="chart.padding.left"
+                                            :x2="chart.width - chart.padding.right"
+                                            :y1="chart.refY"
+                                            :y2="chart.refY"
+                                        />
+                                        <path
+                                            v-if="chart.zeroY == null"
+                                            class="trend-line"
+                                            :class="chart.lineClass"
+                                            :d="chart.path"
+                                            fill="none"
+                                        />
+                                        <path
+                                            v-else
+                                            class="trend-line"
+                                            :class="chart.lineClass"
+                                            :d="chart.path"
+                                            :clip-path="'url(#m-pos-' + chart.key + ')'"
+                                            fill="none"
+                                        />
+                                        <path
+                                            v-if="chart.zeroY != null"
+                                            class="trend-line trend-line--negative"
+                                            :class="chart.lineClass"
+                                            :d="chart.path"
+                                            :clip-path="'url(#m-neg-' + chart.key + ')'"
+                                            fill="none"
+                                        />
+                                        <g class="trend-points">
+                                            <circle
+                                                v-for="point in chart.points"
+                                                :key="point.id + '-' + point.index"
+                                                class="trend-point"
+                                                :class="chart.pointClass"
+                                                :cx="point.x"
+                                                :cy="point.y"
+                                                r="2"
+                                            >
+                                                <title>{{ chart.label }} {{ formatTrendValue(chart, point.value) }} · {{ point.matchLabel }} · {{ point.mapLabel }} · {{ point.dateLabel }}</title>
+                                            </circle>
+                                        </g>
+                                        <circle
+                                            v-if="chart.latest"
+                                            class="trend-point trend-point--latest"
+                                            :class="chart.pointClass"
+                                            :cx="chart.latest.x"
+                                            :cy="chart.latest.y"
+                                            r="4"
+                                        />
+                                        <circle
+                                            v-if="performanceTrendHover.key === chart.key && getTrendHoverPoint(chart)"
+                                            class="trend-point trend-point--hover"
+                                            :class="chart.pointClass"
+                                            :cx="getTrendHoverPoint(chart).x"
+                                            :cy="getTrendHoverPoint(chart).y"
+                                            r="4"
+                                        />
+                                        <text
+                                            v-if="chart.latest"
+                                            class="trend-line-label"
+                                            :class="chart.lineClass"
+                                            :x="chart.width - 6"
+                                            :y="chart.latest.y - 6"
+                                            text-anchor="end"
+                                        >
+                                            <tspan class="trend-line-label__stat" :x="chart.width - 6">{{ chart.label }}</tspan>
+                                            <tspan class="trend-line-label__value" :x="chart.width - 6" dy="14">{{ formatTrendValue(chart, chart.latest.value) }}</tspan>
+                                        </text>
+                                        <g class="trend-axis trend-axis--y">
+                                            <text
+                                                v-for="tick in chart.ticks"
+                                                :key="'ylab-' + chart.key + '-' + tick.y"
+                                                class="trend-axis__label"
+                                                :x="chart.padding.left - 6"
+                                                :y="tick.y + 4"
+                                                text-anchor="end"
+                                            >{{ formatTrendValue(chart, tick.value) }}</text>
+                                        </g>
+                                        <g v-if="chart.showXAxis" class="trend-axis trend-axis--x">
+                                            <line
+                                                class="trend-axis__baseline"
+                                                :x1="chart.padding.left"
+                                                :x2="chart.width - chart.padding.right"
+                                                :y1="chart.height - chart.padding.bottom"
+                                                :y2="chart.height - chart.padding.bottom"
+                                            />
+                                            <text
+                                                v-for="label in chart.xLabels"
+                                                :key="'xlab-' + chart.key + '-' + label.index"
+                                                class="trend-axis__label trend-axis__label--x"
+                                                :x="label.x"
+                                                :y="chart.height - 6"
+                                                text-anchor="middle"
+                                            >{{ label.label }}</text>
+                                            <circle
+                                                v-for="point in chart.points"
+                                                :key="'res-' + chart.key + '-' + point.index"
+                                                class="trend-result-marker"
+                                                :class="'trend-result-marker--' + point.result"
+                                                :cx="point.x"
+                                                :cy="chart.height - chart.padding.bottom"
+                                                r="2"
+                                            ></circle>
+                                        </g>
+                                    </svg>
+                                    <div
+                                        v-if="performanceTrendHover.key === chart.key && getTrendHoverPoint(chart)"
+                                        class="trend-tooltip"
+                                        :style="trendTooltipStyle(chart, getTrendHoverPoint(chart))"
+                                    >
+                                        <div class="trend-tooltip__title">{{ getTrendHoverPoint(chart).matchLabel }} · {{ getTrendHoverPoint(chart).mapLabel }}</div>
+                                        <div class="trend-tooltip__meta">
+                                            {{ getTrendHoverPoint(chart).dateLabel }}
+                                            <span v-if="getTrendHoverPoint(chart).scoreLabel"> · {{ getTrendHoverPoint(chart).scoreLabel }}</span>
+                                            <span
+                                                v-if="mapResultLabel(getTrendHoverPoint(chart))"
+                                                class="trend-tooltip__result"
+                                                :class="'trend-tooltip__result--' + getTrendHoverPoint(chart).result"
+                                            >
+                                                · {{ mapResultLabel(getTrendHoverPoint(chart)) }}
+                                            </span>
+                                        </div>
+                                        <div class="trend-tooltip__value">{{ trendValueLabel(chart, getTrendHoverPoint(chart)) }} {{ tooltipTrendValue(chart, getTrendHoverPoint(chart)) }}</div>
+                                        <div
+                                            v-if="performanceTrendMode === 'cumulative' && getTrendHoverPoint(chart).delta != null"
+                                            class="trend-tooltip__delta"
+                                            :class="getTrendHoverPoint(chart).delta > 0 ? 'trend-delta--positive' : getTrendHoverPoint(chart).delta < 0 ? 'trend-delta--negative' : 'trend-delta--neutral'"
+                                        >
+                                            Muutos {{ formatTrendDelta(chart, getTrendHoverPoint(chart).delta) }}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div v-else class="empty-state-container compact">
                             <div class="empty-state-card">
                                 <h3 class="empty-state-title">Ei trendidataa</h3>
-                                <p class="empty-state-description">Tälle kaudelle ei ole riittävästi otteluita trendiä varten.</p>
+                                <p class="empty-state-description">Tälle kaudelle ei ole riittävästi otteluita trendin piirtämiseen.</p>
                             </div>
                         </div>
                     </div>
-                    <div v-if="matchesList.length" class="table-wrapper">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th>Pvm</th>
-                                    <th>Vastustaja</th>
-                                    <th>BO</th>
-                                    <th>Score</th>
-                                    <th>Eräero</th>
-                                    <th>Tila</th>
-                                    <th>Maps</th>
-                                    <th>Linkki</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="match in matchesList" :key="match.matchId">
-                                    <td>
-                                        <span :class="['result-dot', 'result-dot--' + getMatchResult(match)]"></span>
-                                    </td>
-                                    <td>{{ formatDate(match.ts) }}</td>
-                                    <td :title="vetoSummaryLookup[match.matchId] || ''">{{ match.opponentName || match.team2Name || 'Vastustaja' }}</td>
-                                    <td>BO{{ match.bestOf }}</td>
-                                    <td>{{ match.teamScore }} - {{ match.oppScore }}</td>
-                                    <td :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'">{{ match.roundDiff }}</td>
-                                    <td>{{ match.status }}</td>
-                                    <td>
-                                        <div class="micro-stack" v-if="match.maps && match.maps.length">
-                                            <span v-for="map in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
+
+                </section>
+
+                <section v-if="activeTab === 'matches'" class="team-section scout-view" id="team-tab-matches" role="tabpanel">
+                    <div class="scout-panel scout-performance-trends matches-trends" ref="matchesTrendPanel">
+                        <div class="section-heading section-heading--split">
+                            <div class="section-heading__main">
+                                <h3 class="section-title titleUnderline">Otteluiden kehitys</h3>
+                                <span class="section-sub">X-akseli: kartat ottelujärjestyksessä · RD+, Win/Loss (kausi)</span>
+                            </div>
+                        </div>
+                        <div v-if="matchesTrendCharts.length" class="performance-trends">
+                            <div
+                                v-for="chart in matchesTrendVisibleCharts"
+                                :key="chart.key"
+                                class="trend-chart"
+                                :class="'trend-chart--' + chart.key"
+                            >
+                                <div
+                                    class="trend-chart__plot"
+                                    @mousemove="handleTrendHover($event, chart)"
+                                    @mouseleave="clearTrendHover"
+                                >
+                                    <svg
+                                        class="trend-chart__svg"
+                                        :viewBox="'0 0 ' + chart.width + ' ' + chart.height"
+                                        width="100%"
+                                        :height="chart.height"
+                                        role="img"
+                                        :aria-label="chart.label + ' trendi'"
+                                    >
+                                        <defs v-if="chart.zeroY != null">
+                                            <clipPath :id="'mt-pos-' + chart.key">
+                                                <rect
+                                                    :x="chart.padding.left"
+                                                    :y="chart.padding.top"
+                                                    :width="chart.plotWidth"
+                                                    :height="Math.max(0, chart.zeroY - chart.padding.top)"
+                                                />
+                                            </clipPath>
+                                            <clipPath :id="'mt-neg-' + chart.key">
+                                                <rect
+                                                    :x="chart.padding.left"
+                                                    :y="chart.zeroY"
+                                                    :width="chart.plotWidth"
+                                                    :height="Math.max(0, (chart.height - chart.padding.bottom) - chart.zeroY)"
+                                                />
+                                            </clipPath>
+                                        </defs>
+                                        <g class="trend-grid">
+                                            <line
+                                                v-for="line in chart.gridLines"
+                                                :key="'m-v-' + chart.key + '-' + line.index"
+                                                class="trend-grid__line trend-grid__line--vertical"
+                                                :x1="line.x"
+                                                :x2="line.x"
+                                                :y1="chart.padding.top"
+                                                :y2="chart.height - chart.padding.bottom"
+                                            />
+                                            <line
+                                                v-for="tick in chart.ticks"
+                                                :key="'m-h-' + chart.key + '-' + tick.y"
+                                                class="trend-grid__line"
+                                                :x1="chart.padding.left"
+                                                :x2="chart.width - chart.padding.right"
+                                                :y1="tick.y"
+                                                :y2="tick.y"
+                                            />
+                                        </g>
+                                        <line
+                                            v-if="chart.zeroY != null"
+                                            class="trend-zero-line"
+                                            :x1="chart.padding.left"
+                                            :x2="chart.width - chart.padding.right"
+                                            :y1="chart.zeroY"
+                                            :y2="chart.zeroY"
+                                        />
+                                        <line
+                                            class="trend-ref-line"
+                                            :x1="chart.padding.left"
+                                            :x2="chart.width - chart.padding.right"
+                                            :y1="chart.refY"
+                                            :y2="chart.refY"
+                                        />
+                                        <path
+                                            v-if="chart.zeroY == null"
+                                            class="trend-line"
+                                            :class="chart.lineClass"
+                                            :d="chart.path"
+                                            fill="none"
+                                        />
+                                        <path
+                                            v-else
+                                            class="trend-line"
+                                            :class="chart.lineClass"
+                                            :d="chart.path"
+                                            :clip-path="'url(#mt-pos-' + chart.key + ')'"
+                                            fill="none"
+                                        />
+                                        <path
+                                            v-if="chart.zeroY != null"
+                                            class="trend-line trend-line--negative"
+                                            :class="chart.lineClass"
+                                            :d="chart.path"
+                                            :clip-path="'url(#mt-neg-' + chart.key + ')'"
+                                            fill="none"
+                                        />
+                                        <g class="trend-points">
+                                            <circle
+                                                v-for="point in chart.points"
+                                                :key="point.id + '-' + point.index"
+                                                class="trend-point"
+                                                :class="chart.pointClass"
+                                                :cx="point.x"
+                                                :cy="point.y"
+                                                r="2"
+                                            >
+                                                <title>{{ chart.label }} {{ formatTrendValue(chart, point.value) }} · {{ point.matchLabel }} · {{ point.mapLabel }} · {{ point.dateLabel }}</title>
+                                            </circle>
+                                        </g>
+                                        <circle
+                                            v-if="chart.latest"
+                                            class="trend-point trend-point--latest"
+                                            :class="chart.pointClass"
+                                            :cx="chart.latest.x"
+                                            :cy="chart.latest.y"
+                                            r="4"
+                                        />
+                                        <circle
+                                            v-if="performanceTrendHover.key === chart.key && getTrendHoverPoint(chart)"
+                                            class="trend-point trend-point--hover"
+                                            :class="chart.pointClass"
+                                            :cx="getTrendHoverPoint(chart).x"
+                                            :cy="getTrendHoverPoint(chart).y"
+                                            r="4"
+                                        />
+                                        <text
+                                            v-if="chart.latest"
+                                            class="trend-line-label"
+                                            :class="chart.lineClass"
+                                            :x="chart.width - 6"
+                                            :y="chart.latest.y - 6"
+                                            text-anchor="end"
+                                        >
+                                            <tspan class="trend-line-label__stat" :x="chart.width - 6">{{ chart.label }}</tspan>
+                                            <tspan class="trend-line-label__value" :x="chart.width - 6" dy="14">{{ formatTrendValue(chart, chart.latest.value) }}</tspan>
+                                        </text>
+                                        <g class="trend-axis trend-axis--y">
+                                            <text
+                                                v-for="tick in chart.ticks"
+                                                :key="'m-ylab-' + chart.key + '-' + tick.y"
+                                                class="trend-axis__label"
+                                                :x="chart.padding.left - 6"
+                                                :y="tick.y + 4"
+                                                text-anchor="end"
+                                            >{{ formatTrendValue(chart, tick.value) }}</text>
+                                        </g>
+                                        <g v-if="chart.showXAxis" class="trend-axis trend-axis--x">
+                                            <line
+                                                class="trend-axis__baseline"
+                                                :x1="chart.padding.left"
+                                                :x2="chart.width - chart.padding.right"
+                                                :y1="chart.height - chart.padding.bottom"
+                                                :y2="chart.height - chart.padding.bottom"
+                                            />
+                                            <text
+                                                v-for="label in chart.xLabels"
+                                                :key="'m-xlab-' + chart.key + '-' + label.index"
+                                                class="trend-axis__label trend-axis__label--x"
+                                                :x="label.x"
+                                                :y="chart.height - 6"
+                                                text-anchor="middle"
+                                            >{{ label.label }}</text>
+                                            <circle
+                                                v-for="point in chart.points"
+                                                :key="'m-res-' + chart.key + '-' + point.index"
+                                                class="trend-result-marker"
+                                                :class="'trend-result-marker--' + point.result"
+                                                :cx="point.x"
+                                                :cy="chart.height - chart.padding.bottom"
+                                                r="2"
+                                            ></circle>
+                                        </g>
+                                    </svg>
+                                    <div
+                                        v-if="performanceTrendHover.key === chart.key && getTrendHoverPoint(chart)"
+                                        class="trend-tooltip"
+                                        :style="trendTooltipStyle(chart, getTrendHoverPoint(chart))"
+                                    >
+                                        <div class="trend-tooltip__title">{{ getTrendHoverPoint(chart).matchLabel }} · {{ getTrendHoverPoint(chart).mapLabel }}</div>
+                                        <div class="trend-tooltip__meta">
+                                            {{ getTrendHoverPoint(chart).dateLabel }}
+                                            <span v-if="getTrendHoverPoint(chart).scoreLabel"> · {{ getTrendHoverPoint(chart).scoreLabel }}</span>
+                                            <span
+                                                v-if="mapResultLabel(getTrendHoverPoint(chart))"
+                                                class="trend-tooltip__result"
+                                                :class="'trend-tooltip__result--' + getTrendHoverPoint(chart).result"
+                                            >
+                                                · {{ mapResultLabel(getTrendHoverPoint(chart)) }}
+                                            </span>
                                         </div>
-                                        <span v-else class="cell-muted">Ei karttoja</span>
-                                    </td>
-                                    <td>
-                                        <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">FACEIT</a>
-                                        <span v-else class="cell-muted">-</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                                        <div class="trend-tooltip__value">{{ matchesTrendValueLabel(chart, getTrendHoverPoint(chart)) }} {{ matchesTooltipTrendValue(chart, getTrendHoverPoint(chart)) }}</div>
+                                        <div
+                                            v-if="getTrendHoverPoint(chart).delta != null"
+                                            class="trend-tooltip__delta"
+                                            :class="getTrendHoverPoint(chart).delta > 0 ? 'trend-delta--positive' : getTrendHoverPoint(chart).delta < 0 ? 'trend-delta--negative' : 'trend-delta--neutral'"
+                                        >
+                                            Muutos {{ formatTrendDelta(chart, getTrendHoverPoint(chart).delta) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="empty-state-container compact">
+                            <div class="empty-state-card">
+                                <h3 class="empty-state-title">Ei trendidataa</h3>
+                                <p class="empty-state-description">Tälle kaudelle ei ole riittävästi otteluita trendin piirtämiseen.</p>
+                            </div>
+                        </div>
                     </div>
-                    <div v-else class="empty-state-container">
-                        <div class="empty-state-card">
-                            <h3 class="empty-state-title">Ei otteluita</h3>
-                            <p class="empty-state-description">Tälle kaudelle ei ole otteluhistoriaa saatavilla.</p>
+
+                    <div class="scout-panel scout-table">
+                        <div class="section-heading">
+                            <div>
+                                <h3 class="section-title titleUnderline">Ottelulista</h3>
+                                <span class="section-sub">Ottelukohtaiset tulokset ja kartat</span>
+                            </div>
+                        </div>
+                        <div v-if="matchesList.length" class="table-wrapper">
+                            <table class="data-table matches-table">
+                                <thead>
+                                    <tr>
+                                        <th>Pvm</th>
+                                        <th>Vastustaja</th>
+                                        <th>BO</th>
+                                        <th>Score</th>
+                                        <th>Eräero</th>
+                                        <th>Maps</th>
+                                        <th>Linkki</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="match in matchesList"
+                                        :key="match.matchId"
+                                        :class="{ 'match-row--highlight': match.matchId === matchesHoverMatchId }"
+                                        @mouseenter="setMatchesHover(match.matchId)"
+                                        @mouseleave="clearMatchesHover"
+                                    >
+                                        <td>{{ formatDate(match.ts) }}</td>
+                                        <td :title="vetoSummaryLookup[match.matchId] || ''">{{ match.opponentName || match.team2Name || 'Vastustaja' }}</td>
+                                        <td>BO{{ match.bestOf }}</td>
+                                        <td>{{ match.teamScore }} - {{ match.oppScore }}</td>
+                                        <td :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'">{{ match.roundDiff }}</td>
+                                        <td>
+                                            <div class="micro-stack" v-if="match.maps && match.maps.length">
+                                                <span v-for="map in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
+                                            </div>
+                                            <span v-else class="cell-muted">Ei karttoja</span>
+                                        </td>
+                                        <td>
+                                            <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">FACEIT</a>
+                                            <span v-else class="cell-muted">-</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div v-else class="empty-state-container">
+                            <div class="empty-state-card">
+                                <h3 class="empty-state-title">Ei otteluita</h3>
+                                <p class="empty-state-description">Tälle kaudelle ei ole otteluhistoriaa saatavilla.</p>
+                            </div>
                         </div>
                     </div>
                 </section>

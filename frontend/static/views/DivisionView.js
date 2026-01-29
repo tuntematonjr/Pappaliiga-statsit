@@ -1161,6 +1161,7 @@ window.DivisionView = {
                                 :loading="standingsLoading"
                                 :error="standingsError"
                                 :show-header="false"
+                                :show-rank="false"
                                 :sticky-header="true"
                                 :highlight-team-id="activeTeamChipId"
                             ></team-comparison-board>

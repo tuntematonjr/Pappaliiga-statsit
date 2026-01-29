@@ -51,6 +51,10 @@ window.TeamComparisonBoard = {
             type: Boolean,
             default: false
         },
+        showRank: {
+            type: Boolean,
+            default: true
+        },
         highlightTeamId: {
             type: [String, Number],
             default: null
@@ -214,7 +218,7 @@ window.TeamComparisonBoard = {
                     >
                         <template #cell-team="{ row }">
                             <div class="team-comparison-team">
-                                <span class="team-rank">{{ row.rank }}</span>
+                                <span v-if="showRank" class="team-rank">{{ row.rank }}</span>
                                 <img class="team-logo" :src="row.logo" :alt="row.name" loading="lazy" />
                                 <a :href="getTeamUrl(row.id)" class="team-name team-name--link">{{ row.name }}</a>
                             </div>

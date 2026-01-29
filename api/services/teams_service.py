@@ -359,12 +359,16 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
         played = int(curr.get("played") or 0)
         wins = int(curr.get("wins") or 0)
         picks = int(curr.get("picks") or 0)
+        pick_wins = int(curr.get("wins_own") or 0)
+        opp_pick_wins = int(curr.get("wins_opp") or 0)
         team_map_rows.append(
             {
                 "map_name": map_name,
                 "played": played,
                 "picks": picks,
                 "opp_picks": int(curr.get("opp_picks") or 0),
+                "pick_wins": pick_wins,
+                "opp_pick_wins": opp_pick_wins,
                 "wins": wins,
                 "games": int(curr.get("games") or 0),
                 "ban1": int(curr.get("ban1") or 0),

@@ -53,6 +53,8 @@ class TeamMapStats(CamelModel):
     played: int
     picks: int
     opp_picks: int
+    pick_wins: Optional[int] = None
+    opp_pick_wins: Optional[int] = None
     wins: int
     games: int
     ban1: int
