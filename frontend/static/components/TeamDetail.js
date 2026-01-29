@@ -111,17 +111,6 @@ const SCOUT_MAP_COLUMNS = [
     { key: 'decov', label: 'Decider / overflow', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series' }
 ];
 
-const VETO_COLUMNS = [
-    { key: 'mapName', label: 'Kartta', sortable: true },
-    { key: 'timesPicked', label: 'Omat pickit', sortable: true, numeric: true },
-    { key: 'timesOpponentPicked', label: 'Vast. pickit', sortable: true, numeric: true },
-    { key: 'timesBanned', label: 'Bannit', sortable: true, numeric: true },
-    { key: 'pickRate', label: 'Pick%', sortable: true, numeric: true, decimals: 1 },
-    { key: 'banRate', label: 'Ban%', sortable: true, numeric: true, decimals: 1 },
-    { key: 'pickWinRate', label: 'Win pick', sortable: true, numeric: true, decimals: 1 },
-    { key: 'deciderWinRate', label: 'Win decider', sortable: true, numeric: true, decimals: 1 }
-];
-
 function createSegment() {
     return { data: null, loading: false, error: null, fetchedAt: null };
 }
@@ -665,7 +654,8 @@ function getMatchResult(match) {
 
 function resolveTabFromQuery(route) {
     const tab = route?.query?.tab;
-    const allowed = new Set(['overview', 'matches', 'players', 'veto']);
+    if (tab === 'veto') return 'matches';
+    const allowed = new Set(['overview', 'matches', 'players']);
     return allowed.has(tab) ? tab : 'overview';
 }
 
@@ -674,7 +664,9 @@ window.TeamDetail = {
     components: {
         get LoadingSpinner() { return window.LoadingSpinner; },
         get ErrorMessage() { return window.ErrorMessage; },
-        get SortableTable() { return window.SortableTable; }
+        get SortableTable() { return window.SortableTable; },
+        get PickBanFlow() { return window.PickBanFlow; },
+        get MatchExpandedDetails() { return window.MatchExpandedDetails; }
     },
     props: {
         teamId: { type: [String, Number], required: true },
@@ -692,7 +684,6 @@ window.TeamDetail = {
             SCOUT_MAP_COLUMNS,
             MAP_COLUMNS,
             PLAYER_COLUMNS,
-            VETO_COLUMNS,
             scoutTableKey: 0,
             detailedTableKey: 0,
             performanceTrendHover: {
@@ -712,7 +703,12 @@ window.TeamDetail = {
             matchesHoverMatchId: null,
             matchesHoverSource: null,
             matchesChartWidth: 640,
-            matchesChartHeight: 140
+            matchesChartHeight: 140,
+            expandedMatches: {},
+            matchPlayerStatsState: {},
+            mapCatalog: [],
+            mapCatalogLoading: false,
+            mapCatalogLoaded: false
         };
     },
     computed: {
@@ -1425,6 +1421,16 @@ window.TeamDetail = {
                 return bt - at; // newest first for tables
             });
         },
+        rawMatchesById() {
+            const matches = Array.isArray(this.seasonData?.matchHistory) ? this.seasonData.matchHistory : [];
+            const lookup = {};
+            matches.forEach(match => {
+                if (match?.matchId) {
+                    lookup[match.matchId] = match;
+                }
+            });
+            return lookup;
+        },
         matchesTrendMetrics() {
             return [
                 {
@@ -1592,19 +1598,6 @@ window.TeamDetail = {
             const raw = Array.isArray(this.seasonData?.vetoAggregates) ? this.seasonData.vetoAggregates : [];
             return raw.map(normalizeVeto).filter(Boolean);
         },
-        enhancedVetoAggregates() {
-            const aggregates = this.vetoAggregatesData;
-            const maxPick = Math.max(...aggregates.map(e => e.timesPicked || 0), 0);
-            const maxBan = Math.max(...aggregates.map(e => e.timesBanned || 0), 0);
-            return aggregates.map(e => ({
-                ...e,
-                isTopPick: e.timesPicked === maxPick && maxPick > 0,
-                isTopBan: e.timesBanned === maxBan && maxBan > 0
-            }));
-        },
-        vetoDefaultSort() {
-            return { column: 'timesPicked', order: 'desc', numeric: true };
-        },
         // Veto history: match_id/map_name/status/selected_by_team_id/_name/round_num/order -> rendered as BO2/BO3 step timeline
         vetoHistory() {
             const raw = Array.isArray(this.seasonData?.vetoHistory) ? this.seasonData.vetoHistory : [];
@@ -1636,12 +1629,34 @@ window.TeamDetail = {
                 return { matchId, match, format, steps: decorated };
             });
         },
+        vetoByMatchLookup() {
+            const lookup = {};
+            this.vetoByMatch.forEach(entry => {
+                lookup[entry.matchId] = entry;
+            });
+            return lookup;
+        },
         vetoSummaryLookup() {
             const lookup = {};
             this.vetoByMatch.forEach(entry => {
                 lookup[entry.matchId] = entry.steps.map(s => `${s.step}. ${s.label}: ${s.mapName}`).join(' • ');
             });
             return lookup;
+        },
+        matchPlayerStatsCurrent() {
+            const champId = this.currentChampionshipId;
+            const fallback = { items: [], byMatch: {}, loading: false, error: null };
+            if (!champId) return fallback;
+            return this.matchPlayerStatsState[champId] || fallback;
+        },
+        matchPlayerStatsByMatch() {
+            return this.matchPlayerStatsCurrent.byMatch || {};
+        },
+        matchPlayerStatsLoading() {
+            return !!this.matchPlayerStatsCurrent.loading;
+        },
+        matchPlayerStatsError() {
+            return this.matchPlayerStatsCurrent.error || null;
         },
         // Phase 1: Division averages for comparison
         divisionAverages() {
@@ -1679,6 +1694,9 @@ window.TeamDetail = {
             if (nextTab !== this.activeTab) {
                 this.activeTab = nextTab;
             }
+            if (newVal === 'veto') {
+                this.updateRoute(this.currentChampionshipId, 'matches');
+            }
         },
         activeTab(newVal) {
             if (newVal === 'overview') {
@@ -1689,6 +1707,8 @@ window.TeamDetail = {
             if (newVal === 'matches') {
                 this.$nextTick(() => {
                     this.setupMatchesChartObserver();
+                    this.ensureMatchPlayerStats(this.currentChampionshipId);
+                    this.ensureMapCatalog();
                 });
             }
         },
@@ -1696,6 +1716,11 @@ window.TeamDetail = {
             if (newVal) {
                 this.selectedChampionship = String(newVal);
                 this.fetchSeason(String(newVal), { force: true });
+                this.expandedMatches = {};
+                if (this.activeTab === 'matches') {
+                    this.ensureMatchPlayerStats(String(newVal));
+                    this.ensureMapCatalog();
+                }
             }
         },
         mapViewMode() {
@@ -1719,6 +1744,10 @@ window.TeamDetail = {
             this.setupMapTableScroll();
             this.setupTrendChartObserver();
             this.setupMatchesChartObserver();
+            if (this.activeTab === 'matches') {
+                this.ensureMatchPlayerStats(this.currentChampionshipId);
+                this.ensureMapCatalog();
+            }
         });
     },
     beforeUnmount() {
@@ -1880,6 +1909,18 @@ window.TeamDetail = {
                 this.matchesHoverSource = null;
             }
         },
+        isMatchExpanded(matchId) {
+            return !!this.expandedMatches[matchId];
+        },
+        toggleMatchExpand(matchId) {
+            if (!matchId) return;
+            const next = !this.expandedMatches[matchId];
+            this.expandedMatches = { ...this.expandedMatches, [matchId]: next };
+            if (next) {
+                this.ensureMatchPlayerStats(this.currentChampionshipId);
+                this.ensureMapCatalog();
+            }
+        },
         matchTooltipStyle(chart, point) {
             if (!chart || !point) return {};
             const left = (point.x / chart.width) * 100;
@@ -1972,6 +2013,7 @@ window.TeamDetail = {
             this.selectedChampionship = championshipId;
             this.fetchSeason(championshipId);
             this.updateRoute(championshipId, this.activeTab);
+            this.expandedMatches = {};
         },
         updateRoute(championshipId, tab) {
             if (!this.$router || !this.$route) return;
@@ -1997,6 +2039,50 @@ window.TeamDetail = {
         selectTab(tab) {
             this.activeTab = tab;
             this.updateRoute(this.currentChampionshipId, tab);
+        },
+        async ensureMatchPlayerStats(championshipId) {
+            if (!championshipId || !this.teamId || !window.apiClient) return;
+            const key = String(championshipId);
+            const existing = this.matchPlayerStatsState[key];
+            if (existing?.items?.length && !existing?.loading) return;
+            if (existing?.loading) return;
+            this.matchPlayerStatsState = {
+                ...this.matchPlayerStatsState,
+                [key]: { items: existing?.items || [], byMatch: existing?.byMatch || {}, loading: true, error: null }
+            };
+            try {
+                const items = await window.apiClient.getTeamMatchPlayerStats(this.teamId, championshipId);
+                const byMatch = {};
+                items.forEach(row => {
+                    const matchId = row?.matchId || row?.match_id;
+                    if (!matchId) return;
+                    if (!byMatch[matchId]) byMatch[matchId] = [];
+                    byMatch[matchId].push(row);
+                });
+                this.matchPlayerStatsState = {
+                    ...this.matchPlayerStatsState,
+                    [key]: { items, byMatch, loading: false, error: null }
+                };
+            } catch (error) {
+                this.matchPlayerStatsState = {
+                    ...this.matchPlayerStatsState,
+                    [key]: { items: existing?.items || [], byMatch: existing?.byMatch || {}, loading: false, error: error?.message || 'Failed to load player stats' }
+                };
+            }
+        },
+        async ensureMapCatalog() {
+            if (this.mapCatalogLoaded || this.mapCatalogLoading || !window.apiClient) return;
+            this.mapCatalogLoading = true;
+            try {
+                const catalog = await window.apiClient.getMapsCatalog();
+                this.mapCatalog = Array.isArray(catalog) ? catalog : [];
+                this.mapCatalogLoaded = true;
+            } catch (error) {
+                console.warn('[TeamDetail] map catalog fetch failed', error);
+                this.mapCatalogLoaded = true;
+            } finally {
+                this.mapCatalogLoading = false;
+            }
         },
         resetMapSort() {
             this.scoutTableKey += 1;
@@ -2193,7 +2279,7 @@ window.TeamDetail = {
 
                 <nav class="team-tabs" role="tablist">
                     <button
-                        v-for="tab in ['overview', 'matches', 'players', 'veto']"
+                        v-for="tab in ['overview', 'matches', 'players']"
                         :key="tab"
                         type="button"
                         class="team-tab"
@@ -2203,7 +2289,7 @@ window.TeamDetail = {
                         :aria-selected="activeTab === tab"
                         :aria-controls="'team-tab-' + tab"
                     >
-                        {{ { overview: 'Yleiskuva', matches: 'Ottelut', players: 'Pelaajat', veto: 'Veto/Nosto' }[tab] }}
+                        {{ { overview: 'Yleiskuva', matches: 'Ottelut', players: 'Pelaajat' }[tab] }}
                     </button>
                 </nav>
 
@@ -3040,6 +3126,7 @@ window.TeamDetail = {
                             <table class="data-table matches-table">
                                 <thead>
                                     <tr>
+                                        <th class="match-expand-cell"></th>
                                         <th>Pvm</th>
                                         <th>Vastustaja</th>
                                         <th>BO</th>
@@ -3050,29 +3137,55 @@ window.TeamDetail = {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr
-                                        v-for="match in matchesList"
-                                        :key="match.matchId"
-                                        :class="{ 'match-row--highlight': match.matchId === matchesHoverMatchId }"
-                                        @mouseenter="setMatchesHover(match.matchId)"
-                                        @mouseleave="clearMatchesHover"
-                                    >
-                                        <td>{{ formatDate(match.ts) }}</td>
-                                        <td :title="vetoSummaryLookup[match.matchId] || ''">{{ match.opponentName || match.team2Name || 'Vastustaja' }}</td>
-                                        <td>BO{{ match.bestOf }}</td>
-                                        <td>{{ match.teamScore }} - {{ match.oppScore }}</td>
-                                        <td :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'">{{ match.roundDiff }}</td>
-                                        <td>
-                                            <div class="micro-stack" v-if="match.maps && match.maps.length">
-                                                <span v-for="map in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
-                                            </div>
-                                            <span v-else class="cell-muted">Ei karttoja</span>
-                                        </td>
-                                        <td>
-                                            <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">FACEIT</a>
-                                            <span v-else class="cell-muted">-</span>
-                                        </td>
-                                    </tr>
+                                    <template v-for="match in matchesList" :key="match.matchId">
+                                        <tr
+                                            :class="{ 'match-row--highlight': match.matchId === matchesHoverMatchId }"
+                                            @mouseenter="setMatchesHover(match.matchId)"
+                                            @mouseleave="clearMatchesHover"
+                                        >
+                                            <td class="match-expand-cell">
+                                                <button
+                                                    type="button"
+                                                    class="expand-button"
+                                                    :class="{ 'expand-button--open': isMatchExpanded(match.matchId) }"
+                                                    :aria-expanded="isMatchExpanded(match.matchId) ? 'true' : 'false'"
+                                                    :aria-label="isMatchExpanded(match.matchId) ? 'Collapse match details' : 'Expand match details'"
+                                                    @click.stop="toggleMatchExpand(match.matchId)"
+                                                >
+                                                    <span class="chevron">›</span>
+                                                </button>
+                                            </td>
+                                            <td>{{ formatDate(match.ts) }}</td>
+                                            <td :title="vetoSummaryLookup[match.matchId] || ''">{{ match.opponentName || match.team2Name || 'Vastustaja' }}</td>
+                                            <td>BO{{ match.bestOf }}</td>
+                                            <td>{{ match.teamScore }} - {{ match.oppScore }}</td>
+                                            <td :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'">{{ match.roundDiff }}</td>
+                                            <td>
+                                                <div class="micro-stack" v-if="match.maps && match.maps.length">
+                                                    <span v-for="map in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
+                                                </div>
+                                                <span v-else class="cell-muted">Ei karttoja</span>
+                                            </td>
+                                            <td>
+                                                <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">FACEIT</a>
+                                                <span v-else class="cell-muted">-</span>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="isMatchExpanded(match.matchId)" class="match-expand-row">
+                                            <td :colspan="8">
+                                                <div class="match-expand-content">
+                                                    <match-expanded-details
+                                                        :summary="match"
+                                                        :details="rawMatchesById[match.matchId] || match"
+                                                        :veto-entry="vetoByMatchLookup[match.matchId] || null"
+                                                        :player-stats="matchPlayerStatsByMatch[match.matchId] || []"
+                                                        :map-catalog="mapCatalog"
+                                                        :loading="matchPlayerStatsLoading"
+                                                    ></match-expanded-details>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
                                 </tbody>
                             </table>
                         </div>
@@ -3178,97 +3291,6 @@ window.TeamDetail = {
                     </div>
                 </section>
 
-                <section v-if="activeTab === 'veto'" class="team-section" id="team-tab-veto" role="tabpanel">
-                    <h2 class="section-title titleUnderline">Ban/Nosto Tilastot</h2>
-                    <div v-if="enhancedVetoAggregates.length" class="table-wrapper">
-                        <sortable-table
-                            :columns="VETO_COLUMNS"
-                            :data="enhancedVetoAggregates"
-                            :default-sort="vetoDefaultSort"
-                            :sticky-header="true"
-                            :compact="true"
-                        >
-                            <template #cell-mapName="{ row }">
-                                <span :class="[{ 'stat-strong': row.isTopPick || row.isTopBan }]">{{ row.mapName }}</span>
-                                <span v-if="row.isTopPick" class="chip chip--accent">Top pick</span>
-                                <span v-if="row.isTopBan" class="chip chip--warn">Top ban</span>
-                            </template>
-                            <template #cell-timesPicked="{ row }">
-                                <div class="cell-with-bar">
-                                    <span>{{ row.timesPicked }}</span>
-                                    <div class="inline-bar inline-bar--thin">
-                                        <div class="inline-bar__fill inline-bar__fill--accent" :style="{ width: ((row.timesPicked + row.timesOpponentPicked + row.timesBanned) ? (row.timesPicked / (row.timesPicked + row.timesOpponentPicked + row.timesBanned) * 100) : 0) + '%' }"></div>
-                                    </div>
-                                </div>
-                            </template>
-                            <template #cell-timesOpponentPicked="{ row }">
-                                <span>{{ row.timesOpponentPicked }}</span>
-                            </template>
-                            <template #cell-timesBanned="{ row }">
-                                <div class="cell-with-bar">
-                                    <span>{{ row.timesBanned }}</span>
-                                    <div class="inline-bar inline-bar--thin">
-                                        <div class="inline-bar__fill inline-bar__fill--danger" :style="{ width: ((row.timesPicked + row.timesOpponentPicked + row.timesBanned) ? (row.timesBanned / (row.timesPicked + row.timesOpponentPicked + row.timesBanned) * 100) : 0) + '%' }"></div>
-                                    </div>
-                                </div>
-                            </template>
-                            <template #cell-pickRate="{ row }">
-                                <span>{{ formatPercent(row.pickRate, 1) }}</span>
-                            </template>
-                            <template #cell-banRate="{ row }">
-                                <span>{{ formatPercent(row.banRate, 1) }}</span>
-                            </template>
-                            <template #cell-pickWinRate="{ row }">
-                                <span>{{ formatPercent(row.pickWinRate, 1) }}</span>
-                            </template>
-                            <template #cell-deciderWinRate="{ row }">
-                                <span>{{ formatPercent(row.deciderWinRate, 1) }}</span>
-                            </template>
-                        </sortable-table>
-                    </div>
-                    <div v-else class="empty-state-container">
-                        <div class="empty-state-card">
-                            <h3 class="empty-state-title">Ei ban/nosto historiaa</h3>
-                            <p class="empty-state-description">Tälle kaudelle ei ole ban/nosto historiatietoja saatavilla.</p>
-                        </div>
-                    </div>
-                    <div class="glass-card" v-if="enhancedVetoAggregates.length">
-                        <div class="section-heading">
-                            <h3>Picks vs bans per kartta</h3>
-                        </div>
-                        <div class="stacked-bars">
-                            <div v-for="row in enhancedVetoAggregates" :key="row.mapName" class="stacked-bars__row">
-                                <span class="stacked-bars__label">{{ row.mapName }}</span>
-                                <div class="stacked-bars__bar">
-                                    <span class="stacked-seg stacked-seg--picks" :class="{ 'stacked-seg--highlight': row.isTopPick }" :style="{ width: ((row.timesPicked + row.timesOpponentPicked + row.timesBanned) ? (row.timesPicked / (row.timesPicked + row.timesOpponentPicked + row.timesBanned) * 100) : 0) + '%' }">Pick {{ row.timesPicked }}</span>
-                                    <span class="stacked-seg stacked-seg--picks-opp" :style="{ width: ((row.timesPicked + row.timesOpponentPicked + row.timesBanned) ? (row.timesOpponentPicked / (row.timesPicked + row.timesOpponentPicked + row.timesBanned) * 100) : 0) + '%' }">Vast {{ row.timesOpponentPicked }}</span>
-                                    <span class="stacked-seg stacked-seg--bans" :class="{ 'stacked-seg--highlight': row.isTopBan }" :style="{ width: ((row.timesPicked + row.timesOpponentPicked + row.timesBanned) ? (row.timesBanned / (row.timesPicked + row.timesOpponentPicked + row.timesBanned) * 100) : 0) + '%' }">Ban {{ row.timesBanned }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="glass-card" v-if="vetoByMatch.length">
-                        <div class="section-heading">
-                            <h3>BO2/BO3 veto-polku</h3>
-                            <span class="section-sub">Jokainen askel, joukkue ja decider/overflow korostettu</span>
-                        </div>
-                        <div class="veto-timeline" v-for="v in vetoByMatch" :key="v.matchId">
-                            <div class="veto-timeline__header">
-                                <span class="pill">Match {{ v.matchId }}</span>
-                                <span class="pill">Format {{ v.format.toUpperCase() }}</span>
-                                <span class="pill" v-if="v.match?.opponentName || v.match?.team2Name">vs {{ v.match?.opponentName || v.match?.team2Name }}</span>
-                            </div>
-                            <div class="veto-steps">
-                                <div v-for="step in v.steps" :key="step.step + step.mapName" class="veto-step" :class="'veto-step--' + step.action">
-                                    <div class="veto-step__order">#{{ step.step }}</div>
-                                    <div class="veto-step__title">{{ step.label }}</div>
-                                    <div class="veto-step__map">{{ step.mapName }}</div>
-                                    <div class="veto-step__actor">{{ step.teamName || 'Järjestelmä' }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
             </div>
         </div>
     `

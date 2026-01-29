@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Collection, Dict, Optional
+import json
 from datetime import datetime, timezone
 
 from db_async import compute_team_map_deltas_async, get_team_matches_mirror_async, query_async
@@ -186,6 +187,79 @@ async def fetch_team_matches(team_id: str, championship_id: Optional[str] = None
         })
     
     return result
+
+
+async def fetch_team_match_player_stats(team_id: str, championship_id: str) -> list[dict[str, Any]]:
+    """Fetch player map stats for every match the team played in a championship."""
+    team_check = await query_async(
+        "SELECT team_id FROM teams WHERE team_id = :team_id",
+        {"team_id": team_id}
+    )
+    if not team_check:
+        raise NotFoundError(f"Team '{team_id}' not found")
+
+    champ_rows = await query_async(
+        "SELECT championship_id FROM championships WHERE championship_id = :champ_id",
+        {"champ_id": championship_id}
+    )
+    if not champ_rows:
+        raise NotFoundError(f"Championship {championship_id} not found")
+
+    rows = await query_async(
+        """
+        SELECT
+            ps.match_id,
+            ps.round_index,
+            ps.map_id,
+            mp.map_name,
+            mc.image_sm,
+            mc.image_lg,
+            ps.player_id,
+            p.nickname,
+            ps.team_id,
+            ps.opponent_team_id,
+            ps.is_forfeit_map,
+            ps.stats_json
+        FROM player_stats ps
+        JOIN matches m ON m.match_id = ps.match_id
+        LEFT JOIN players p ON p.player_id = ps.player_id
+        LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+        LEFT JOIN maps_catalog mc ON LOWER(mc.map_id) = LOWER(mp.map_name)
+        WHERE m.championship_id = :champ_id
+          AND (m.team1_id = :team_id OR m.team2_id = :team_id)
+        ORDER BY ps.match_id, ps.round_index, ps.player_id
+        """,
+        {"champ_id": championship_id, "team_id": team_id}
+    )
+
+    normalized: list[dict[str, Any]] = []
+    for row in rows:
+        stats_raw = row.get("stats_json")
+        if isinstance(stats_raw, str):
+            try:
+                stats_raw = json.loads(stats_raw)
+            except Exception:
+                stats_raw = {}
+        elif stats_raw is None:
+            stats_raw = {}
+        normalized.append(
+            {
+                "match_id": row.get("match_id"),
+                "round_index": int(row.get("round_index") or 0),
+                "map_id": row.get("map_id"),
+                "map_name": row.get("map_name"),
+                "image_sm": row.get("image_sm"),
+                "image_lg": row.get("image_lg"),
+                "player_id": row.get("player_id"),
+                "nickname": row.get("nickname"),
+                "team_id": row.get("team_id"),
+                "opponent_team_id": row.get("opponent_team_id"),
+                "is_forfeit_map": bool(row.get("is_forfeit_map")),
+                "stats": stats_raw or {},
+            }
+        )
+
+    return normalized
 
 
 async def fetch_team_players(team_id: str, championship_id: Optional[str] = None) -> list[dict[str, Any]]:

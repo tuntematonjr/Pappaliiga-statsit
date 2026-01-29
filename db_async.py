@@ -2157,9 +2157,11 @@ async def get_team_matches_mirror_async(
         mm.best_of, mm.status, mm.is_forfeit AS match_is_forfeit, mm.winner_team_id AS match_winner_team_id,
         mm.ts, mm.played,
         ma.round_index, ma.map_name, ma.score_team1, ma.score_team2, ma.winner_team_id AS map_winner_team_id,
-        COALESCE(ma.is_forfeit, 0) AS map_is_forfeit
+        COALESCE(ma.is_forfeit, 0) AS map_is_forfeit,
+        mc.image_sm, mc.image_lg
       FROM my_matches mm
       LEFT JOIN maps ma ON ma.match_id = mm.match_id
+      LEFT JOIN maps_catalog mc ON LOWER(mc.map_id) = LOWER(ma.map_name)
     ),
     ps_agg AS (
       SELECT
@@ -2188,6 +2190,7 @@ async def get_team_matches_mirror_async(
       t1.avatar AS t1_avatar, t2.avatar AS t2_avatar,
       mp.round_index, mp.map_name, mp.score_team1, mp.score_team2,
       mp.map_is_forfeit, mp.map_winner_team_id,
+      mp.image_sm, mp.image_lg,
       pk.pick_team_id,
       COALESCE(ps1.kills, 0)      AS t1_kills,
       COALESCE(ps1.deaths, 0)     AS t1_deaths,
@@ -2256,6 +2259,9 @@ async def get_team_matches_mirror_async(
             {
                 "round_index": r["round_index"],
                 "map": r["map_name"],
+                "map_name": r["map_name"],
+                "image_sm": r.get("image_sm"),
+                "image_lg": r.get("image_lg"),
                 "rf": rf if rf is not None else 0,
                 "ra": ra if ra is not None else 0,
                 "is_forfeit": bool(r["map_is_forfeit"]),

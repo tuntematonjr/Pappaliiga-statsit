@@ -128,6 +128,10 @@
             `/api/teams/${teamId}/season/${seasonId}/players`,
             `/api/v1/teams/${teamId}/season/${seasonId}/players`
         ],
+        teamMatchPlayerStats: (teamId, championshipId) => [
+            `/api/teams/${teamId}/match-player-stats/${championshipId}`,
+            `/api/v1/teams/${teamId}/match-player-stats/${championshipId}`
+        ],
         // Legacy compatibility
         divisions: seasonId => [
             `/api/season-view/divisions/${seasonId}`,
@@ -1103,6 +1107,26 @@
             } catch (error) {
                 if (isDev) {
                     console.warn('[apiClient] teamMapStats endpoint failed', error);
+                }
+                return [];
+            }
+        }
+
+        async getTeamMatchPlayerStats(teamId, championshipId, options = {}) {
+            if (!teamId || !championshipId) {
+                throw new Error('teamId and championshipId are required');
+            }
+            const encTeamId = encodeURIComponent(teamId);
+            const encChampId = encodeURIComponent(championshipId);
+            const routes = buildRouteCandidates('teamMatchPlayerStats', encTeamId, encChampId);
+            try {
+                const result = await fetchWithFallback(routes, options);
+                const payload = result?.data ?? result ?? [];
+                const normalized = ensureSnakeCaseDeep(payload);
+                return Array.isArray(normalized) ? normalized : [];
+            } catch (error) {
+                if (isDev) {
+                    console.warn('[apiClient] teamMatchPlayerStats endpoint failed', error);
                 }
                 return [];
             }

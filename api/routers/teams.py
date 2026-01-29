@@ -144,6 +144,21 @@ class PlayerStats(CamelModel):
     damage: int
 
 
+class MatchPlayerStats(CamelModel):
+    match_id: str
+    round_index: int
+    map_id: Optional[int]
+    map_name: Optional[str]
+    image_sm: Optional[str]
+    image_lg: Optional[str]
+    player_id: str
+    nickname: Optional[str]
+    team_id: Optional[str]
+    opponent_team_id: Optional[str]
+    is_forfeit_map: bool
+    stats: Dict[str, Any]
+
+
 class VetoBanAggregate(CamelModel):
     map_name: str
     times_banned: int
@@ -271,6 +286,16 @@ async def get_team_page(
         
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{team_id}/match-player-stats/{championship_id}", response_model=List[MatchPlayerStats])
+async def get_team_match_player_stats(team_id: str, championship_id: str):
+    """Get player map stats for every match the team played in a championship."""
+    try:
+        rows = await teams_service.fetch_team_match_player_stats(team_id, championship_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [MatchPlayerStats(**row) for row in rows]
 
 
 @router.get("/{team_id}/season/{championship_id}", response_model=ComprehensiveTeamSeasonData)

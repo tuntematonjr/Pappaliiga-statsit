@@ -104,7 +104,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-db-concurrency",
         type=int,
-        default=getattr(faceit_config, "MAX_DB_WRITER_CONCURRENCY", 6),
+        default=getattr(faceit_config, "MAX_DB_WRITER_CONCURRENCY", 3),
         help="Maximum number of concurrent DB writer tasks (default: MAX_DB_WRITER_CONCURRENCY)",
     )
     return parser
