@@ -247,6 +247,12 @@ def get_democracy_history(match_id: str) -> Dict[str, Any]:
     data = _get(url, HEADERS_DEMOCRACY)
     return data or None
 
+def get_team_details(team_id: str) -> Dict[str, Any]:
+    """Fetch team details including avatar, name, members, etc."""
+    url = f"{OPEN_BASE}/teams/{team_id}"
+    data = _get(url, HEADERS_OPEN)
+    return data or None
+
 def list_championships_for_organizer(organizer_id: str, limit: int = 100) -> List[Dict[str, Any]]:
     """List all championships for a given organizer_id."""
     url = f"{OPEN_BASE}/organizers/{organizer_id}/championships"

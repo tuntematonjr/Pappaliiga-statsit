@@ -18,7 +18,7 @@ from logging.handlers import RotatingFileHandler
 
 from faceit_config import DIVISIONS, CURRENT_SEASON
 from faceit_client import (
-    list_championship_matches, get_match_details, get_match_stats, get_democracy_history
+    list_championship_matches, get_match_details, get_match_stats, get_democracy_history, get_team_details
 )
 from db import (
     get_conn, init_db,
@@ -588,9 +588,9 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
 
     # Upsert teams (names & avatars live only in teams)
     if team1_id or (summary and summary.get("team1_name")) or f1.get("name"):
-        upsert_team(con, {"team_id": team1_id, "name": (summary.get("team1_name") if summary else f1.get("name")), "avatar": (summary.get("team1_avatar") if summary else f1.get("avatar")), "updated_at": None})
+        upsert_team(con, {"team_id": team1_id, "name": (summary.get("team1_name") if summary else f1.get("name")), "avatar": (summary.get("team1_avatar") if summary else f1.get("avatar"))})
     if team2_id or (summary and summary.get("team2_name")) or f2.get("name"):
-        upsert_team(con, {"team_id": team2_id, "name": (summary.get("team2_name") if summary else f2.get("name")), "avatar": (summary.get("team2_avatar") if summary else f2.get("avatar")), "updated_at": None})
+        upsert_team(con, {"team_id": team2_id, "name": (summary.get("team2_name") if summary else f2.get("name")), "avatar": (summary.get("team2_avatar") if summary else f2.get("avatar"))})
 
     # Bulk upsert rosters (players)
     roster_players = []
@@ -746,10 +746,45 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
 
 # ---- main sync --------------------------------------------------------------
 
-def main(db_path: str, division_num: int = None, season: int = None, all_seasons: bool = False, playoffs_only: bool = False, clean: bool = False, vacuum: bool = False, cleanup_orphans: bool = False) -> None:
+def main(db_path: str, division_num: int = None, season: int = None, all_seasons: bool = False, playoffs_only: bool = False, clean: bool = False, vacuum: bool = False, cleanup_orphans: bool = False, update_teams: bool = False) -> None:
     con = get_conn(db_path)
     try:
         init_db(con)
+        
+        # If --update-teams, fetch and update all team avatars/names from Faceit
+        if update_teams:
+            cur = con.execute("SELECT DISTINCT team_id FROM teams WHERE team_id IS NOT NULL ORDER BY team_id")
+            team_ids = [row[0] for row in cur.fetchall()]
+            total = len(team_ids)
+            print(f">> [UPDATE-TEAMS] Updating {total} teams from Faceit API...")
+            start_ts = time.time()
+            updated = 0
+            not_found = 0
+            failed = 0
+            for i, team_id in enumerate(team_ids, start=1):
+                try:
+                    team_data = get_team_details(team_id)
+                    if team_data:
+                        upsert_team(con, {
+                            "team_id": team_id,
+                            "name": team_data.get("name") or team_data.get("nickname"),
+                            "avatar": team_data.get("avatar"),
+                        })
+                        updated += 1
+                    else:
+                        # 404 - team deleted/private on Faceit
+                        not_found += 1
+                except Exception as e:
+                    logging.warning(f"Failed to update team {team_id}: {e}")
+                    failed += 1
+                if i % 10 == 0 or i == total:
+                    elapsed = time.time() - start_ts
+                    rate = i / elapsed if elapsed > 0 else 0
+                    eta = (total - i) / rate if rate > 0 else 0
+                    print(f"\r>> [{i}/{total}] updated={updated}, not_found={not_found}, failed={failed}, elapsed={int(elapsed)}s, ETA={int(eta)}s", end="", flush=True)
+            con.commit()
+            print(f"\n>> [UPDATE-TEAMS] Complete! Updated {updated} teams, {not_found} not found (404), {failed} errors.")
+            return
         
         # If --cleanup-orphans, remove unused teams and players
         if cleanup_orphans:
@@ -880,5 +915,7 @@ if __name__ == "__main__":
                    help="Remove orphaned teams, players, and old map pool data")
     p.add_argument("--vacuum", action="store_true",
                    help="Optimize database file size by reclaiming unused space (run after --clean)")
+    p.add_argument("--update-teams", action="store_true",
+                   help="Fetch and update all team avatars/names from Faceit Teams API")
     args = p.parse_args()
-    main(args.db, args.div, args.season, args.all_seasons, args.playoffs_only, args.clean, args.vacuum, args.cleanup_orphans)
+    main(args.db, args.div, args.season, args.all_seasons, args.playoffs_only, args.clean, args.vacuum, args.cleanup_orphans, args.update_teams)

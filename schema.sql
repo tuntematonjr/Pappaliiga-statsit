@@ -27,8 +27,7 @@ CREATE INDEX IF NOT EXISTS ix_champ_season ON championships(season);
 CREATE TABLE IF NOT EXISTS teams (
   team_id    TEXT PRIMARY KEY,
   name       TEXT,
-  avatar     TEXT,
-  updated_at INTEGER
+  avatar     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS players (
@@ -146,9 +145,7 @@ CREATE TABLE IF NOT EXISTS maps_catalog (
   map_id       TEXT PRIMARY KEY,              -- canonical id, e.g. 'de_ancient'
   pretty_name  TEXT,                          -- e.g. 'Ancient'
   image_sm     TEXT,                          -- small image URL from FACEIT
-  image_lg     TEXT,                          -- large image URL from FACEIT
-  first_seen_at INTEGER DEFAULT (strftime('%s','now')),
-  last_seen_at  INTEGER DEFAULT (strftime('%s','now'))
+  image_lg     TEXT                           -- large image URL from FACEIT
 );
 
 CREATE INDEX IF NOT EXISTS ix_maps_catalog_pretty ON maps_catalog(pretty_name);

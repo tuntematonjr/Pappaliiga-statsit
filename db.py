@@ -117,23 +117,26 @@ def upsert_championship(con: sqlite3.Connection, row: Dict[str, Any]) -> Dict[st
 
 def upsert_team(con: sqlite3.Connection, team: Dict[str, Any]) -> None:
     """
-    team = { team_id, name, avatar, updated_at? }
+        team = { team_id, name, avatar }
     Guarantees:
       - always persist some avatar (default if missing)
       - never overwrite an existing non-empty value
     """
-    if "updated_at" not in team:
-        team["updated_at"] = None
     avatar_in = team.get("avatar")
     team["avatar"] = avatar_in if (avatar_in is not None and str(avatar_in).strip() != "") else DEFAULT_TEAM_AVATAR
 
     sql = """
-    INSERT INTO teams (team_id, name, avatar, updated_at)
-    VALUES (:team_id, :name, :avatar, COALESCE(:updated_at, strftime('%s','now')))
+    INSERT INTO teams (team_id, name, avatar)
+    VALUES (:team_id, :name, :avatar)
     ON CONFLICT(team_id) DO UPDATE SET
       name       = CASE WHEN teams.name IS NULL OR teams.name='' THEN excluded.name ELSE teams.name END,
-      avatar     = COALESCE(NULLIF(teams.avatar, ''), NULLIF(excluded.avatar, ''), :default_avatar),
-      updated_at = COALESCE(excluded.updated_at, teams.updated_at)
+      avatar     = CASE
+                     WHEN excluded.avatar IS NOT NULL AND excluded.avatar != '' AND excluded.avatar != teams.avatar
+                       THEN excluded.avatar
+                     WHEN teams.avatar IS NULL OR teams.avatar = ''
+                       THEN COALESCE(NULLIF(excluded.avatar, ''), :default_avatar)
+                     ELSE teams.avatar
+                   END
     """
     con.execute(sql, {**team, "default_avatar": DEFAULT_TEAM_AVATAR})
 
@@ -996,13 +999,12 @@ def upsert_map_catalog(con: sqlite3.Connection, row: dict) -> None:
     row: {map_id, pretty_name, image_sm, image_lg}
     """
     sql = """
-    INSERT INTO maps_catalog (map_id, pretty_name, image_sm, image_lg, first_seen_at, last_seen_at)
-    VALUES (:map_id, :pretty_name, :image_sm, :image_lg, strftime('%s','now'), strftime('%s','now'))
+        INSERT INTO maps_catalog (map_id, pretty_name, image_sm, image_lg)
+        VALUES (:map_id, :pretty_name, :image_sm, :image_lg)
     ON CONFLICT(map_id) DO UPDATE SET
       pretty_name = COALESCE(excluded.pretty_name, maps_catalog.pretty_name),
       image_sm    = COALESCE(NULLIF(excluded.image_sm,''), maps_catalog.image_sm),
-      image_lg    = COALESCE(NULLIF(excluded.image_lg,''), maps_catalog.image_lg),
-      last_seen_at= strftime('%s','now')
+            image_lg    = COALESCE(NULLIF(excluded.image_lg,''), maps_catalog.image_lg)
     """
     con.execute(sql, row)
 
