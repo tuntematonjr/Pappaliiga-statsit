@@ -8,10 +8,9 @@ import asyncio
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from db_async import fetch_all
-from division_overrides import load_division_overrides
 import faceit_config
 
 OVERRIDES_PATH = Path(__file__).with_name("division_overrides.json")

@@ -20,7 +20,7 @@ import argparse
 import asyncio
 import json
 from pathlib import Path
-from typing import Iterable, List, Set
+from typing import Set
 
 from db_async import (
     connection,

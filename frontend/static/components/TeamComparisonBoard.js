@@ -250,14 +250,11 @@ window.TeamComparisonBoard = {
                             <split-bar
                                 :wins="row.split.wins"
                                 :losses="row.split.losses"
-                                height="18px"
-                                :show-labels="false"
-                                :show-percent="true"
+                                height="24px"
+                                :left-text="formatInteger(row.wins) + ' voittoa'"
+                                :right-text="formatInteger(row.losses) + ' tappiota'"
+                                :show-percent="false"
                             ></split-bar>
-                            <div class="split-labels">
-                                <span class="wins">{{ formatInteger(row.wins) }} voittoa</span>
-                                <span class="losses">{{ formatInteger(row.losses) }} tappiota</span>
-                            </div>
                         </template>
                     </sortable-table>
 

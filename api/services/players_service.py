@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from fastapi import HTTPException
 
 from db_async import compute_player_map_deltas_async, query_async
 

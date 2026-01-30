@@ -10,7 +10,7 @@ from env_loader import load_env  # noqa: E402
 
 load_env(PROJECT_ROOT)
 
-from db_async import readonly_connection
+from db_async import readonly_connection  # noqa: E402
 
 
 async def main() -> None:

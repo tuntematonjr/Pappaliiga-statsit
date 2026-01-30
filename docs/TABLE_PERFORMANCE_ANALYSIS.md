@@ -161,12 +161,14 @@ The `*_prev` tables were designed to track historical snapshots for "before/afte
 ### Snapshot Mechanism
 
 ```python
-# sync_pipeline.py:754
-snapshot_ts = await get_division_snapshot_ts_async(conn, season, division_num)
+# sync_pipeline.py:756
+snapshot_ts = await create_snapshot_ts_async(
+    conn, season, division_num, match_id=match_id
+)
 
 # db_async.py:1351-1462
 await upsert_player_season_totals_async(
-    season, division_num, player_id, 
+    season, division_num, player_id,
     snapshot_ts=snapshot_ts  # Passed but not stored in _prev
 )
 ```

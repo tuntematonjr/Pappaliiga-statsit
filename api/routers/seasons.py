@@ -1,11 +1,10 @@
 """Seasons API endpoints for aggregated season data."""
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import List
 
 from fastapi import APIRouter, HTTPException
 
-from api.exceptions import NotFoundError
 from api.models import CamelModel
 from api.services import seasons_service
 

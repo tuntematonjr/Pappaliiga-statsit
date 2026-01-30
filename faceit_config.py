@@ -3,7 +3,8 @@
 # API key is read from env FACEIT_API_KEY to avoid committing secrets.
 # Keep things simple and explicit.
 
-import os, json
+import os
+import json
 from pathlib import Path
 from typing import Any, List
 

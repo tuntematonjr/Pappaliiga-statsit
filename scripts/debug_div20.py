@@ -109,7 +109,7 @@ async def main():
     
     print(f"\nFinished matches: {finished}")
     print(f"Servujatkot wins: {wins}")
-    print(f"\nScreenshot shows: 11 GP, 7 W for Servujatkot")
+    print("\nScreenshot shows: 11 GP, 7 W for Servujatkot")
 
 if __name__ == "__main__":
     asyncio.run(main())

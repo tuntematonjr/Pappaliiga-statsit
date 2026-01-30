@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-import json
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
 
 from db_async import query_async
 

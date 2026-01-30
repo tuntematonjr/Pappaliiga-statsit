@@ -498,6 +498,9 @@
                     return true;
                 }
                 return playoffsWinner === seasonWinner;
+            },
+            playoffsCtaDisabled() {
+                return !this.division.season.isFinished;
             }
         },
         methods: {
@@ -601,7 +604,18 @@
                                 Voittaja: {{ division.playoffs.winner }}
                             </p>
                             <div class="division-card__action-row">
+                                <button
+                                    v-if="playoffsCtaDisabled"
+                                    type="button"
+                                    class="division-card__action division-card__action--ghost division-card__action--disabled"
+                                    title="Runkosarja kesken"
+                                    aria-label="Playoffit avautuvat, kun runkosarja on valmis"
+                                    disabled
+                                >
+                                    Näytä playoffit
+                                </button>
                                 <a
+                                    v-else
                                     class="division-card__action division-card__action--ghost"
                                     :href="division.playoffs.href"
                                     @click="handlePlayoffsCTA"

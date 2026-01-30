@@ -1,6 +1,6 @@
 """Quick diagnostic to verify Phase 1 data availability."""
 import asyncio
-from db_async import query_async, connection
+from db_async import query_async
 
 
 async def check_data():
@@ -76,7 +76,7 @@ async def check_data():
         """
     )
     if rows:
-        print(f"   ✅ Top 5 teams in latest season:")
+        print("   ✅ Top 5 teams in latest season:")
         for idx, r in enumerate(rows, 1):
             print(f"      {idx}. {r['team_name']}: {r['matches_won']}W/{r['matches_played']}M (RD: {r['round_diff']})")
     else:

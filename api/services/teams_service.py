@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Collection, Dict, Optional
-import json
+from typing import Any, Optional
 from datetime import datetime, timezone
 
 from db_async import compute_team_map_deltas_async, get_team_matches_mirror_async, query_async
-from standings_utils import calculate_standings, get_team_position
+from standings_utils import calculate_standings
 
 from api.exceptions import NotFoundError
 
@@ -704,7 +703,6 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
         round_bucket = rounds_by_map.get(map_name, {"rounds_won": 0, "rounds_lost": 0})
         rounds_won = round_bucket.get("rounds_won", 0)
         rounds_lost = round_bucket.get("rounds_lost", 0)
-        estimated_rounds = played * 30
         total_rounds = rounds_won + rounds_lost
         
         # Store actual round totals for display

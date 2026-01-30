@@ -27,7 +27,6 @@ else is kept in source control.
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import logging
 import os
@@ -37,7 +36,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncIterator, Collection, Dict, Iterable, Mapping, Optional, Sequence, Set
+from typing import Any, AsyncIterator, Collection, Dict, Iterable, Mapping, Optional, Sequence
 from urllib.parse import parse_qsl, urlparse
 
 import asyncmy
@@ -445,13 +444,6 @@ async def execute(sql: str, params: Sequence[Any] | Dict[str, Any] | None = None
             return cur.rowcount
 
 
-async def executemany(sql: str, args: Iterable[Sequence[Any] | Dict[str, Any]]) -> int:
-    async with connection() as conn:
-        async with conn.cursor() as cur:
-            await cur.executemany(sql, args)
-            return cur.rowcount
-
-
 async def fetch_all(sql: str, params: Sequence[Any] | Dict[str, Any] | None = None) -> list[dict[str, Any]]:
     async with readonly_connection() as conn:
         async with conn.cursor(asyncmy.cursors.DictCursor) as cur:
@@ -571,6 +563,7 @@ async def reset_db_async(confirm: bool = False) -> None:
             else:
                 LOGGER.info("No tables found to drop")
             await cur.execute("SET FOREIGN_KEY_CHECKS=1")
+        await conn.commit()
         LOGGER.info("All tables dropped from %s", dbname)
 
 
@@ -599,12 +592,6 @@ async def query_async(sql: str, params: Any = None) -> list[dict]:
     sql_conv, params_conv = _translate_sql(sql, params)
     rows = await fetch_all(sql_conv, params_conv)
     return [dict(row) for row in rows]
-
-
-async def execute_async(sql: str, params: Dict[str, Any] | Sequence[Any] | None = None) -> None:
-    """Execute a statement and commit."""
-    sql_conv, params_conv = _translate_sql(sql, params)
-    await execute(sql_conv, params_conv)
 
 
 def _prepare_excluded(
@@ -1098,27 +1085,6 @@ async def get_map_id_lookup_async(
     return {int(r[1]): int(r[0]) for r in rows}
 
 
-async def get_division_snapshot_ts_async(
-    conn: asyncmy.Connection,
-    season: int,
-    division_num: int,
-) -> int:
-    """Return snapshot_ts for player/team totals."""
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            SELECT snapshot_ts
-            FROM division_snapshots
-            WHERE season = %s AND division_num = %s
-            ORDER BY snapshot_ts DESC
-            LIMIT 1
-            """,
-            (season, division_num),
-        )
-        row = await cur.fetchone()
-    return int(row[0]) if row else 0
-
-
 async def replace_map_votes_async(
     match_id: str,
     season: int,
@@ -1350,7 +1316,7 @@ async def upsert_team_season_totals_async(
                   AND m.division_num = %s
                   AND (m.team1_id = %s OR m.team2_id = %s)
                   AND c.is_playoffs = 0
-                  AND m.finished_at IS NOT NULL
+                  AND NULLIF(m.finished_at, 0) IS NOT NULL
                 GROUP BY season, division_num, team_id
                 ON DUPLICATE KEY UPDATE
                   matches_played = VALUES(matches_played),
@@ -1408,7 +1374,7 @@ async def upsert_team_season_totals_async(
                                             AND m.division_num = %s
                                             AND (m.team1_id = %s OR m.team2_id = %s)
                                             AND c.is_playoffs = 0
-                                            AND m.finished_at IS NOT NULL
+                                            AND NULLIF(m.finished_at, 0) IS NOT NULL
                                         GROUP BY season, division_num, team_id
                                         """,
                                         (
@@ -2061,50 +2027,6 @@ async def replace_player_map_season_totals_async(
         await upsert_player_map_season_totals_async(season, division_num, pid)
 
 
-async def recompute_all_async(
-    conn: asyncmy.Connection,
-    season: int,
-    division_num: int,
-) -> None:
-    """Recompute aggregates for a division (useful for backfills)."""
-    await replace_team_season_totals_async(conn, season, division_num)
-    await replace_player_season_totals_async(conn, season, division_num)
-    await replace_team_map_season_totals_async(conn, season, division_num)
-    await replace_player_map_season_totals_async(conn, season, division_num)
-
-
-async def _delete_team_stats_for_match_async(
-    conn: asyncmy.Connection,
-    match_id: str,
-    map_lookup: Mapping[int, int],
-) -> None:
-    map_ids = [val for val in map_lookup.values() if val is not None]
-    placeholders = ", ".join(["%s"] * len(map_ids))
-    async with conn.cursor() as cur:
-        await cur.execute("DELETE FROM player_stats WHERE match_id = %s", (match_id,))
-        await cur.execute("DELETE FROM team_stats WHERE match_id = %s", (match_id,))
-        if map_ids:
-            await cur.execute(f"DELETE FROM map_votes WHERE match_id = %s AND map_id IN ({placeholders})", (match_id, *map_ids))
-    await conn.commit()
-
-
-async def get_map_vote_metadata_async(match_id: str) -> list[dict[str, Any]]:
-    """Return metadata from map_votes table for a match."""
-    async with connection(label="get-map-votes") as conn:
-        async with conn.cursor(cursors.DictCursor) as cur:
-            await cur.execute(
-                """
-                SELECT map_id, map_name, status, selected_by_team_id, selected_by_faction, round_num
-                FROM map_votes
-                WHERE match_id = %s
-                ORDER BY round_num
-                """,
-                (match_id,),
-            )
-            rows = await cur.fetchall()
-    return [dict(row) for row in rows]
-
-
 async def create_snapshot_ts_async(
     conn: asyncmy.Connection,
     season: int,
@@ -2142,46 +2064,6 @@ async def create_snapshot_ts_async(
         snapshot_ts = int(row[0]) if row else int(time.time())
     LOGGER.debug("%s snapshot_ts=%s", label, snapshot_ts)
     return snapshot_ts
-
-
-async def recompute_for_match_async(
-    match_id: str,
-    *,
-    season: int,
-    division_num: int,
-    team1_id: str,
-    team2_id: str,
-    map_rows: Sequence[Row],
-    player_stats: Sequence[Row],
-    team_stats: Sequence[Row],
-    snapshot_ts: int,
-) -> None:
-    """Recompute derived aggregates for a single match (utility for tools)."""
-    forfeit_lookup = {int(row["round_index"]): bool(row.get("is_forfeit")) for row in map_rows}
-
-    async with connection(label=f"recompute-match:{match_id}") as conn:
-        map_lookup = {int(row["round_index"]): int(row["map_id"]) for row in map_rows if row.get("map_id")}
-        await _delete_team_stats_for_match_async(conn, match_id, map_lookup)
-        await replace_map_votes_async(match_id, season, division_num, [], label="recompute-map-votes")
-        await upsert_maps_bulk_async(match_id, season, division_num, map_rows, label="recompute-maps")
-        map_lookup = await get_map_id_lookup_async(conn, match_id)
-        await upsert_player_stats_for_match_async(conn, season, division_num, match_id, map_lookup, player_stats, forfeit_lookup)
-        await upsert_team_stats_for_match_async(conn, season, division_num, match_id, map_lookup, team_stats, forfeit_lookup)
-
-        # Update aggregates
-        for team_id in (team1_id, team2_id):
-            await upsert_team_season_totals_async(season, division_num, team_id, snapshot_ts=snapshot_ts, label=f"recompute-team-season:{team_id}")
-            await upsert_team_map_season_totals_async(season, division_num, team_id, snapshot_ts=snapshot_ts, label=f"recompute-team-map:{team_id}")
-
-        affected_players: Set[str] = set()
-        for row in player_stats:
-            pid = row.get("player_id")
-            if pid:
-                affected_players.add(str(pid))
-
-        for player_id in affected_players:
-            await upsert_player_season_totals_async(season, division_num, player_id, snapshot_ts=snapshot_ts, label=f"recompute-player-season:{player_id}")
-            await upsert_player_map_season_totals_async(season, division_num, player_id, snapshot_ts=snapshot_ts, label=f"recompute-player-map:{player_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -2561,7 +2443,7 @@ async def get_team_matches_mirror_async(
         m.match_id, m.championship_id, m.team1_id, m.team2_id,
         m.best_of, m.status, m.is_forfeit, m.winner_team_id,
         COALESCE(m.started_at, m.scheduled_at, m.configured_at, 0) AS ts,
-        CASE WHEN m.finished_at IS NOT NULL THEN 1 ELSE 0 END AS played
+        CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN 1 ELSE 0 END AS played
       FROM matches m
       WHERE m.championship_id = :champ AND (:team = m.team1_id OR :team = m.team2_id){excl_clause}
     ),
@@ -2693,26 +2575,6 @@ async def get_team_matches_mirror_async(
 # Division summary helpers for season overview
 # ---------------------------------------------------------------------------
 
-async def get_all_base_divisions_for_championship(conn: asyncmy.Connection, championship_id: str) -> list[Row]:
-    """Fetch base divisions (non-playoff) for a championship's season."""
-    async with conn.cursor(cursors.DictCursor) as cur:
-        await cur.execute(
-            """
-            SELECT
-                c.championship_id as division_id,
-                c.division_num as tier,
-                c.name,
-                'waiting' as status
-            FROM championships c
-            WHERE c.season = (SELECT season FROM championships WHERE championship_id = %s LIMIT 1)
-              AND c.is_playoffs = 0
-            ORDER BY c.division_num;
-            """,
-            (championship_id,),
-        )
-        return await cur.fetchall()
-
-
 async def get_all_base_divisions_for_season(conn: asyncmy.Connection, season: int) -> list[Row]:
     """Fetch base divisions (non-playoff) for a season."""
     async with conn.cursor(cursors.DictCursor) as cur:
@@ -2729,16 +2591,6 @@ async def get_all_base_divisions_for_season(conn: asyncmy.Connection, season: in
             ORDER BY c.division_num;
             """,
             (season,),
-        )
-        return await cur.fetchall()
-
-
-async def get_maps_for_division(conn: asyncmy.Connection, season: int, division_num: int) -> list[Row]:
-    """Return maps for a division."""
-    async with conn.cursor(cursors.DictCursor) as cur:
-        await cur.execute(
-            "SELECT * FROM maps WHERE season = %s AND division_num = %s",
-            (season, division_num),
         )
         return await cur.fetchall()
 

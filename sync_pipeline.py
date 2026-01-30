@@ -4,9 +4,12 @@ import asyncio
 import logging
 import re
 import time
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
+
+import httpx
 
 from utils import format_hms, log_stage
 from runtime_diagnostics import SyncDiagnostics
@@ -18,6 +21,7 @@ from faceit_client_async import (
     get_match_details_async,
     get_championship_details_async,
     get_match_stats_async,
+    get_championship_teams_async,
 )
 
 import faceit_config
@@ -48,6 +52,7 @@ from db_async import (
 LOGGER = logging.getLogger(__name__)
 
 PENDING_REFRESH_INTERVAL_SECONDS = 15 * 60  # avoid re-fetching pending matches more than every 15 minutes
+TEAM_REFRESH_INTERVAL_SECONDS = 24 * 60 * 60  # throttle team refresh to once per day
 
 __all__ = [
     "ChampionshipSyncResult",
@@ -90,6 +95,14 @@ def safe_int(value: Any, default: Optional[int] = 0) -> Optional[int]:
         return int(str(value).strip())
     except Exception:
         return default
+
+
+def normalize_finished_at(value: Any) -> Optional[int]:
+    """Normalize finished_at to None when missing/zero to avoid false positives."""
+    ts = safe_int(value, None)
+    if not ts or ts <= 0:
+        return None
+    return ts
 
 
 def safe_float(value: Any, default: Optional[float] = 0.0) -> Optional[float]:
@@ -442,6 +455,131 @@ def _collect_team_payloads(details: Dict[str, Any], banned_lookup: Dict[str, Dic
     return out
 
 
+def _normalize_db_timestamp(value: Any) -> Optional[datetime]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value))
+        except Exception:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+async def _filter_stale_team_payloads(team_payloads: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not team_payloads:
+        return []
+
+    team_ids = [str(row.get("team_id")) for row in team_payloads if row.get("team_id")]
+    if not team_ids:
+        return []
+
+    placeholders = ", ".join(["%s"] * len(team_ids))
+    rows = await fetch_all(
+        f"SELECT team_id, updated_at FROM teams WHERE team_id IN ({placeholders})",
+        team_ids,
+    )
+    updated_lookup = {str(row.get("team_id")): _normalize_db_timestamp(row.get("updated_at")) for row in rows}
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=TEAM_REFRESH_INTERVAL_SECONDS)
+
+    stale: List[Dict[str, Any]] = []
+    for row in team_payloads:
+        team_id = str(row.get("team_id"))
+        updated_at = updated_lookup.get(team_id)
+        if not updated_at or updated_at < cutoff:
+            stale.append(row)
+    return stale
+
+
+async def _avatar_url_ok(
+    url: str,
+    client: httpx.AsyncClient,
+    cache: Dict[str, bool],
+) -> bool:
+    if url in cache:
+        return cache[url]
+    ok = False
+    try:
+        resp = await client.head(url, follow_redirects=True)
+        ok = resp.status_code < 400
+        if not ok and resp.status_code in {403, 405, 429}:
+            resp = await client.get(
+                url,
+                headers={"Range": "bytes=0-0"},
+                follow_redirects=True,
+            )
+            ok = resp.status_code < 400
+    except httpx.RequestError:
+        ok = False
+    cache[url] = ok
+    return ok
+
+
+async def _validate_team_avatars(team_payloads: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not team_payloads:
+        return []
+    cache: Dict[str, bool] = {}
+    sem = asyncio.Semaphore(10)
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        async def validate(row: Dict[str, Any]) -> None:
+            avatar = (row.get("avatar") or "").strip()
+            if not avatar or avatar == DEFAULT_TEAM_AVATAR:
+                row["avatar"] = DEFAULT_TEAM_AVATAR
+                return
+            async with sem:
+                ok = await _avatar_url_ok(avatar, client, cache)
+            if not ok:
+                row["avatar"] = DEFAULT_TEAM_AVATAR
+
+        await asyncio.gather(*(validate(row) for row in team_payloads))
+    return list(team_payloads)
+
+
+async def _build_championship_team_payloads(
+    championship_id: str,
+    status_entries: Sequence[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    status_lookup = {entry.get("team_id"): entry for entry in status_entries if entry.get("team_id")}
+    team_payloads: List[Dict[str, Any]] = []
+
+    try:
+        teams_api = await get_championship_teams_async(championship_id, limit=100)
+    except Exception:
+        teams_api = None
+    if teams_api:
+        for team in teams_api:
+            team_id = team.get("team_id") or team.get("id")
+            if not team_id:
+                continue
+            override = status_lookup.get(team_id, {})
+            name = team.get("name") or team.get("nickname") or override.get("team_name")
+            avatar = team.get("avatar") or override.get("avatar") or DEFAULT_TEAM_AVATAR
+            team_payloads.append(
+                {
+                    "team_id": team_id,
+                    "name": name,
+                    "avatar": avatar,
+                }
+            )
+    else:
+        team_payloads = [
+            {
+                "team_id": entry["team_id"],
+                "name": entry.get("team_name"),
+                "avatar": entry.get("avatar") or DEFAULT_TEAM_AVATAR,
+            }
+            for entry in status_entries
+            if entry.get("team_id")
+        ]
+
+    stale_payloads = await _filter_stale_team_payloads(team_payloads)
+    return await _validate_team_avatars(stale_payloads)
+
+
 def _map_votes_from_democracy(match_id: str, demo_json: Dict[str, Any], team_lookup: Dict[str, str], best_of: int = 3) -> List[Dict[str, Any]]:
     """Parse map votes from Democracy API response.
     
@@ -567,7 +705,7 @@ def _build_normalised_match(
         if pid and nickname and pid not in payload_players:
             payload_players[pid] = {"player_id": pid, "nickname": nickname}
 
-    finish_ts = safe_int(details.get("finished_at"))
+    finish_ts = normalize_finished_at(details.get("finished_at"))
     winner_team_id = None
     res = (details or {}).get("results") or {}
     winner_team_id = _normalize_team_ref(res.get("winner"), team1_id, team2_id)
@@ -649,7 +787,7 @@ async def sync_match_async(
         raise RuntimeError(f"Match {match_id} details missing")
 
     status = str(details.get("status") or "").lower()
-    finish_ts = safe_int(details.get("finished_at"))
+    finish_ts = normalize_finished_at(details.get("finished_at"))
     has_played = bool(finish_ts) or status in {"finished", "closed", "over", "completed"}
 
     # For unplayed matches: skip stats/votes to reduce API calls
@@ -951,6 +1089,7 @@ async def sync_championship_async(
     override_source = overrides if overrides is not None else load_division_overrides()
     status_entries = combined_status_teams(championship_id, override_source)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
+    team_payloads = await _build_championship_team_payloads(championship_id, status_entries)
 
     # Find parent championship if this is a playoff division
     parent_championship_id = await find_parent_championship_id(slug, season, division_num, is_playoffs)
@@ -975,15 +1114,6 @@ async def sync_championship_async(
 
         await upsert_championship_async(conn, champ_row)
 
-        team_payloads = [
-            {
-                "team_id": entry["team_id"],
-                "name": entry.get("team_name"),
-                "avatar": entry.get("avatar") or DEFAULT_TEAM_AVATAR,
-            }
-            for entry in status_entries
-            if entry.get("team_id")
-        ]
         if team_payloads:
             await upsert_teams_bulk_async(team_payloads, conn=conn)
 
@@ -1171,6 +1301,7 @@ async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics 
     overrides = load_division_overrides()
     status_entries = combined_status_teams(championship_id, overrides)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
+    team_payloads = await _build_championship_team_payloads(championship_id, status_entries)
 
     # Find parent championship if this is a playoff division
     parent_championship_id = await find_parent_championship_id(slug, season, division_num, is_playoffs)
@@ -1190,17 +1321,8 @@ async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics 
 
         await upsert_championship_async(conn, champ_row)
 
-        team_payloads = [
-            {
-                "team_id": entry["team_id"],
-                "name": entry.get("team_name"),
-                "avatar": entry.get("avatar") or DEFAULT_TEAM_AVATAR,
-            }
-            for entry in status_entries
-            if entry.get("team_id")
-        ]
         if team_payloads:
-            await upsert_teams_bulk_async(conn, team_payloads)
+            await upsert_teams_bulk_async(team_payloads, conn=conn)
 
     await sync_match_async(
         championship_id,

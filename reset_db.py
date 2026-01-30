@@ -7,7 +7,6 @@ from __future__ import annotations
 import asyncio
 import sys
 
-import env_loader  # Load environment variables
 from db_async import get_pool
 
 

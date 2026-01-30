@@ -67,13 +67,18 @@ window.SplitBar = {
             if (this.total === 0) return '50%';
             if (this.wins === this.total) return '100%';
             if (this.wins === 0) return '0%';
-            return `${Math.round(this.winPercentage)}%`;
+            // Use decimals (not Math.round) to avoid visible 1% gaps from rounding.
+            const pct = Math.max(0, Math.min(100, this.winPercentage));
+            return `${pct.toFixed(1)}%`;
         },
         lossTargetWidth() {
             if (this.total === 0) return '50%';
             if (this.losses === this.total) return '100%';
             if (this.losses === 0) return '0%';
-            return `${Math.round(this.lossPercentage)}%`;
+            // Derive from win percentage so win+loss is always exactly 100%.
+            const winPct = Math.max(0, Math.min(100, this.winPercentage));
+            const lossPct = Math.max(0, Math.min(100, 100 - winPct));
+            return `${lossPct.toFixed(1)}%`;
         },
         segmentTargets() {
             return {
@@ -143,12 +148,26 @@ window.SplitBar = {
         }
     },
     template: `
-        <div :class="barClass" :style="{ height: height }">
-            <div :class="winClass" :style="winStyle"></div>
-            <div :class="lossClass" :style="lossStyle"></div>
-            <span v-if="showLabels" class="label label-left">{{ leftText || (wins + 'W') }}</span>
-            <span v-if="showLabels" class="label label-right">{{ rightText || (losses + 'L') }}</span>
-            <span v-if="showPercent && total>0" class="label label-center">{{ centerPercent }}</span>
+        <div class="bar-split-shell" :style="{ height: height, '--split-win': winTargetWidth, '--split-divider-opacity': (total > 0 && wins > 0 && losses > 0) ? 1 : 0 }">
+            <div :class="barClass" :style="{ height: '100%' }">
+                <!-- SVG mask definition for wavy seam -->
+                <svg width="0" height="0" style="position: absolute;">
+                    <defs>
+                        <clipPath id="wavySeamWin" clipPathUnits="objectBoundingBox">
+                            <!-- Creates organic wave boundary; wave moves via CSS animation on parent -->
+                            <path class="wavy-seam-path" d="M 0 0 L 1 0 Q 0.998 0.15, 1 0.25 Q 1.002 0.35, 1 0.5 Q 0.998 0.65, 1 0.75 Q 1.002 0.85, 1 1 L 0 1 Z" vector-effect="non-scaling-stroke" />
+                        </clipPath>
+                    </defs>
+                </svg>
+                <div :class="winClass" :style="winStyle"></div>
+                <div :class="lossClass" :style="lossStyle"></div>
+                <!-- Ripple effects at seam -->
+                <div class="seam-ripple seam-ripple-1"></div>
+                <div class="seam-ripple seam-ripple-2"></div>
+                <span v-if="showLabels" class="label label-left">{{ leftText || (wins + 'W') }}</span>
+                <span v-if="showLabels" class="label label-right">{{ rightText || (losses + 'L') }}</span>
+                <span v-if="showPercent && total>0" class="label label-center">{{ centerPercent }}</span>
+            </div>
         </div>
     `
 };

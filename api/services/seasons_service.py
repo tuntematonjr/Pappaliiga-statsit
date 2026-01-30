@@ -28,9 +28,9 @@ async def get_seasons_list() -> List[Dict[str, Any]]:
         SELECT 
             c.season,
             MIN(m.started_at) AS start_date,
-            MAX(m.finished_at) AS end_date,
+            MAX(NULLIF(m.finished_at, 0)) AS end_date,
             COUNT(DISTINCT c.championship_id) AS divisions_count,
-            COUNT(DISTINCT CASE WHEN m.finished_at IS NOT NULL THEN m.match_id END) AS finished_matches,
+            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS finished_matches,
             COUNT(DISTINCT m.match_id) AS total_matches
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
@@ -45,8 +45,6 @@ async def get_seasons_list() -> List[Dict[str, Any]]:
         start_ts = row.get("start_date")
         end_ts = row.get("end_date")
         finished = int(row.get("finished_matches") or 0)
-        total = int(row.get("total_matches") or 0)
-        
         # Determine status based on current time and match completion
         status = "finished"
         if end_ts is None or end_ts > int(time.time()):
@@ -84,7 +82,7 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
                     SELECT COUNT(*) 
                     FROM matches m2 
                     WHERE m2.championship_id = c.championship_id 
-                      AND m2.finished_at IS NULL
+                      AND NULLIF(m2.finished_at, 0) IS NULL
                 ) = 0 
                 THEN c.championship_id 
             END) AS finished_divisions
@@ -103,9 +101,9 @@ async def get_season_summary(season: int) -> Dict[str, Any]:
         """
         SELECT
             COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 THEN m.match_id END) AS regular_total,
-            COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 AND m.finished_at IS NOT NULL THEN m.match_id END) AS regular_played,
+            COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 AND NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS regular_played,
             COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 THEN m.match_id END) AS playoff_total,
-            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 AND m.finished_at IS NOT NULL THEN m.match_id END) AS playoff_played
+            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 AND NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS playoff_played
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         WHERE c.season = :season
@@ -203,10 +201,10 @@ async def get_season_divisions(season: int) -> List[Dict[str, Any]]:
             c.is_playoffs,
             c.parent_championship_id,
             COUNT(DISTINCT CASE WHEN m.is_forfeit = 0 THEN ct.team_id END) AS teams_count,
-            COUNT(DISTINCT CASE WHEN m.finished_at IS NOT NULL THEN m.match_id END) AS played_matches,
+            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS played_matches,
             COUNT(DISTINCT m.match_id) AS total_matches,
             MIN(m.started_at) AS first_started,
-            MAX(m.finished_at) AS last_finished
+            MAX(NULLIF(m.finished_at, 0)) AS last_finished
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         LEFT JOIN (
@@ -478,7 +476,6 @@ async def get_division_detailed_stats(season: int, division_id: str) -> Dict[str
     division_num = int(div_data["division_num"])
     
     # Get excluded teams
-    from division_overrides import combined_status_teams
     excluded_teams = {team["team_id"] for team in combined_status_teams(division_id)}
     
     # Build exclusion clause
@@ -618,7 +615,6 @@ async def get_division_detailed_stats(season: int, division_id: str) -> Dict[str
     }
     
     # Get playoff bracket if this is a playoff division or has playoffs
-    playoff_bracket = []
     playoff_info = {
         "matches_played": 0,
         "matches_total": 0,

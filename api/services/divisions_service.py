@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from db_async import query_async
 from division_overrides import combined_status_teams
@@ -89,9 +89,9 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
             c.is_playoffs AS is_playoff,
             c.parent_championship_id,
             COALESCE(tc.teams_count, 0) AS teams_count,
-            COUNT(DISTINCT CASE WHEN m.finished_at IS NOT NULL THEN m.match_id END) AS played_matches,
+            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS played_matches,
             COUNT(DISTINCT m.match_id) AS total_matches,
-            SUM(CASE WHEN m.finished_at IS NOT NULL THEN 1 ELSE 0 END) AS finished_matches,
+            SUM(CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN 1 ELSE 0 END) AS finished_matches,
             SUM(
                 CASE
                     WHEN UPPER(COALESCE(m.status, '')) IN ('LIVE', 'ONGOING', 'IN_PROGRESS', 'STARTED')
@@ -210,7 +210,7 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
                 SUM(CASE WHEN winner_team_id = team_id THEN 1 ELSE 0 END) AS matches_won
             FROM division_match_teams
             WHERE team_id IS NOT NULL
-                AND finished_at IS NOT NULL
+                AND NULLIF(finished_at, 0) IS NOT NULL
             GROUP BY team_id
         ),
         map_totals AS (
@@ -646,7 +646,7 @@ async def _get_division_aggregates(
     rows = await query_async(
         """
         SELECT
-            COUNT(DISTINCT CASE WHEN m.finished_at IS NOT NULL THEN m.match_id END) AS played_matches,
+            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS played_matches,
             COUNT(DISTINCT m.match_id) AS total_matches,
             SUM(CASE WHEN m.is_forfeit = 1 THEN 1 ELSE 0 END) AS forfeits
         FROM matches m

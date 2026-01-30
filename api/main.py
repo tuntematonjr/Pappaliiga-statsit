@@ -6,10 +6,8 @@ Replaces static HTML generation with REST API endpoints.
 """
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +16,6 @@ from fastapi.staticfiles import StaticFiles
 
 from db_async import close_pool, get_pool
 
-from api.services import stats_service
 from .routers import championships, divisions, matches, players, stats, teams, seasons
 from .routers import maps_catalog, image_proxy, season_view
 from api.exceptions import BadRequestError, NotFoundError

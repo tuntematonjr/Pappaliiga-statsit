@@ -94,7 +94,7 @@ async def fix_division_20():
                 print(f"  Matches: {row[1]} played, {row[2]} won")
                 print(f"  Maps: {row[3]} played, {row[4]} won")
                 print(f"  Rounds: {row[5]} won, {row[6]} lost, {row[5]-row[6]} diff")
-                print(f"\nExpected from screenshot: 11 GP, 7 W for Servujatkot")
+                print("\nExpected from screenshot: 11 GP, 7 W for Servujatkot")
 
 if __name__ == '__main__':
     asyncio.run(fix_division_20())

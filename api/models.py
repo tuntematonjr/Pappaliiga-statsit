@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import List, Optional, Literal
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -28,7 +30,6 @@ class PaginationMeta(CamelModel):
 
 
 # --- V3 models merged in from api/models_v3.py ---
-from typing import List, Optional, Literal
 
 
 class SeasonProgress(CamelModel):

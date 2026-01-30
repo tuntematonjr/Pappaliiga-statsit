@@ -244,7 +244,7 @@ async def get_season_stats(season: int) -> dict[str, Any]:
         SELECT
             CASE WHEN c.slug LIKE '%%-po%%' THEN 1 ELSE 0 END AS is_playoff,
             COUNT(DISTINCT m.match_id) AS total_matches,
-            COUNT(DISTINCT CASE WHEN m.finished_at IS NOT NULL THEN m.match_id END) AS played_matches
+            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS played_matches
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         WHERE c.season = :season
@@ -358,7 +358,7 @@ async def _get_season_progress(season: int, summary_totals: dict[str, Any]) -> d
                         SELECT COUNT(*)
                         FROM matches m2
                         WHERE m2.championship_id = c.championship_id
-                          AND m2.finished_at IS NULL
+                          AND NULLIF(m2.finished_at, 0) IS NULL
                     ) = 0
                     THEN c.championship_id
                 END
@@ -376,13 +376,13 @@ async def _get_season_progress(season: int, summary_totals: dict[str, Any]) -> d
             COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 THEN m.match_id END) AS regular_total,
             COUNT(
                 DISTINCT CASE
-                    WHEN c.is_playoffs = 0 AND m.finished_at IS NOT NULL THEN m.match_id
+                    WHEN c.is_playoffs = 0 AND NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id
                 END
             ) AS regular_played,
             COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 THEN m.match_id END) AS playoff_total,
             COUNT(
                 DISTINCT CASE
-                    WHEN c.is_playoffs = 1 AND m.finished_at IS NOT NULL THEN m.match_id
+                    WHEN c.is_playoffs = 1 AND NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id
                 END
             ) AS playoff_played
         FROM championships c
