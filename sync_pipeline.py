@@ -28,7 +28,7 @@ from db_async import (
     connection,
     delete_stats_for_match_async,
     fetch_all,
-    get_division_snapshot_ts_async,
+    create_snapshot_ts_async,
     get_map_id_lookup_async,
     replace_map_votes_async,
     upsert_championship_async,
@@ -361,7 +361,7 @@ def _extract_player_rows(
                         "team_id": tid,
                         "opponent_team_id": None,
                         "nickname": player.get("nickname") or player.get("name"),
-                        "stats_json": ps,
+                        "stats": ps,
                     }
                 )
     for row in rows:
@@ -749,9 +749,17 @@ async def sync_match_async(
             label=f"match:{match_id}:maps",
         )
 
+    snapshot_ts: int | None = None
     async with connection(label=f"match:{match_id}:lookup") as conn:
         map_lookup = await get_map_id_lookup_async(conn, match_id)
-        snapshot_ts = await get_division_snapshot_ts_async(conn, ctx.season, ctx.division_num)
+        if normalised.match_row.get("finished_at"):
+            snapshot_ts = await create_snapshot_ts_async(
+                conn,
+                ctx.season,
+                ctx.division_num,
+                match_id=match_id,
+                label=f"match:{match_id}:snapshot",
+            )
 
     await replace_map_votes_async(
         match_id,

@@ -50,6 +50,7 @@ async def fix_division_20():
                     WHERE m.season = %s
                     AND m.division_num = %s
                     AND c.is_playoffs = 0
+                    AND m.finished_at IS NOT NULL
                     GROUP BY m.team1_id
                     
                     UNION ALL
@@ -68,6 +69,7 @@ async def fix_division_20():
                     WHERE m.season = %s
                     AND m.division_num = %s
                     AND c.is_playoffs = 0
+                    AND m.finished_at IS NOT NULL
                     GROUP BY m.team2_id
                 ) AS agg
                 GROUP BY team_id

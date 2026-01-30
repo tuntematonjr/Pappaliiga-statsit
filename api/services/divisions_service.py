@@ -8,6 +8,7 @@ from division_overrides import combined_status_teams
 
 from api.exceptions import NotFoundError
 from api.services.player_counts import get_player_counts
+from api.services.season_aggregates import dedupe_team_total
 
 DEFAULT_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
 
@@ -209,6 +210,7 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
                 SUM(CASE WHEN winner_team_id = team_id THEN 1 ELSE 0 END) AS matches_won
             FROM division_match_teams
             WHERE team_id IS NOT NULL
+                AND finished_at IS NOT NULL
             GROUP BY team_id
         ),
         map_totals AS (
@@ -453,8 +455,12 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
     division_player_count = len(unique_player_ids)
 
     map_stats_task = asyncio.create_task(_get_division_map_stats(championship_id, season, division_num))
-    aggregates_task = asyncio.create_task(_get_division_aggregates(championship_id, season, division_num))
-    leaders_task = asyncio.create_task(_get_division_leaders(championship_id, season, division_num))
+    aggregates_task = asyncio.create_task(
+        _get_division_aggregates(championship_id, season, division_num, bool(champ["is_playoff"]))
+    )
+    leaders_task = asyncio.create_task(
+        _get_division_leaders(championship_id, season, division_num, bool(champ["is_playoff"]))
+    )
 
     map_stats, aggregates, leaders = await asyncio.gather(
         map_stats_task,
@@ -631,7 +637,12 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
     return []
 
 
-async def _get_division_aggregates(championship_id: str, season: int, division_num: int) -> dict[str, Any]:
+async def _get_division_aggregates(
+    championship_id: str,
+    season: int,
+    division_num: int,
+    is_playoff: bool,
+) -> dict[str, Any]:
     rows = await query_async(
         """
         SELECT
@@ -647,7 +658,9 @@ async def _get_division_aggregates(championship_id: str, season: int, division_n
 
     map_totals = await query_async(
         """
-        SELECT COUNT(*) AS maps_played_total
+        SELECT
+          COUNT(*) AS maps_played_total,
+          COALESCE(SUM(CASE WHEN mp.is_forfeit = 0 THEN (COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) ELSE 0 END),0) AS rounds_played_total
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
         WHERE m.championship_id = :champ_id
@@ -656,7 +669,54 @@ async def _get_division_aggregates(championship_id: str, season: int, division_n
         """,
         {"champ_id": championship_id},
     )
-    maps_played_total = int((map_totals[0] or {}).get("maps_played_total") or 0) if map_totals else 0
+    map_total_row = map_totals[0] if map_totals else {}
+    maps_played_total = int(map_total_row.get("maps_played_total") or 0)
+    rounds_played_total = int(map_total_row.get("rounds_played_total") or 0)
+
+    player_totals = {}
+    if is_playoff:
+        player_rows = await query_async(
+            """
+            SELECT
+                COUNT(DISTINCT ps.player_id) AS player_count,
+                COALESCE(SUM(CASE WHEN ps.is_forfeit_map = 0 THEN ps.kills ELSE 0 END), 0) AS total_kills,
+                COALESCE(SUM(CASE WHEN ps.is_forfeit_map = 0 THEN ps.deaths ELSE 0 END), 0) AS total_deaths
+            FROM player_stats ps
+            JOIN matches m ON m.match_id = ps.match_id
+            WHERE m.championship_id = :champ_id
+              AND m.ignored_due_ban = 0
+            """,
+            {"champ_id": championship_id},
+        )
+        player_totals = player_rows[0] if player_rows else {}
+    else:
+        player_rows = await query_async(
+            """
+            SELECT
+                COUNT(DISTINCT pst.player_id) AS player_count,
+                COALESCE(SUM(pst.kills), 0) AS total_kills,
+                COALESCE(SUM(pst.deaths), 0) AS total_deaths
+            FROM player_season_totals pst
+            WHERE pst.season = :season AND pst.division_num = :division
+            """,
+            {"season": season, "division": division_num},
+        )
+        player_totals = player_rows[0] if player_rows else {}
+
+    team_rounds_total = 0
+    if not is_playoff:
+        team_rows = await query_async(
+            """
+            SELECT COALESCE(SUM(rounds_won + rounds_lost), 0) AS rounds_total
+            FROM team_season_totals
+            WHERE season = :season AND division_num = :division
+            """,
+            {"season": season, "division": division_num},
+        )
+        team_rounds_total = int((team_rows[0] or {}).get("rounds_total") or 0) if team_rows else 0
+
+    if rounds_played_total == 0 and team_rounds_total:
+        rounds_played_total = dedupe_team_total(team_rounds_total)
 
     played = int(row.get("played_matches") or 0)
     total = int(row.get("total_matches") or 0)
@@ -668,10 +728,62 @@ async def _get_division_aggregates(championship_id: str, season: int, division_n
         "total_matches": total,
         "forfeits": forfeits,
         "maps_played_total": maps_played_total,
+        "rounds_played_total": rounds_played_total,
+        "total_kills": int(player_totals.get("total_kills") or 0),
+        "total_deaths": int(player_totals.get("total_deaths") or 0),
+        "player_count": int(player_totals.get("player_count") or 0),
     }
 
 
-async def _get_division_leaders(championship_id: str, season: int, division_num: int) -> List[Dict[str, Any]]:
+async def _get_division_leaders(
+    championship_id: str,
+    season: int,
+    division_num: int,
+    is_playoff: bool,
+) -> List[Dict[str, Any]]:
+    if not is_playoff:
+        rows = await query_async(
+            """
+            SELECT
+                pst.player_id,
+                pst.team_id,
+                pst.kills,
+                pst.deaths,
+                pst.adr,
+                pst.kr,
+                pst.kd,
+                pst.mvps,
+                pst.utility_damage,
+                p.nickname,
+                t.name AS team_name
+            FROM player_season_totals pst
+            LEFT JOIN players p ON p.player_id = pst.player_id
+            LEFT JOIN teams t ON t.team_id = pst.team_id
+            WHERE pst.season = :season AND pst.division_num = :division
+            ORDER BY pst.kills DESC, pst.adr DESC
+            LIMIT 10
+            """,
+            {"season": season, "division": division_num},
+        )
+        leaders = []
+        for row in rows:
+            leaders.append(
+                {
+                    "player_id": row.get("player_id"),
+                    "team_id": row.get("team_id"),
+                    "team_name": row.get("team_name"),
+                    "nickname": row.get("nickname"),
+                    "kills": int(row.get("kills") or 0),
+                    "deaths": int(row.get("deaths") or 0),
+                    "adr": float(row.get("adr") or 0.0),
+                    "kr": float(row.get("kr") or 0.0),
+                    "kd": float(row.get("kd") or 0.0),
+                    "mvps": int(row.get("mvps") or 0),
+                    "utility_damage": int(row.get("utility_damage") or 0),
+                }
+            )
+        return leaders
+
     rows = await query_async(
         """
         WITH player_totals AS (

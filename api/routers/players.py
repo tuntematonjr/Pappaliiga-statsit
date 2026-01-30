@@ -37,6 +37,23 @@ class PlayerSeasonStats(CamelModel):
     mvps: int
 
 
+class PlayerSeasonProgressPoint(CamelModel):
+    snapshot_ts: int
+    snapshot_time: Optional[str] = None
+    team_id: Optional[str] = None
+    maps_played: int
+    rounds_played: int
+    kills: int
+    deaths: int
+    assists: int
+    mvps: int
+    kd: float
+    adr: float
+    kr: float
+    hs_pct: float
+    damage: int
+
+
 class PlayerMapStatsWithDelta(CamelModel):
     map_name: str
     curr: Dict[str, Any]
@@ -70,6 +87,19 @@ async def get_player_map_stats(player_id: str, championship_id: str):
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return [PlayerMapStatsWithDelta(**row) for row in rows]
+
+
+@router.get("/{player_id}/season-progression", response_model=List[PlayerSeasonProgressPoint])
+async def get_player_season_progression(
+    player_id: str,
+    season: int = Query(..., description="Season number"),
+    division: int = Query(..., description="Division number"),
+):
+    try:
+        rows = await players_service.fetch_player_season_progression(player_id, season, division)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [PlayerSeasonProgressPoint(**row) for row in rows]
 
 
 @router.get("/", response_model=List[PlayerInfo])

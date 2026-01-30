@@ -91,7 +91,7 @@ async def get_season_summary_totals(season: int) -> Dict[str, Any]:
             {"season": season},
         )
 
-    match_rows, map_round_rows, kill_rows = await query_async(
+    match_rows, map_round_rows = await query_async(
         """
         SELECT COUNT(*) AS cnt
         FROM matches
@@ -108,22 +108,10 @@ async def get_season_summary_totals(season: int) -> Dict[str, Any]:
         WHERE season = :season
         """,
         {"season": season},
-    ), await query_async(
-        """
-        SELECT
-            COALESCE(SUM(CASE WHEN ps.is_forfeit_map = 0 THEN ps.kills ELSE 0 END), 0) AS total_kills,
-            COALESCE(SUM(CASE WHEN ps.is_forfeit_map = 0 THEN ps.deaths ELSE 0 END), 0) AS total_deaths
-        FROM player_stats ps
-        JOIN matches m ON m.match_id = ps.match_id
-        WHERE ps.season = :season
-          AND m.ignored_due_ban = 0
-        """,
-        {"season": season},
     )
 
     match_row = match_rows[0] if match_rows else {}
     map_round_row = map_round_rows[0] if map_round_rows else {}
-    kill_row = kill_rows[0] if kill_rows else {}
 
     maps_total = int(map_round_row.get("total_maps") or 0)
     fallback_maps = dedupe_team_total(team_totals["maps_played_total"])
@@ -135,15 +123,8 @@ async def get_season_summary_totals(season: int) -> Dict[str, Any]:
     if rounds_total == 0:
         rounds_total = fallback_rounds
 
-    kills_total = int(kill_row.get("total_kills") or 0)
-    fallback_kills = player_totals["total_kills"]
-    if kills_total == 0:
-        kills_total = fallback_kills
-
-    deaths_total = int(kill_row.get("total_deaths") or 0)
-    fallback_deaths = player_totals["total_deaths"]
-    if deaths_total == 0:
-        deaths_total = fallback_deaths
+    kills_total = int(player_totals["total_kills"] or 0)
+    deaths_total = int(player_totals["total_deaths"] or 0)
 
     summary_totals = {
         "divisions": int((division_rows[0] or {}).get("cnt") or 0),

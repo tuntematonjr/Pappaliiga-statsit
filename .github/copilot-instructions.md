@@ -10,7 +10,7 @@
 - Manual dev: `python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000` (serves static assets); legacy `python frontend/spa_server.py 8080` only if you need frontend-only hosting.
 - Sync data: `python sync.py` (current season) | `python sync.py --season <n>` | `python sync.py --championship-id <cid>` | `python sync.py --match-id <match>` | `python sync.py --all-seasons`; add `--refresh-divisions [--refresh-min-season N --refresh-dry-run --refresh-allow-empty]` to update divisions.json before syncing; tune concurrency with `--max-concurrency` (fetch) and `--max-db-concurrency` (writers).
 - Diagnostics: sync logs rotate in `logs/`; runtime snapshots controlled by `SYNC_DIAGNOSTICS` land in `logs/runtime_diagnostics.jsonl`; rate-limit stats printed at end of sync; `scripts/db_diag.py --season N` gives quick counts.
-- DB utilities: `python tools/check_db_connection.py` | `python tools/apply_schema.py` | `python tools/recompute_totals.py` (supports `--season`).
+- DB utilities: `python tools/check_db_connection.py` | `python tools/apply_schema.py` | `python tools/recompute_totals.py --championship-id <cid>`.
 
 ## Backend Conventions
 - Async-only; wrap DB work with `connection()` or `readonly_connection()` from `db_async.py` (writes auto-commit/rollback).
@@ -25,13 +25,18 @@
 - Division registry: `division_registry.py` discovers championships for the organizer and writes `divisions.json`; `faceit_config` reloads it to expose `DIVISIONS` and `CURRENT_SEASON`.
 - Division overrides: `division_overrides.json` marks banned/quit teams; matches they touch set `ignored_due_ban=1` and are excluded from stats.
 - Match normalization in `sync_pipeline.py` merges Faceit `rounds`/`detailed_results`, detects forfeits, stores map votes, and writes map/team/player totals; pending matches are re-checked every ~15 minutes.
-- Schema: computed columns in `player_stats`/`team_stats` derive metrics from JSON; `maps_catalog` stores display metadata; `maps` rows flag `is_forfeit` per map.
+- Schema: computed columns in `player_stats`/`team_stats` derive metrics; `maps_catalog` stores display metadata; `maps` rows flag `is_forfeit` per map.
+- Totals table usage (performance-critical):
+	- **Regular season (is_playoffs=0):** prefer `player_season_totals`, `team_season_totals`, `player_map_season_totals`, `team_map_season_totals` for summary/leaderboard/table data.
+	- **Playoffs (is_playoffs=1):** totals tables are not reliable; use `matches`, `maps`, `player_stats`, `team_stats` scoped by `championship_id`.
+	- **Progression charts:** use `*_prev` snapshot tables ordered by `snapshot_ts`. Latest snapshots should match current totals.
+- Snapshot policy: on **finished match** for a division, create a `division_snapshots` row (with `match_id`) and insert snapshot rows into `*_prev` tables for affected teams/players/maps.
 
 ## Frontend Guidance (Vue SPA)
 - Routes (history mode): `/`, `/seasons`, `/division/:championshipId`, `/division/:championshipId/playoffs`, `/team/:teamId`, `/team/:championshipId/:teamId`, `/player/:playerId`.
-- Data flow: Pinia stores in `frontend/static/stores/*` (notably `useTeamStore`, `useSeasonsStore`, `useDivisionStore`); `TeamDetail` uses `apiClient.getTeamPage(teamId, championshipId)` and mirrors `championship` query for sharable links.
+- Data flow: Pinia stores in `frontend/static/stores/*` (notably `useTeamStore`, `useSeasonsStore`, `useDivisionStore`); `TeamDetail` component in `components/TeamDetail.js` uses `apiClient.getTeamPage(teamId, championshipId)` and mirrors `championship` query for sharable links.
 - Season selector defaults to latest; use championship names to differentiate playoffs vs regular.
-- API base resolved at runtime (`window.__API_BASE__` or origin + `/api`); uvicorn already serves the SPA so no build step.
+- API base resolved at runtime (`window.PL_API_URL` or `window.__API_BASE__` or origin + `/api`); uvicorn serves both SPA and API so no build step.
 
 ## Common Pitfalls
 1) Exceeding DB pool budget when raising `--max-concurrency`/`--max-db-concurrency` without bumping `DB_POOL_MAX_SIZE`.
@@ -45,8 +50,8 @@
 - Data sync: `sync.py`, `sync_pipeline.py`, `division_registry.py`, `faceit_client_async.py`, `division_overrides.json`.
 - DB layer: `db_async.py`, `mariadb_schema.sql`.
 - Standings: `standings_utils.py` (official Pappaliiga tiebreaker logic with h2h support).
-- API: `api/main.py`, routers `api/routers/{seasons,season_view,divisions,championships,teams,players,matches,stats,maps_catalog}.py`, services `api/services/{seasons_service,season_view_service,stats_service,teams_service}.py`.
-- Frontend: `frontend/static/app-main.js`, `frontend/static/api-client.js`, views `frontend/static/views/{HomeView.js,SeasonsView.js,DivisionView.js,TeamDetailView.js,PlayerView.js}`, components under `frontend/static/components/`.
+- API: `api/main.py`, routers `api/routers/{seasons,season_view,divisions,championships,teams,players,matches,stats,maps_catalog,image_proxy}.py`, services `api/services/{seasons_service,season_view_service,season_aggregates,stats_service,teams_service,players_service,matches_service,divisions_service,player_counts}.py`.
+- Frontend: `frontend/static/app-main.js`, `frontend/static/api-client.js`, views `frontend/static/views/{HomeView.js,SeasonsView.js,DivisionView.js,TeamDetailView.js,PlayerView.js}`, stores `frontend/static/stores/{useHomeStore,useSeasonsStore,useDivisionStore,useTeamStore,usePlayerStore}.js`, components under `frontend/static/components/`.
 
 ## Environment
 Required (`.env` in repo root):

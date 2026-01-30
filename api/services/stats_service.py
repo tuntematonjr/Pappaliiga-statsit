@@ -46,7 +46,7 @@ async def _get_lifetime_summary_totals() -> dict[str, int]:
         team_rows,
         match_rows,
         map_rows,
-        totals_rows,
+        map_round_rows,
         team_totals_rows,
         player_totals_rows,
     ) = await query_async(
@@ -61,13 +61,8 @@ async def _get_lifetime_summary_totals() -> dict[str, int]:
     ), await query_async(
         """
         SELECT
-          COALESCE(SUM(CASE WHEN ps.is_forfeit_map = 0 THEN (COALESCE(m.score_team1,0)+COALESCE(m.score_team2,0)) ELSE 0 END),0) AS total_rounds,
-          COALESCE(SUM(ps.kills),0) AS total_kills,
-          COALESCE(SUM(ps.deaths),0) AS total_deaths
-        FROM player_stats ps
-        LEFT JOIN maps m ON m.match_id = ps.match_id AND m.round_index = ps.round_index
-        JOIN matches mt ON mt.match_id = ps.match_id
-        WHERE mt.ignored_due_ban = 0
+          COALESCE(SUM(CASE WHEN is_forfeit = 0 THEN (COALESCE(score_team1,0) + COALESCE(score_team2,0)) ELSE 0 END),0) AS total_rounds
+        FROM maps
         """
     ), await query_async(
         """
@@ -85,7 +80,6 @@ async def _get_lifetime_summary_totals() -> dict[str, int]:
         """
     )
     player_counts = await get_player_counts(include_all_time=True)
-    totals_row = totals_rows[0] if totals_rows else {}
     team_totals_row = team_totals_rows[0] if team_totals_rows else {}
     player_totals_row = player_totals_rows[0] if player_totals_rows else {}
 
@@ -94,20 +88,14 @@ async def _get_lifetime_summary_totals() -> dict[str, int]:
     if maps_total == 0:
         maps_total = fallback_maps
 
-    rounds_total = int(totals_row.get("total_rounds") or 0)
+    map_round_row = map_round_rows[0] if map_round_rows else {}
+    rounds_total = int(map_round_row.get("total_rounds") or 0)
     fallback_rounds = dedupe_team_total(team_totals_row.get("rounds_total"))
     if rounds_total == 0:
         rounds_total = fallback_rounds
 
-    kills_total = int(totals_row.get("total_kills") or 0)
-    fallback_kills = int(player_totals_row.get("total_kills") or 0)
-    if kills_total == 0:
-        kills_total = fallback_kills
-
-    deaths_total = int(totals_row.get("total_deaths") or 0)
-    fallback_deaths = int(player_totals_row.get("total_deaths") or 0)
-    if deaths_total == 0:
-        deaths_total = fallback_deaths
+    kills_total = int(player_totals_row.get("total_kills") or 0)
+    deaths_total = int(player_totals_row.get("total_deaths") or 0)
 
     return {
         "divisions": int(div_rows[0]["cnt"] if div_rows else 0),

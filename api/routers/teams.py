@@ -38,6 +38,19 @@ class TeamSeasonStats(CamelModel):
     rounds_diff: Optional[int] = None
 
 
+class TeamSeasonProgressPoint(CamelModel):
+    snapshot_ts: int
+    snapshot_time: Optional[str] = None
+    matches_played: int
+    matches_won: int
+    losses: int
+    win_rate: float
+    maps_played: int
+    maps_won: int
+    rounds_won: int
+    rounds_lost: int
+
+
 class MapVeto(CamelModel):
     match_id: str
     map_name: str
@@ -343,6 +356,19 @@ async def get_team_map_stats(team_id: str, championship_id: str):
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return [TeamMapStats(**row) for row in rows]
+
+
+@router.get("/{team_id}/season-progression", response_model=List[TeamSeasonProgressPoint])
+async def get_team_season_progression(
+    team_id: str,
+    season: int = Query(..., description="Season number"),
+    division: int = Query(..., description="Division number"),
+):
+    try:
+        rows = await teams_service.fetch_team_season_progression(team_id, season, division)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [TeamSeasonProgressPoint(**row) for row in rows]
 
 
 @router.get("/{team_id}/veto-history/{championship_id}", response_model=List[MapVeto])

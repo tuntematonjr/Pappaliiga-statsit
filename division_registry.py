@@ -97,7 +97,8 @@ async def discover_cs_divisions(
             continue
 
         division_num = _parse_leading_divnum(name)
-        season = _parse_season(name)
+        description = (championship.get("description") or "").strip()
+        season = _parse_season(name) or _parse_season(description)
         is_po = _is_playoffs(name)
 
         if division_num is None and MESTAR_RX.search(name):
@@ -111,14 +112,12 @@ async def discover_cs_divisions(
             stats["skipped_status"] += 1
             continue
 
-        game = (championship.get("game") or championship.get("game_id") or "cs2").strip().lower() or "cs2"
         entry = {
             "championship_id": cid,
             "name": name,
             "season": season,
             "division_num": division_num if division_num is not None else 0,
             "slug": _base_slug(division_num if division_num is not None else 0, season, is_po),
-            "game": game if game in CS_TAGS else "cs2",
             "is_playoffs": 1 if is_po else 0,
         }
 
@@ -199,25 +198,20 @@ def load_existing(path: Path) -> List[Dict[str, Any]]:
     return []
 
 
-def _next_unique_division_id(existing: List[Dict[str, Any]]) -> int:
-    nums = [int(entry["division_id"]) for entry in existing if isinstance(entry.get("division_id"), int)]
-    return (max(nums) + 1) if nums else 101
-
-
 def non_destructive_merge(existing: List[Dict[str, Any]], discovered: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     by_cid: Dict[str, Dict[str, Any]] = {}
     used_slugs: set[str] = set()
     for entry in existing:
+        if isinstance(entry, dict):
+            entry = dict(entry)
+            entry.pop("division_id", None)
+            entry.pop("game", None)
         slug = entry.get("slug")
         if isinstance(slug, str):
             used_slugs.add(slug)
         cid = entry.get("championship_id")
         if cid:
             by_cid[cid] = dict(entry)
-
-    def alloc_id() -> int:
-        current = list(by_cid.values())
-        return _next_unique_division_id(current)
 
     for discovered_entry in discovered:
         cid = discovered_entry["championship_id"]
@@ -232,8 +226,6 @@ def non_destructive_merge(existing: List[Dict[str, Any]], discovered: List[Dict[
                 used_slugs.add(current["slug"])
 
             for key, value in discovered_entry.items():
-                if key == "division_id":
-                    continue
                 if key not in current:
                     current[key] = value
                 else:
@@ -250,7 +242,6 @@ def non_destructive_merge(existing: List[Dict[str, Any]], discovered: List[Dict[
             by_cid[cid] = current
         else:
             new_row = dict(discovered_entry)
-            new_row["division_id"] = alloc_id()
             unique_slug = _make_unique_slug(proposed_slug, cid, used_slugs)
             new_row["slug"] = unique_slug
             used_slugs.add(unique_slug)
@@ -261,7 +252,6 @@ def non_destructive_merge(existing: List[Dict[str, Any]], discovered: List[Dict[
         key=lambda item: (
             -int(item.get("season", 0)),
             int(item.get("division_num", 0)),
-            int(item.get("division_id", 0)) if isinstance(item.get("division_id"), int) else 0,
         )
     )
     return merged

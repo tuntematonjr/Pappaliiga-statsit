@@ -222,11 +222,18 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
         if not args.force_reset:
             LOGGER.error("--reset-db requires --force-reset to avoid accidental data loss")
             return 2
+        LOGGER.warning("=" * 70)
+        LOGGER.warning("DROPPING ALL TABLES AND RECREATING SCHEMA")
+        LOGGER.warning("This will DELETE ALL DATA in the database")
+        LOGGER.warning("=" * 70)
         await reset_db_async(confirm=True)
+        LOGGER.info("All tables dropped successfully")
         await create_schema_async(force=True)
+        LOGGER.info("Schema recreated from %s", Path(__file__).with_name("mariadb_schema.sql"))
         # Do not proceed to syncing when performing a reset. Optionally run verify, then exit.
         if args.verify:
             await _verify_counts()
+        LOGGER.info("Database reset complete. Run sync.py to populate data.")
         await shutdown_clients()
         return 0
 

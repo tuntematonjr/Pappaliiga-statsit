@@ -75,6 +75,44 @@ async def fetch_player_map_stats(championship_id: str, player_id: str) -> list[d
     return result
 
 
+async def fetch_player_season_progression(
+    player_id: str,
+    season: int,
+    division_num: int,
+) -> list[dict[str, Any]]:
+    rows = await query_async(
+        """
+        SELECT
+            pst.snapshot_ts,
+            ds.created_at AS snapshot_time,
+            pst.team_id,
+            pst.maps_played,
+            pst.rounds_played,
+            pst.kills,
+            pst.deaths,
+            pst.assists,
+            pst.mvps,
+            pst.kd,
+            pst.adr,
+            pst.kr,
+            pst.hs_pct,
+            pst.damage
+        FROM player_season_totals_prev pst
+        LEFT JOIN division_snapshots ds ON ds.snapshot_ts = pst.snapshot_ts
+        WHERE pst.player_id = :player_id
+          AND pst.season = :season
+          AND pst.division_num = :division_num
+        ORDER BY pst.snapshot_ts ASC
+        """,
+        {"player_id": player_id, "season": season, "division_num": division_num},
+    )
+    if not rows:
+        raise NotFoundError(
+            f"No progression snapshots found for player '{player_id}' in season {season} division {division_num}"
+        )
+    return rows
+
+
 async def list_players(
     *,
     season: Optional[int] = None,
