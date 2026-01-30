@@ -556,9 +556,9 @@ async def reset_db_async(confirm: bool = False) -> None:
             if tables:
                 LOGGER.info("Found %d tables to drop: %s", len(tables), ", ".join(tables))
                 LOGGER.info("Dropping tables...")
-                for table in tables:
-                    await cur.execute(f"DROP TABLE IF EXISTS `{table}`")
-                    LOGGER.debug("Dropped table %s", table)
+                # Use batch DROP TABLE statement to avoid potential deadlocks from sequential drops
+                drop_stmt = "DROP TABLE IF EXISTS " + ", ".join(f"`{table}`" for table in tables)
+                await cur.execute(drop_stmt)
                 LOGGER.info("Successfully dropped %d tables", len(tables))
             else:
                 LOGGER.info("No tables found to drop")
