@@ -1284,117 +1284,120 @@ async def upsert_team_season_totals_async(
     
     Note: Aggregates ONLY regular season matches (is_playoffs=0), not playoffs.
     """
-    async with connection(label=label) as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                INSERT INTO team_season_totals (
-                  season, division_num, team_id,
-                  matches_played, matches_won, maps_played, maps_won,
-                  rounds_won, rounds_lost
-                )
-                SELECT
-                  %s AS season, %s AS division_num, %s AS team_id,
-                  COUNT(DISTINCT m.match_id) AS matches_played,
-                  COUNT(DISTINCT CASE WHEN m.winner_team_id = %s THEN m.match_id END) AS matches_won,
-                  COUNT(mp.map_id) AS maps_played,
-                  SUM(CASE WHEN mp.winner_team_id = %s THEN 1 ELSE 0 END) AS maps_won,
-                  SUM(
-                    CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team1,0)
-                         WHEN m.team2_id = %s THEN COALESCE(mp.score_team2,0)
-                         ELSE 0 END
-                  ) AS rounds_won,
-                  SUM(
-                    CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team2,0)
-                         WHEN m.team2_id = %s THEN COALESCE(mp.score_team1,0)
-                         ELSE 0 END
-                  ) AS rounds_lost
-                FROM matches m
-                JOIN championships c ON m.championship_id = c.championship_id
-                LEFT JOIN maps mp ON mp.match_id = m.match_id
-                WHERE m.season = %s
-                  AND m.division_num = %s
-                  AND (m.team1_id = %s OR m.team2_id = %s)
-                  AND c.is_playoffs = 0
-                  AND NULLIF(m.finished_at, 0) IS NOT NULL
-                GROUP BY season, division_num, team_id
-                ON DUPLICATE KEY UPDATE
-                  matches_played = VALUES(matches_played),
-                  matches_won = VALUES(matches_won),
-                  maps_played = VALUES(maps_played),
-                  maps_won = VALUES(maps_won),
-                  rounds_won = VALUES(rounds_won),
-                  rounds_lost = VALUES(rounds_lost)
-                """,
-                (
-                    season,
-                    division_num,
-                    team_id,
-                    team_id,
-                    team_id,
-                    team_id,
-                    team_id,
-                    team_id,
-                    team_id,
-                    season,
-                    division_num,
-                    team_id,
-                    team_id,
-                ),
-            )
-            if snapshot_ts is not None:
+    async def _op():
+        async with connection(label=label) as conn:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     """
-                                        INSERT IGNORE INTO team_season_totals_prev (
-                                            season, division_num, team_id,
-                                            matches_played, matches_won, maps_played, maps_won,
-                                            rounds_won, rounds_lost, snapshot_ts
-                                        )
-                                        SELECT
-                                            %s AS season, %s AS division_num, %s AS team_id,
-                                            COUNT(DISTINCT m.match_id) AS matches_played,
-                                            COUNT(DISTINCT CASE WHEN m.winner_team_id = %s THEN m.match_id END) AS matches_won,
-                                            COUNT(mp.map_id) AS maps_played,
-                                            SUM(CASE WHEN mp.winner_team_id = %s THEN 1 ELSE 0 END) AS maps_won,
-                                            SUM(
-                                                CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team1,0)
-                                                         WHEN m.team2_id = %s THEN COALESCE(mp.score_team2,0)
-                                                         ELSE 0 END
-                                            ) AS rounds_won,
-                                            SUM(
-                                                CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team2,0)
-                                                         WHEN m.team2_id = %s THEN COALESCE(mp.score_team1,0)
-                                                         ELSE 0 END
-                                            ) AS rounds_lost,
-                                            %s AS snapshot_ts
-                                        FROM matches m
-                                        JOIN championships c ON m.championship_id = c.championship_id
-                                        LEFT JOIN maps mp ON mp.match_id = m.match_id
-                                        WHERE m.season = %s
-                                            AND m.division_num = %s
-                                            AND (m.team1_id = %s OR m.team2_id = %s)
-                                            AND c.is_playoffs = 0
-                                            AND NULLIF(m.finished_at, 0) IS NOT NULL
-                                        GROUP BY season, division_num, team_id
-                                        """,
-                                        (
-                                                season,
-                                                division_num,
-                                                team_id,
-                                                team_id,
-                                                team_id,
-                                                team_id,
-                                                team_id,
-                                                team_id,
-                                                team_id,
-                                                snapshot_ts,
-                                                season,
-                                                division_num,
-                                                team_id,
-                                                team_id,
-                                        ),
-                                )
-        await conn.commit()
+                    INSERT INTO team_season_totals (
+                      season, division_num, team_id,
+                      matches_played, matches_won, maps_played, maps_won,
+                      rounds_won, rounds_lost
+                    )
+                    SELECT
+                      %s AS season, %s AS division_num, %s AS team_id,
+                      COUNT(DISTINCT m.match_id) AS matches_played,
+                      COUNT(DISTINCT CASE WHEN m.winner_team_id = %s THEN m.match_id END) AS matches_won,
+                      COUNT(mp.map_id) AS maps_played,
+                      SUM(CASE WHEN mp.winner_team_id = %s THEN 1 ELSE 0 END) AS maps_won,
+                      SUM(
+                        CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team1,0)
+                             WHEN m.team2_id = %s THEN COALESCE(mp.score_team2,0)
+                             ELSE 0 END
+                      ) AS rounds_won,
+                      SUM(
+                        CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team2,0)
+                             WHEN m.team2_id = %s THEN COALESCE(mp.score_team1,0)
+                             ELSE 0 END
+                      ) AS rounds_lost
+                    FROM matches m
+                    JOIN championships c ON m.championship_id = c.championship_id
+                    LEFT JOIN maps mp ON mp.match_id = m.match_id
+                    WHERE m.season = %s
+                      AND m.division_num = %s
+                      AND (m.team1_id = %s OR m.team2_id = %s)
+                      AND c.is_playoffs = 0
+                      AND NULLIF(m.finished_at, 0) IS NOT NULL
+                    GROUP BY season, division_num, team_id
+                    ON DUPLICATE KEY UPDATE
+                      matches_played = VALUES(matches_played),
+                      matches_won = VALUES(matches_won),
+                      maps_played = VALUES(maps_played),
+                      maps_won = VALUES(maps_won),
+                      rounds_won = VALUES(rounds_won),
+                      rounds_lost = VALUES(rounds_lost)
+                    """,
+                    (
+                        season,
+                        division_num,
+                        team_id,
+                        team_id,
+                        team_id,
+                        team_id,
+                        team_id,
+                        team_id,
+                        team_id,
+                        season,
+                        division_num,
+                        team_id,
+                        team_id,
+                    ),
+                )
+                if snapshot_ts is not None:
+                    await cur.execute(
+                        """
+                                            INSERT IGNORE INTO team_season_totals_prev (
+                                                season, division_num, team_id,
+                                                matches_played, matches_won, maps_played, maps_won,
+                                                rounds_won, rounds_lost, snapshot_ts
+                                            )
+                                            SELECT
+                                                %s AS season, %s AS division_num, %s AS team_id,
+                                                COUNT(DISTINCT m.match_id) AS matches_played,
+                                                COUNT(DISTINCT CASE WHEN m.winner_team_id = %s THEN m.match_id END) AS matches_won,
+                                                COUNT(mp.map_id) AS maps_played,
+                                                SUM(CASE WHEN mp.winner_team_id = %s THEN 1 ELSE 0 END) AS maps_won,
+                                                SUM(
+                                                    CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team1,0)
+                                                             WHEN m.team2_id = %s THEN COALESCE(mp.score_team2,0)
+                                                             ELSE 0 END
+                                                ) AS rounds_won,
+                                                SUM(
+                                                    CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team2,0)
+                                                             WHEN m.team2_id = %s THEN COALESCE(mp.score_team1,0)
+                                                             ELSE 0 END
+                                                ) AS rounds_lost,
+                                                %s AS snapshot_ts
+                                            FROM matches m
+                                            JOIN championships c ON m.championship_id = c.championship_id
+                                            LEFT JOIN maps mp ON mp.match_id = m.match_id
+                                            WHERE m.season = %s
+                                                AND m.division_num = %s
+                                                AND (m.team1_id = %s OR m.team2_id = %s)
+                                                AND c.is_playoffs = 0
+                                                AND NULLIF(m.finished_at, 0) IS NOT NULL
+                                            GROUP BY season, division_num, team_id
+                                            """,
+                        (
+                            season,
+                            division_num,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            team_id,
+                            snapshot_ts,
+                            season,
+                            division_num,
+                            team_id,
+                            team_id,
+                        ),
+                    )
+            await conn.commit()
+
+    await _retry_on_deadlock(_op, label=label)
 
 
 async def upsert_player_season_totals_async(
@@ -1406,167 +1409,170 @@ async def upsert_player_season_totals_async(
     label: str = "player-season-totals",
 ) -> None:
     """Upsert aggregated season totals for a player (inline, no stored proc)."""
-    async with connection(label=label) as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                INSERT INTO player_season_totals (
-                  season, division_num, player_id, team_id,
-                  maps_played, rounds_played, kills, deaths, assists,
-                  mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                  utility_damage, enemies_flashed, flash_count, flash_successes,
-                  utility_count, utility_successes, utility_enemies,
-                  mk_2k, mk_3k, mk_4k, mk_5k,
-                  clutch_kills, cl_1v1_attempts, cl_1v1_wins,
-                  cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
-                  adr, kr, kd, hs_pct, damage
-                )
-                SELECT
-                  %s AS season, %s AS division_num, %s AS player_id,
-                  MAX(ps.team_id) AS team_id,
-                  COUNT(DISTINCT ps.match_id) AS maps_played,
-                  SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
-                  SUM(ps.kills) AS kills,
-                  SUM(ps.deaths) AS deaths,
-                  SUM(ps.assists) AS assists,
-                  SUM(ps.mvps) AS mvps,
-                  SUM(ps.headshots) AS headshots,
-                  SUM(ps.sniper_kills) AS sniper_kills,
-                  SUM(ps.pistol_kills) AS pistol_kills,
-                  SUM(ps.knife_kills) AS knife_kills,
-                  SUM(ps.zeus_kills) AS zeus_kills,
-                  SUM(ps.first_kills) AS first_kills,
-                  SUM(ps.utility_damage) AS utility_damage,
-                  SUM(ps.enemies_flashed) AS enemies_flashed,
-                  SUM(ps.flash_count) AS flash_count,
-                  SUM(ps.flash_successes) AS flash_successes,
-                  SUM(ps.utility_count) AS utility_count,
-                  SUM(ps.utility_successes) AS utility_successes,
-                  SUM(ps.utility_enemies) AS utility_enemies,
-                  SUM(ps.mk_2k) AS mk_2k,
-                  SUM(ps.mk_3k) AS mk_3k,
-                  SUM(ps.mk_4k) AS mk_4k,
-                  SUM(ps.mk_5k) AS mk_5k,
-                  SUM(ps.clutch_kills) AS clutch_kills,
-                  SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
-                  SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
-                  SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
-                  SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
-                  SUM(ps.entry_count) AS entry_count,
-                  SUM(ps.entry_wins) AS entry_wins,
-                  COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
-                  COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
-                  COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                  AVG(ps.hs_pct) AS hs_pct,
-                  SUM(ps.damage) AS damage
-                FROM player_stats ps
-                JOIN matches m ON m.match_id = ps.match_id
-                LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
-                GROUP BY ps.player_id
-                ON DUPLICATE KEY UPDATE
-                  team_id = VALUES(team_id),
-                  maps_played = VALUES(maps_played),
-                  rounds_played = VALUES(rounds_played),
-                  kills = VALUES(kills),
-                  deaths = VALUES(deaths),
-                  assists = VALUES(assists),
-                  mvps = VALUES(mvps),
-                  headshots = VALUES(headshots),
-                  sniper_kills = VALUES(sniper_kills),
-                  pistol_kills = VALUES(pistol_kills),
-                  knife_kills = VALUES(knife_kills),
-                  zeus_kills = VALUES(zeus_kills),
-                  first_kills = VALUES(first_kills),
-                  utility_damage = VALUES(utility_damage),
-                  enemies_flashed = VALUES(enemies_flashed),
-                  flash_count = VALUES(flash_count),
-                  flash_successes = VALUES(flash_successes),
-                  utility_count = VALUES(utility_count),
-                  utility_successes = VALUES(utility_successes),
-                  utility_enemies = VALUES(utility_enemies),
-                  mk_2k = VALUES(mk_2k),
-                  mk_3k = VALUES(mk_3k),
-                  mk_4k = VALUES(mk_4k),
-                  mk_5k = VALUES(mk_5k),
-                  clutch_kills = VALUES(clutch_kills),
-                  cl_1v1_attempts = VALUES(cl_1v1_attempts),
-                  cl_1v1_wins = VALUES(cl_1v1_wins),
-                  cl_1v2_attempts = VALUES(cl_1v2_attempts),
-                  cl_1v2_wins = VALUES(cl_1v2_wins),
-                  entry_count = VALUES(entry_count),
-                  entry_wins = VALUES(entry_wins),
-                  adr = VALUES(adr),
-                  kr = VALUES(kr),
-                  kd = VALUES(kd),
-                  hs_pct = VALUES(hs_pct),
-                  damage = VALUES(damage)
-                """,
-                (season, division_num, player_id, season, division_num, player_id),
-            )
-            if snapshot_ts is not None:
+    async def _op():
+        async with connection(label=label) as conn:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     """
-                                        INSERT IGNORE INTO player_season_totals_prev (
-                                            season, division_num, player_id, team_id,
-                                            maps_played, rounds_played, kills, deaths, assists,
-                                            mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                                            utility_damage, enemies_flashed, flash_count, flash_successes,
-                                            utility_count, utility_successes, utility_enemies,
-                                            mk_2k, mk_3k, mk_4k, mk_5k,
-                                            clutch_kills, cl_1v1_attempts, cl_1v1_wins,
-                                            cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
-                                            adr, kr, kd, hs_pct, damage,
-                                            snapshot_ts
-                                        )
-                                        SELECT
-                                            %s AS season, %s AS division_num, %s AS player_id,
-                                            MAX(ps.team_id) AS team_id,
-                                            COUNT(DISTINCT ps.match_id) AS maps_played,
-                                            SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
-                                            SUM(ps.kills) AS kills,
-                                            SUM(ps.deaths) AS deaths,
-                                            SUM(ps.assists) AS assists,
-                                            SUM(ps.mvps) AS mvps,
-                                            SUM(ps.headshots) AS headshots,
-                                            SUM(ps.sniper_kills) AS sniper_kills,
-                                            SUM(ps.pistol_kills) AS pistol_kills,
-                                            SUM(ps.knife_kills) AS knife_kills,
-                                            SUM(ps.zeus_kills) AS zeus_kills,
-                                            SUM(ps.first_kills) AS first_kills,
-                                            SUM(ps.utility_damage) AS utility_damage,
-                                            SUM(ps.enemies_flashed) AS enemies_flashed,
-                                            SUM(ps.flash_count) AS flash_count,
-                                            SUM(ps.flash_successes) AS flash_successes,
-                                            SUM(ps.utility_count) AS utility_count,
-                                            SUM(ps.utility_successes) AS utility_successes,
-                                            SUM(ps.utility_enemies) AS utility_enemies,
-                                            SUM(ps.mk_2k) AS mk_2k,
-                                            SUM(ps.mk_3k) AS mk_3k,
-                                            SUM(ps.mk_4k) AS mk_4k,
-                                            SUM(ps.mk_5k) AS mk_5k,
-                                            SUM(ps.clutch_kills) AS clutch_kills,
-                                            SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
-                                            SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
-                                            SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
-                                            SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
-                                            SUM(ps.entry_count) AS entry_count,
-                                            SUM(ps.entry_wins) AS entry_wins,
-                                            COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
-                                            COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
-                                            COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                                            AVG(ps.hs_pct) AS hs_pct,
-                                            SUM(ps.damage) AS damage,
-                                            %s AS snapshot_ts
-                                        FROM player_stats ps
-                                        JOIN matches m ON m.match_id = ps.match_id
-                                        LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                                        WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
-                                        GROUP BY ps.player_id
+                    INSERT INTO player_season_totals (
+                      season, division_num, player_id, team_id,
+                      maps_played, rounds_played, kills, deaths, assists,
+                      mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
+                      utility_damage, enemies_flashed, flash_count, flash_successes,
+                      utility_count, utility_successes, utility_enemies,
+                      mk_2k, mk_3k, mk_4k, mk_5k,
+                      clutch_kills, cl_1v1_attempts, cl_1v1_wins,
+                      cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
+                      adr, kr, kd, hs_pct, damage
+                    )
+                    SELECT
+                      %s AS season, %s AS division_num, %s AS player_id,
+                      MAX(ps.team_id) AS team_id,
+                      COUNT(DISTINCT ps.match_id) AS maps_played,
+                      SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
+                      SUM(ps.kills) AS kills,
+                      SUM(ps.deaths) AS deaths,
+                      SUM(ps.assists) AS assists,
+                      SUM(ps.mvps) AS mvps,
+                      SUM(ps.headshots) AS headshots,
+                      SUM(ps.sniper_kills) AS sniper_kills,
+                      SUM(ps.pistol_kills) AS pistol_kills,
+                      SUM(ps.knife_kills) AS knife_kills,
+                      SUM(ps.zeus_kills) AS zeus_kills,
+                      SUM(ps.first_kills) AS first_kills,
+                      SUM(ps.utility_damage) AS utility_damage,
+                      SUM(ps.enemies_flashed) AS enemies_flashed,
+                      SUM(ps.flash_count) AS flash_count,
+                      SUM(ps.flash_successes) AS flash_successes,
+                      SUM(ps.utility_count) AS utility_count,
+                      SUM(ps.utility_successes) AS utility_successes,
+                      SUM(ps.utility_enemies) AS utility_enemies,
+                      SUM(ps.mk_2k) AS mk_2k,
+                      SUM(ps.mk_3k) AS mk_3k,
+                      SUM(ps.mk_4k) AS mk_4k,
+                      SUM(ps.mk_5k) AS mk_5k,
+                      SUM(ps.clutch_kills) AS clutch_kills,
+                      SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
+                      SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
+                      SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
+                      SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
+                      SUM(ps.entry_count) AS entry_count,
+                      SUM(ps.entry_wins) AS entry_wins,
+                      COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
+                      COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
+                      COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
+                      AVG(ps.hs_pct) AS hs_pct,
+                      SUM(ps.damage) AS damage
+                    FROM player_stats ps
+                    JOIN matches m ON m.match_id = ps.match_id
+                    LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+                    WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
+                    GROUP BY ps.player_id
+                    ON DUPLICATE KEY UPDATE
+                      team_id = VALUES(team_id),
+                      maps_played = VALUES(maps_played),
+                      rounds_played = VALUES(rounds_played),
+                      kills = VALUES(kills),
+                      deaths = VALUES(deaths),
+                      assists = VALUES(assists),
+                      mvps = VALUES(mvps),
+                      headshots = VALUES(headshots),
+                      sniper_kills = VALUES(sniper_kills),
+                      pistol_kills = VALUES(pistol_kills),
+                      knife_kills = VALUES(knife_kills),
+                      zeus_kills = VALUES(zeus_kills),
+                      first_kills = VALUES(first_kills),
+                      utility_damage = VALUES(utility_damage),
+                      enemies_flashed = VALUES(enemies_flashed),
+                      flash_count = VALUES(flash_count),
+                      flash_successes = VALUES(flash_successes),
+                      utility_count = VALUES(utility_count),
+                      utility_successes = VALUES(utility_successes),
+                      utility_enemies = VALUES(utility_enemies),
+                      mk_2k = VALUES(mk_2k),
+                      mk_3k = VALUES(mk_3k),
+                      mk_4k = VALUES(mk_4k),
+                      mk_5k = VALUES(mk_5k),
+                      clutch_kills = VALUES(clutch_kills),
+                      cl_1v1_attempts = VALUES(cl_1v1_attempts),
+                      cl_1v1_wins = VALUES(cl_1v1_wins),
+                      cl_1v2_attempts = VALUES(cl_1v2_attempts),
+                      cl_1v2_wins = VALUES(cl_1v2_wins),
+                      entry_count = VALUES(entry_count),
+                      entry_wins = VALUES(entry_wins),
+                      adr = VALUES(adr),
+                      kr = VALUES(kr),
+                      kd = VALUES(kd),
+                      hs_pct = VALUES(hs_pct),
+                      damage = VALUES(damage)
                     """,
-                    (season, division_num, player_id, snapshot_ts, season, division_num, player_id),
+                    (season, division_num, player_id, season, division_num, player_id),
                 )
-        await conn.commit()
+                if snapshot_ts is not None:
+                    await cur.execute(
+                        """
+                                            INSERT IGNORE INTO player_season_totals_prev (
+                                                season, division_num, player_id, team_id,
+                                                maps_played, rounds_played, kills, deaths, assists,
+                                                mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
+                                                utility_damage, enemies_flashed, flash_count, flash_successes,
+                                                utility_count, utility_successes, utility_enemies,
+                                                mk_2k, mk_3k, mk_4k, mk_5k,
+                                                clutch_kills, cl_1v1_attempts, cl_1v1_wins,
+                                                cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
+                                                adr, kr, kd, hs_pct, damage,
+                                                snapshot_ts
+                                            )
+                                            SELECT
+                                                %s AS season, %s AS division_num, %s AS player_id,
+                                                MAX(ps.team_id) AS team_id,
+                                                COUNT(DISTINCT ps.match_id) AS maps_played,
+                                                SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
+                                                SUM(ps.kills) AS kills,
+                                                SUM(ps.deaths) AS deaths,
+                                                SUM(ps.assists) AS assists,
+                                                SUM(ps.mvps) AS mvps,
+                                                SUM(ps.headshots) AS headshots,
+                                                SUM(ps.sniper_kills) AS sniper_kills,
+                                                SUM(ps.pistol_kills) AS pistol_kills,
+                                                SUM(ps.knife_kills) AS knife_kills,
+                                                SUM(ps.zeus_kills) AS zeus_kills,
+                                                SUM(ps.first_kills) AS first_kills,
+                                                SUM(ps.utility_damage) AS utility_damage,
+                                                SUM(ps.enemies_flashed) AS enemies_flashed,
+                                                SUM(ps.flash_count) AS flash_count,
+                                                SUM(ps.flash_successes) AS flash_successes,
+                                                SUM(ps.utility_count) AS utility_count,
+                                                SUM(ps.utility_successes) AS utility_successes,
+                                                SUM(ps.utility_enemies) AS utility_enemies,
+                                                SUM(ps.mk_2k) AS mk_2k,
+                                                SUM(ps.mk_3k) AS mk_3k,
+                                                SUM(ps.mk_4k) AS mk_4k,
+                                                SUM(ps.mk_5k) AS mk_5k,
+                                                SUM(ps.clutch_kills) AS clutch_kills,
+                                                SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
+                                                SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
+                                                SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
+                                                SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
+                                                SUM(ps.entry_count) AS entry_count,
+                                                SUM(ps.entry_wins) AS entry_wins,
+                                                COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
+                                                COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
+                                                COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
+                                                AVG(ps.hs_pct) AS hs_pct,
+                                                SUM(ps.damage) AS damage,
+                                                %s AS snapshot_ts
+                                            FROM player_stats ps
+                                            JOIN matches m ON m.match_id = ps.match_id
+                                            LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+                                            WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
+                                            GROUP BY ps.player_id
+                        """,
+                        (season, division_num, player_id, snapshot_ts, season, division_num, player_id),
+                    )
+            await conn.commit()
+
+    await _retry_on_deadlock(_op, label=label)
 
 
 async def upsert_team_map_season_totals_async(
@@ -1579,130 +1585,133 @@ async def upsert_team_map_season_totals_async(
     label: str = "team-map-season-totals",
 ) -> None:
     """Upsert aggregated map-level season totals for a team (inline)."""
-    async with connection(label=label) as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                f"""
-                INSERT INTO team_map_season_totals (
-                  season, division_num, team_id, map_name,
-                  played, picks, opp_picks, wins, games,
-                  ban1, ban2, opp_ban, total_own_ban, decov,
-                  kills, deaths, mvps, rd, kd, adr, damage, utility_damage
-                )
-                SELECT
-                  %s AS season, %s AS division_num, %s AS team_id, mp.map_name,
-                  COUNT(*) AS played,
-                  0 AS picks,
-                  0 AS opp_picks,
-                  SUM(CASE WHEN ts.win = 1 THEN 1 ELSE 0 END) AS wins,
-                  COUNT(*) AS games,
-                  0, 0, 0, 0, 0,
-                  SUM(COALESCE(ts.final_score,0)) AS kills, -- reuse field as rounds_for placeholder
-                  SUM(COALESCE(opp.final_score,0)) AS deaths,
-                  SUM(COALESCE(ps.mvps,0)) AS mvps,
-                  SUM(COALESCE(ts.final_score,0) - COALESCE(opp.final_score,0)) AS rd,
-                  COALESCE(SUM(COALESCE(ts.final_score,0)) / NULLIF(SUM(COALESCE(opp.final_score,0)),0), SUM(COALESCE(ts.final_score,0))) AS kd,
-                  0 AS adr,
-                  SUM(COALESCE(ps.damage,0)) AS damage,
-                  SUM(COALESCE(ps.utility_damage,0)) AS utility_damage
-                FROM team_stats ts
-                JOIN matches m ON m.match_id = ts.match_id
-                JOIN maps mp ON mp.match_id = ts.match_id AND mp.round_index = ts.round_index
-                LEFT JOIN team_stats opp
-                  ON opp.match_id = ts.match_id
-                 AND opp.team_id <> ts.team_id
-                 AND opp.round_index = ts.round_index
-                LEFT JOIN player_stats ps
-                  ON ps.match_id = ts.match_id
-                 AND ps.round_index = ts.round_index
-                 AND ps.team_id = ts.team_id
-                                WHERE m.season = %s AND m.division_num = %s AND ts.team_id = %s
-                                    AND ts.is_forfeit_map = 0
-                                    AND mp.is_forfeit = 0
-                { "AND mp.map_name = %s" if map_name else "" }
-                GROUP BY mp.map_name
-                ON DUPLICATE KEY UPDATE
-                  played = VALUES(played),
-                  wins = VALUES(wins),
-                  games = VALUES(games),
-                  rd = VALUES(rd),
-                  kd = VALUES(kd),
-                  kills = VALUES(kills),
-                  deaths = VALUES(deaths),
-                  mvps = VALUES(mvps),
-                  damage = VALUES(damage),
-                  utility_damage = VALUES(utility_damage)
-                """,
-                (
-                    season,
-                    division_num,
-                    team_id,
-                    season,
-                    division_num,
-                    team_id,
-                    map_name,
-                )
-                if map_name
-                else (season, division_num, team_id, season, division_num, team_id),
-            )
-            if snapshot_ts is not None:
+    async def _op():
+        async with connection(label=label) as conn:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     f"""
-                                        INSERT IGNORE INTO team_map_season_totals_prev (
-                                            season, division_num, team_id, map_name,
-                                            played, picks, opp_picks, wins, games,
-                                            ban1, ban2, opp_ban, total_own_ban, decov,
-                                            kills, deaths, mvps, rd, kd, adr, damage, utility_damage,
-                                            snapshot_ts
-                                        )
-                                        SELECT
-                                            %s AS season, %s AS division_num, %s AS team_id, mp.map_name,
-                                            COUNT(*) AS played,
-                                            0 AS picks,
-                                            0 AS opp_picks,
-                                            SUM(CASE WHEN ts.win = 1 THEN 1 ELSE 0 END) AS wins,
-                                            COUNT(*) AS games,
-                                            0, 0, 0, 0, 0,
-                                            SUM(COALESCE(ts.final_score,0)) AS kills,
-                                            SUM(COALESCE(opp.final_score,0)) AS deaths,
-                                            SUM(COALESCE(ps.mvps,0)) AS mvps,
-                                            SUM(COALESCE(ts.final_score,0) - COALESCE(opp.final_score,0)) AS rd,
-                                            COALESCE(SUM(COALESCE(ts.final_score,0)) / NULLIF(SUM(COALESCE(opp.final_score,0)),0), SUM(COALESCE(ts.final_score,0))) AS kd,
-                                            0 AS adr,
-                                            SUM(COALESCE(ps.damage,0)) AS damage,
-                                            SUM(COALESCE(ps.utility_damage,0)) AS utility_damage,
-                                            %s AS snapshot_ts
-                                        FROM team_stats ts
-                                        JOIN matches m ON m.match_id = ts.match_id
-                                        JOIN maps mp ON mp.match_id = ts.match_id AND mp.round_index = ts.round_index
-                                        LEFT JOIN team_stats opp
-                                            ON opp.match_id = ts.match_id
-                                         AND opp.team_id <> ts.team_id
-                                         AND opp.round_index = ts.round_index
-                                        LEFT JOIN player_stats ps
-                                            ON ps.match_id = ts.match_id
-                                         AND ps.round_index = ts.round_index
-                                         AND ps.team_id = ts.team_id
-                                        WHERE m.season = %s AND m.division_num = %s AND ts.team_id = %s
-                                            AND ts.is_forfeit_map = 0
-                                            AND mp.is_forfeit = 0
-                                        {"AND mp.map_name = %s" if map_name else ""}
-                                        GROUP BY mp.map_name
+                    INSERT INTO team_map_season_totals (
+                      season, division_num, team_id, map_name,
+                      played, picks, opp_picks, wins, games,
+                      ban1, ban2, opp_ban, total_own_ban, decov,
+                      kills, deaths, mvps, rd, kd, adr, damage, utility_damage
+                    )
+                    SELECT
+                      %s AS season, %s AS division_num, %s AS team_id, mp.map_name,
+                      COUNT(*) AS played,
+                      0 AS picks,
+                      0 AS opp_picks,
+                      SUM(CASE WHEN ts.win = 1 THEN 1 ELSE 0 END) AS wins,
+                      COUNT(*) AS games,
+                      0, 0, 0, 0, 0,
+                      SUM(COALESCE(ts.final_score,0)) AS kills, -- reuse field as rounds_for placeholder
+                      SUM(COALESCE(opp.final_score,0)) AS deaths,
+                      SUM(COALESCE(ps.mvps,0)) AS mvps,
+                      SUM(COALESCE(ts.final_score,0) - COALESCE(opp.final_score,0)) AS rd,
+                      COALESCE(SUM(COALESCE(ts.final_score,0)) / NULLIF(SUM(COALESCE(opp.final_score,0)),0), SUM(COALESCE(ts.final_score,0))) AS kd,
+                      0 AS adr,
+                      SUM(COALESCE(ps.damage,0)) AS damage,
+                      SUM(COALESCE(ps.utility_damage,0)) AS utility_damage
+                    FROM team_stats ts
+                    JOIN matches m ON m.match_id = ts.match_id
+                    JOIN maps mp ON mp.match_id = ts.match_id AND mp.round_index = ts.round_index
+                    LEFT JOIN team_stats opp
+                      ON opp.match_id = ts.match_id
+                     AND opp.team_id <> ts.team_id
+                     AND opp.round_index = ts.round_index
+                    LEFT JOIN player_stats ps
+                      ON ps.match_id = ts.match_id
+                     AND ps.round_index = ts.round_index
+                     AND ps.team_id = ts.team_id
+                                    WHERE m.season = %s AND m.division_num = %s AND ts.team_id = %s
+                                        AND ts.is_forfeit_map = 0
+                                        AND mp.is_forfeit = 0
+                    { "AND mp.map_name = %s" if map_name else "" }
+                    GROUP BY mp.map_name
+                    ON DUPLICATE KEY UPDATE
+                      played = VALUES(played),
+                      wins = VALUES(wins),
+                      games = VALUES(games),
+                      rd = VALUES(rd),
+                      kd = VALUES(kd),
+                      kills = VALUES(kills),
+                      deaths = VALUES(deaths),
+                      mvps = VALUES(mvps),
+                      damage = VALUES(damage),
+                      utility_damage = VALUES(utility_damage)
                     """,
                     (
                         season,
                         division_num,
                         team_id,
-                        snapshot_ts,
                         season,
                         division_num,
                         team_id,
                         map_name,
                     )
                     if map_name
-                    else (season, division_num, team_id, snapshot_ts, season, division_num, team_id),
+                    else (season, division_num, team_id, season, division_num, team_id),
                 )
-        await conn.commit()
+                if snapshot_ts is not None:
+                    await cur.execute(
+                        f"""
+                                            INSERT IGNORE INTO team_map_season_totals_prev (
+                                                season, division_num, team_id, map_name,
+                                                played, picks, opp_picks, wins, games,
+                                                ban1, ban2, opp_ban, total_own_ban, decov,
+                                                kills, deaths, mvps, rd, kd, adr, damage, utility_damage,
+                                                snapshot_ts
+                                            )
+                                            SELECT
+                                                %s AS season, %s AS division_num, %s AS team_id, mp.map_name,
+                                                COUNT(*) AS played,
+                                                0 AS picks,
+                                                0 AS opp_picks,
+                                                SUM(CASE WHEN ts.win = 1 THEN 1 ELSE 0 END) AS wins,
+                                                COUNT(*) AS games,
+                                                0, 0, 0, 0, 0,
+                                                SUM(COALESCE(ts.final_score,0)) AS kills,
+                                                SUM(COALESCE(opp.final_score,0)) AS deaths,
+                                                SUM(COALESCE(ps.mvps,0)) AS mvps,
+                                                SUM(COALESCE(ts.final_score,0) - COALESCE(opp.final_score,0)) AS rd,
+                                                COALESCE(SUM(COALESCE(ts.final_score,0)) / NULLIF(SUM(COALESCE(opp.final_score,0)),0), SUM(COALESCE(ts.final_score,0))) AS kd,
+                                                0 AS adr,
+                                                SUM(COALESCE(ps.damage,0)) AS damage,
+                                                SUM(COALESCE(ps.utility_damage,0)) AS utility_damage,
+                                                %s AS snapshot_ts
+                                            FROM team_stats ts
+                                            JOIN matches m ON m.match_id = ts.match_id
+                                            JOIN maps mp ON mp.match_id = ts.match_id AND mp.round_index = ts.round_index
+                                            LEFT JOIN team_stats opp
+                                                ON opp.match_id = ts.match_id
+                                             AND opp.team_id <> ts.team_id
+                                             AND opp.round_index = ts.round_index
+                                            LEFT JOIN player_stats ps
+                                                ON ps.match_id = ts.match_id
+                                             AND ps.round_index = ts.round_index
+                                             AND ps.team_id = ts.team_id
+                                            WHERE m.season = %s AND m.division_num = %s AND ts.team_id = %s
+                                                AND ts.is_forfeit_map = 0
+                                                AND mp.is_forfeit = 0
+                                            {"AND mp.map_name = %s" if map_name else ""}
+                                            GROUP BY mp.map_name
+                        """,
+                        (
+                            season,
+                            division_num,
+                            team_id,
+                            snapshot_ts,
+                            season,
+                            division_num,
+                            team_id,
+                            map_name,
+                        )
+                        if map_name
+                        else (season, division_num, team_id, snapshot_ts, season, division_num, team_id),
+                    )
+            await conn.commit()
+
+    await _retry_on_deadlock(_op, label=label)
 
 
 async def upsert_player_map_season_totals_async(
@@ -1714,169 +1723,172 @@ async def upsert_player_map_season_totals_async(
     label: str = "player-map-season-totals",
 ) -> None:
     """Upsert aggregated map-level season totals for a player."""
-    async with connection(label=label) as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                INSERT INTO player_map_season_totals (
-                  season, division_num, player_id, team_id, map_name,
-                  maps_played, rounds_played, kills, deaths, assists,
-                  headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                  utility_damage, enemies_flashed, flash_count, flash_successes,
-                  utility_count, utility_successes, utility_enemies,
-                  mk_2k, mk_3k, mk_4k, mk_5k,
-                  entry_count, entry_wins, clutch_kills,
-                  cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
-                  adr, kr, kd, hs_pct, mvps, damage
-                )
-                SELECT
-                  %s AS season, %s AS division_num, %s AS player_id,
-                  MAX(ps.team_id) AS team_id,
-                  COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
-                  COUNT(DISTINCT ps.match_id) AS maps_played,
-                  SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
-                  SUM(ps.kills) AS kills,
-                  SUM(ps.deaths) AS deaths,
-                  SUM(ps.assists) AS assists,
-                  SUM(ps.headshots) AS headshots,
-                  SUM(ps.sniper_kills) AS sniper_kills,
-                  SUM(ps.pistol_kills) AS pistol_kills,
-                  SUM(ps.knife_kills) AS knife_kills,
-                  SUM(ps.zeus_kills) AS zeus_kills,
-                  SUM(ps.first_kills) AS first_kills,
-                  SUM(ps.utility_damage) AS utility_damage,
-                  SUM(ps.enemies_flashed) AS enemies_flashed,
-                  SUM(ps.flash_count) AS flash_count,
-                  SUM(ps.flash_successes) AS flash_successes,
-                  SUM(ps.utility_count) AS utility_count,
-                  SUM(ps.utility_successes) AS utility_successes,
-                  SUM(ps.utility_enemies) AS utility_enemies,
-                  SUM(ps.mk_2k) AS mk_2k,
-                  SUM(ps.mk_3k) AS mk_3k,
-                  SUM(ps.mk_4k) AS mk_4k,
-                  SUM(ps.mk_5k) AS mk_5k,
-                  SUM(ps.entry_count) AS entry_count,
-                  SUM(ps.entry_wins) AS entry_wins,
-                  SUM(ps.clutch_kills) AS clutch_kills,
-                  SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
-                  SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
-                  SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
-                  SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
-                  COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
-                  COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
-                  COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                  AVG(ps.hs_pct) AS hs_pct,
-                  SUM(ps.mvps) AS mvps,
-                  SUM(ps.damage) AS damage
-                FROM player_stats ps
-                JOIN matches m ON m.match_id = ps.match_id
-                LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
-                GROUP BY COALESCE(mp.map_name, CONCAT('map_', ps.map_id))
-                ON DUPLICATE KEY UPDATE
-                  team_id = VALUES(team_id),
-                  maps_played = VALUES(maps_played),
-                  rounds_played = VALUES(rounds_played),
-                  kills = VALUES(kills),
-                  deaths = VALUES(deaths),
-                  assists = VALUES(assists),
-                  headshots = VALUES(headshots),
-                  sniper_kills = VALUES(sniper_kills),
-                  pistol_kills = VALUES(pistol_kills),
-                  knife_kills = VALUES(knife_kills),
-                  zeus_kills = VALUES(zeus_kills),
-                  first_kills = VALUES(first_kills),
-                  utility_damage = VALUES(utility_damage),
-                  enemies_flashed = VALUES(enemies_flashed),
-                  flash_count = VALUES(flash_count),
-                  flash_successes = VALUES(flash_successes),
-                  utility_count = VALUES(utility_count),
-                  utility_successes = VALUES(utility_successes),
-                  utility_enemies = VALUES(utility_enemies),
-                  mk_2k = VALUES(mk_2k),
-                  mk_3k = VALUES(mk_3k),
-                  mk_4k = VALUES(mk_4k),
-                  mk_5k = VALUES(mk_5k),
-                  entry_count = VALUES(entry_count),
-                  entry_wins = VALUES(entry_wins),
-                  clutch_kills = VALUES(clutch_kills),
-                  cl_1v1_attempts = VALUES(cl_1v1_attempts),
-                  cl_1v1_wins = VALUES(cl_1v1_wins),
-                  cl_1v2_attempts = VALUES(cl_1v2_attempts),
-                  cl_1v2_wins = VALUES(cl_1v2_wins),
-                  adr = VALUES(adr),
-                  kr = VALUES(kr),
-                  kd = VALUES(kd),
-                  hs_pct = VALUES(hs_pct),
-                  mvps = VALUES(mvps),
-                  damage = VALUES(damage)
-                """,
-                (season, division_num, player_id, season, division_num, player_id),
-            )
-            if snapshot_ts is not None:
+    async def _op():
+        async with connection(label=label) as conn:
+            async with conn.cursor() as cur:
                 await cur.execute(
                     """
-                                        INSERT IGNORE INTO player_map_season_totals_prev (
-                                            season, division_num, player_id, team_id, map_name,
-                                            maps_played, rounds_played, kills, deaths, assists,
-                                            headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                                            utility_damage, enemies_flashed, flash_count, flash_successes,
-                                            utility_count, utility_successes, utility_enemies,
-                                            mk_2k, mk_3k, mk_4k, mk_5k,
-                                            entry_count, entry_wins, clutch_kills,
-                                            cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
-                                            adr, kr, kd, hs_pct, mvps, damage,
-                                            snapshot_ts
-                                        )
-                                        SELECT
-                                            %s AS season, %s AS division_num, %s AS player_id,
-                                            MAX(ps.team_id) AS team_id,
-                                            COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
-                                            COUNT(DISTINCT ps.match_id) AS maps_played,
-                                            SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
-                                            SUM(ps.kills) AS kills,
-                                            SUM(ps.deaths) AS deaths,
-                                            SUM(ps.assists) AS assists,
-                                            SUM(ps.headshots) AS headshots,
-                                            SUM(ps.sniper_kills) AS sniper_kills,
-                                            SUM(ps.pistol_kills) AS pistol_kills,
-                                            SUM(ps.knife_kills) AS knife_kills,
-                                            SUM(ps.zeus_kills) AS zeus_kills,
-                                            SUM(ps.first_kills) AS first_kills,
-                                            SUM(ps.utility_damage) AS utility_damage,
-                                            SUM(ps.enemies_flashed) AS enemies_flashed,
-                                            SUM(ps.flash_count) AS flash_count,
-                                            SUM(ps.flash_successes) AS flash_successes,
-                                            SUM(ps.utility_count) AS utility_count,
-                                            SUM(ps.utility_successes) AS utility_successes,
-                                            SUM(ps.utility_enemies) AS utility_enemies,
-                                            SUM(ps.mk_2k) AS mk_2k,
-                                            SUM(ps.mk_3k) AS mk_3k,
-                                            SUM(ps.mk_4k) AS mk_4k,
-                                            SUM(ps.mk_5k) AS mk_5k,
-                                            SUM(ps.entry_count) AS entry_count,
-                                            SUM(ps.entry_wins) AS entry_wins,
-                                            SUM(ps.clutch_kills) AS clutch_kills,
-                                            SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
-                                            SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
-                                            SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
-                                            SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
-                                            COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
-                                            COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
-                                            COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                                            AVG(ps.hs_pct) AS hs_pct,
-                                            SUM(ps.mvps) AS mvps,
-                                            SUM(ps.damage) AS damage,
-                                            %s AS snapshot_ts
-                                        FROM player_stats ps
-                                        JOIN matches m ON m.match_id = ps.match_id
-                                        LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                                        WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
-                                        GROUP BY COALESCE(mp.map_name, CONCAT('map_', ps.map_id))
+                    INSERT INTO player_map_season_totals (
+                      season, division_num, player_id, team_id, map_name,
+                      maps_played, rounds_played, kills, deaths, assists,
+                      headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
+                      utility_damage, enemies_flashed, flash_count, flash_successes,
+                      utility_count, utility_successes, utility_enemies,
+                      mk_2k, mk_3k, mk_4k, mk_5k,
+                      entry_count, entry_wins, clutch_kills,
+                      cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
+                      adr, kr, kd, hs_pct, mvps, damage
+                    )
+                    SELECT
+                      %s AS season, %s AS division_num, %s AS player_id,
+                      MAX(ps.team_id) AS team_id,
+                      COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
+                      COUNT(DISTINCT ps.match_id) AS maps_played,
+                      SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
+                      SUM(ps.kills) AS kills,
+                      SUM(ps.deaths) AS deaths,
+                      SUM(ps.assists) AS assists,
+                      SUM(ps.headshots) AS headshots,
+                      SUM(ps.sniper_kills) AS sniper_kills,
+                      SUM(ps.pistol_kills) AS pistol_kills,
+                      SUM(ps.knife_kills) AS knife_kills,
+                      SUM(ps.zeus_kills) AS zeus_kills,
+                      SUM(ps.first_kills) AS first_kills,
+                      SUM(ps.utility_damage) AS utility_damage,
+                      SUM(ps.enemies_flashed) AS enemies_flashed,
+                      SUM(ps.flash_count) AS flash_count,
+                      SUM(ps.flash_successes) AS flash_successes,
+                      SUM(ps.utility_count) AS utility_count,
+                      SUM(ps.utility_successes) AS utility_successes,
+                      SUM(ps.utility_enemies) AS utility_enemies,
+                      SUM(ps.mk_2k) AS mk_2k,
+                      SUM(ps.mk_3k) AS mk_3k,
+                      SUM(ps.mk_4k) AS mk_4k,
+                      SUM(ps.mk_5k) AS mk_5k,
+                      SUM(ps.entry_count) AS entry_count,
+                      SUM(ps.entry_wins) AS entry_wins,
+                      SUM(ps.clutch_kills) AS clutch_kills,
+                      SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
+                      SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
+                      SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
+                      SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
+                      COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
+                      COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
+                      COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
+                      AVG(ps.hs_pct) AS hs_pct,
+                      SUM(ps.mvps) AS mvps,
+                      SUM(ps.damage) AS damage
+                    FROM player_stats ps
+                    JOIN matches m ON m.match_id = ps.match_id
+                    LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+                    WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
+                    GROUP BY COALESCE(mp.map_name, CONCAT('map_', ps.map_id))
+                    ON DUPLICATE KEY UPDATE
+                      team_id = VALUES(team_id),
+                      maps_played = VALUES(maps_played),
+                      rounds_played = VALUES(rounds_played),
+                      kills = VALUES(kills),
+                      deaths = VALUES(deaths),
+                      assists = VALUES(assists),
+                      headshots = VALUES(headshots),
+                      sniper_kills = VALUES(sniper_kills),
+                      pistol_kills = VALUES(pistol_kills),
+                      knife_kills = VALUES(knife_kills),
+                      zeus_kills = VALUES(zeus_kills),
+                      first_kills = VALUES(first_kills),
+                      utility_damage = VALUES(utility_damage),
+                      enemies_flashed = VALUES(enemies_flashed),
+                      flash_count = VALUES(flash_count),
+                      flash_successes = VALUES(flash_successes),
+                      utility_count = VALUES(utility_count),
+                      utility_successes = VALUES(utility_successes),
+                      utility_enemies = VALUES(utility_enemies),
+                      mk_2k = VALUES(mk_2k),
+                      mk_3k = VALUES(mk_3k),
+                      mk_4k = VALUES(mk_4k),
+                      mk_5k = VALUES(mk_5k),
+                      entry_count = VALUES(entry_count),
+                      entry_wins = VALUES(entry_wins),
+                      clutch_kills = VALUES(clutch_kills),
+                      cl_1v1_attempts = VALUES(cl_1v1_attempts),
+                      cl_1v1_wins = VALUES(cl_1v1_wins),
+                      cl_1v2_attempts = VALUES(cl_1v2_attempts),
+                      cl_1v2_wins = VALUES(cl_1v2_wins),
+                      adr = VALUES(adr),
+                      kr = VALUES(kr),
+                      kd = VALUES(kd),
+                      hs_pct = VALUES(hs_pct),
+                      mvps = VALUES(mvps),
+                      damage = VALUES(damage)
                     """,
-                    (season, division_num, player_id, snapshot_ts, season, division_num, player_id),
+                    (season, division_num, player_id, season, division_num, player_id),
                 )
-        await conn.commit()
+                if snapshot_ts is not None:
+                    await cur.execute(
+                        """
+                                            INSERT IGNORE INTO player_map_season_totals_prev (
+                                                season, division_num, player_id, team_id, map_name,
+                                                maps_played, rounds_played, kills, deaths, assists,
+                                                headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
+                                                utility_damage, enemies_flashed, flash_count, flash_successes,
+                                                utility_count, utility_successes, utility_enemies,
+                                                mk_2k, mk_3k, mk_4k, mk_5k,
+                                                entry_count, entry_wins, clutch_kills,
+                                                cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
+                                                adr, kr, kd, hs_pct, mvps, damage,
+                                                snapshot_ts
+                                            )
+                                            SELECT
+                                                %s AS season, %s AS division_num, %s AS player_id,
+                                                MAX(ps.team_id) AS team_id,
+                                                COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
+                                                COUNT(DISTINCT ps.match_id) AS maps_played,
+                                                SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
+                                                SUM(ps.kills) AS kills,
+                                                SUM(ps.deaths) AS deaths,
+                                                SUM(ps.assists) AS assists,
+                                                SUM(ps.headshots) AS headshots,
+                                                SUM(ps.sniper_kills) AS sniper_kills,
+                                                SUM(ps.pistol_kills) AS pistol_kills,
+                                                SUM(ps.knife_kills) AS knife_kills,
+                                                SUM(ps.zeus_kills) AS zeus_kills,
+                                                SUM(ps.first_kills) AS first_kills,
+                                                SUM(ps.utility_damage) AS utility_damage,
+                                                SUM(ps.enemies_flashed) AS enemies_flashed,
+                                                SUM(ps.flash_count) AS flash_count,
+                                                SUM(ps.flash_successes) AS flash_successes,
+                                                SUM(ps.utility_count) AS utility_count,
+                                                SUM(ps.utility_successes) AS utility_successes,
+                                                SUM(ps.utility_enemies) AS utility_enemies,
+                                                SUM(ps.mk_2k) AS mk_2k,
+                                                SUM(ps.mk_3k) AS mk_3k,
+                                                SUM(ps.mk_4k) AS mk_4k,
+                                                SUM(ps.mk_5k) AS mk_5k,
+                                                SUM(ps.entry_count) AS entry_count,
+                                                SUM(ps.entry_wins) AS entry_wins,
+                                                SUM(ps.clutch_kills) AS clutch_kills,
+                                                SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
+                                                SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
+                                                SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
+                                                SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
+                                                COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
+                                                COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
+                                                COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
+                                                AVG(ps.hs_pct) AS hs_pct,
+                                                SUM(ps.mvps) AS mvps,
+                                                SUM(ps.damage) AS damage,
+                                                %s AS snapshot_ts
+                                            FROM player_stats ps
+                                            JOIN matches m ON m.match_id = ps.match_id
+                                            LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+                                            WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
+                                            GROUP BY COALESCE(mp.map_name, CONCAT('map_', ps.map_id))
+                        """,
+                        (season, division_num, player_id, snapshot_ts, season, division_num, player_id),
+                    )
+            await conn.commit()
+
+    await _retry_on_deadlock(_op, label=label)
 
 
 async def upsert_player_stats_for_match_async(
