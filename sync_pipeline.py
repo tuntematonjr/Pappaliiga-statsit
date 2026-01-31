@@ -215,12 +215,24 @@ def _extract_rounds(stats_json: Dict[str, Any] | None) -> List[Dict[str, Any]]:
     return rounds if isinstance(rounds, list) else []
 
 
+def _is_bye_value(value: Any) -> bool:
+    if value is None:
+        return False
+    return str(value).strip().lower() == "bye"
+
+
+def _is_placeholder_team(team_id: Any, name: Any) -> bool:
+    return _is_bye_value(team_id) or _is_bye_value(name)
+
+
 def _derive_team_ids(details: Dict[str, Any], rounds: Sequence[Dict[str, Any]]) -> tuple[Optional[str], Optional[str]]:
     teams_section = details.get("teams") if isinstance(details, dict) else {}
     faction1 = teams_section.get("faction1") or {}
     faction2 = teams_section.get("faction2") or {}
     f1_name = (faction1.get("name") or "").strip() or None
     f2_name = (faction2.get("name") or "").strip() or None
+    f1_is_bye = _is_bye_value(f1_name)
+    f2_is_bye = _is_bye_value(f2_name)
 
     seen: List[str] = []
     team1_id: Optional[str] = None
@@ -229,12 +241,14 @@ def _derive_team_ids(details: Dict[str, Any], rounds: Sequence[Dict[str, Any]]) 
     for rnd in rounds:
         for team in rnd.get("teams", []) or []:
             tid = team.get("team_id") or team.get("id") or team.get("faction_id")
+            name = (team.get("name") or team.get("team") or "").strip() or None
+            if _is_placeholder_team(tid, name):
+                continue
             if tid and tid not in seen:
                 seen.append(tid)
-            name = (team.get("name") or team.get("team") or "").strip() or None
-            if f1_name and name == f1_name and not team1_id:
+            if f1_name and name == f1_name and not team1_id and not f1_is_bye:
                 team1_id = tid
-            if f2_name and name == f2_name and not team2_id:
+            if f2_name and name == f2_name and not team2_id and not f2_is_bye:
                 team2_id = tid
 
     if (team1_id is None or team2_id is None) and len(seen) >= 2:
@@ -252,6 +266,11 @@ def _derive_team_ids(details: Dict[str, Any], rounds: Sequence[Dict[str, Any]]) 
         if fallback:
             team2_id = fallback
 
+    if _is_placeholder_team(team1_id, f1_name):
+        team1_id = None
+    if _is_placeholder_team(team2_id, f2_name):
+        team2_id = None
+
     return team1_id, team2_id
 
 
@@ -259,6 +278,8 @@ def _normalize_team_ref(ref: Any, team1_id: Optional[str], team2_id: Optional[st
     if ref is None:
         return None
     value = str(ref).lower()
+    if _is_bye_value(value):
+        return None
     if value in {"faction1", "1", "team1"}:
         return team1_id
     if value in {"faction2", "2", "team2"}:
@@ -362,6 +383,9 @@ def _extract_player_rows(
     for idx, rnd in enumerate(rounds, start=1):
         for team in rnd.get("teams", []) or []:
             tid = team.get("team_id") or team.get("id") or team.get("faction_id")
+            name = (team.get("name") or team.get("team") or "").strip() or None
+            if _is_placeholder_team(tid, name):
+                continue
             for player in team.get("players", []) or []:
                 ps_raw = player.get("player_stats") or player.get("stats") or {}
                 ps = _normalise_player_stats(ps_raw)
@@ -398,6 +422,9 @@ def _extract_team_rows(
             continue
         for team in team_entries:
             tid = team.get("team_id") or team.get("id") or team.get("faction_id")
+            name = (team.get("name") or team.get("team") or "").strip() or None
+            if _is_placeholder_team(tid, name):
+                continue
             if not tid:
                 continue
             opponent = None
@@ -445,10 +472,13 @@ def _collect_team_payloads(details: Dict[str, Any], banned_lookup: Dict[str, Dic
         if not team_id:
             continue
         info = banned_lookup.get(team_id, {})
+        name = faction.get("name") or info.get("team_name")
+        if _is_placeholder_team(team_id, name):
+            continue
         out.append(
             {
                 "team_id": team_id,
-                "name": faction.get("name") or info.get("team_name"),
+                "name": name,
                 "avatar": faction.get("avatar") or info.get("avatar") or DEFAULT_TEAM_AVATAR,
             }
         )
@@ -557,6 +587,8 @@ async def _build_championship_team_payloads(
                 continue
             override = status_lookup.get(team_id, {})
             name = team.get("name") or team.get("nickname") or override.get("team_name")
+            if _is_placeholder_team(team_id, name):
+                continue
             avatar = team.get("avatar") or override.get("avatar") or DEFAULT_TEAM_AVATAR
             team_payloads.append(
                 {
@@ -573,7 +605,7 @@ async def _build_championship_team_payloads(
                 "avatar": entry.get("avatar") or DEFAULT_TEAM_AVATAR,
             }
             for entry in status_entries
-            if entry.get("team_id")
+            if entry.get("team_id") and not _is_placeholder_team(entry.get("team_id"), entry.get("team_name"))
         ]
 
     stale_payloads = await _filter_stale_team_payloads(team_payloads)

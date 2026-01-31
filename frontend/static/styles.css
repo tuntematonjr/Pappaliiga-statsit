@@ -4710,7 +4710,7 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
     height: 24px;
     border-radius: 999px;
     overflow: hidden;
-    background: rgba(12, 18, 34, 0.9);
+    background: transparent;
     border: 1px solid rgba(90, 145, 255, 0.25);
     z-index: 2;
     flex: 1 1 auto;
@@ -4718,9 +4718,9 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
     min-width: 0;
     /* Wavy seam driver (single source of truth):
        Both .win and .loss read the same inherited --wave-offset, so they stay in sync.
-       Tweak speed: change duration (2.4s). */
+       Aggressive animation: 1.8s for faster, more intense wave motion. */
     --wave-offset: 0;
-    animation: waveSeam 2.4s ease-in-out infinite;
+    animation: waveSeam 1.8s ease-in-out infinite;
 }
 
 .bar-split::before {
@@ -4728,27 +4728,17 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 4px;
+    /* Removed sharp vertical core line (user preference).
+       Keep the softer collision/interference via ::after + ripples. */
+    width: 0;
     left: var(--split-win, 50%);
-    transform: translateX(-2px);
-    /* Enhanced beam collision core: bright center line with dynamic wave */
-    background:
-        linear-gradient(
-            to bottom,
-            rgba(255, 255, 255, 0.7) 0%,
-            rgba(255, 255, 255, 0.85) 20%,
-            rgba(255, 255, 255, 0.9) 50%,
-            rgba(255, 255, 255, 0.85) 80%,
-            rgba(255, 255, 255, 0.7) 100%
-        );
-    box-shadow:
-        0 0 8px 1px rgba(140, 210, 255, 0.65),
-        0 0 12px 2px rgba(255, 170, 140, 0.5),
-        0 0 20px 4px rgba(255, 255, 255, 0.25);
-    opacity: var(--split-divider-opacity, 0);
+    transform: translateX(0);
+    background: transparent;
+    box-shadow: none;
+    opacity: 0;
     pointer-events: none;
     z-index: 3;
-    animation: beamIntensity 2.1s ease-in-out infinite;
+    animation: none;
 }
 
 .bar-split::after {
@@ -4756,33 +4746,34 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 48px;
+    width: 64px;
     left: var(--split-win, 50%);
     transform: translate(-50%, 0);
-    /* Energy interference gradient: collision of blue and red beams */
+    /* Energy interference gradient: collision of blue and red beams.
+       Aggressive: wider, brighter, faster pulsing. */
     background:
         linear-gradient(
             90deg,
             rgba(90, 210, 255, 0.0) 0%,
-            rgba(90, 210, 255, 0.35) 30%,
-            rgba(140, 255, 240, 0.28) 45%,
-            rgba(255, 255, 255, 0.32) 50%,
-            rgba(255, 200, 180, 0.28) 55%,
-            rgba(255, 170, 140, 0.35) 70%,
+            rgba(90, 210, 255, 0.5) 25%,
+            rgba(140, 255, 240, 0.4) 42%,
+            rgba(255, 255, 255, 0.45) 50%,
+            rgba(255, 200, 180, 0.4) 58%,
+            rgba(255, 170, 140, 0.5) 75%,
             rgba(255, 170, 140, 0.0) 100%
         ),
         radial-gradient(
             ellipse at 50% 50%,
-            rgba(255, 255, 255, 0.4) 0%,
+            rgba(255, 255, 255, 0.55) 0%,
             rgba(255, 255, 255, 0.15) 40%,
             rgba(255, 255, 255, 0.0) 70%
         );
-    opacity: calc(var(--split-divider-opacity, 0) * 0.92);
-    filter: blur(1.5px);
+    opacity: calc(var(--split-divider-opacity, 0) * 1.0);
+    filter: blur(1.2px);
     pointer-events: none;
     z-index: 2;
-    animation: collisionPulse 2.8s ease-in-out infinite,
-        collisionDrift 2.8s ease-in-out infinite;
+    animation: collisionPulse 1.8s ease-in-out infinite,
+        collisionDrift 1.8s ease-in-out infinite;
 }
 
 /* Wave animation: shifts wave pattern vertically to create moving seam effect.
@@ -4808,15 +4799,15 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
     }
 }
 
-/* Collision pulse: energy interference field intensity variation */
+/* Collision pulse: energy interference field intensity variation (aggressive/fast) */
 @keyframes collisionPulse {
     0%, 100% {
-        opacity: calc(var(--split-divider-opacity, 0) * 0.7);
-        filter: blur(1.5px);
+        opacity: calc(var(--split-divider-opacity, 0) * 0.8);
+        filter: blur(1.0px);
     }
     50% {
-        opacity: calc(var(--split-divider-opacity, 0) * 1.0);
-        filter: blur(2px);
+        opacity: calc(var(--split-divider-opacity, 0) * 1.2);
+        filter: blur(0.8px);
     }
 }
 
@@ -4914,21 +4905,22 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
         linear-gradient(90deg, rgba(90, 200, 255, 0.95), rgba(60, 255, 210, 0.9));
     background-blend-mode: screen;
     /* Wavy seam: IMPORTANT: anchor to the segment's own edge (100%),
-       not to --split-win (container %) to avoid gaps/misalignment. */
+       not to --split-win (container %) to avoid gaps/misalignment.
+       Aggressive wave: 5px amplitude for more dramatic motion. */
     clip-path: polygon(
         0 0,
         100% 0,
-        calc(100% - 0.5px + sin(var(--wave-offset, 0) * 6.283) * 3px) calc(0% + 0 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.1) * 6.283) * 3px) calc(0% + 1 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.2) * 6.283) * 3px) calc(0% + 2 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.3) * 6.283) * 3px) calc(0% + 3 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.4) * 6.283) * 3px) calc(0% + 4 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.5) * 6.283) * 3px) calc(0% + 5 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.6) * 6.283) * 3px) calc(0% + 6 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.7) * 6.283) * 3px) calc(0% + 7 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.8) * 6.283) * 3px) calc(0% + 8 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.9) * 6.283) * 3px) calc(0% + 9 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 1.0) * 6.283) * 3px) 100%,
+        calc(100% - 0.5px + sin(var(--wave-offset, 0) * 6.283) * 5px) calc(0% + 0 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.1) * 6.283) * 5px) calc(0% + 1 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.2) * 6.283) * 5px) calc(0% + 2 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.3) * 6.283) * 5px) calc(0% + 3 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.4) * 6.283) * 5px) calc(0% + 4 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.5) * 6.283) * 5px) calc(0% + 5 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.6) * 6.283) * 5px) calc(0% + 6 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.7) * 6.283) * 5px) calc(0% + 7 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.8) * 6.283) * 5px) calc(0% + 8 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.9) * 6.283) * 5px) calc(0% + 9 * 10%),
+        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 1.0) * 6.283) * 5px) 100%,
         0 100%
     );
     /* No animation here; parent (.bar-split) animates --wave-offset for perfect sync. */
@@ -4940,22 +4932,23 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
         radial-gradient(circle at 0% 50%, rgba(255, 190, 160, 0.28), transparent 58%),
         linear-gradient(90deg, rgba(249, 112, 102, 0.8), rgba(255, 174, 145, 0.7));
     background-blend-mode: screen;
-    /* Complementary wavy edge on loss side */
+    /* Complementary wavy edge on loss side.
+       Aggressive wave: 5px amplitude for more dramatic motion. */
     clip-path: polygon(
         0 0,
         100% 0,
         100% 100%,
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 1.0) * 6.283) * 3px) 100%,
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.9) * 6.283) * 3px) calc(100% - 1 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.8) * 6.283) * 3px) calc(100% - 2 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.7) * 6.283) * 3px) calc(100% - 3 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.6) * 6.283) * 3px) calc(100% - 4 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.5) * 6.283) * 3px) calc(100% - 5 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.4) * 6.283) * 3px) calc(100% - 6 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.3) * 6.283) * 3px) calc(100% - 7 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.2) * 6.283) * 3px) calc(100% - 8 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.1) * 6.283) * 3px) calc(100% - 9 * 10%),
-        calc(0% + 0.5px + sin(var(--wave-offset, 0) * 6.283) * 3px) 0%
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 1.0) * 6.283) * 5px) 100%,
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.9) * 6.283) * 5px) calc(100% - 1 * 10%),
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.8) * 6.283) * 5px) calc(100% - 2 * 10%),
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.7) * 6.283) * 5px) calc(100% - 3 * 10%),
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.6) * 6.283) * 5px) calc(100% - 4 * 10%),
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.5) * 6.283) * 5px) calc(100% - 5 * 10%),
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.4) * 6.283) * 5px) calc(100% - 6 * 10%),
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.3) * 6.283) * 5px) calc(100% - 7 * 10%),
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.2) * 6.283) * 5px) calc(100% - 8 * 10%),
+        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.1) * 6.283) * 5px) calc(100% - 9 * 10%),
+        calc(0% + 0.5px + sin(var(--wave-offset, 0) * 6.283) * 5px) 0%
     );
     /* No animation here; parent (.bar-split) animates --wave-offset for perfect sync. */
 }

@@ -548,7 +548,21 @@ async def reset_db_async(confirm: bool = False) -> None:
             await cur.execute("SELECT DATABASE()")
             dbname = (await cur.fetchone() or ("",))[0]
             LOGGER.warning("Dropping all tables from %s", dbname)
+            
+            # Kill any other connections that might be holding locks
+            await cur.execute("SHOW PROCESSLIST")
+            processes = await cur.fetchall()
+            current_id = conn.thread_id()
+            for proc_id, user, host, db, *_ in processes:
+                if proc_id != current_id and db == dbname:
+                    try:
+                        await cur.execute(f"KILL {proc_id}")
+                        LOGGER.info("Killed process %s to release locks", proc_id)
+                    except Exception as e:
+                        LOGGER.warning("Could not kill process %s: %s", proc_id, e)
+            
             await cur.execute("SET FOREIGN_KEY_CHECKS=0")
+            await cur.execute("SET lock_wait_timeout=5")
             await cur.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()"
             )
@@ -556,9 +570,15 @@ async def reset_db_async(confirm: bool = False) -> None:
             if tables:
                 LOGGER.info("Found %d tables to drop: %s", len(tables), ", ".join(tables))
                 LOGGER.info("Dropping tables...")
-                # Use batch DROP TABLE statement to avoid potential deadlocks from sequential drops
-                drop_stmt = "DROP TABLE IF EXISTS " + ", ".join(f"`{table}`" for table in tables)
-                await cur.execute(drop_stmt)
+                # Drop tables one by one with explicit error handling to avoid hangs
+                for table in tables:
+                    try:
+                        LOGGER.debug("Dropping table %s", table)
+                        await cur.execute(f"DROP TABLE IF EXISTS `{table}`")
+                        LOGGER.debug("Successfully dropped table %s", table)
+                    except Exception as e:
+                        LOGGER.error("Failed to drop table %s: %s", table, e)
+                        raise
                 LOGGER.info("Successfully dropped %d tables", len(tables))
             else:
                 LOGGER.info("No tables found to drop")
