@@ -1152,8 +1152,35 @@ async def sync_championship_async(
     fetch_start_time = time.perf_counter()
     matches = await get_championship_matches_async(championship_id, match_type="all")
     fetch_elapsed = time.perf_counter() - fetch_start_time
-    match_ids = [item.get("match_id") for item in matches if item.get("match_id")]
+    
+    # Filter out matches with 'bye' placeholder team_id
+    filtered_matches = []
+    for item in matches:
+        if not item.get("match_id"):
+            continue
+        # Check if either team is a 'bye' placeholder
+        teams = item.get("teams", {})
+        faction1 = teams.get("faction1", {})
+        faction2 = teams.get("faction2", {})
+        
+        f1_id = faction1.get("faction_id") or faction1.get("team_id")
+        f1_name = faction1.get("name")
+        f2_id = faction2.get("faction_id") or faction2.get("team_id")
+        f2_name = faction2.get("name")
+        
+        # Skip if either team is a 'bye' placeholder
+        if _is_placeholder_team(f1_id, f1_name) or _is_placeholder_team(f2_id, f2_name):
+            LOGGER.info("Skipping match %s with 'bye' placeholder team (f1: %s/%s, f2: %s/%s)",
+                       item.get("match_id"), f1_id, f1_name, f2_id, f2_name)
+            continue
+        
+        filtered_matches.append(item)
+    
+    match_ids = [item.get("match_id") for item in filtered_matches]
     total_matches = len(match_ids)
+    if len(matches) > len(filtered_matches):
+        LOGGER.info("Filtered out %d matches with 'bye' teams (from %d total)",
+                   len(matches) - len(filtered_matches), len(matches))
 
     existing_rows = await fetch_all(
         """
@@ -1315,6 +1342,20 @@ async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics 
     details = await get_match_details_async(match_id)
     if not details:
         LOGGER.warning("Cannot refresh match %s; details not found", match_id)
+        return None
+
+    # Check if match has 'bye' placeholder teams - skip if so
+    teams = details.get("teams", {})
+    faction1 = teams.get("faction1", {})
+    faction2 = teams.get("faction2", {})
+    f1_id = faction1.get("faction_id") or faction1.get("team_id")
+    f1_name = faction1.get("name")
+    f2_id = faction2.get("faction_id") or faction2.get("team_id")
+    f2_name = faction2.get("name")
+    
+    if _is_placeholder_team(f1_id, f1_name) or _is_placeholder_team(f2_id, f2_name):
+        LOGGER.info("Skipping match %s with 'bye' placeholder team (f1: %s/%s, f2: %s/%s)",
+                   match_id, f1_id, f1_name, f2_id, f2_name)
         return None
 
     championship_id = details.get("competition_id") or details.get("championship_id")
