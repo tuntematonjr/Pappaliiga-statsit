@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable, Dict, Hashable, Optional, Tuple, TypeVar
 
@@ -15,13 +16,14 @@ class _CacheEntry:
 
 
 class AsyncTTLCache:
-    """Simple in-memory TTL cache for async services."""
+    """Simple in-memory TTL cache for async services with LRU eviction and single-flight."""
 
     def __init__(self, ttl_seconds: float = 30.0, maxsize: int = 128) -> None:
         self.ttl = ttl_seconds
         self.maxsize = maxsize
-        self._entries: Dict[Hashable, _CacheEntry] = {}
+        self._entries: "OrderedDict[Hashable, _CacheEntry]" = OrderedDict()
         self._lock = asyncio.Lock()
+        self._inflight: Dict[Hashable, asyncio.Future] = {}
 
     async def get(self, key: Hashable) -> Optional[Any]:
         async with self._lock:
@@ -31,20 +33,34 @@ class AsyncTTLCache:
             if entry.expires_at < time.monotonic():
                 self._entries.pop(key, None)
                 return None
+            self._entries.move_to_end(key)
             return entry.value
 
-    async def set(self, key: Hashable, value: Any) -> None:
+    async def set(self, key: Hashable, value: Any, *, ttl_seconds: Optional[float] = None) -> None:
         async with self._lock:
-            if len(self._entries) >= self.maxsize:
-                # Drop the oldest entry
-                oldest_key, _ = min(self._entries.items(), key=lambda item: item[1].expires_at)
-                self._entries.pop(oldest_key, None)
-            self._entries[key] = _CacheEntry(value=value, expires_at=time.monotonic() + self.ttl)
+            now = time.monotonic()
+            expired_keys = [k for k, v in self._entries.items() if v.expires_at < now]
+            for expired_key in expired_keys:
+                self._entries.pop(expired_key, None)
+
+            if key in self._entries:
+                self._entries.pop(key, None)
+
+            self._entries[key] = _CacheEntry(
+                value=value,
+                expires_at=now + (ttl_seconds if ttl_seconds is not None else self.ttl),
+            )
+            self._entries.move_to_end(key)
+
+            while len(self._entries) > self.maxsize:
+                self._entries.popitem(last=False)
 
     async def get_or_set(
         self,
         key: Hashable,
         producer: Callable[[], Awaitable[T]],
+        *,
+        ttl_seconds: Optional[float] = None,
     ) -> Tuple[T, bool]:
         """Return cache value if present, otherwise compute via producer.
 
@@ -55,6 +71,49 @@ class AsyncTTLCache:
         if cached is not None:
             return cached, True
 
-        value = await producer()
-        await self.set(key, value)
+        async with self._lock:
+            cached = self._entries.get(key)
+            if cached is not None and cached.expires_at >= time.monotonic():
+                self._entries.move_to_end(key)
+                return cached.value, True
+
+            inflight = self._inflight.get(key)
+            if inflight is None:
+                loop = asyncio.get_running_loop()
+                inflight = loop.create_future()
+                self._inflight[key] = inflight
+                is_producer = True
+            else:
+                is_producer = False
+
+        if not is_producer:
+            value = await inflight
+            return value, True
+
+        try:
+            value = await producer()
+            await self.set(key, value, ttl_seconds=ttl_seconds)
+            inflight.set_result(value)
+        except Exception as exc:  # pragma: no cover - surface errors to all waiters
+            inflight.set_exception(exc)
+            raise
+        finally:
+            async with self._lock:
+                self._inflight.pop(key, None)
+
         return value, False
+
+    async def invalidate(self, key: Hashable) -> None:
+        async with self._lock:
+            self._entries.pop(key, None)
+
+    async def invalidate_matching(self, predicate: Callable[[Hashable], bool]) -> int:
+        async with self._lock:
+            keys = [key for key in self._entries if predicate(key)]
+            for key in keys:
+                self._entries.pop(key, None)
+            return len(keys)
+
+    async def clear(self) -> None:
+        async with self._lock:
+            self._entries.clear()

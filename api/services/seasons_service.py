@@ -7,6 +7,13 @@ from typing import Any, Dict, List, Optional
 
 from db_async import query_async
 from division_overrides import combined_status_teams
+from api.services.cache_helpers import (
+    GLOBAL_CACHE,
+    get_championship_revision,
+    get_global_revision,
+    get_season_revision,
+    select_season_cache,
+)
 from api.services.season_aggregates import get_season_summary_totals
 
 logger = logging.getLogger("pappaliiga.api.seasons")
@@ -23,6 +30,13 @@ def _percent(part: int, total: int) -> float:
 
 async def get_seasons_list() -> List[Dict[str, Any]]:
     """Return list of all seasons with metadata."""
+    revision = await get_global_revision()
+    cache_key = ("seasons-list", revision)
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute_seasons_list)
+    return cached_value
+
+
+async def _compute_seasons_list() -> List[Dict[str, Any]]:
     rows = await query_async(
         """
         SELECT 
@@ -67,6 +81,21 @@ async def get_seasons_list() -> List[Dict[str, Any]]:
 
 async def get_season_summary(season: int) -> Dict[str, Any]:
     """Return comprehensive aggregated statistics for a season."""
+    cache, ttl_seconds = select_season_cache(season)
+    if cache is not None:
+        revision = await get_season_revision(season)
+        cache_key = ("season-summary", season, revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_season_summary(season),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_season_summary(season)
+
+
+async def _compute_season_summary(season: int) -> Dict[str, Any]:
     totals_payload = await get_season_summary_totals(season)
     summary_totals = totals_payload["summary_totals"]
     team_totals = totals_payload["team_totals"]
@@ -189,6 +218,21 @@ async def get_season_divisions(season: int) -> List[Dict[str, Any]]:
     Note: Only returns regular season divisions. Playoff data is embedded within each division.
     """
     
+    cache, ttl_seconds = select_season_cache(season)
+    if cache is not None:
+        revision = await get_season_revision(season)
+        cache_key = ("season-divisions", season, revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_season_divisions(season),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_season_divisions(season)
+
+
+async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
     # Get all divisions for the season (including playoffs for data lookup)
     divisions_rows = await query_async(
         """
@@ -451,6 +495,22 @@ def _format_timestamp(ts: Optional[int]) -> Optional[str]:
 
 async def get_division_detailed_stats(season: int, division_id: str) -> Dict[str, Any]:
     """Return detailed breakdown for a specific division including teams, players, and playoff bracket."""
+    cache, ttl_seconds = select_season_cache(season)
+    if cache is not None:
+        season_revision = await get_season_revision(season)
+        champ_revision = await get_championship_revision(division_id)
+        cache_key = ("division-detailed", season, division_id, season_revision, champ_revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_division_detailed_stats(season, division_id),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_division_detailed_stats(season, division_id)
+
+
+async def _compute_division_detailed_stats(season: int, division_id: str) -> Dict[str, Any]:
     
     # Get division metadata
     div_rows = await query_async(
@@ -651,7 +711,16 @@ async def get_division_detailed_stats(season: int, division_id: str) -> Dict[str
 
 async def _get_playoff_bracket(championship_id: str) -> Dict[str, Any]:
     """Get playoff bracket details for a championship."""
-    
+    revision = await get_championship_revision(championship_id)
+    cache_key = ("playoff-bracket", championship_id, revision)
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(
+        cache_key,
+        lambda: _compute_playoff_bracket(championship_id),
+    )
+    return cached_value
+
+
+async def _compute_playoff_bracket(championship_id: str) -> Dict[str, Any]:
     matches_rows = await query_async(
         """
         SELECT 

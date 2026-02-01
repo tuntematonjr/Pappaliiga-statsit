@@ -5,6 +5,13 @@ from typing import Any, Dict, Literal, Optional
 from db_async import query_async
 
 from api.exceptions import BadRequestError, NotFoundError
+from api.services.cache_helpers import (
+    GLOBAL_CACHE,
+    get_championship_revision,
+    get_global_revision,
+    get_season_revision,
+    select_season_cache,
+)
 from api.services.player_counts import get_player_counts
 from api.services.season_aggregates import dedupe_team_total, get_season_summary_totals
 from division_overrides import combined_status_teams
@@ -41,6 +48,16 @@ def _build_metric_list(summary_totals: Dict[str, Any]) -> list[dict[str, Any]]:
 
 
 async def _get_lifetime_summary_totals() -> dict[str, int]:
+    revision = await get_global_revision()
+    cache_key = ("lifetime-summary", revision)
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(
+        cache_key,
+        _compute_lifetime_summary_totals,
+    )
+    return cached_value
+
+
+async def _compute_lifetime_summary_totals() -> dict[str, int]:
     (
         div_rows,
         team_rows,
@@ -111,6 +128,13 @@ async def _get_lifetime_summary_totals() -> dict[str, int]:
 
 
 async def get_overview_stats() -> dict[str, int]:
+    revision = await get_global_revision()
+    cache_key = ("overview-stats", revision)
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute_overview_stats)
+    return cached_value
+
+
+async def _compute_overview_stats() -> dict[str, int]:
     season_rows = await query_async(
         "SELECT COUNT(DISTINCT season) AS cnt FROM championships"
     )
@@ -140,6 +164,38 @@ _STAT_COLUMN_MAP = {
 
 
 async def get_top_players(
+    stat: str,
+    *,
+    season: Optional[int],
+    division: Optional[int],
+    limit: int,
+    min_maps: int,
+) -> list[dict[str, Any]]:
+    cache = None
+    ttl_seconds = None
+    revision = None
+
+    if season is not None:
+        cache, ttl_seconds = select_season_cache(season)
+        if cache is not None:
+            revision = await get_season_revision(season)
+    else:
+        revision = await get_global_revision()
+        cache = GLOBAL_CACHE
+
+    cache_key = ("top-players", stat, season, division, limit, min_maps, revision)
+    if cache is not None:
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_top_players(stat, season=season, division=division, limit=limit, min_maps=min_maps),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_top_players(stat, season=season, division=division, limit=limit, min_maps=min_maps)
+
+
+async def _compute_top_players(
     stat: str,
     *,
     season: Optional[int],
@@ -182,6 +238,16 @@ async def get_top_players(
 
 
 async def get_division_averages(championship_id: int) -> dict[str, float]:
+    revision = await get_championship_revision(str(championship_id))
+    cache_key = ("division-averages", championship_id, revision)
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(
+        cache_key,
+        lambda: _compute_division_averages(championship_id),
+    )
+    return cached_value
+
+
+async def _compute_division_averages(championship_id: int) -> dict[str, float]:
     champ_rows = await query_async(
         "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
         {"champ_id": championship_id},
@@ -233,6 +299,21 @@ async def get_season_stats(season: int) -> dict[str, Any]:
     The payload mirrors the legacy shape used by the frontend Home view.
     """
 
+    cache, ttl_seconds = select_season_cache(season)
+    if cache is not None:
+        revision = await get_season_revision(season)
+        cache_key = ("season-stats", season, revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_season_stats(season),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_season_stats(season)
+
+
+async def _compute_season_stats(season: int) -> dict[str, Any]:
     totals_payload = await get_season_summary_totals(season)
     season_summary_totals = totals_payload["summary_totals"]
     team_totals = totals_payload["team_totals"]
@@ -424,23 +505,51 @@ async def get_stats_summary(scope: StatsSummaryScope, season: Optional[int] = No
         raise BadRequestError(f"Unsupported stats summary scope '{scope}'")
 
     if scope == "all":
-        summary_totals = await _get_lifetime_summary_totals()
-        summary_season = None
-        label = "All Seasons"
-        progress: dict[str, int] | None = None
-    else:
-        if season is None:
-            raise BadRequestError("Season identifier required for season scope")
-        totals_payload = await get_season_summary_totals(season)
-        summary_totals = totals_payload["summary_totals"]
-        summary_season = season
-        label = f"Season {season}"
-        progress = await _get_season_progress(season, summary_totals)
+        revision = await get_global_revision()
+        cache_key = ("stats-summary", "all", revision)
+        cached_value, _ = await GLOBAL_CACHE.get_or_set(
+            cache_key,
+            _compute_stats_summary_all,
+        )
+        return cached_value
 
+    if season is None:
+        raise BadRequestError("Season identifier required for season scope")
+
+    cache, ttl_seconds = select_season_cache(season)
+    if cache is not None:
+        revision = await get_season_revision(season)
+        cache_key = ("stats-summary", "season", season, revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_stats_summary_season(season),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_stats_summary_season(season)
+
+
+async def _compute_stats_summary_all() -> dict[str, Any]:
+    summary_totals = await _get_lifetime_summary_totals()
     return {
-        "scope": scope,
-        "season": summary_season,
-        "label": label,
+        "scope": "all",
+        "season": None,
+        "label": "All Seasons",
+        "summary_totals": summary_totals,
+        "metrics": _build_metric_list(summary_totals),
+        "progress": None,
+    }
+
+
+async def _compute_stats_summary_season(season: int) -> dict[str, Any]:
+    totals_payload = await get_season_summary_totals(season)
+    summary_totals = totals_payload["summary_totals"]
+    progress = await _get_season_progress(season, summary_totals)
+    return {
+        "scope": "season",
+        "season": season,
+        "label": f"Season {season}",
         "summary_totals": summary_totals,
         "metrics": _build_metric_list(summary_totals),
         "progress": progress,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+import asyncio
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,9 +17,10 @@ from fastapi.staticfiles import StaticFiles
 
 from db_async import close_pool, get_pool
 
-from .routers import championships, divisions, matches, players, stats, teams, seasons
+from .routers import championships, divisions, matches, players, stats, teams, seasons, debug
 from .routers import maps_catalog, image_proxy, season_view
 from api.exceptions import BadRequestError, NotFoundError
+from api.services.cache_reheat import reheat_main_page
 
 # Track app start time for uptime calculation
 import time
@@ -49,6 +51,11 @@ async def lifespan(app: FastAPI):
     # Startup: ensure pool is ready
     await get_pool()
     print("[info] Database pool initialized")
+
+    try:
+        asyncio.create_task(reheat_main_page())
+    except Exception as exc:
+        print(f"[warn] Cache reheat failed to start: {exc}")
     
     yield
     
@@ -82,6 +89,7 @@ if (frontend_dir / "static").exists():
 
 # Include routers
 app.include_router(seasons.router, prefix="/api/seasons", tags=["seasons"])
+app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 app.include_router(divisions.router, prefix="/api/divisions", tags=["divisions"])
 app.include_router(championships.router, prefix="/api/championships", tags=["championships"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])

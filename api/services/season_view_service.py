@@ -5,6 +5,7 @@ from typing import Any, Dict, List
 
 import db_async as db
 from api.services import seasons_service
+from api.services.cache_helpers import get_season_revision, select_season_cache
 from db_async import get_pool
 
 
@@ -26,6 +27,21 @@ def _as_float(value: Any, default: float = 0.0) -> float:
 
 async def get_season_summary(season_id: int) -> Dict[str, Any]:
     """Return aggregated season statistics tailored for the SPA season overview."""
+    cache, ttl_seconds = select_season_cache(season_id)
+    if cache is not None:
+        revision = await get_season_revision(season_id)
+        cache_key = ("season-view-summary", season_id, revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_season_summary(season_id),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_season_summary(season_id)
+
+
+async def _compute_season_summary(season_id: int) -> Dict[str, Any]:
     summary = await seasons_service.get_season_summary(season_id)
     if not summary:
         return {}
@@ -65,6 +81,21 @@ async def get_season_summary(season_id: int) -> Dict[str, Any]:
 
 async def get_divisions(season_id: int) -> List[Dict[str, Any]]:
     """Return divisions for a season with progress for the SPA overview."""
+    cache, ttl_seconds = select_season_cache(season_id)
+    if cache is not None:
+        revision = await get_season_revision(season_id)
+        cache_key = ("season-view-divisions", season_id, revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_divisions(season_id),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_divisions(season_id)
+
+
+async def _compute_divisions(season_id: int) -> List[Dict[str, Any]]:
     pool = await get_pool()
     async with pool.acquire() as conn:
         divisions = await db.get_all_base_divisions_for_season(conn, season_id)

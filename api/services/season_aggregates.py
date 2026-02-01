@@ -5,6 +5,8 @@ from typing import Any, Dict
 
 from db_async import query_async
 
+from api.services.cache_helpers import get_season_revision, select_season_cache
+
 
 def dedupe_team_total(value: float | int | None) -> int:
     """Team-level aggregates count each match/map twice (once per team)."""
@@ -21,6 +23,22 @@ def dedupe_team_total(value: float | int | None) -> int:
 
 async def get_season_summary_totals(season: int) -> Dict[str, Any]:
     """Return the canonical totals for the eight summary cards for a single season."""
+    cache, ttl_seconds = select_season_cache(season)
+    if cache is not None:
+        revision = await get_season_revision(season)
+        cache_key = ("season-summary-totals", season, revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _compute_season_summary_totals(season),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _compute_season_summary_totals(season)
+
+
+async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
+    """Compute season summary totals without caching."""
     team_rows, player_rows = await query_async(
         """
         SELECT

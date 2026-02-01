@@ -22,6 +22,16 @@ async def get_division_matches(
     limit: int,
     offset: int,
 ) -> Tuple[list[dict[str, Any]], int, str | None, str]:
+    revision_rows = await query_async(
+        """
+        SELECT MAX(updated_at) AS revision
+        FROM matches
+        WHERE championship_id = :champ_id
+        """,
+        {"champ_id": championship_id},
+    )
+    revision = revision_rows[0].get("revision") if revision_rows else None
+
     async def producer() -> Tuple[list[dict[str, Any]], int, str | None, str]:
         rows = await query_async(
             """
@@ -65,20 +75,10 @@ async def get_division_matches(
             {"champ_id": championship_id},
         )
         total = int(count_rows[0].get("total") or 0) if count_rows else 0
-
-        revision_rows = await query_async(
-            """
-            SELECT MAX(updated_at) AS revision
-            FROM matches
-            WHERE championship_id = :champ_id
-            """,
-            {"champ_id": championship_id},
-        )
-        revision = revision_rows[0].get("revision") if revision_rows else None
         etag = _build_etag(championship_id, revision, total, limit, offset)
         return rows, total, revision, etag
 
-    cache_key = (championship_id, limit, offset)
+    cache_key = (championship_id, limit, offset, revision)
     cached_value, _ = await _MATCH_LIST_CACHE.get_or_set(cache_key, producer)
     return cached_value
 
