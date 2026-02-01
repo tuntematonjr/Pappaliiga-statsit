@@ -24,20 +24,28 @@ class AsyncTTLCache:
         self._entries: "OrderedDict[Hashable, _CacheEntry]" = OrderedDict()
         self._lock = asyncio.Lock()
         self._inflight: Dict[Hashable, asyncio.Future] = {}
+        # Statistics
+        self._hits = 0
+        self._misses = 0
+        self._sets = 0
 
     async def get(self, key: Hashable) -> Optional[Any]:
         async with self._lock:
             entry = self._entries.get(key)
             if not entry:
+                self._misses += 1
                 return None
             if entry.expires_at < time.monotonic():
                 self._entries.pop(key, None)
+                self._misses += 1
                 return None
             self._entries.move_to_end(key)
+            self._hits += 1
             return entry.value
 
     async def set(self, key: Hashable, value: Any, *, ttl_seconds: Optional[float] = None) -> None:
         async with self._lock:
+            self._sets += 1
             now = time.monotonic()
             expired_keys = [k for k, v in self._entries.items() if v.expires_at < now]
             for expired_key in expired_keys:
@@ -117,3 +125,20 @@ class AsyncTTLCache:
     async def clear(self) -> None:
         async with self._lock:
             self._entries.clear()
+
+    def get_stats(self) -> dict:
+        """Return cache statistics."""
+        total_requests = self._hits + self._misses
+        hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0.0
+        return {
+            "hits": self._hits,
+            "misses": self._misses,
+            "sets": self._sets,
+            "hit_rate": round(hit_rate, 2),
+        }
+
+    def reset_stats(self) -> None:
+        """Reset cache statistics."""
+        self._hits = 0
+        self._misses = 0
+        self._sets = 0
