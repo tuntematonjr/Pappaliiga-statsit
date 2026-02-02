@@ -75,6 +75,10 @@ DEFAULT_TEAM_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pa
 _pool: Optional[asyncmy.Pool] = None
 _pool_lock = asyncio.Lock()
 
+_POOL_WAIT_WARN_SECONDS = float(os.environ.get("DB_POOL_WAIT_WARN_SECONDS", "2.0"))
+_POOL_HOLD_WARN_SECONDS = float(os.environ.get("DB_POOL_HOLD_WARN_SECONDS", "5.0"))
+_POOL_WAIT_WARN_THRESHOLD = int(os.environ.get("DB_POOL_WAIT_WARN_THRESHOLD", "5"))
+
 
 @dataclass(slots=True)
 class _PoolLease:
@@ -120,6 +124,13 @@ class _PoolTracker:
         }
         self.events.append(evt)
         POOL_LOGGER.info("POOL wait label=%s waiting=%d task=%s", label, self.waiting, evt["task"])
+        if self.waiting >= _POOL_WAIT_WARN_THRESHOLD:
+            POOL_LOGGER.warning(
+                "POOL wait backlog=%d label=%s task=%s",
+                self.waiting,
+                label,
+                evt["task"],
+            )
 
     def on_acquired(self, conn: asyncmy.Connection, label: str | None) -> None:
         if not self.enabled:
@@ -181,6 +192,14 @@ class _PoolTracker:
             len(self.active),
             self.waiting,
         )
+        if held >= _POOL_HOLD_WARN_SECONDS:
+            POOL_LOGGER.warning(
+                "POOL long-held conn=%s label=%s task=%s held=%.3fs",
+                conn_id,
+                label,
+                lease.task if lease else None,
+                held,
+            )
 
     def snapshot(self) -> Dict[str, Any]:
         if not self.enabled:

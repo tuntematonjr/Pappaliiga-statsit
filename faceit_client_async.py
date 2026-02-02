@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections import deque
 from typing import Any, Deque, Dict, Iterable, List, Optional
 
@@ -19,7 +20,7 @@ LOGGER = logging.getLogger(__name__)
 MAX_HTTP_CONCURRENCY = 8
 HTTP_TIMEOUT = httpx.Timeout(20.0, connect=10.0, read=20.0, write=20.0)
 MAX_RETRIES = 5
-HOURLY_LIMIT = 10_000
+HOURLY_LIMIT = int(os.environ.get("FACEIT_HOURLY_LIMIT", "0"))
 HOURLY_WINDOW_SECONDS = 3600.0
 
 BASE_SLEEP = 0.10
@@ -84,7 +85,7 @@ _LIMITER = AdaptiveLimiter(BASE_SLEEP, MAX_SLEEP, BACKOFF_FACTOR, RECOVER_FACTOR
 
 class HourlyLimiter:
     def __init__(self, capacity: int, window_seconds: float) -> None:
-        self.capacity = max(1, capacity)
+        self.capacity = capacity
         self.window = max(0.01, window_seconds)
         self._events: Deque[float] = deque()
         self._lock = asyncio.Lock()
@@ -92,6 +93,8 @@ class HourlyLimiter:
         self._started_at: float | None = None
 
     async def acquire(self) -> float:
+        if self.capacity <= 0:
+            return 0.0
         waited = 0.0
         loop = asyncio.get_running_loop()
         while True:
@@ -124,6 +127,16 @@ class HourlyLimiter:
             self._started_at = None
 
     async def snapshot(self) -> Dict[str, float]:
+        if self.capacity <= 0:
+            return {
+                "request_count_total": 0.0,
+                "requests_last_minute": 0.0,
+                "requests_last_five_minutes": 0.0,
+                "requests_last_hour": 0.0,
+                "hourly_usage_ratio": 0.0,
+                "hourly_requests_remaining": 0.0,
+                "average_requests_per_minute": 0.0,
+            }
         loop = asyncio.get_running_loop()
         async with self._lock:
             now = loop.time()
@@ -264,10 +277,27 @@ async def _request_json(
 ) -> Optional[Dict[str, Any]]:
     expected = set(expected_status or {200})
 
+    def _log_retry(retry_state: Any) -> None:
+        exc = retry_state.outcome.exception()
+        if isinstance(exc, RateLimitError):
+            return
+        wait = getattr(getattr(retry_state, "next_action", None), "sleep", None)
+        wait_msg = f"{wait:.2f}s" if isinstance(wait, (int, float)) else "unknown"
+        LOGGER.warning(
+            "Retrying %s %s (attempt %d/%d) in %s due to %s",
+            method,
+            url,
+            retry_state.attempt_number,
+            MAX_RETRIES,
+            wait_msg,
+            exc,
+        )
+
     async for attempt in AsyncRetrying(
         retry=retry_if_exception_type((RateLimitError, httpx.HTTPError, httpx.TransportError, httpx.TimeoutException)),
         stop=stop_after_attempt(MAX_RETRIES),
         wait=wait_exponential_jitter(initial=0.75, max=5.0),
+        before_sleep=_log_retry,
         reraise=True,
     ):
         with attempt:
@@ -275,6 +305,13 @@ async def _request_json(
             hourly_wait = await _HOURLY_LIMITER.acquire()
             if hourly_wait:
                 await _record_hourly_wait(hourly_wait)
+                if hourly_wait >= 5:
+                    LOGGER.warning(
+                        "Hourly limiter slept %.2fs before %s %s",
+                        hourly_wait,
+                        method,
+                        url,
+                    )
             resp = await client.request(method, url, params=params)
             status = resp.status_code
 

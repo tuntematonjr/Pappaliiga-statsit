@@ -1150,7 +1150,11 @@ async def sync_championship_async(
             await upsert_teams_bulk_async(team_payloads, conn=conn)
 
     fetch_start_time = time.perf_counter()
-    matches = await get_championship_matches_async(championship_id, match_type="all")
+    match_type = "all"
+    if season < faceit_config.CURRENT_SEASON:
+        match_type = "past"
+    LOGGER.info("Fetching matches for championship %s type=%s", championship_id, match_type)
+    matches = await get_championship_matches_async(championship_id, match_type=match_type)
     fetch_elapsed = time.perf_counter() - fetch_start_time
     
     # Filter out matches with 'bye' placeholder team_id
