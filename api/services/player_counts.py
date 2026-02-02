@@ -4,6 +4,12 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from db_async import query_async
+from api.services.cache_helpers import (
+    GLOBAL_CACHE,
+    get_global_revision,
+    get_season_revision,
+    select_season_cache,
+)
 
 
 async def get_player_counts(
@@ -26,6 +32,33 @@ async def get_player_counts(
     Raises:
         ValueError: If ``division`` is provided without ``season``.
     """
+    # Build cache key based on parameters
+    if season is not None:
+        revision = await get_season_revision(season)
+        cache_key = ("get_player_counts", season, division, include_all_time, revision)
+        cache, ttl_seconds = select_season_cache(season)
+    else:
+        revision = await get_global_revision()
+        cache_key = ("get_player_counts", None, None, include_all_time, revision)
+        cache = GLOBAL_CACHE
+        ttl_seconds = None
+
+    async def _compute():
+        return await _compute_player_counts(season=season, division=division, include_all_time=include_all_time)
+
+    if ttl_seconds:
+        cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
+    else:
+        cached_value, _ = await cache.get_or_set(cache_key, _compute)
+    return cached_value
+
+
+async def _compute_player_counts(
+    *,
+    season: Optional[int] = None,
+    division: Optional[int] = None,
+    include_all_time: bool = True,
+) -> Dict[str, int | None]:
     counts: Dict[str, int | None] = {
         "division_players": None,
         "season_players": None,

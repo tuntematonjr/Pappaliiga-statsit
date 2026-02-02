@@ -7,52 +7,72 @@ from db_async import compute_team_map_deltas_async, get_team_matches_mirror_asyn
 from standings_utils import calculate_standings
 
 from api.exceptions import NotFoundError
+from api.services.cache_helpers import (
+    GLOBAL_CACHE,
+    get_championship_revision,
+    get_global_revision,
+    select_season_cache,
+)
 
 DEFAULT_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
 
 
 async def fetch_team(team_id: str) -> dict[str, Any]:
-    rows = await query_async(
-        """
-        SELECT team_id, name AS team_name, name AS display_name, avatar
-        FROM teams
-        WHERE team_id = :team_id
-        """,
-        {"team_id": team_id},
-    )
-    if not rows:
-        raise NotFoundError(f"Team '{team_id}' not found")
-    team = rows[0]
-    team.setdefault("avatar", DEFAULT_AVATAR)
-    team["faceit_url"] = None
-    return team
+    revision = await get_global_revision()
+    cache_key = ("fetch_team", team_id, revision)
+
+    async def _compute():
+        rows = await query_async(
+            """
+            SELECT team_id, name AS team_name, name AS display_name, avatar
+            FROM teams
+            WHERE team_id = :team_id
+            """,
+            {"team_id": team_id},
+        )
+        if not rows:
+            raise NotFoundError(f"Team '{team_id}' not found")
+        team = rows[0]
+        team.setdefault("avatar", DEFAULT_AVATAR)
+        team["faceit_url"] = None
+        return team
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
 
 
 async def fetch_team_season_stats(team_id: str) -> list[dict[str, Any]]:
-    rows = await query_async(
-        """
-         SELECT tst.season, tst.division_num, c.championship_id,
-             c.name,
-             c.is_playoffs,
-             tst.maps_played, tst.matches_played, tst.matches_won AS wins,
-               GREATEST(
-                   CAST(tst.matches_played AS SIGNED) - CAST(tst.matches_won AS SIGNED),
-                   0
-               ) AS losses,
-               CASE WHEN tst.matches_played > 0
-                    THEN (tst.matches_won / tst.matches_played)
-                    ELSE 0.0 END AS win_rate,
-               tst.rounds_won, tst.rounds_lost, tst.maps_won
-        FROM team_season_totals tst
-        JOIN championships c ON c.season = tst.season AND c.division_num = tst.division_num
-        WHERE tst.team_id = :team_id
-        ORDER BY tst.season DESC, tst.division_num
-        """,
-        {"team_id": team_id},
-    )
-    if not rows:
-        raise NotFoundError(f"No stats found for team '{team_id}'")
-    return rows
+    revision = await get_global_revision()
+    cache_key = ("fetch_team_season_stats", team_id, revision)
+
+    async def _compute():
+        rows = await query_async(
+            """
+             SELECT tst.season, tst.division_num, c.championship_id,
+                 c.name,
+                 c.is_playoffs,
+                 tst.maps_played, tst.matches_played, tst.matches_won AS wins,
+                   GREATEST(
+                       CAST(tst.matches_played AS SIGNED) - CAST(tst.matches_won AS SIGNED),
+                       0
+                   ) AS losses,
+                   CASE WHEN tst.matches_played > 0
+                        THEN (tst.matches_won / tst.matches_played)
+                        ELSE 0.0 END AS win_rate,
+                   tst.rounds_won, tst.rounds_lost, tst.maps_won
+            FROM team_season_totals tst
+            JOIN championships c ON c.season = tst.season AND c.division_num = tst.division_num
+            WHERE tst.team_id = :team_id
+            ORDER BY tst.season DESC, tst.division_num
+            """,
+            {"team_id": team_id},
+        )
+        if not rows:
+            raise NotFoundError(f"No stats found for team '{team_id}'")
+        return rows
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
 
 
 async def fetch_team_season_progression(
@@ -465,6 +485,34 @@ def _normalize_matches_for_page(matches: list[dict[str, Any]], team_id: str) -> 
 
 
 async def fetch_team_page(team_id: str, championship_id: Optional[str] = None) -> dict[str, Any]:
+    # Build cache key
+    if championship_id:
+        revision = await get_championship_revision(championship_id)
+        cache_key = ("fetch_team_page", team_id, championship_id, revision)
+    else:
+        revision = await get_global_revision()
+        cache_key = ("fetch_team_page", team_id, None, revision)
+
+    async def _compute():
+        return await _compute_team_page(team_id, championship_id)
+
+    # Select cache based on championship
+    if championship_id:
+        champ_rows = await query_async(
+            "SELECT season FROM championships WHERE championship_id = :champ_id",
+            {"champ_id": championship_id},
+        )
+        if champ_rows:
+            season = int(champ_rows[0]["season"])
+            cache, ttl_seconds = select_season_cache(season)
+            cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
+            return cached_value
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
+
+
+async def _compute_team_page(team_id: str, championship_id: Optional[str] = None) -> dict[str, Any]:
     """Return consolidated payload for the team page (profile, seasons, selected season data)."""
     team = await fetch_team(team_id)
 

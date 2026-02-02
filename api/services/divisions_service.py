@@ -9,6 +9,13 @@ from division_overrides import combined_status_teams
 from api.exceptions import NotFoundError
 from api.services.player_counts import get_player_counts
 from api.services.season_aggregates import dedupe_team_total
+from api.services.cache_helpers import (
+    GLOBAL_CACHE,
+    get_championship_revision,
+    get_global_revision,
+    get_season_revision,
+    select_season_cache,
+)
 
 DEFAULT_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
 
@@ -19,24 +26,31 @@ def get_excluded_team_ids(championship_id: str) -> set[str]:
 
 
 async def fetch_seasons() -> List[dict[str, Any]]:
-    rows = await query_async(
-        """
-        SELECT DISTINCT season, division_num, championship_id
-        FROM championships
-        ORDER BY season DESC, division_num
-        """
-    )
+    revision = await get_global_revision()
+    cache_key = ("fetch_seasons", revision)
 
-    seasons_map: dict[int, dict[str, Any]] = {}
-    for row in rows:
-        season = int(row["season"])
-        entry = seasons_map.setdefault(
-            season,
-            {"season": season, "divisions": [], "championship_ids": []},
+    async def _compute():
+        rows = await query_async(
+            """
+            SELECT DISTINCT season, division_num, championship_id
+            FROM championships
+            ORDER BY season DESC, division_num
+            """
         )
-        entry["divisions"].append(int(row["division_num"]))
-        entry["championship_ids"].append(row["championship_id"])
-    return list(seasons_map.values())
+
+        seasons_map: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            season = int(row["season"])
+            entry = seasons_map.setdefault(
+                season,
+                {"season": season, "divisions": [], "championship_ids": []},
+            )
+            entry["divisions"].append(int(row["division_num"]))
+            entry["championship_ids"].append(row["championship_id"])
+        return list(seasons_map.values())
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
 
 
 async def list_divisions(limit: int, offset: int) -> List[dict[str, Any]]:
@@ -65,19 +79,24 @@ async def count_divisions(season: Optional[int] = None) -> int:
 
 
 async def list_divisions_by_season(season: int, limit: int, offset: int) -> List[dict[str, Any]]:
-    rows = await query_async(
-        """
-        WITH team_counts AS (
-            SELECT championship_id, COUNT(DISTINCT team_id) AS teams_count
-            FROM (
-                SELECT championship_id, team1_id AS team_id
-                FROM matches
-                WHERE team1_id IS NOT NULL
-                UNION ALL
-                SELECT championship_id, team2_id AS team_id
-                FROM matches
-                WHERE team2_id IS NOT NULL
-            ) team_lookup
+    cache, ttl_seconds = select_season_cache(season)
+    revision = await get_season_revision(season)
+    cache_key = ("list_divisions_by_season", season, limit, offset, revision)
+
+    async def _compute():
+        return await query_async(
+            """
+            WITH team_counts AS (
+                SELECT championship_id, COUNT(DISTINCT team_id) AS teams_count
+                FROM (
+                    SELECT championship_id, team1_id AS team_id
+                    FROM matches
+                    WHERE team1_id IS NOT NULL
+                    UNION ALL
+                    SELECT championship_id, team2_id AS team_id
+                    FROM matches
+                    WHERE team2_id IS NOT NULL
+                ) team_lookup
             GROUP BY championship_id
         )
         SELECT
@@ -120,9 +139,11 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
         ORDER BY c.division_num ASC
         LIMIT :limit OFFSET :offset
         """,
-        {"season": season, "limit": limit, "offset": offset},
-    )
-    return rows
+            {"season": season, "limit": limit, "offset": offset},
+        )
+
+    cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
+    return cached_value
 
 
 async def _fetch_champ_row(where_clause: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -146,7 +167,14 @@ async def fetch_division_by_slug(slug: str) -> dict[str, Any]:
 
 
 async def fetch_division_by_id(championship_id: str) -> dict[str, Any]:
-    return await _fetch_champ_row("championship_id = :champ_id", {"champ_id": championship_id})
+    revision = await get_championship_revision(championship_id)
+    cache_key = ("fetch_division_by_id", championship_id, revision)
+
+    async def _compute():
+        return await _fetch_champ_row("championship_id = :champ_id", {"champ_id": championship_id})
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
 
 
 async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
@@ -154,6 +182,18 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
     season = int(champ["season"])
     division_num = int(champ["division_num"])
 
+    cache, ttl_seconds = select_season_cache(season)
+    revision = await get_championship_revision(championship_id)
+    cache_key = ("get_division_details", championship_id, revision)
+
+    async def _compute():
+        return await _compute_division_details(championship_id, season, division_num, champ)
+
+    cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
+    return cached_value
+
+
+async def _compute_division_details(championship_id: str, season: int, division_num: int, champ: dict[str, Any]) -> dict[str, Any]:
     team_rows = await query_async(
         """
         WITH division_matches AS (
