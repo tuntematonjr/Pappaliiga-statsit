@@ -129,7 +129,13 @@ def upsert_team(con: sqlite3.Connection, team: Dict[str, Any]) -> None:
     INSERT INTO teams (team_id, name, avatar)
     VALUES (:team_id, :name, :avatar)
     ON CONFLICT(team_id) DO UPDATE SET
-      name       = CASE WHEN teams.name IS NULL OR teams.name='' THEN excluded.name ELSE teams.name END,
+            name       = CASE
+                                         WHEN excluded.name IS NOT NULL AND excluded.name != '' AND excluded.name != teams.name
+                                             THEN excluded.name
+                                         WHEN teams.name IS NULL OR teams.name = ''
+                                             THEN excluded.name
+                                         ELSE teams.name
+                                     END,
       avatar     = CASE
                      WHEN excluded.avatar IS NOT NULL AND excluded.avatar != '' AND excluded.avatar != teams.avatar
                        THEN excluded.avatar
