@@ -1151,6 +1151,7 @@ window.DivisionView = {
                 <section id="standings" class="division-section division-section--stacked">
                     <header class="division-section__heading division-team-heading">
                         <h2 class="title-accent titleUnderlineSection">Joukkuavertailu</h2>
+                        <p class="division-section__lede">Klikkaa joukkueen nimeä avataksesi joukkuesivun.</p>
                     </header>
                     <div class="division-team-module">
                         <div class="division-team-panels">

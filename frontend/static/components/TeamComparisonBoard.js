@@ -220,7 +220,10 @@ window.TeamComparisonBoard = {
                             <div class="team-comparison-team">
                                 <span v-if="showRank" class="team-rank">{{ row.rank }}</span>
                                 <img class="team-logo" :src="row.logo" :alt="row.name" loading="lazy" />
-                                <a :href="getTeamUrl(row.id)" class="team-name team-name--link">{{ row.name }}</a>
+                                <a :href="getTeamUrl(row.id)" class="team-name team-name--link" :title="'Avaa ' + row.name + ' joukkueen sivu'">
+                                    <span class="team-name__label">{{ row.name }}</span>
+                                    <span class="team-name__icon" aria-hidden="true">↗</span>
+                                </a>
                             </div>
                         </template>
 

@@ -322,6 +322,16 @@ window.HomeView = {
                     logo: 'https://armafinland.fi/logot/images/armafin-logo-400px.png'
                 },
                 {
+                    id: 'sosso-bot',
+                    name: 'Sössö The PappaCS bot',
+                    description: 'Sössö on Discord-botti, joka tuo Pappaliiga-statistiikkaa suoraan Discord-palvelimillesi. Saat reaaliaikaisia tilastoja, ottelutuloksia ja pelaajatietoja kätevästi chatissa.',
+                    primaryLabel: 'Lisää botti palvelimelle',
+                    primaryHref: 'https://discord.com/oauth2/authorize?client_id=1414332827310489732',
+                    secondaryLabel: 'Komennot ja ohjeet',
+                    secondaryHref: 'RIP',
+                    logo: '/static/sosso-bot-logo.png'
+                },
+                {
                     id: 'pappaliiga',
                     // eyebrow: 'Liiga',
                     name: 'Pappaliiga',
@@ -926,7 +936,11 @@ window.HomeView = {
                     <header class="partner-callout__header">
                         <div
                             class="logo-wrap logo-card partner-callout__logo-wrap"
-                            :class="callout.id === 'armafi' ? 'logo-card--armafinland' : 'logo-card--pappaliiga'"
+                            :class="{
+                                'logo-card--armafinland': callout.id === 'armafi',
+                                'logo-card--sosso-bot': callout.id === 'sosso-bot',
+                                'logo-card--pappaliiga': callout.id === 'pappaliiga'
+                            }"
                         >
                             <img
                                 class="partner-callout__logo"
