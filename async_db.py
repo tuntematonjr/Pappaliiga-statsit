@@ -171,22 +171,39 @@ async def execute_async(pool: AsyncConnectionPool, sql: str, params: dict = None
         await conn.commit()
 
 # Async versions of main query functions from db.py
-async def get_teams_in_championship_async(pool: AsyncConnectionPool, division_id: int) -> list[dict]:
-    # Async version of get_teams_in_championship
-    sql = """
-    WITH team_ids AS (
-      SELECT DISTINCT team1_id AS team_id FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
-      UNION
-      SELECT DISTINCT team2_id AS team_id FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
-    )
-    SELECT t.team_id,
-           COALESCE(t.name, '') AS team_name,
-           t.avatar
-    FROM team_ids x
-    LEFT JOIN teams t ON t.team_id = x.team_id
-    ORDER BY team_name COLLATE NOCASE
-    """
-    rows = await query_async(pool, sql, (division_id, division_id))
+async def get_teams_in_championship_async(pool: AsyncConnectionPool, division_id: int, season: int = None) -> list[dict]:
+    # Async version using team_seasons as source of truth
+    if season:
+        sql = """
+        WITH team_ids AS (
+          SELECT DISTINCT team1_id AS team_id FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
+          UNION
+          SELECT DISTINCT team2_id AS team_id FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
+        )
+        SELECT x.team_id,
+               COALESCE(ts.name, '') AS team_name,
+               COALESCE(ts.avatar, ?) AS avatar
+        FROM team_ids x
+        LEFT JOIN team_seasons ts ON ts.team_id = x.team_id AND ts.season = ?
+        ORDER BY team_name COLLATE NOCASE
+        """
+        DEFAULT_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
+        rows = await query_async(pool, sql, (division_id, division_id, DEFAULT_AVATAR, season))
+    else:
+        sql = """
+        WITH team_ids AS (
+          SELECT DISTINCT team1_id AS team_id FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
+          UNION
+          SELECT DISTINCT team2_id AS team_id FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
+        )
+        SELECT x.team_id,
+               COALESCE((SELECT ts.name FROM team_seasons ts WHERE ts.team_id = x.team_id ORDER BY ts.season DESC LIMIT 1), '') AS team_name,
+               COALESCE((SELECT ts.avatar FROM team_seasons ts WHERE ts.team_id = x.team_id ORDER BY ts.season DESC LIMIT 1), ?) AS avatar
+        FROM team_ids x
+        ORDER BY team_name COLLATE NOCASE
+        """
+        DEFAULT_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
+        rows = await query_async(pool, sql, (division_id, division_id, DEFAULT_AVATAR))
     return [r for r in rows if r["team_id"]]
 
 async def compute_team_summary_data_async(
@@ -624,7 +641,8 @@ async def compute_champ_player_summary_async(
       JOIN matches m ON m.match_id = ps.match_id
       JOIN maps    mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
       LEFT JOIN players pl ON pl.player_id = ps.player_id
-      LEFT JOIN teams   t  ON t.team_id   = ps.team_id
+      LEFT JOIN championships c ON c.championship_id = m.championship_id
+      LEFT JOIN team_seasons t ON t.team_id = ps.team_id AND t.season = c.season
       WHERE m.championship_id = :champ{excl_clause}
       GROUP BY ps.player_id
     """, {"champ": championship_id, **excl_params})
@@ -2111,11 +2129,13 @@ async def get_team_matches_mirror_async(
       COALESCE(ps2.adr_avg, 0.0)  AS t2_adr,
       COALESCE(ps2.dmg, 0)        AS t2_dmg
     FROM mp
+    JOIN my_matches mm_season ON mm_season.match_id = mp.match_id
+    JOIN championships c ON c.championship_id = mm_season.championship_id
     LEFT JOIN ps_agg ps1 ON ps1.match_id=mp.match_id AND ps1.round_index=mp.round_index AND ps1.team_id=mp.team1_id
     LEFT JOIN ps_agg ps2 ON ps2.match_id=mp.match_id AND ps2.round_index=mp.round_index AND ps2.team_id=mp.team2_id
     LEFT JOIN picks pk    ON pk.match_id=mp.match_id AND pk.map_name=mp.map_name
-    LEFT JOIN teams t1    ON t1.team_id = mp.team1_id
-    LEFT JOIN teams t2    ON t2.team_id = mp.team2_id
+    LEFT JOIN team_seasons t1 ON t1.team_id = mp.team1_id AND t1.season = c.season
+    LEFT JOIN team_seasons t2 ON t2.team_id = mp.team2_id AND t2.season = c.season
     ORDER BY (mp.ts IS NULL) ASC, mp.ts ASC, mp.match_id ASC, mp.round_index ASC
     """
     

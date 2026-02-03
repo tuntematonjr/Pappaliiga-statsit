@@ -1,4 +1,40 @@
 // Extracted from html_gen.py UNIFIED_HEAD <script>
+
+// Default Pappaliiga logo for broken images
+const DEFAULT_LOGO_URL = 'https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png';
+
+/**
+ * Handle image load errors by replacing with default logo
+ * Attaches to all images with class 'logo' 
+ */
+function setupImageFallbacks() {
+	const images = document.querySelectorAll('img.logo');
+	images.forEach(img => {
+		// Add error handler if not already present
+		if (!img.hasAttribute('data-fallback-set')) {
+			img.addEventListener('error', function() {
+				this.src = DEFAULT_LOGO_URL;
+
+				this.title = 'Default logo (image not available)';
+			}, { once: true });
+			img.setAttribute('data-fallback-set', 'true');
+		}
+	});
+}
+
+// Setup fallbacks when DOM is ready
+document.addEventListener('DOMContentLoaded', setupImageFallbacks);
+
+// Also watch for dynamically added images
+const imageObserver = new MutationObserver(() => {
+	setupImageFallbacks();
+});
+
+imageObserver.observe(document.body, {
+	childList: true,
+	subtree: true
+});
+
 function sortTable(tableId,n,numeric){
 	const table=document.getElementById(tableId);
 	const dirAttr=table.getAttribute('data-sort-dir')||'asc';

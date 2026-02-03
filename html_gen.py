@@ -42,6 +42,12 @@ from async_db import (
 # --- HTML/template versioning ---
 HTML_TEMPLATE_VERSION = 9
 
+# Default Pappaliiga logo URL for image fallback
+DEFAULT_LOGO_URL = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
+
+# Image fallback handler for broken/missing logos
+IMG_ONERROR_HANDLER = f'onerror="this.src=\'{DEFAULT_LOGO_URL}\';"'
+
 # Parse command line arguments
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Generate HTML statistics for Pappaliiga divisions')
@@ -268,7 +274,8 @@ def compute_champ_player_summary(con, division_id: int, min_rounds: int = 40, mi
       JOIN matches m ON m.match_id = ps.match_id AND m.is_forfeit = 0
       JOIN maps    mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
       LEFT JOIN players pl ON pl.player_id = ps.player_id
-      LEFT JOIN teams   t  ON t.team_id   = ps.team_id
+      LEFT JOIN championships c ON c.championship_id = m.championship_id
+      LEFT JOIN team_seasons t ON t.team_id = ps.team_id AND t.season = c.season
       WHERE m.championship_id = ?
       GROUP BY ps.player_id
     """, (division_id,))
@@ -1145,7 +1152,7 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     banned_ids = {entry.get("team_id") for entry in banned_entries if entry.get("team_id")}
 
     # Get teams and thresholds concurrently
-    teams_task = get_teams_in_championship_async(pool, div["championship_id"])
+    teams_task = get_teams_in_championship_async(pool, div["championship_id"], season=div.get("season"))
     thresholds_task = compute_champ_thresholds_data_async(pool, div["championship_id"], banned_ids)
     map_avgs_task = compute_champ_map_avgs_data_async(pool, div["championship_id"], banned_ids)
     div_summary_task = compute_champ_player_summary_async(
@@ -1242,7 +1249,7 @@ async def _render_division_pure_async(pool: AsyncConnectionPool, div: dict) -> P
     for t in teams:
         name = t.get("display_name") or t.get("team_name") or t.get("team_id") or "-"
         avatar = t.get("avatar")
-        logo = f'<img class="logo nav-logo" src="{avatar}" alt="{escape(name)}" loading="lazy">' if avatar else ''
+        logo = f'<img class="logo nav-logo" src="{avatar}" alt="{escape(name)}" loading="lazy" {IMG_ONERROR_HANDLER}>' if avatar else ''
         css_classes = []
         if t.get("is_banned"):
             css_classes.append("is-banned")
@@ -1418,7 +1425,7 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
         if map_art:
             pretty = map_art.get('pretty_name', map_id)
             img_url = map_art.get('image_sm')
-        img_html = f'<img class="map-img-sm" src="{img_url}" alt="{pretty}" loading="lazy">' if img_url else ''
+        img_html = f'<img class="map-img-sm" src="{img_url}" alt="{pretty}" loading="lazy" {IMG_ONERROR_HANDLER}>' if img_url else ''
         combined_data.append((map_id, pretty, img_html, played, banned, rounds))
 
     # Sort by played count descending, then by name ascending
@@ -1536,7 +1543,7 @@ async def _render_division_summary_async(pool: AsyncConnectionPool, div: dict, d
                     for team in teams:
                         if team.get("team_name") == leaders[stat_key][1] or team.get("team_id") == leaders[stat_key][1]:
                             if team.get("avatar"):
-                                team_logo = f'<img class="logo leader-team-logo" src="{team["avatar"]}" alt="{team_name}" loading="lazy">'
+                                team_logo = f'<img class="logo leader-team-logo" src="{team["avatar"]}" alt="{team_name}" loading="lazy" {IMG_ONERROR_HANDLER}>'
                             break
                 
                 # Create detailed tooltip with breakdown
@@ -1657,7 +1664,7 @@ async def render_team_summary_async(pool: AsyncConnectionPool, team: dict, div: 
     # Team header
     name = team["team_name"] or team["team_id"]
     avatar = team.get("avatar")
-    logo = f'<img class="logo team-logo" src="{avatar}" alt="">' if avatar else ''
+    logo = f'<img class="logo team-logo" src="{avatar}" alt="" {IMG_ONERROR_HANDLER}>' if avatar else ''
     html.append(f'<h2 class="team-name">{logo}{escape(name)}</h2>')
     
     # Team stats summary

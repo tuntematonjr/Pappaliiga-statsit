@@ -23,7 +23,7 @@ from faceit_client import (
 from db import (
     get_conn, init_db,
     upsert_championship, upsert_match,
-    upsert_team,
+    upsert_team_season,
     upsert_maps, upsert_map_votes,
     upsert_player_stats,
     upsert_map_catalog, add_map_to_season_pool,
@@ -586,11 +586,17 @@ def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: 
         pass
     winner_team_id = _normalize_team_ref(winner_raw, team1_id, team2_id)
 
-    # Upsert teams (names & avatars live only in teams)
+    # Upsert teams by season (names & avatars stored only in team_seasons)
     if team1_id or (summary and summary.get("team1_name")) or f1.get("name"):
-        upsert_team(con, {"team_id": team1_id, "name": (summary.get("team1_name") if summary else f1.get("name")), "avatar": (summary.get("team1_avatar") if summary else f1.get("avatar"))})
+        t1_name = summary.get("team1_name") if summary else f1.get("name")
+        t1_avatar = summary.get("team1_avatar") if summary else f1.get("avatar")
+        if team1_id:  # Only if we have a valid team ID
+            upsert_team_season(con, team1_id, champ_row["season"], t1_name, t1_avatar)
     if team2_id or (summary and summary.get("team2_name")) or f2.get("name"):
-        upsert_team(con, {"team_id": team2_id, "name": (summary.get("team2_name") if summary else f2.get("name")), "avatar": (summary.get("team2_avatar") if summary else f2.get("avatar"))})
+        t2_name = summary.get("team2_name") if summary else f2.get("name")
+        t2_avatar = summary.get("team2_avatar") if summary else f2.get("avatar")
+        if team2_id:  # Only if we have a valid team ID
+            upsert_team_season(con, team2_id, champ_row["season"], t2_name, t2_avatar)
 
     # Bulk upsert rosters (players)
     roster_players = []
@@ -751,9 +757,9 @@ def main(db_path: str, division_num: int = None, season: int = None, all_seasons
     try:
         init_db(con)
         
-        # If --update-teams, fetch and update all team avatars/names from Faceit
+        # If --update-teams, fetch and update all team names/avatars from Faceit for all seasons
         if update_teams:
-            cur = con.execute("SELECT DISTINCT team_id FROM teams WHERE team_id IS NOT NULL ORDER BY team_id")
+            cur = con.execute("SELECT DISTINCT team_id FROM team_seasons WHERE team_id IS NOT NULL ORDER BY team_id")
             team_ids = [row[0] for row in cur.fetchall()]
             total = len(team_ids)
             print(f">> [UPDATE-TEAMS] Updating {total} teams from Faceit API...")
@@ -765,11 +771,22 @@ def main(db_path: str, division_num: int = None, season: int = None, all_seasons
                 try:
                     team_data = get_team_details(team_id)
                     if team_data:
-                        upsert_team(con, {
-                            "team_id": team_id,
-                            "name": team_data.get("name") or team_data.get("nickname"),
-                            "avatar": team_data.get("avatar"),
-                        })
+                        team_name = team_data.get("name") or team_data.get("nickname")
+                        team_avatar = team_data.get("avatar")
+                        
+                        # Update season-specific names for all seasons this team appears in
+                        season_rows = con.execute(
+                            """SELECT DISTINCT c.season FROM matches m 
+                               JOIN championships c ON c.championship_id = m.championship_id 
+                               WHERE (m.team1_id = ? OR m.team2_id = ?)
+                               ORDER BY c.season""",
+                            (team_id, team_id)
+                        ).fetchall()
+                        
+                        for season_row in season_rows:
+                            season = season_row[0]
+                            upsert_team_season(con, team_id, season, team_name, team_avatar)
+                        
                         updated += 1
                     else:
                         # 404 - team deleted/private on Faceit
@@ -788,14 +805,16 @@ def main(db_path: str, division_num: int = None, season: int = None, all_seasons
         
         # If --cleanup-orphans, remove unused teams and players
         if cleanup_orphans:
-            # Delete orphaned teams
+            # Delete orphaned team_seasons
             orphaned_teams = con.execute("""
-                DELETE FROM teams WHERE team_id NOT IN (
-                    SELECT DISTINCT team_id FROM (
-                        SELECT team1_id as team_id FROM matches WHERE team1_id IS NOT NULL
+                DELETE FROM team_seasons WHERE (team_id, season) NOT IN (
+                    SELECT DISTINCT t.team_id, c.season
+                    FROM (
+                        SELECT team1_id as team_id, championship_id FROM matches WHERE team1_id IS NOT NULL
                         UNION
-                        SELECT team2_id FROM matches WHERE team2_id IS NOT NULL
-                    )
+                        SELECT team2_id, championship_id FROM matches WHERE team2_id IS NOT NULL
+                    ) t
+                    JOIN championships c ON c.championship_id = t.championship_id
                 )
             """)
             teams_deleted = orphaned_teams.rowcount

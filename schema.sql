@@ -5,6 +5,9 @@
 
 PRAGMA foreign_keys = ON;
 
+-- Drop old tables if they exist
+DROP TABLE IF EXISTS teams;
+
 ------------------------------------------------------------
 -- Core reference tables
 ------------------------------------------------------------
@@ -24,11 +27,16 @@ CREATE TABLE IF NOT EXISTS championships (
 CREATE INDEX IF NOT EXISTS ix_champ_season ON championships(season);
 
 -- Reference entities
-CREATE TABLE IF NOT EXISTS teams (
-  team_id    TEXT PRIMARY KEY,
+-- Season-specific team names (source of truth for team data per season)
+CREATE TABLE IF NOT EXISTS team_seasons (
+  team_id    TEXT NOT NULL,
+  season     INTEGER NOT NULL,
   name       TEXT,
-  avatar     TEXT
+  avatar     TEXT,
+  PRIMARY KEY (team_id, season)
 );
+
+CREATE INDEX IF NOT EXISTS ix_team_seasons_lookup ON team_seasons(team_id, season);
 
 CREATE TABLE IF NOT EXISTS players (
   player_id   TEXT PRIMARY KEY,
@@ -54,8 +62,8 @@ CREATE TABLE IF NOT EXISTS matches (
   status           TEXT,
   last_seen_at     INTEGER,
 
-  team1_id         TEXT REFERENCES teams(team_id),
-  team2_id         TEXT REFERENCES teams(team_id),
+  team1_id         TEXT,
+  team2_id         TEXT,
   winner_team_id   TEXT,
   is_forfeit       INTEGER NOT NULL DEFAULT 0       -- 1 if entire match is forfeit, 0 if real match
 );
@@ -95,7 +103,7 @@ CREATE TABLE IF NOT EXISTS player_stats (
   match_id         TEXT NOT NULL REFERENCES matches(match_id) ON DELETE CASCADE,
   round_index      INTEGER NOT NULL,
   player_id        TEXT REFERENCES players(player_id) ON DELETE SET NULL,
-  team_id          TEXT REFERENCES teams(team_id) ON DELETE SET NULL,
+  team_id          TEXT,
   kills            INTEGER,
   deaths           INTEGER,
   assists          INTEGER,

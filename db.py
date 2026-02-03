@@ -115,36 +115,22 @@ def upsert_championship(con: sqlite3.Connection, row: Dict[str, Any]) -> Dict[st
 # Teams & Players
 # -------------------------
 
-def upsert_team(con: sqlite3.Connection, team: Dict[str, Any]) -> None:
+def upsert_team_season(con: sqlite3.Connection, team_id: str, season: int, name: str, avatar: str = None) -> None:
     """
-        team = { team_id, name, avatar }
-    Guarantees:
-      - always persist some avatar (default if missing)
-      - never overwrite an existing non-empty value
+    Upsert season-specific team name and avatar (source of truth).
+    Always store the provided name/avatar for this season.
     """
-    avatar_in = team.get("avatar")
-    team["avatar"] = avatar_in if (avatar_in is not None and str(avatar_in).strip() != "") else DEFAULT_TEAM_AVATAR
+    avatar_in = avatar
+    avatar = avatar_in if (avatar_in is not None and str(avatar_in).strip() != "") else DEFAULT_TEAM_AVATAR
 
     sql = """
-    INSERT INTO teams (team_id, name, avatar)
-    VALUES (:team_id, :name, :avatar)
-    ON CONFLICT(team_id) DO UPDATE SET
-            name       = CASE
-                                         WHEN excluded.name IS NOT NULL AND excluded.name != '' AND excluded.name != teams.name
-                                             THEN excluded.name
-                                         WHEN teams.name IS NULL OR teams.name = ''
-                                             THEN excluded.name
-                                         ELSE teams.name
-                                     END,
-      avatar     = CASE
-                     WHEN excluded.avatar IS NOT NULL AND excluded.avatar != '' AND excluded.avatar != teams.avatar
-                       THEN excluded.avatar
-                     WHEN teams.avatar IS NULL OR teams.avatar = ''
-                       THEN COALESCE(NULLIF(excluded.avatar, ''), :default_avatar)
-                     ELSE teams.avatar
-                   END
+    INSERT INTO team_seasons (team_id, season, name, avatar)
+    VALUES (:team_id, :season, :name, :avatar)
+    ON CONFLICT(team_id, season) DO UPDATE SET
+      name   = CASE WHEN excluded.name IS NOT NULL AND excluded.name != '' THEN excluded.name ELSE team_seasons.name END,
+      avatar = CASE WHEN excluded.avatar IS NOT NULL AND excluded.avatar != '' THEN excluded.avatar ELSE team_seasons.avatar END
     """
-    con.execute(sql, {**team, "default_avatar": DEFAULT_TEAM_AVATAR})
+    con.execute(sql, {"team_id": team_id, "season": season, "name": name, "avatar": avatar})
 
 def upsert_player(con: sqlite3.Connection, player: Dict[str, Any]) -> None:
     """
@@ -181,22 +167,47 @@ def has_column(con: sqlite3.Connection, table: str, col: str) -> bool:
         _COLS_CACHE[key] = cols
     return col in cols
 
-def get_teams_in_championship(con: sqlite3.Connection, division_id: int) -> list[dict]:
-    sql = """
-    WITH team_ids AS (
-      SELECT DISTINCT team1_id AS team_id FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
-      UNION
-      SELECT DISTINCT team2_id AS team_id FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
-    )
-    SELECT t.team_id,
-           COALESCE(t.name, '') AS team_name,
-           t.avatar
-    FROM team_ids x
-    LEFT JOIN teams t ON t.team_id = x.team_id
-    ORDER BY team_name COLLATE NOCASE
-    """
-    rows = query(con, sql, (division_id, division_id))
+def get_teams_in_championship(con: sqlite3.Connection, division_id: int, season: int = None) -> list[dict]:
+    if season:
+        sql = """
+        WITH team_ids AS (
+          SELECT DISTINCT team1_id AS team_id FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
+          UNION
+          SELECT DISTINCT team2_id AS team_id FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
+        )
+        SELECT x.team_id,
+               COALESCE(ts.name, '') AS team_name,
+               COALESCE(ts.avatar, ?) AS avatar
+        FROM team_ids x
+        LEFT JOIN team_seasons ts ON ts.team_id = x.team_id AND ts.season = ?
+        ORDER BY team_name COLLATE NOCASE
+        """
+        rows = query(con, sql, (division_id, division_id, DEFAULT_TEAM_AVATAR, season))
+    else:
+        sql = """
+        WITH team_ids AS (
+          SELECT DISTINCT team1_id AS team_id FROM matches WHERE championship_id=? AND team1_id IS NOT NULL
+          UNION
+          SELECT DISTINCT team2_id AS team_id FROM matches WHERE championship_id=? AND team2_id IS NOT NULL
+        )
+        SELECT x.team_id,
+               COALESCE((SELECT ts.name FROM team_seasons ts WHERE ts.team_id = x.team_id ORDER BY ts.season DESC LIMIT 1), '') AS team_name,
+               COALESCE((SELECT ts.avatar FROM team_seasons ts WHERE ts.team_id = x.team_id ORDER BY ts.season DESC LIMIT 1), ?) AS avatar
+        FROM team_ids x
+        ORDER BY team_name COLLATE NOCASE
+        """
+        rows = query(con, sql, (division_id, division_id, DEFAULT_TEAM_AVATAR))
     return [r for r in rows if r["team_id"]]
+
+def get_team_name_for_season(con: sqlite3.Connection, team_id: str, season: int) -> Optional[str]:
+    """
+    Get the season-specific team name.
+    """
+    row = con.execute(
+        """SELECT name FROM team_seasons WHERE team_id=? AND season=? LIMIT 1""",
+        (team_id, season)
+    ).fetchone()
+    return row[0] if row and row[0] else None
 
 def compute_team_summary_data(con: sqlite3.Connection, division_id: int, team_id: str) -> dict:
     # Fetch only played maps (join maps); everything else derives from these
@@ -927,11 +938,13 @@ def get_team_matches_mirror(con: sqlite3.Connection, championship_id: int, team_
       COALESCE(ps2.adr_avg, 0.0)  AS t2_adr,
       COALESCE(ps2.dmg, 0)        AS t2_dmg
     FROM mp
+    JOIN my_matches mm_season ON mm_season.match_id = mp.match_id
+    JOIN championships c ON c.championship_id = mm_season.championship_id
     LEFT JOIN ps_agg ps1 ON ps1.match_id=mp.match_id AND ps1.round_index=mp.round_index AND ps1.team_id=mp.team1_id
     LEFT JOIN ps_agg ps2 ON ps2.match_id=mp.match_id AND ps2.round_index=mp.round_index AND ps2.team_id=mp.team2_id
     LEFT JOIN picks pk    ON pk.match_id=mp.match_id AND pk.map_name=mp.map_name
-    LEFT JOIN teams t1    ON t1.team_id = mp.team1_id
-    LEFT JOIN teams t2    ON t2.team_id = mp.team2_id
+    LEFT JOIN team_seasons t1 ON t1.team_id = mp.team1_id AND t1.season = c.season
+    LEFT JOIN team_seasons t2 ON t2.team_id = mp.team2_id AND t2.season = c.season
     ORDER BY (mp.ts IS NULL) ASC, mp.ts ASC, mp.match_id ASC, mp.round_index ASC
     """
     rows = cur.execute(sql, {"champ": championship_id, "team": team_id}).fetchall()
