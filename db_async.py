@@ -1008,6 +1008,32 @@ async def upsert_teams_bulk_async(
     await _retry_on_deadlock(_op, label=f"upsert-{label}")
 
 
+async def upsert_team_championships_bulk_async(
+    rows: Sequence[Row],
+    *,
+    conn: asyncmy.Connection | None = None,
+    label: str = "team_championships",
+) -> None:
+    """Upsert team-championship associations with historical team names."""
+    if not rows:
+        return
+
+    sql = """
+    INSERT INTO team_championships (team_id, championship_id, team_name)
+    VALUES (%(team_id)s, %(championship_id)s, %(team_name)s)
+    ON DUPLICATE KEY UPDATE
+      team_name = CASE WHEN VALUES(team_name) <> '' THEN VALUES(team_name) ELSE team_championships.team_name END
+    """
+
+    async def _op():
+        async with _write_connection(conn, label=f"upsert-{label}") as target_conn:
+            async with target_conn.cursor() as cur:
+                await cur.executemany(sql, rows)
+                await target_conn.commit()
+
+    await _retry_on_deadlock(_op, label=f"upsert-{label}")
+
+
 async def upsert_players_bulk_async(
     rows: Sequence[Row],
     *,
@@ -2533,8 +2559,10 @@ async def get_team_matches_mirror_async(
       mp.match_id, mp.ts, mp.status, mp.best_of, mp.played,
       mp.match_is_forfeit, mp.match_winner_team_id,
       mp.team1_id, mp.team2_id,
-      t1.name AS team1_name, t2.name AS team2_name,
-      t1.avatar AS t1_avatar, t2.avatar AS t2_avatar,
+      COALESCE(tc1.team_name, t1.name) AS team1_name,
+      COALESCE(tc2.team_name, t2.name) AS team2_name,
+      COALESCE(tc1.avatar, t1.avatar) AS t1_avatar,
+      COALESCE(tc2.avatar, t2.avatar) AS t2_avatar,
       mp.round_index, mp.map_name, mp.score_team1, mp.score_team2,
       mp.map_is_forfeit, mp.map_winner_team_id,
       mp.image_sm, mp.image_lg,
@@ -2553,6 +2581,8 @@ async def get_team_matches_mirror_async(
     LEFT JOIN picks pk    ON pk.match_id=mp.match_id AND pk.map_name=mp.map_name
     LEFT JOIN teams t1    ON t1.team_id = mp.team1_id
     LEFT JOIN teams t2    ON t2.team_id = mp.team2_id
+    LEFT JOIN team_championships tc1 ON tc1.team_id = mp.team1_id AND tc1.championship_id = :champ
+    LEFT JOIN team_championships tc2 ON tc2.team_id = mp.team2_id AND tc2.championship_id = :champ
     ORDER BY (mp.ts IS NULL) ASC, mp.ts ASC, mp.match_id ASC, mp.round_index ASC
     """
 
@@ -2682,7 +2712,10 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
                 (SELECT t.name
                  FROM teams t
                  JOIN championships c ON c.winner_team_id = t.team_id
-                 WHERE c.parent_championship_id = %(division_id)s LIMIT 1) AS winner_team
+                 WHERE c.parent_championship_id = %(division_id)s LIMIT 1) AS winner_team,
+                (SELECT c.championship_id
+                 FROM championships c
+                 WHERE c.parent_championship_id = %(division_id)s LIMIT 1) AS playoff_championship_id
             """,
             {"division_id": division_id},
         )

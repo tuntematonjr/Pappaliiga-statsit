@@ -72,7 +72,12 @@ async def _compute_lifetime_summary_totals() -> dict[str, int]:
     ), await query_async(
         "SELECT COUNT(DISTINCT team_id) AS cnt FROM teams"
     ), await query_async(
-        "SELECT COUNT(DISTINCT match_id) AS cnt FROM matches WHERE is_forfeit = 0"
+        """
+        SELECT COUNT(DISTINCT match_id) AS cnt
+        FROM matches
+        WHERE is_forfeit = 0
+          AND NULLIF(finished_at, 0) IS NOT NULL
+        """
     ), await query_async(
         "SELECT COUNT(*) AS cnt FROM maps"
     ), await query_async(
@@ -118,7 +123,7 @@ async def _compute_lifetime_summary_totals() -> dict[str, int]:
         "divisions": int(div_rows[0]["cnt"] if div_rows else 0),
         "teams": int(team_rows[0]["cnt"] if team_rows else 0),
         "players": int(player_counts.get("all_time_players") or 0),
-        # Matches, maps, rounds, kills and deaths combine the regular season and playoffs.
+        # Matches, maps, rounds, kills and deaths combine played games from the regular season and playoffs.
         "matches": int(match_rows[0]["cnt"] if match_rows else 0),
         "maps": maps_total,
         "rounds": rounds_total,

@@ -277,7 +277,10 @@ async def _compute_division_details(championship_id: str, season: int, division_
                             AND ps.team_id IS NOT NULL
                         GROUP BY ps.team_id
         )
-        SELECT DISTINCT t.team_id, t.name AS team_name, t.name AS display_name, t.avatar,
+        SELECT DISTINCT t.team_id,
+               COALESCE(tc.team_name, t.name) AS team_name,
+               COALESCE(tc.team_name, t.name) AS display_name,
+               t.avatar,
                COALESCE(mt.matches_played, 0) AS matches_played,
                COALESCE(mt.matches_won, 0) AS matches_won,
                COALESCE(mp.maps_played, 0) AS maps_played,
@@ -289,6 +292,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
                COALESCE(agg.damage, 0) AS damage
         FROM teams t
         JOIN division_match_teams dmt ON dmt.team_id = t.team_id
+        LEFT JOIN team_championships tc ON tc.team_id = t.team_id AND tc.championship_id = :champ_id
         LEFT JOIN match_totals mt ON mt.team_id = t.team_id
         LEFT JOIN map_totals mp ON mp.team_id = t.team_id
         LEFT JOIN player_totals agg ON agg.team_id = t.team_id

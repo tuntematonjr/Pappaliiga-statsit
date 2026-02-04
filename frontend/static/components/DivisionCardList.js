@@ -200,6 +200,63 @@
         return String(rawName).replace(/\s+S\d+$/i, '').trim();
     }
 
+    function slugifyFallback(value) {
+        if (!value) return '';
+        const base = String(value);
+        const normalized = typeof base.normalize === 'function' ? base.normalize('NFD') : base;
+        return normalized
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .toLowerCase();
+    }
+
+    function resolveDivisionSlug(division, fallbackName) {
+        const normalizer = typeof window !== 'undefined' ? window.divisionNormalizer : null;
+        const resolved = normalizer?.getDivisionSlug ? normalizer.getDivisionSlug(division) : null;
+        if (resolved) return resolved;
+        const name = fallbackName || division?.name || '';
+        return slugifyFallback(name) || null;
+    }
+
+    function resolveDivisionSeason(division) {
+        if (!division) return null;
+        const direct = division.seasonNumber ?? division.season_number;
+        if (direct != null) return direct;
+        const seasonValue = division.season;
+        if (typeof seasonValue === 'number' || typeof seasonValue === 'string') {
+            return seasonValue;
+        }
+        if (seasonValue && typeof seasonValue === 'object') {
+            return (
+                seasonValue.season ??
+                seasonValue.season_number ??
+                seasonValue.seasonNumber ??
+                seasonValue.id ??
+                null
+            );
+        }
+        return null;
+    }
+
+    function buildDivisionHref(slug, divisionId, name, season, isPlayoffs) {
+        const base = slug || (divisionId != null ? String(divisionId) : '');
+        if (!base) return '/division';
+        const path = isPlayoffs ? `/division/${base}/playoffs` : `/division/${base}`;
+        const params = new URLSearchParams();
+        if (divisionId != null) {
+            params.set('championship', String(divisionId));
+        }
+        if (name) {
+            params.set('championship_name', String(name));
+        }
+        if (season != null) {
+            params.set('championship_season', String(season));
+        }
+        const query = params.toString();
+        return query ? `${path}?${query}` : path;
+    }
+
     function buildCardModel(division) {
         if (!division) {
             return null;
@@ -257,10 +314,16 @@
             ? buildProgressCopy(playoffsMatchesPlayed, playoffsMatchesTotal)
             : { label: 'Ei playoffeja', tooltip: 'Ei playoffeja', percent: 0, remaining: 0 };
         
-        const hrefId = division.slug || divisionId;
+        const hrefId = resolveDivisionSlug(division, division.name) || divisionId;
+        const playoffsHrefId =
+            (typeof window !== 'undefined' && window.divisionNormalizer?.getPlayoffsHrefId
+                ? window.divisionNormalizer.getPlayoffsHrefId(division)
+                : null) ||
+            null;
         // Clean the division name - remove season suffix
         const cleanName = cleanDivisionName(division.name);
         const title = cleanName || (divisionNum ? `Division ${divisionNum}` : 'Division');
+        const seasonValue = resolveDivisionSeason(division);
         
         // Extract best player and MVP team info
         const bestPlayer = division.meta?.mvp_player || division.best_player || division.bestPlayer;
@@ -299,7 +362,9 @@
                 progressLabel: playoffCopy.label,
                 progressTooltip: playoffCopy.tooltip,
                 winner: division.playoffs?.winner_team || division.playoffs?.winner || null,
-                href: playoffsConfigured ? `/division/${hrefId}/playoffs` : ''
+                href: playoffsConfigured && playoffsHrefId
+                    ? buildDivisionHref(playoffsHrefId, playoffsHrefId, title, seasonValue, true)
+                    : ''
             },
             bestPlayer: bestPlayer ? {
                 name: bestPlayer.name || bestPlayer.nickname,
@@ -308,7 +373,7 @@
             mvpTeam: mvpTeam,
             winners: winners,
             slug: hrefId,
-            href: `/division/${hrefId}`,
+            href: buildDivisionHref(hrefId, divisionId, title, seasonValue, false),
             searchIndex: [division.name, division.id, division.divisionId].map(value => (value ? String(value).toLowerCase() : '')).join(' ')
         };
     }

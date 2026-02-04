@@ -115,6 +115,7 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
         FROM matches
         WHERE season = :season
           AND is_forfeit = 0
+          AND NULLIF(finished_at, 0) IS NOT NULL
         """,
         {"season": season},
     ), await query_async(
@@ -148,7 +149,7 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
         "divisions": int((division_rows[0] or {}).get("cnt") or 0),
         "teams": team_totals["total_teams"],
         "players": player_totals["total_players"],
-        # Matches, maps, rounds, kills and deaths include both regular season and playoff games.
+        # Matches, maps, rounds, kills and deaths include played games from the regular season and playoffs.
         "matches": int(match_row.get("cnt") or 0),
         "maps": maps_total,
         "rounds": rounds_total,

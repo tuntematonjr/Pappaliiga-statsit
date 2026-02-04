@@ -347,6 +347,7 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
             playoff_winners = winners_map.get(playoff_champ_id, [])
             
             division_data["playoffs"] = {
+                "playoff_championship_id": playoff_champ_id,
                 "status": playoff_status,
                 "teams": playoff_teams,
                 "matches_played": playoff_played,
@@ -356,6 +357,7 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
         else:
             # No playoff for this division yet
             division_data["playoffs"] = {
+                "playoff_championship_id": None,
                 "status": "waiting",
                 "teams": 0,
                 "matches_played": 0,
@@ -726,14 +728,17 @@ async def _compute_playoff_bracket(championship_id: str) -> Dict[str, Any]:
         SELECT 
             m.match_id,
             m.best_of AS round,
-            t1.name AS team1,
-            t2.name AS team2,
-            tw.name AS winner,
+            COALESCE(tc1.team_name, t1.name) AS team1,
+            COALESCE(tc2.team_name, t2.name) AS team2,
+            COALESCE(tcw.team_name, tw.name) AS winner,
             m.finished_at
         FROM matches m
         LEFT JOIN teams t1 ON t1.team_id = m.team1_id
         LEFT JOIN teams t2 ON t2.team_id = m.team2_id
         LEFT JOIN teams tw ON tw.team_id = m.winner_team_id
+        LEFT JOIN team_championships tc1 ON tc1.team_id = m.team1_id AND tc1.championship_id = :champ_id
+        LEFT JOIN team_championships tc2 ON tc2.team_id = m.team2_id AND tc2.championship_id = :champ_id
+        LEFT JOIN team_championships tcw ON tcw.team_id = m.winner_team_id AND tcw.championship_id = :champ_id
         WHERE m.championship_id = :champ_id
         AND m.is_forfeit = 0
         ORDER BY m.started_at ASC

@@ -144,6 +144,7 @@ async def _compute_divisions(season_id: int) -> List[Dict[str, Any]]:
                         "matches_played": playoff_matches_played,
                         "matches_total": playoff_matches_total,
                         "winner_team": playoff_stats.get("winner_team"),
+                        "playoff_championship_id": playoff_stats.get("playoff_championship_id"),
                     },
                     "meta": {
                         "winner_team": None,  # Placeholder

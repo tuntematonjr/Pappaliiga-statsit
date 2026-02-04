@@ -62,7 +62,16 @@ async def fetch_team_season_stats(team_id: str) -> list[dict[str, Any]]:
                    tst.rounds_won, tst.rounds_lost, tst.maps_won
             FROM team_season_totals tst
             JOIN championships c ON c.season = tst.season AND c.division_num = tst.division_num
+            LEFT JOIN team_championships tc
+                ON tc.team_id = tst.team_id AND tc.championship_id = c.championship_id
             WHERE tst.team_id = :team_id
+              AND (
+                  c.is_playoffs = 0
+                  OR tc.team_id IS NOT NULL
+                  OR NOT EXISTS (
+                      SELECT 1 FROM team_championships tc2 WHERE tc2.championship_id = c.championship_id
+                  )
+              )
             ORDER BY tst.season DESC, tst.division_num
             """,
             {"team_id": team_id},

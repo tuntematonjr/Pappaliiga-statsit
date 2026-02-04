@@ -43,6 +43,82 @@
         return match ? match.id : 5;
     }
 
+    function cleanDivisionName(rawName) {
+        if (!rawName) return '';
+        // Remove season suffix like "S11", "S12", etc.
+        return String(rawName).replace(/\s+S\d+$/i, '').trim();
+    }
+
+    function isLikelyId(value) {
+        if (value === null || value === undefined) return false;
+        const text = String(value).trim();
+        if (!text) return false;
+        if (/^\d+$/.test(text)) return true;
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text);
+    }
+
+    function slugifyDivisionName(value) {
+        if (!value) return '';
+        const base = String(value);
+        const normalized = typeof base.normalize === 'function' ? base.normalize('NFD') : base;
+        return normalized
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-zA-Z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .toLowerCase();
+    }
+
+    function getDivisionSlug(division) {
+        if (!division || typeof division !== 'object') {
+            return null;
+        }
+        const raw = division.raw && typeof division.raw === 'object' ? division.raw : division;
+        const rawSlug = raw.slug || division.slug || null;
+        const name = cleanDivisionName(raw.name || division.name || '');
+        const derived = slugifyDivisionName(name);
+
+        if (rawSlug && !isLikelyId(rawSlug)) {
+            return String(rawSlug);
+        }
+        if (derived) {
+            return derived;
+        }
+        return rawSlug || raw.division_id || raw.divisionId || raw.id || division.id || null;
+    }
+
+    function getDivisionHrefId(division) {
+        if (!division || typeof division !== 'object') {
+            return null;
+        }
+        return getDivisionSlug(division);
+    }
+
+    function getPlayoffsHrefId(division) {
+        if (!division || typeof division !== 'object') {
+            return null;
+        }
+        const raw = division.raw && typeof division.raw === 'object' ? division.raw : division;
+        const playoffs = raw.playoffs && typeof raw.playoffs === 'object' ? raw.playoffs : division.playoffs || {};
+        return (
+            playoffs.playoff_championship_id ||
+            playoffs.playoffChampionshipId ||
+            playoffs.championship_id ||
+            playoffs.championshipId ||
+            null
+        );
+    }
+
+    function hasPlayoffsStarted(division) {
+        if (!division || typeof division !== 'object') {
+            return false;
+        }
+        const raw = division.raw && typeof division.raw === 'object' ? division.raw : division;
+        const playoffs = raw.playoffs && typeof raw.playoffs === 'object' ? raw.playoffs : division.playoffs || {};
+        const matchesPlayed = toNumber(playoffs.matches_played ?? playoffs.matchesPlayed, 0);
+        const status = String(playoffs.status || '').toLowerCase();
+        return matchesPlayed > 0 || status === 'active' || status === 'finished';
+    }
+
     function clampMatches(block) {
         const matchesTotal = Math.max(0, toNumber(block.matches_played_total ?? block.matches_total, 0));
         const rawPlayed = toNumber(block.matches_played, 0);
@@ -140,7 +216,7 @@
                 } : null,
                 mvpTeam: mvpTeam ? String(mvpTeam) : null,
                 winners: winners,
-                slug: raw.slug || null,
+                slug: getDivisionSlug(raw),
                 seasonNumber: raw.season_number ?? null,
                 raw
             }
@@ -149,6 +225,12 @@
 
     window.divisionNormalizer = Object.freeze({
         normalizeDivision,
-        inferTier
+        inferTier,
+        cleanDivisionName,
+        slugifyDivisionName,
+        getDivisionSlug,
+        getDivisionHrefId,
+        getPlayoffsHrefId,
+        hasPlayoffsStarted
     });
 })();

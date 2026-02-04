@@ -71,6 +71,7 @@
             `/api/divisions/${divisionId}/stats`
         ],
         divisionDetails: divisionId => [
+            `/api/divisions/by-slug/${divisionId}`,
             `/api/divisions/${divisionId}`,
             `/api/divisions/${divisionId}/details`,
             `/api/championships/${divisionId}`,
@@ -853,6 +854,30 @@
                 console.warn('[apiClient] Division payload empty from', meta.resolvedPath || 'unknown route');
             }
             return { data: list, meta, errors: [], validationCounts: {} };
+        }
+
+        async getNormalizedDivisions(seasonId, options = {}) {
+            const { includePlayoffs = false } = options;
+            try {
+                const response = await this.getDivisions(seasonId);
+                const list = response?.data ?? response ?? [];
+                const filtered = Array.isArray(list)
+                    ? list.filter(item => includePlayoffs || (!item.is_playoff && !item.isPlayoff))
+                    : [];
+                const normalized = filtered.map(item => ({
+                    id: item.division_id || item.divisionId || item.id,
+                    name: item.name || `Division ${item.tier || item.division || '?'}`,
+                    tier: item.tier || item.division || 0,
+                    status: item.status,
+                    isPlayoff: item.is_playoff || item.isPlayoff || false
+                })).sort((a, b) => (a.tier || 0) - (b.tier || 0));
+                return normalized;
+            } catch (err) {
+                if (isDev) {
+                    console.warn(`[apiClient] Failed to fetch normalized divisions for season ${seasonId}:`, err);
+                }
+                return [];
+            }
         }
 
         async fetchLifetimeSummary() {

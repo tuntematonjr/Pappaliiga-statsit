@@ -62,7 +62,21 @@ const router = createRouter({
 // Create app
 const app = createApp({
     name: 'PappaliigaStats',
-    template: '<router-view></router-view>'
+    components: {
+        GlobalNav: window.GlobalNav
+    },
+    template: `
+        <GlobalNav />
+        <main class="main-content">
+            <div class="layout-boundary main-surface">
+                <router-view v-slot="{ Component }">
+                    <transition name="fade" mode="out-in">
+                        <component :is="Component"></component>
+                    </transition>
+                </router-view>
+            </div>
+        </main>
+    `
 });
 
 // Use plugins

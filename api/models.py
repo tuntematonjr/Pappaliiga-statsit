@@ -71,6 +71,7 @@ class DivisionPlayoffsStats(CamelModel):
     matches_played: int
     matches_total: int = 7
     winner_team: Optional[str] = None
+    playoff_championship_id: Optional[str] = None
 
 
 class MvpPlayer(CamelModel):

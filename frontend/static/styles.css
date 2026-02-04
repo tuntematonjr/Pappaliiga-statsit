@@ -3657,6 +3657,98 @@ html, body {
     }
 }
 
+/* Global Navigation Breadcrumbs */
+.global-nav {
+    background: rgba(14, 20, 40, 0.75);
+    border-bottom: 1px solid rgba(52, 76, 128, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 0.75rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 90;
+}
+
+.breadcrumbs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.breadcrumb-link,
+.breadcrumb-current {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.breadcrumb-link {
+    color: rgba(200, 215, 240, 0.85);
+    text-decoration: none;
+    background: rgba(20, 32, 60, 0.4);
+    border: 1px solid rgba(82, 128, 220, 0.2);
+}
+
+.breadcrumb-link:hover {
+    background: rgba(60, 100, 180, 0.35);
+    border-color: rgba(82, 128, 220, 0.45);
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(56, 104, 210, 0.2);
+}
+
+.breadcrumb-link--active {
+    color: rgba(200, 215, 240, 0.65);
+    cursor: default;
+    pointer-events: none;
+}
+
+.breadcrumb-current {
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(91, 140, 255, 0.25), rgba(255, 156, 64, 0.25));
+    border: 1px solid rgba(91, 140, 255, 0.4);
+    font-weight: 600;
+}
+
+.breadcrumb-icon {
+    font-size: 1rem;
+    line-height: 1;
+    opacity: 0.9;
+}
+
+.breadcrumb-text {
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+.breadcrumb-separator {
+    color: rgba(150, 170, 200, 0.5);
+    font-size: 1.1rem;
+    user-select: none;
+    padding: 0 0.15rem;
+}
+
+@media (max-width: 768px) {
+    .breadcrumbs {
+        font-size: 0.85rem;
+    }
+    
+    .breadcrumb-link,
+    .breadcrumb-current {
+        padding: 0.3rem 0.6rem;
+    }
+    
+    .breadcrumb-icon {
+        font-size: 0.9rem;
+    }
+}
+
 /* Loading & Error States */
 .loading-spinner {
     display: flex;
@@ -3747,6 +3839,17 @@ html, body {
 
 .seasons-grid {
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    max-width: 960px;
+    width: 100%;
+    margin: 2rem auto;
+    justify-content: center;
+}
+
+.seasons-view > .titleUnderlinePage {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    text-align: center;
 }
 
 .stat-card,
@@ -3826,6 +3929,12 @@ html, body {
     margin-top: 1rem;
 }
 
+.division-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
 .division-link {
     padding: 0.75rem;
     background: var(--bg);
@@ -3834,11 +3943,31 @@ html, body {
     color: var(--text);
     text-decoration: none;
     transition: border-color 0.2s, color 0.2s;
+    flex: 1;
+}
+
+.division-link--regular {
+    min-width: 0;
+}
+
+.division-link--playoffs {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
 }
 
 .division-link:hover {
     border-color: var(--accent);
     color: var(--accent);
+}
+
+.division-link--playoffs:hover {
+    background: var(--accent);
+    color: var(--bg-900);
 }
 
 @media (max-width: 640px) {

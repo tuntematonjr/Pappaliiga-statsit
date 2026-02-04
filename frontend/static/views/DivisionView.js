@@ -340,8 +340,11 @@ window.DivisionView = {
         };
     },
     computed: {
-        championshipId() {
+        championshipParam() {
             return this.$route.params?.championshipId || null;
+        },
+        championshipId() {
+            return this.$route.query?.championship || this.$route.query?.division_id || this.$route.params?.championshipId || null;
         },
         divisionState() {
             if (!this.championshipId || !this.divisionStore) {
@@ -735,10 +738,17 @@ window.DivisionView = {
         teamRoute(team) {
             if (!team || !team.team_id) return null;
             if (this.championshipId) {
+                const divisionName = this.divisionDetails?.name || this.divisionTitle || null;
+                const divisionSeason = this.divisionDetails?.season || null;
+                const divisionParam = this.championshipParam || this.championshipId;
                 return {
                     name: 'team-detail',
-                    params: { championshipId: this.championshipId, teamId: team.team_id },
-                    query: { championship: this.championshipId }
+                    params: { championshipId: divisionParam, teamId: team.team_id },
+                    query: {
+                        championship: this.championshipId,
+                        ...(divisionName ? { championship_name: divisionName } : {}),
+                        ...(divisionSeason != null ? { championship_season: divisionSeason } : {})
+                    }
                 };
             }
             return { name: 'team', params: { teamId: team.team_id }, query: {} };

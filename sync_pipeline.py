@@ -43,6 +43,7 @@ from db_async import (
     upsert_player_season_totals_async,
     upsert_player_stats_bulk_async,
     upsert_players_bulk_async,
+    upsert_team_championships_bulk_async,
     upsert_team_map_season_totals_async,
     upsert_team_season_totals_async,
     upsert_team_stats_bulk_async,
@@ -901,6 +902,19 @@ async def sync_match_async(
             normalised.team_rows,
             label=f"match:{match_id}:teams",
         )
+        # Save historical team names for this championship
+        team_champ_rows = [
+            {
+                "team_id": row["team_id"],
+                "championship_id": normalised.match_row["championship_id"],
+                "team_name": row.get("name"),
+            }
+            for row in normalised.team_rows
+        ]
+        await upsert_team_championships_bulk_async(
+            team_champ_rows,
+            label=f"match:{match_id}:team_champs",
+        )
     if normalised.player_rows:
         await upsert_players_bulk_async(
             normalised.player_rows,
@@ -1148,6 +1162,17 @@ async def sync_championship_async(
 
         if team_payloads:
             await upsert_teams_bulk_async(team_payloads, conn=conn)
+            # Save historical team names/logos for this championship
+            team_champ_rows = [
+                {
+                    "team_id": row["team_id"],
+                    "championship_id": championship_id,
+                    "team_name": row.get("name"),
+                    "avatar": row.get("avatar") or DEFAULT_TEAM_AVATAR,
+                }
+                for row in team_payloads
+            ]
+            await upsert_team_championships_bulk_async(team_champ_rows, conn=conn)
 
     fetch_start_time = time.perf_counter()
     match_type = "all"
@@ -1179,6 +1204,36 @@ async def sync_championship_async(
             continue
         
         filtered_matches.append(item)
+
+    # Fallback: populate team_championships from match list if championship teams endpoint is empty
+    # (common for playoffs before teams are exposed in the teams API).
+    if filtered_matches:
+        seen_team_ids: set[str] = set()
+        match_team_payloads: List[Dict[str, Any]] = []
+        for item in filtered_matches:
+            for payload in _collect_team_payloads(item, banned_lookup):
+                team_id = payload.get("team_id")
+                if not team_id or team_id in seen_team_ids:
+                    continue
+                seen_team_ids.add(team_id)
+                match_team_payloads.append(payload)
+        if match_team_payloads:
+            await upsert_teams_bulk_async(
+                match_team_payloads,
+                label=f"champ:{championship_id}:matchlist-teams",
+            )
+            match_team_champ_rows = [
+                {
+                    "team_id": row["team_id"],
+                    "championship_id": championship_id,
+                    "team_name": row.get("name"),
+                }
+                for row in match_team_payloads
+            ]
+            await upsert_team_championships_bulk_async(
+                match_team_champ_rows,
+                label=f"champ:{championship_id}:matchlist-team-champs",
+            )
     
     match_ids = [item.get("match_id") for item in filtered_matches]
     total_matches = len(match_ids)
@@ -1400,6 +1455,16 @@ async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics 
 
         if team_payloads:
             await upsert_teams_bulk_async(team_payloads, conn=conn)
+            # Save historical team names for this championship
+            team_champ_rows = [
+                {
+                    "team_id": row["team_id"],
+                    "championship_id": championship_id,
+                    "team_name": row.get("name"),
+                }
+                for row in team_payloads
+            ]
+            await upsert_team_championships_bulk_async(team_champ_rows, conn=conn)
 
     await sync_match_async(
         championship_id,

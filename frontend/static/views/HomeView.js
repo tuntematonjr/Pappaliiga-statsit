@@ -6,7 +6,7 @@
  *   1. Divisioonia → summary_totals.divisions → divisions → total_divisions
  *   2. Joukkueita → summary_totals.teams → teams → total_teams
  *   3. Pelaajia → summary_totals.players → players → total_players
- *   4. Otteluja → summary_totals.matches → matches → total_matches
+ *   4. Otteluja → summary_totals.matches (played) → matches_played → total_matches
  *   5. Karttoja → summary_totals.maps → maps → maps_played_total
  *   6. Kierroksia → summary_totals.rounds → rounds → total_rounds
  *   7. Tappoja → summary_totals.kills → kills → total_kills
@@ -63,9 +63,9 @@ const SUMMARY_METRIC_SCHEMA = [
             'summaryTotals.matches',
             'totals.matches',
             'matches',
-            'matches_total',
             'matches_played_total',
             'matches_played',
+            'matches_total',
             'total_matches',
             'matchesTotal',
             'matchesPlayedTotal'

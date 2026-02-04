@@ -43,14 +43,18 @@ async def get_division_matches(
                 m.team2_id,
                 m.is_forfeit,
                 m.ignored_due_ban,
-                t1.name AS team1_name,
-                t2.name AS team2_name,
+                COALESCE(tc1.team_name, t1.name) AS team1_name,
+                COALESCE(tc2.team_name, t2.name) AS team2_name,
+                t1.avatar AS team1_avatar,
+                t2.avatar AS team2_avatar,
                 COALESCE(SUM(CASE WHEN mp.winner_team_id = m.team1_id THEN 1 ELSE 0 END), 0) AS team1_score,
                 COALESCE(SUM(CASE WHEN mp.winner_team_id = m.team2_id THEN 1 ELSE 0 END), 0) AS team2_score,
                 m.activity_ts
             FROM matches m
             LEFT JOIN teams t1 ON t1.team_id = m.team1_id
             LEFT JOIN teams t2 ON t2.team_id = m.team2_id
+            LEFT JOIN team_championships tc1 ON tc1.team_id = m.team1_id AND tc1.championship_id = :champ_id
+            LEFT JOIN team_championships tc2 ON tc2.team_id = m.team2_id AND tc2.championship_id = :champ_id
             LEFT JOIN maps mp ON mp.match_id = m.match_id
             WHERE m.championship_id = :champ_id
             GROUP BY
@@ -61,8 +65,8 @@ async def get_division_matches(
                 m.team2_id,
                 m.is_forfeit,
                 m.ignored_due_ban,
-                t1.name,
-                t2.name,
+                COALESCE(tc1.team_name, t1.name),
+                COALESCE(tc2.team_name, t2.name),
                 m.activity_ts
             ORDER BY m.activity_ts DESC, m.match_id
             LIMIT :limit OFFSET :offset
@@ -94,12 +98,15 @@ async def get_match_details(match_id: str) -> dict[str, Any]:
                m.team2_id,
                m.is_forfeit,
                m.ignored_due_ban,
-               t1.name AS team1_name,
-               t2.name AS team2_name,
-               t1.avatar AS team1_avatar, t2.avatar AS team2_avatar
+               COALESCE(tc1.team_name, t1.name) AS team1_name,
+               COALESCE(tc2.team_name, t2.name) AS team2_name,
+               t1.avatar AS team1_avatar,
+               t2.avatar AS team2_avatar
         FROM matches m
         LEFT JOIN teams t1 ON t1.team_id = m.team1_id
         LEFT JOIN teams t2 ON t2.team_id = m.team2_id
+        LEFT JOIN team_championships tc1 ON tc1.team_id = m.team1_id AND tc1.championship_id = m.championship_id
+        LEFT JOIN team_championships tc2 ON tc2.team_id = m.team2_id AND tc2.championship_id = m.championship_id
         WHERE m.match_id = :match_id
         """,
         {"match_id": match_id},

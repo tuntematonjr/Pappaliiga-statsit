@@ -9,7 +9,7 @@ window.TeamDetailView = {
             return this.$route.params?.teamId || null;
         },
         championshipId() {
-            return this.$route.params?.championshipId || this.$route.query?.championship || null;
+            return this.$route.query?.championship || this.$route.params?.championshipId || null;
         }
     },
     watch: {
