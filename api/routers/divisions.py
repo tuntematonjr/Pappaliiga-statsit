@@ -239,9 +239,14 @@ async def get_divisions_by_season(
 @router.get("/by-slug/{slug}", response_model=DivisionDetails)
 async def get_division_by_slug(slug: str):
     try:
+        # Try as slug first
         champ_row = await divisions_service.fetch_division_by_slug(slug)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except NotFoundError:
+        try:
+            # Fall back to championship_id in case a UUID was passed
+            champ_row = await divisions_service.fetch_division_by_id(slug)
+        except NotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
     details = await divisions_service.get_division_details(champ_row)
     return DivisionDetails(**details)
 
