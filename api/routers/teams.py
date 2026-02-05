@@ -245,6 +245,55 @@ async def get_team_season_stats(team_id: str):
     return [TeamSeasonStats(**row) for row in rows]
 
 
+async def _build_team_page_payload(team_id: str, championship_id: Optional[str]) -> dict[str, Any]:
+    """Assemble team page response payload shared by multiple routes."""
+    # Get basic team info and seasons
+    team = await teams_service.fetch_team(team_id)
+
+    try:
+        seasons = await teams_service.fetch_team_season_stats(team_id)
+    except NotFoundError:
+        seasons = []
+
+    # Determine which championship to load
+    available_champs = {row.get("championship_id") for row in seasons if row.get("championship_id")}
+    selected_champ = championship_id or None
+
+    if selected_champ:
+        # If requested championship not available, silently ignore it (don't throw error)
+        # This allows the team page to still load with basic info even if that specific season isn't available
+        if selected_champ not in available_champs:
+            selected_champ = None
+    elif available_champs:
+        # Default to most recent championship
+        selected_champ = seasons[0]["championship_id"]
+
+    # Fetch comprehensive season data if championship available
+    season_data = None
+    if selected_champ:
+        try:
+            season_data = await teams_service.fetch_comprehensive_team_season(team_id, selected_champ)
+        except NotFoundError:
+            season_data = None
+
+    current_season = None
+    current_division = None
+    if selected_champ:
+        selected_row = next((s for s in seasons if s.get("championship_id") == selected_champ), None)
+        if selected_row:
+            current_season = selected_row.get("season")
+            current_division = selected_row.get("division_num")
+
+    return {
+        "team": team,
+        "seasons": seasons,
+        "current_championship_id": selected_champ,
+        "current_season": current_season,
+        "current_division": current_division,
+        "season_data": season_data,
+    }
+
+
 @router.get("/{team_id}/page", response_model=TeamPageResponse)
 async def get_team_page(
     team_id: str,
@@ -252,50 +301,16 @@ async def get_team_page(
 ):
     """Get team page overview (basic profile + season list + season data if championship provided)."""
     try:
-        # Get basic team info and seasons
-        team = await teams_service.fetch_team(team_id)
-        
-        try:
-            seasons = await teams_service.fetch_team_season_stats(team_id)
-        except NotFoundError:
-            seasons = []
-        
-        # Determine which championship to load
-        available_champs = {row.get("championship_id") for row in seasons if row.get("championship_id")}
-        selected_champ = championship_id or None
-        
-        if selected_champ:
-            if selected_champ not in available_champs and available_champs:
-                raise NotFoundError(f"Championship {selected_champ} not found for team '{team_id}'")
-        elif available_champs:
-            # Default to most recent championship
-            selected_champ = seasons[0]["championship_id"]
-        
-        # Fetch comprehensive season data if championship available
-        season_data = None
-        if selected_champ:
-            try:
-                season_data = await teams_service.fetch_comprehensive_team_season(team_id, selected_champ)
-            except NotFoundError:
-                season_data = None
+        return await _build_team_page_payload(team_id, championship_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
-        current_season = None
-        current_division = None
-        if selected_champ:
-            selected_row = next((s for s in seasons if s.get("championship_id") == selected_champ), None)
-            if selected_row:
-                current_season = selected_row.get("season")
-                current_division = selected_row.get("division_num")
-        
-        return {
-            "team": team,
-            "seasons": seasons,
-            "current_championship_id": selected_champ,
-            "current_season": current_season,
-            "current_division": current_division,
-            "season_data": season_data,
-        }
-        
+
+@router.get("/{team_id}/season/{championship_id}/page", response_model=TeamPageResponse)
+async def get_team_page_for_season(team_id: str, championship_id: str):
+    """Legacy/compat route for team page by season path segment."""
+    try:
+        return await _build_team_page_payload(team_id, championship_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
