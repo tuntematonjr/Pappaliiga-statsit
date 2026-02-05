@@ -3073,6 +3073,24 @@
     background: rgba(8, 12, 26, 0.75);
 }
 
+/* Mobile: increase vertical padding for better touch targets and readability */
+@media (max-width: 768px) {
+    .table-sortable thead th {
+        padding: 1rem 0.65rem;
+    }
+    
+    .table-sortable tbody td {
+        padding: 1.1rem 0.65rem;
+        line-height: 1.5;
+    }
+    
+    /* Extra space for map stats tables specifically */
+    .map-summary-table tbody td,
+    .map-full-table tbody td {
+        padding: 1.25rem 0.75rem;
+    }
+}
+
 .col-stat {
     min-width: 88px;
     text-align: right;
@@ -4134,12 +4152,17 @@ html, body {
 
 @media (max-width: 720px) {
     .map-logo {
-        width: 34px;
-        height: 34px;
+        width: 38px;
+        height: 38px;
     }
     .map-name {
-        gap: 0.45rem;
-        align-items: flex-start;
+        gap: 0.6rem;
+        align-items: center;
+        padding: 8px 0;
+    }
+    .map-name-text {
+        font-size: 0.95rem;
+        line-height: 1.5;
     }
 }
 
@@ -7969,13 +7992,17 @@ body.is-division .card.maps-section {
 .scout-table .table-sortable td:first-child {
     position: sticky;
     left: 0;
-    z-index: 2;
+    z-index: 8;
     background: rgba(13, 17, 23, 0.98);
     box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .scout-table .table-sortable th:first-child {
-    z-index: 3;
+    z-index: 9;
+}
+
+.scout-table .table-sortable tbody td:first-child {
+    z-index: 8;
 }
 
 .scout-table .map-summary-table .table-sortable th:nth-child(4),
@@ -8038,6 +8065,45 @@ body.is-division .card.maps-section {
 
 .scout-table .col-map-name {
     font-weight: 700;
+}
+
+/* Minimum column widths to prevent sort icon overlap */
+.scout-table .col-played {
+    min-width: 95px;
+}
+
+.scout-table .col-picks,
+.scout-table .col-opp-picks {
+    min-width: 135px;
+}
+
+.scout-table .col-winrate,
+.scout-table .col-winrate-own,
+.scout-table .col-winrate-opp {
+    min-width: 100px;
+}
+
+.scout-table .col-rd {
+    min-width: 95px;
+}
+
+.scout-table .col-kd {
+    min-width: 85px;
+}
+
+.scout-table .col-adr {
+    min-width: 90px;
+}
+
+.scout-table .col-ban1,
+.scout-table .col-ban2,
+.scout-table .col-opp-ban,
+.scout-table .col-ban-total {
+    min-width: 110px;
+}
+
+.scout-table .col-decov {
+    min-width: 150px;
 }
 
 .btn-reset-sort {
@@ -9532,6 +9598,15 @@ a:focus,
     z-index: 3;
 }
 
+/* Ensure sticky first column stays above group headers */
+.scout-table .table-sortable.sticky-header.has-group-header thead tr.table-group-header th:first-child {
+    z-index: 10;
+}
+
+.scout-table .table-sortable.sticky-header.has-group-header thead tr.table-group-header + tr th:first-child {
+    z-index: 9;
+}
+
 .table-group-header--collapsible {
     cursor: pointer;
     user-select: none;
@@ -9895,6 +9970,33 @@ a:focus,
     font-size: 0.7rem;
     line-height: 1.2;
     opacity: 0.85;
+}
+
+/* Mobile spacing improvements for map stats table */
+@media (max-width: 768px) {
+    .scout-cell {
+        padding: 8px 8px;
+    }
+    
+    .scout-cell--stacked {
+        padding: 8px 8px;
+    }
+    
+    .scout-cell--stacked > div:first-child {
+        line-height: 1.6;
+        margin-bottom: 4px;
+    }
+    
+    .scout-cell--stacked .sub-metric-line {
+        font-size: 0.8rem;
+        margin-top: 4px;
+    }
+    
+    .rounds-breakdown {
+        gap: 0.45rem;
+        margin-top: 4px;
+        font-size: 0.75rem;
+    }
 }
 
 .rounds-won {
