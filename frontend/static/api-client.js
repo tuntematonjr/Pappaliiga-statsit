@@ -160,6 +160,8 @@
         ],
         health: () => [`/api/health`, `/api/v1/health`, `/healthz`],
         mapsCatalog: () => [
+            `/api/maps`,
+            `/api/maps/`,
             `/api/maps_catalog`,
             `/api/maps-catalog`,
             `/api/maps/catalog`

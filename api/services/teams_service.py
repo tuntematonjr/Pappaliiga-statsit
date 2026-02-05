@@ -48,31 +48,46 @@ async def fetch_team_season_stats(team_id: str) -> list[dict[str, Any]]:
     async def _compute():
         rows = await query_async(
             """
-             SELECT tst.season, tst.division_num, c.championship_id,
-                 c.name,
-                 c.is_playoffs,
-                 tst.maps_played, tst.matches_played, tst.matches_won AS wins,
+            WITH team_champs AS (
+                SELECT championship_id
+                FROM team_championships
+                WHERE team_id = :team_id
+            ),
+            base_champs AS (
+                SELECT c.season, c.division_num, c.championship_id, c.name, c.is_playoffs
+                FROM championships c
+                JOIN team_champs tc ON tc.championship_id = c.championship_id
+                UNION ALL
+                SELECT c.season, c.division_num, c.championship_id, c.name, c.is_playoffs
+                FROM team_season_totals tst
+                JOIN championships c ON c.season = tst.season AND c.division_num = tst.division_num
+                WHERE tst.team_id = :team_id
+                  AND c.championship_id NOT IN (SELECT championship_id FROM team_champs)
+            )
+            SELECT bc.season,
+                   bc.division_num,
+                   bc.championship_id,
+                   bc.name,
+                   bc.is_playoffs,
+                   COALESCE(tst.maps_played, 0) AS maps_played,
+                   COALESCE(tst.matches_played, 0) AS matches_played,
+                   COALESCE(tst.matches_won, 0) AS wins,
                    GREATEST(
-                       CAST(tst.matches_played AS SIGNED) - CAST(tst.matches_won AS SIGNED),
+                       CAST(COALESCE(tst.matches_played, 0) AS SIGNED) - CAST(COALESCE(tst.matches_won, 0) AS SIGNED),
                        0
                    ) AS losses,
-                   CASE WHEN tst.matches_played > 0
+                   CASE WHEN COALESCE(tst.matches_played, 0) > 0
                         THEN (tst.matches_won / tst.matches_played)
                         ELSE 0.0 END AS win_rate,
-                   tst.rounds_won, tst.rounds_lost, tst.maps_won
-            FROM team_season_totals tst
-            JOIN championships c ON c.season = tst.season AND c.division_num = tst.division_num
-            LEFT JOIN team_championships tc
-                ON tc.team_id = tst.team_id AND tc.championship_id = c.championship_id
-            WHERE tst.team_id = :team_id
-              AND (
-                  c.is_playoffs = 0
-                  OR tc.team_id IS NOT NULL
-                  OR NOT EXISTS (
-                      SELECT 1 FROM team_championships tc2 WHERE tc2.championship_id = c.championship_id
-                  )
-              )
-            ORDER BY tst.season DESC, tst.division_num
+                   COALESCE(tst.rounds_won, 0) AS rounds_won,
+                   COALESCE(tst.rounds_lost, 0) AS rounds_lost,
+                   COALESCE(tst.maps_won, 0) AS maps_won
+            FROM base_champs bc
+            LEFT JOIN team_season_totals tst
+                ON tst.team_id = :team_id
+               AND tst.season = bc.season
+               AND tst.division_num = bc.division_num
+            ORDER BY bc.season DESC, bc.division_num
             """,
             {"team_id": team_id},
         )
