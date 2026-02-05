@@ -58,6 +58,18 @@ window.TeamComparisonBoard = {
         highlightTeamId: {
             type: [String, Number],
             default: null
+        },
+        championshipId: {
+            type: [String, Number],
+            default: null
+        },
+        championshipName: {
+            type: String,
+            default: null
+        },
+        championshipSeason: {
+            type: [String, Number],
+            default: null
         }
     },
     data() {
@@ -152,8 +164,15 @@ window.TeamComparisonBoard = {
             const numeric = this.parseNumber(value);
             return TEAM_BOARD_INT_FORMATTER.format(numeric);
         },
-        getTeamUrl(teamId) {
-            return '/team/' + teamId;
+        getTeamUrl(teamId, teamName) {
+            const base = '/team/' + teamId;
+            const params = new URLSearchParams();
+            if (this.championshipId) params.set('championship', this.championshipId);
+            if (this.championshipName) params.set('championship_name', this.championshipName);
+            if (this.championshipSeason != null) params.set('championship_season', this.championshipSeason);
+            if (teamName) params.set('team_name', teamName);
+            const query = params.toString();
+            return query ? base + '?' + query : base;
         },
         scrollToTeam(teamId, options = {}) {
             const resolvedId = this.resolveTeamId(teamId);
@@ -220,7 +239,7 @@ window.TeamComparisonBoard = {
                             <div class="team-comparison-team">
                                 <span v-if="showRank" class="team-rank">{{ row.rank }}</span>
                                 <img class="team-logo" :src="row.logo" :alt="row.name" loading="lazy" />
-                                <a :href="getTeamUrl(row.id)" class="team-name team-name--link" :title="'Avaa ' + row.name + ' joukkueen sivu'">
+                                <a :href="getTeamUrl(row.id, row.name)" class="team-name team-name--link" :title="'Avaa ' + row.name + ' joukkueen sivu'">
                                     <span class="team-name__label">{{ row.name }}</span>
                                     <span class="team-name__icon" aria-hidden="true">↗</span>
                                 </a>

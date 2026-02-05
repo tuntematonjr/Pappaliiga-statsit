@@ -32,6 +32,7 @@
             const route = useRoute();
             const router = useRouter();
             const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
+            const teamStore = typeof window.useTeamStore === 'function' ? window.useTeamStore() : null;
 
             function beautifyDivisionLabel(value) {
                 if (!value) return '';
@@ -72,10 +73,53 @@
                     const name = entry?.details?.data?.name;
                     if (name) return String(name);
                 }
-                if (params?.championshipId) {
-                    return beautifyDivisionLabel(params.championshipId);
+                if (lookupKey) {
+                    return beautifyDivisionLabel(lookupKey);
                 }
                 return 'Divisioona';
+            }
+
+            function resolveTeamName(params, query) {
+                if (query?.team_name) {
+                    return String(query.team_name);
+                }
+                const teamId = params?.teamId;
+                if (teamStore && teamId && typeof teamStore.getTeamState === 'function') {
+                    const entry = teamStore.getTeamState(teamId);
+                    const team = entry?.page?.data?.team || null;
+                    const name =
+                        team?.displayName ||
+                        team?.display_name ||
+                        team?.teamName ||
+                        team?.team_name ||
+                        team?.name ||
+                        null;
+                    if (name) return String(name);
+                }
+                if (teamId) {
+                    return `Joukkue ${teamId}`;
+                }
+                return 'Joukkue';
+            }
+
+            function resolveTeamSeason(params, query) {
+                if (query?.championship_season) {
+                    return String(query.championship_season);
+                }
+                const teamId = params?.teamId;
+                if (teamStore && teamId && typeof teamStore.getTeamState === 'function') {
+                    const entry = teamStore.getTeamState(teamId);
+                    const page = entry?.page?.data || null;
+                    const selected = entry?.selectedChampionship || page?.currentChampionshipId || query?.championship || null;
+                    const seasons = Array.isArray(page?.seasons) ? page.seasons : [];
+                    if (selected && seasons.length) {
+                        const match = seasons.find(season => String(season.championshipId) === String(selected));
+                        if (match?.season != null) {
+                            return String(match.season);
+                        }
+                    }
+                }
+                return '';
             }
 
             const breadcrumbs = computed(() => {
@@ -84,7 +128,7 @@
                 const params = route.params;
                 const query = route.query;
 
-                // Always add home
+                // Always add home first
                 crumbs.push({
                     key: 'home',
                     label: 'Etusivu',
@@ -120,10 +164,34 @@
 
                 // Team context
                 if (params.teamId) {
-                    const teamName = query.team_name || `Joukkue ${params.teamId}`;
+                    const teamName = resolveTeamName(params, query);
                     
-                    // If we have both championship and team, the division breadcrumb is already added above
-                    // Just add the team
+                    // If championship isn't in params but we have it in query or store, add division breadcrumb
+                    if (!params.championshipId && (query?.championship || query?.team_championship)) {
+                        const championshipIdFromQuery = query.championship || query.team_championship;
+                        const championshipName = resolveDivisionName({ championshipId: championshipIdFromQuery }, query);
+                        const seasonValue = resolveDivisionSeason({ championshipId: championshipIdFromQuery }, query);
+                        const seasonLabel = seasonValue ? formatSeasonLabel(seasonValue) : '';
+                        const fullLabel = seasonLabel ? `${championshipName} (${seasonLabel})` : championshipName;
+                        
+                        crumbs.push({
+                            key: 'division',
+                            label: fullLabel,
+                            icon: '🏆',
+                            to: { 
+                                name: 'division', 
+                                params: { championshipId: championshipIdFromQuery },
+                                query: {
+                                    ...(query.championship ? { championship: query.championship } : {}),
+                                    ...(query.championship_name ? { championship_name: query.championship_name } : {}),
+                                    ...(query.championship_season ? { championship_season: query.championship_season } : {})
+                                }
+                            },
+                            disabled: false
+                        });
+                    }
+                    
+                    // Add team breadcrumb
                     crumbs.push({
                         key: 'team',
                         label: teamName,
@@ -139,13 +207,14 @@
                                     ...(query.championship ? { championship: query.championship } : {}),
                                     ...(query.championship_name ? { championship_name: query.championship_name } : {}),
                                     ...(query.championship_season ? { championship_season: query.championship_season } : {}),
-                                    ...(query.team_name ? { team_name: query.team_name } : {})
+                                    ...(query.team_name ? { team_name: query.team_name } : {}),
+                                    ...(teamName ? { team_name: teamName } : {})
                                 }
                             }
                             : { 
                                 name: 'team', 
                                 params: { teamId: params.teamId },
-                                query: query.team_name ? { team_name: query.team_name } : {}
+                                query: teamName ? { team_name: teamName } : {}
                             },
                         disabled: routeName === 'team' || routeName === 'team-detail'
                     });

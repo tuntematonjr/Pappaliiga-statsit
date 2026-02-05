@@ -740,6 +740,7 @@ window.DivisionView = {
             if (this.championshipId) {
                 const divisionName = this.divisionDetails?.name || this.divisionTitle || null;
                 const divisionSeason = this.divisionDetails?.season || null;
+                const teamName = team.name || team.display_name || team.team_name || team.teamName || null;
                 const divisionParam = this.championshipParam || this.championshipId;
                 return {
                     name: 'team-detail',
@@ -747,11 +748,25 @@ window.DivisionView = {
                     query: {
                         championship: this.championshipId,
                         ...(divisionName ? { championship_name: divisionName } : {}),
-                        ...(divisionSeason != null ? { championship_season: divisionSeason } : {})
+                        ...(divisionSeason != null ? { championship_season: divisionSeason } : {}),
+                        ...(teamName ? { team_name: teamName } : {})
                     }
                 };
             }
-            return { name: 'team', params: { teamId: team.team_id }, query: {} };
+            // Fallback without championshipId in params, but include championship in query
+            const divisionName = this.divisionDetails?.name || this.divisionTitle || null;
+            const divisionSeason = this.divisionDetails?.season || null;
+            const teamName = team.name || team.display_name || team.team_name || team.teamName || null;
+            return { 
+                name: 'team', 
+                params: { teamId: team.team_id }, 
+                query: {
+                    ...(this.championshipId ? { championship: this.championshipId } : {}),
+                    ...(divisionName ? { championship_name: divisionName } : {}),
+                    ...(divisionSeason != null ? { championship_season: divisionSeason } : {}),
+                    ...(teamName ? { team_name: teamName } : {})
+                }
+            };
         },
         highlightTeamRoute(highlight) {
             if (!highlight?.team) return null;
@@ -1175,6 +1190,9 @@ window.DivisionView = {
                                 :show-rank="false"
                                 :sticky-header="true"
                                 :highlight-team-id="activeTeamChipId"
+                                :championship-id="championshipId"
+                                :championship-name="divisionDetails?.name"
+                                :championship-season="divisionDetails?.season"
                             ></team-comparison-board>
                         </div>
                     </div>
