@@ -19,12 +19,12 @@ from faceit_client_async import (
     get_championship_matches_async,
     get_map_votes_async,
     get_match_details_async,
-    get_championship_details_async,
     get_match_stats_async,
     get_championship_teams_async,
 )
 
 import faceit_config
+from division_naming import build_division_name
 
 from db_async import (
     DEFAULT_TEAM_AVATAR,
@@ -1120,7 +1120,7 @@ async def sync_championship_async(
 
     season = division_info["season"]
     division_num = division_info["division_num"]
-    division_name = division_info.get("name", f"Division {division_num}")
+    division_name = build_division_name(season, division_num, division_info.get("is_playoffs"))
     
     LOGGER.info(
         "Starting sync for championship %s (%s, Season %d, Division %d)",
@@ -1145,19 +1145,12 @@ async def sync_championship_async(
             "championship_id": championship_id,
             "season": season,
             "division_num": division_num,
-            "name": division_info.get("name") or slug,
+            "name": division_name,
             "is_playoffs": 1 if is_playoffs else 0,
             "slug": slug,
             "parent_championship_id": parent_championship_id,
         }
         
-        # For playoff championships, check if there's a winner in the details
-        if is_playoffs:
-            # Fetch championship-level details (not match details) to see if a winner exists
-            details = await get_championship_details_async(championship_id, silent=True)
-            if details and details.get("winner"):
-                champ_row["winner_team_id"] = details["winner"]
-
         await upsert_championship_async(conn, champ_row)
 
         if team_payloads:
@@ -1443,14 +1436,11 @@ async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics 
             "championship_id": championship_id,
             "season": season,
             "division_num": division_num,
-            "name": division.get("name") or slug,
+            "name": build_division_name(season, division_num, is_playoffs),
             "is_playoffs": 1 if is_playoffs else 0,
             "slug": slug,
             "parent_championship_id": parent_championship_id,
         }
-        if is_playoffs and details and details.get("winner"):
-            champ_row["winner_team_id"] = details["winner"]
-
         await upsert_championship_async(conn, champ_row)
 
         if team_payloads:

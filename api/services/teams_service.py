@@ -7,6 +7,7 @@ from db_async import compute_team_map_deltas_async, get_team_matches_mirror_asyn
 from standings_utils import calculate_standings
 
 from api.exceptions import NotFoundError
+from division_naming import build_division_name
 from api.services.cache_helpers import (
     GLOBAL_CACHE,
     get_championship_revision,
@@ -93,7 +94,16 @@ async def fetch_team_season_stats(team_id: str) -> list[dict[str, Any]]:
         )
         if not rows:
             raise NotFoundError(f"No stats found for team '{team_id}'")
-        return rows
+        processed = []
+        for row in rows:
+            data = dict(row)
+            data["name"] = build_division_name(
+                data.get("season"),
+                data.get("division_num"),
+                data.get("is_playoffs"),
+            )
+            processed.append(data)
+        return processed
 
     cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
     return cached_value
@@ -716,12 +726,24 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
         rounds_by_map_rows = await query_async(
             """
             SELECT
-                map_name,
-                SUM(COALESCE(kills, 0)) AS rounds_won,
-                SUM(COALESCE(deaths, 0)) AS rounds_lost
-            FROM team_map_season_totals
-            WHERE season = :season AND division_num = :division AND team_id = :team_id
-            GROUP BY map_name
+                m.map_name,
+                SUM(COALESCE(ts_team.final_score, 0)) as rounds_won,
+                SUM(COALESCE(ts_opp.final_score, 0)) as rounds_lost
+            FROM maps m
+            INNER JOIN matches mt ON m.match_id = mt.match_id
+            INNER JOIN team_stats ts_team
+                ON m.map_id = ts_team.map_id
+                AND ts_team.team_id = :team_id
+                AND ts_team.is_forfeit_map = 0
+            LEFT JOIN team_stats ts_opp
+                ON m.map_id = ts_opp.map_id
+                AND ts_opp.team_id <> :team_id
+                AND ts_opp.is_forfeit_map = 0
+            WHERE mt.season = :season
+                AND mt.division_num = :division
+                AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
+                AND m.is_forfeit = 0
+            GROUP BY m.map_name
             """,
             {"season": season, "division": division_num, "team_id": team_id},
         )

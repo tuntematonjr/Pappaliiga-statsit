@@ -7,6 +7,7 @@ import db_async as db
 from api.services import seasons_service
 from api.services.cache_helpers import get_season_revision, select_season_cache
 from db_async import get_pool
+from division_naming import build_division_name
 
 
 def _as_int(value: Any, default: int = 0) -> int:
@@ -131,7 +132,7 @@ async def _compute_divisions(season_id: int) -> List[Dict[str, Any]]:
                 {
                     "division_id": div["division_id"],
                     "tier": div["tier"],
-                    "name": div["name"],
+                    "name": build_division_name(season_id, div.get("tier"), False),
                     "status": season_status,
                     "season": {
                         "teams": season_stats.get("teams", 0),

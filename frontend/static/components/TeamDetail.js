@@ -2015,6 +2015,41 @@ window.TeamDetail = {
             this.updateRoute(championshipId, this.activeTab);
             this.expandedMatches = {};
         },
+        resolveChampionshipMeta(championshipId) {
+            if (!championshipId) return { name: null, season: null };
+            const seasons = Array.isArray(this.pageData?.seasons) ? this.pageData.seasons : [];
+            const row = seasons.find(season => String(season.championshipId) === String(championshipId));
+            if (!row) return { name: null, season: null };
+
+            let name = row.name || null;
+            if (!name) {
+                const divNum = toNumber(row.divisionNum, null);
+                if (divNum === 0) {
+                    name = 'Mestaruussarja';
+                } else if (divNum != null) {
+                    name = `${divNum} Divisioona`;
+                } else {
+                    name = 'Divisioona';
+                }
+                if (row.isPlayoffs) {
+                    name = `${name} Playoffs`;
+                }
+            }
+
+            if (name) {
+                const normalizer = typeof window !== 'undefined' ? window.divisionNormalizer : null;
+                if (normalizer?.cleanDivisionName) {
+                    name = normalizer.cleanDivisionName(name);
+                } else {
+                    name = String(name).replace(/\s+S\d+$/i, '').trim();
+                }
+            }
+
+            return {
+                name: name || null,
+                season: row.season ?? null
+            };
+        },
         updateRoute(championshipId, tab) {
             if (!this.$router || !this.$route) return;
             const params = { ...(this.$route.params || {}), teamId: this.teamId };
@@ -2023,6 +2058,17 @@ window.TeamDetail = {
                 query.championship = championshipId;
             } else {
                 delete query.championship;
+            }
+            const meta = this.resolveChampionshipMeta(championshipId);
+            if (meta.name) {
+                query.championship_name = meta.name;
+            } else {
+                delete query.championship_name;
+            }
+            if (meta.season != null) {
+                query.championship_season = String(meta.season);
+            } else {
+                delete query.championship_season;
             }
             const normalizedTab = tab || this.activeTab;
             if (normalizedTab && normalizedTab !== 'overview') {

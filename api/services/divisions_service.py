@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Sequence
 
 from db_async import query_async
 from division_overrides import combined_status_teams
+from division_naming import build_division_name
 
 from api.exceptions import NotFoundError
 from api.services.player_counts import get_player_counts
@@ -18,6 +19,15 @@ from api.services.cache_helpers import (
 )
 
 DEFAULT_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
+
+
+def _apply_division_name(row: dict[str, Any]) -> dict[str, Any]:
+    data = dict(row)
+    is_playoff = data.get("is_playoff")
+    if is_playoff is None:
+        is_playoff = data.get("is_playoffs")
+    data["name"] = build_division_name(data.get("season"), data.get("division_num"), is_playoff)
+    return data
 
 
 def get_excluded_team_ids(championship_id: str) -> set[str]:
@@ -64,7 +74,7 @@ async def list_divisions(limit: int, offset: int) -> List[dict[str, Any]]:
         """,
         {"limit": limit, "offset": offset},
     )
-    return rows
+    return [_apply_division_name(row) for row in rows]
 
 
 async def count_divisions(season: Optional[int] = None) -> int:
@@ -84,7 +94,7 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
     cache_key = ("list_divisions_by_season", season, limit, offset, revision)
 
     async def _compute():
-        return await query_async(
+        rows = await query_async(
             """
             WITH team_counts AS (
                 SELECT championship_id, COUNT(DISTINCT team_id) AS teams_count
@@ -141,6 +151,7 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
         """,
             {"season": season, "limit": limit, "offset": offset},
         )
+        return [_apply_division_name(row) for row in rows]
 
     cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
     return cached_value
@@ -159,7 +170,7 @@ async def _fetch_champ_row(where_clause: str, params: dict[str, Any]) -> dict[st
     )
     if not rows:
         raise NotFoundError("Division not found")
-    return rows[0]
+    return _apply_division_name(rows[0])
 
 
 async def fetch_division_by_slug(slug: str) -> dict[str, Any]:

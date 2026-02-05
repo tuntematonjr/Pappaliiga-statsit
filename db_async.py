@@ -771,16 +771,15 @@ _TS_EXPR = (
 )
 
 _CHAMPIONSHIP_UPSERT_SQL = """
-    INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug, parent_championship_id, winner_team_id)
-    VALUES (%(championship_id)s, %(season)s, %(division_num)s, %(name)s, %(is_playoffs)s, %(slug)s, %(parent_championship_id)s, %(winner_team_id)s)
+    INSERT INTO championships (championship_id, season, division_num, name, is_playoffs, slug, parent_championship_id)
+    VALUES (%(championship_id)s, %(season)s, %(division_num)s, %(name)s, %(is_playoffs)s, %(slug)s, %(parent_championship_id)s)
     ON DUPLICATE KEY UPDATE
       season = VALUES(season),
       division_num = VALUES(division_num),
       name = CASE WHEN championships.name = '' THEN VALUES(name) ELSE championships.name END,
       is_playoffs = VALUES(is_playoffs),
       slug = CASE WHEN championships.slug = '' THEN VALUES(slug) ELSE championships.slug END,
-      parent_championship_id = VALUES(parent_championship_id),
-      winner_team_id = VALUES(winner_team_id)
+      parent_championship_id = VALUES(parent_championship_id)
 """
 
 _TEAM_UPSERT_SQL = """
@@ -904,7 +903,6 @@ def _champ_row(row: Mapping[str, Any]) -> dict[str, Any]:
         "is_playoffs": row.get("is_playoffs", 0),
         "slug": row.get("slug"),
         "parent_championship_id": row.get("parent_championship_id"),
-        "winner_team_id": row.get("winner_team_id"),
     }
 
 
@@ -2561,8 +2559,8 @@ async def get_team_matches_mirror_async(
       mp.team1_id, mp.team2_id,
       COALESCE(tc1.team_name, t1.name) AS team1_name,
       COALESCE(tc2.team_name, t2.name) AS team2_name,
-      COALESCE(tc1.avatar, t1.avatar) AS t1_avatar,
-      COALESCE(tc2.avatar, t2.avatar) AS t2_avatar,
+      t1.avatar AS t1_avatar,
+      t2.avatar AS t2_avatar,
       mp.round_index, mp.map_name, mp.score_team1, mp.score_team2,
       mp.map_is_forfeit, mp.map_winner_team_id,
       mp.image_sm, mp.image_lg,
@@ -2710,9 +2708,14 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
                  JOIN championships c ON m.championship_id = c.championship_id
                  WHERE c.parent_championship_id = %(division_id)s) AS matches_total,
                 (SELECT t.name
-                 FROM teams t
-                 JOIN championships c ON c.winner_team_id = t.team_id
-                 WHERE c.parent_championship_id = %(division_id)s LIMIT 1) AS winner_team,
+                 FROM matches m
+                 JOIN championships c ON m.championship_id = c.championship_id
+                 JOIN teams t ON t.team_id = m.winner_team_id
+                 WHERE c.parent_championship_id = %(division_id)s
+                   AND m.status = 'finished'
+                   AND m.winner_team_id IS NOT NULL
+                 ORDER BY m.finished_at DESC, m.scheduled_at DESC
+                 LIMIT 1) AS winner_team,
                 (SELECT c.championship_id
                  FROM championships c
                  WHERE c.parent_championship_id = %(division_id)s LIMIT 1) AS playoff_championship_id

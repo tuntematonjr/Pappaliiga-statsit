@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS championships (
     is_playoffs TINYINT(1) NOT NULL DEFAULT 0,
     slug VARCHAR(120) NOT NULL,
     parent_championship_id VARCHAR(64) NULL,
-    winner_team_id VARCHAR(64) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (championship_id),
@@ -34,11 +33,8 @@ CREATE TABLE IF NOT EXISTS championships (
     KEY idx_championships_season_division (season, division_num),
     KEY idx_championships_division (division_num),
     KEY idx_championships_parent (parent_championship_id),
-    KEY idx_championships_winner (winner_team_id),
     CONSTRAINT fk_championships_parent FOREIGN KEY (parent_championship_id) 
-        REFERENCES championships (championship_id) ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT fk_championships_winner FOREIGN KEY (winner_team_id)
-        REFERENCES teams (team_id) ON DELETE SET NULL ON UPDATE CASCADE
+        REFERENCES championships (championship_id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Team championship history: stores team name as they appeared in each championship

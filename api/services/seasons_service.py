@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from db_async import query_async
 from division_overrides import combined_status_teams
+from division_naming import build_division_name
 from api.services.cache_helpers import (
     GLOBAL_CACHE,
     get_championship_revision,
@@ -307,7 +308,7 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
             "division_id": champ_id,
             "division_num": division_num,
             "tier": tier,
-            "name": row["name"],
+            "name": build_division_name(row.get("season"), division_num, row.get("is_playoffs")),
             "slug": row["slug"],
             "status": status,
             "is_playoff": False,

@@ -14,6 +14,7 @@ from typing import Any, Sequence
 
 from db_async import create_schema_async, fetch_val, reset_db_async, connection, upsert_championships_async
 from division_overrides import load_division_overrides
+from division_naming import build_division_name
 from faceit_client_async import get_rate_limit_stats, reset_rate_limit_stats, shutdown_clients
 import faceit_config
 from sync_pipeline import ChampionshipSyncResult, sync_championship_async, update_single_match_async
@@ -321,14 +322,17 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
                 continue
             entry = {"championship_id": championship_id, "division": division}
             championships_by_season.setdefault(season, []).append(entry)
-            fallback_slug = f"div{division.get('division_num')}-s{season}"
+            division_num = division.get("division_num")
+            is_playoffs = division.get("is_playoffs")
+            fallback_slug = f"div{division_num}-s{season}"
+            division_name = build_division_name(season, division_num, is_playoffs)
             championship_rows.append(
                 {
                     "championship_id": championship_id,
                     "season": season,
-                    "division_num": division.get("division_num"),
-                    "name": division.get("name") or division.get("slug") or fallback_slug,
-                    "is_playoffs": 1 if division.get("is_playoffs") else 0,
+                    "division_num": division_num,
+                    "name": division_name,
+                    "is_playoffs": 1 if is_playoffs else 0,
                     "slug": division.get("slug") or fallback_slug,
                 }
             )
@@ -373,7 +377,11 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
                 async with sem:
                     championship_id = entry["championship_id"]
                     division = entry["division"]
-                    division_name = division.get("name", f"Division {division.get('division_num', '?')}")
+                    division_name = build_division_name(
+                        division.get("season"),
+                        division.get("division_num"),
+                        division.get("is_playoffs"),
+                    )
                     LOGGER.info("Syncing championship %s (%s)", championship_id, division_name)
                     try:
                         result = await sync_championship_async(
