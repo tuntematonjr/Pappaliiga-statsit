@@ -102,6 +102,9 @@ class TeamMapStats(CamelModel):
     enemies_flashed: Optional[int] = None
     flash_count: Optional[int] = None
     flash_successes: Optional[int] = None
+    # Map catalog images
+    image_sm: Optional[str] = None
+    image_lg: Optional[str] = None
 
 
 class MatchFull(CamelModel):

@@ -325,10 +325,10 @@ window.HomeView = {
                     id: 'sosso-bot',
                     name: 'Sössö The PappaCS bot',
                     description: 'Sössö on Discord-botti, joka tuo Pappaliiga-statistiikkaa suoraan Discord-palvelimillesi. Saat reaaliaikaisia tilastoja, ottelutuloksia ja pelaajatietoja kätevästi chatissa.',
-                    primaryLabel: 'Lisää botti palvelimelle',
-                    primaryHref: 'https://discord.com/oauth2/authorize?client_id=1414332827310489732',
-                    secondaryLabel: 'Komennot ja ohjeet',
-                    secondaryHref: 'RIP',
+                    primaryLabel: 'Lue lisää ja kutsu Sössö bot palvelimellesi',
+                    primaryHref: 'https://cultti.github.io/Sosso-Bot/',
+                    // secondaryLabel: 'Komennot ja ohjeet',
+                    // secondaryHref: 'https://cultti.github.io/Sosso-Bot/',
                     logo: '/static/sosso-bot-logo.png'
                 },
                 {

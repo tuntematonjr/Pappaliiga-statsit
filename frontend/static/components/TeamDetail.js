@@ -267,7 +267,8 @@ function normalizeSeasonData(pageData) {
 
 function normalizeMap(entry) {
     if (!entry) return null;
-    const rawName = entry.mapName || 'Kartta';
+    const rawMapId = entry.mapId || entry.map_id || entry.map || entry.mapName || null;
+    const rawName = entry.mapName || entry.mapNameRaw || rawMapId || entry.map_name || entry.map || 'Kartta';
     const lowerRaw = String(rawName || '').toLowerCase();
     if (lowerRaw === 'forfeit') {
         return null; // never include forfeit entries as maps
@@ -300,7 +301,7 @@ function normalizeMap(entry) {
     const pickWinRate = picks ? (pickWins / picks) * 100 : null;
     const oppPickWinRate = oppPicks ? (oppPickWins / oppPicks) * 100 : null;
 
-    const identifier = entry.mapId || rawName;
+    const identifier = rawMapId || rawName;
 
     const assists = toNumber(entry.assists);
     const kr = toNumber(entry.kr);
@@ -342,7 +343,12 @@ function normalizeMap(entry) {
 
     return {
         id: identifier,
+        mapId: rawMapId || null,
+        map_name: entry.map_name || rawMapId || rawName || null,
         mapName: beautified,
+        mapNameRaw: rawName,
+        image_sm: entry.image_sm || entry.imageSm || null,
+        image_lg: entry.image_lg || entry.imageLg || null,
         played,
         games,
         wins,
@@ -780,6 +786,12 @@ window.TeamDetail = {
                 .map(normalizeMap)
                 .filter(Boolean)
                 .map(recomputeMapDerived)
+                .map(entry => ({
+                    ...entry,
+                    mapImage: window.MapImageUtils
+                        ? window.MapImageUtils.resolveMapImage(entry, { mapCatalog: this.mapCatalog, apiClient: window.apiClient })
+                        : null
+                }))
                 .sort((a, b) => (b.played || 0) - (a.played || 0) || String(a.mapName).localeCompare(String(b.mapName)));
         },
         mapTotals() {
@@ -998,7 +1010,10 @@ window.TeamDetail = {
                     played,
                     wins,
                     losses,
-                    winrate
+                    winrate,
+                    mapImage: map.mapImage || (window.MapImageUtils
+                        ? window.MapImageUtils.resolveMapImage(map, { mapCatalog: this.mapCatalog, apiClient: window.apiClient })
+                        : null)
                 };
             });
         },
@@ -1196,6 +1211,8 @@ window.TeamDetail = {
             return [
                 buildCell('veto-heatmap__cell--team-pick', 'Oma pick'),
                 buildCell('veto-heatmap__cell--opp-pick', 'Vastustajan pick'),
+                buildCell('veto-heatmap__cell--decider', 'Ratkaisukartta'),
+                buildCell('veto-heatmap__cell--overflow', 'Overflow'),
                 buildCell('veto-heatmap__cell--team-ban1', 'Oma banni (1.)'),
                 buildCell('veto-heatmap__cell--team-ban2', 'Oma banni (2.)'),
                 buildCell('veto-heatmap__cell--opp-ban', 'Vastustajan banni'),
@@ -1689,6 +1706,14 @@ window.TeamDetail = {
                 this.bootstrap();
             }
         },
+        mapStats: {
+            immediate: true,
+            handler(newStats) {
+                if (window.MapImageUtils && window.MapImageUtils.shouldFetchCatalog(newStats)) {
+                    this.ensureMapCatalog();
+                }
+            }
+        },
         '$route.query.tab'(newVal) {
             const nextTab = resolveTabFromQuery({ query: { tab: newVal } });
             if (nextTab !== this.activeTab) {
@@ -1744,6 +1769,9 @@ window.TeamDetail = {
             this.setupMapTableScroll();
             this.setupTrendChartObserver();
             this.setupMatchesChartObserver();
+            if (window.MapImageUtils && window.MapImageUtils.shouldFetchCatalog(this.mapStats)) {
+                this.ensureMapCatalog();
+            }
             if (this.activeTab === 'matches') {
                 this.ensureMatchPlayerStats(this.currentChampionshipId);
                 this.ensureMapCatalog();
@@ -2475,6 +2503,7 @@ window.TeamDetail = {
                             >
                                 <template #cell-mapName="{ row }">
                                     <div class="map-name">
+                                        <img v-if="row.mapImage" :src="row.mapImage" class="map-logo" alt="" />
                                         <span class="map-name-text">{{ row.mapName }}</span>
                                     </div>
                                 </template>
@@ -2564,6 +2593,7 @@ window.TeamDetail = {
                             >
                                 <template #cell-mapName="{ row }">
                                     <div class="map-name">
+                                        <img v-if="row.mapImage" :src="row.mapImage" class="map-logo" alt="" />
                                         <span class="map-name-text">{{ row.mapName }}</span>
                                     </div>
                                 </template>

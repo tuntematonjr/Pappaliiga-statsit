@@ -649,128 +649,93 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
                 "pick_rate": (picks / played * 100) if played > 0 else 0.0,
             }
         )
+
+    # Attach map images from catalog for UI rendering
+    catalog_rows = await query_async(
+        "SELECT map_id, pretty_name, image_sm, image_lg FROM maps_catalog"
+    )
+    catalog_by_id = {}
+    catalog_by_pretty = {}
+    for row in catalog_rows:
+        map_id = (row.get("map_id") or "").lower()
+        pretty = (row.get("pretty_name") or "").lower()
+        if map_id:
+            catalog_by_id[map_id] = row
+        if pretty:
+            catalog_by_pretty[pretty] = row
+
+    for row in team_map_rows:
+        key = (row.get("map_name") or "").lower()
+        match = catalog_by_id.get(key) or catalog_by_pretty.get(key)
+        if match:
+            row["image_sm"] = match.get("image_sm")
+            row["image_lg"] = match.get("image_lg")
     
     # Enhance with per-player stats aggregated by map
-    if not is_playoffs:
-        player_stats_by_map = await query_async(
-            """
-            SELECT
-                pm.map_name,
-                SUM(pm.maps_played) AS stat_count,
-                SUM(pm.kills) AS kills,
-                SUM(pm.deaths) AS deaths,
-                SUM(pm.assists) AS assists,
-                SUM(pm.mvps) AS mvps,
-                SUM(pm.damage) AS damage,
-                SUM(pm.utility_damage) AS utility_damage,
-                AVG(NULLIF(pm.kr, 0)) AS kr,
-                AVG(NULLIF(pm.hs_pct, 0)) AS hs_pct,
-                SUM(pm.sniper_kills) AS sniper_kills,
-                SUM(pm.pistol_kills) AS pistol_kills,
-                SUM(pm.mk_2k) AS multi_2k,
-                SUM(pm.mk_3k) AS multi_3k,
-                SUM(pm.mk_4k) AS multi_4k,
-                SUM(pm.mk_5k) AS multi_5k,
-                SUM(pm.clutch_kills) AS clutch_kills,
-                SUM(pm.enemies_flashed) AS enemies_flashed,
-                SUM(pm.flash_count) AS flash_count,
-                SUM(pm.flash_successes) AS flash_successes
-            FROM player_map_season_totals pm
-            WHERE pm.season = :season
-              AND pm.division_num = :division
-              AND pm.team_id = :team_id
-            GROUP BY pm.map_name
-            """,
-            {"season": season, "division": division_num, "team_id": team_id},
-        )
-    else:
-        player_stats_by_map = await query_async(
-            """
-            SELECT
-                m.map_name,
-                COUNT(DISTINCT ps.player_stat_id) as stat_count,
-                SUM(ps.kills) as kills,
-                SUM(ps.deaths) as deaths,
-                SUM(ps.assists) as assists,
-                SUM(ps.mvps) as mvps,
-                SUM(ps.damage) as damage,
-                SUM(ps.utility_damage) as utility_damage,
-                AVG(ps.kr) as kr,
-                AVG(ps.hs_pct) as hs_pct,
-                SUM(ps.sniper_kills) as sniper_kills,
-                SUM(ps.pistol_kills) as pistol_kills,
-                SUM(ps.mk_2k) as multi_2k,
-                SUM(ps.mk_3k) as multi_3k,
-                SUM(ps.mk_4k) as multi_4k,
-                SUM(ps.mk_5k) as multi_5k,
-                SUM(ps.clutch_kills) as clutch_kills,
-                SUM(ps.enemies_flashed) as enemies_flashed,
-                SUM(ps.flash_count) as flash_count,
-                SUM(ps.flash_successes) as flash_successes
-            FROM maps m
-            INNER JOIN matches mt ON m.match_id = mt.match_id 
-            LEFT JOIN player_stats ps ON m.map_id = ps.map_id AND ps.team_id = :team_id AND ps.is_forfeit_map = 0
-            WHERE mt.championship_id = :champ_id
-                AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
-                AND m.is_forfeit = 0
-            GROUP BY m.map_name
-            """,
-            {"champ_id": championship_id, "team_id": team_id}
-        )
+    # Always use direct query from player_stats joined with championship matches
+    # to ensure stats are only from matches actually played in this championship
+    player_stats_by_map = await query_async(
+        """
+        SELECT
+            m.map_name,
+            COUNT(DISTINCT ps.player_stat_id) as stat_count,
+            SUM(ps.kills) as kills,
+            SUM(ps.deaths) as deaths,
+            SUM(ps.assists) as assists,
+            SUM(ps.mvps) as mvps,
+            SUM(ps.damage) as damage,
+            SUM(ps.utility_damage) as utility_damage,
+            AVG(ps.kr) as kr,
+            AVG(ps.hs_pct) as hs_pct,
+            SUM(ps.sniper_kills) as sniper_kills,
+            SUM(ps.pistol_kills) as pistol_kills,
+            SUM(ps.mk_2k) as multi_2k,
+            SUM(ps.mk_3k) as multi_3k,
+            SUM(ps.mk_4k) as multi_4k,
+            SUM(ps.mk_5k) as multi_5k,
+            SUM(ps.clutch_kills) as clutch_kills,
+            SUM(ps.enemies_flashed) as enemies_flashed,
+            SUM(ps.flash_count) as flash_count,
+            SUM(ps.flash_successes) as flash_successes
+        FROM maps m
+        INNER JOIN matches mt ON m.match_id = mt.match_id 
+        LEFT JOIN player_stats ps ON m.map_id = ps.map_id AND ps.team_id = :team_id AND ps.is_forfeit_map = 0
+        WHERE mt.championship_id = :champ_id
+            AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
+            AND m.is_forfeit = 0
+        GROUP BY m.map_name
+        """,
+        {"champ_id": championship_id, "team_id": team_id}
+    )
     
     # Create lookup dict for player stats
     player_stats_map = {row["map_name"]: dict(row) for row in player_stats_by_map}
     
     # Get actual round counts by map (won + lost rounds)
-    if not is_playoffs:
-        rounds_by_map_rows = await query_async(
-            """
-            SELECT
-                m.map_name,
-                SUM(COALESCE(ts_team.final_score, 0)) as rounds_won,
-                SUM(COALESCE(ts_opp.final_score, 0)) as rounds_lost
-            FROM maps m
-            INNER JOIN matches mt ON m.match_id = mt.match_id
-            INNER JOIN team_stats ts_team
-                ON m.map_id = ts_team.map_id
-                AND ts_team.team_id = :team_id
-                AND ts_team.is_forfeit_map = 0
-            LEFT JOIN team_stats ts_opp
-                ON m.map_id = ts_opp.map_id
-                AND ts_opp.team_id <> :team_id
-                AND ts_opp.is_forfeit_map = 0
-            WHERE mt.season = :season
-                AND mt.division_num = :division
-                AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
-                AND m.is_forfeit = 0
-            GROUP BY m.map_name
-            """,
-            {"season": season, "division": division_num, "team_id": team_id},
-        )
-    else:
-        rounds_by_map_rows = await query_async(
-            """
-            SELECT
-                m.map_name,
-                SUM(COALESCE(ts_team.final_score, 0)) as rounds_won,
-                SUM(COALESCE(ts_opp.final_score, 0)) as rounds_lost
-            FROM maps m
-            INNER JOIN matches mt ON m.match_id = mt.match_id
-            INNER JOIN team_stats ts_team
-                ON m.map_id = ts_team.map_id
-                AND ts_team.team_id = :team_id
-                AND ts_team.is_forfeit_map = 0
-            LEFT JOIN team_stats ts_opp
-                ON m.map_id = ts_opp.map_id
-                AND ts_opp.team_id <> :team_id
-                AND ts_opp.is_forfeit_map = 0
-            WHERE mt.championship_id = :champ_id
-                AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
-                AND m.is_forfeit = 0
-            GROUP BY m.map_name
-            """,
-            {"champ_id": championship_id, "team_id": team_id}
-        )
+    # Always filter by championship_id to avoid mixing regular season and playoffs
+    rounds_by_map_rows = await query_async(
+        """
+        SELECT
+            m.map_name,
+            SUM(COALESCE(ts_team.final_score, 0)) as rounds_won,
+            SUM(COALESCE(ts_opp.final_score, 0)) as rounds_lost
+        FROM maps m
+        INNER JOIN matches mt ON m.match_id = mt.match_id
+        INNER JOIN team_stats ts_team
+            ON m.map_id = ts_team.map_id
+            AND ts_team.team_id = :team_id
+            AND ts_team.is_forfeit_map = 0
+        LEFT JOIN team_stats ts_opp
+            ON m.map_id = ts_opp.map_id
+            AND ts_opp.team_id <> :team_id
+            AND ts_opp.is_forfeit_map = 0
+        WHERE mt.championship_id = :champ_id
+            AND (mt.team1_id = :team_id OR mt.team2_id = :team_id)
+            AND m.is_forfeit = 0
+        GROUP BY m.map_name
+        """,
+        {"champ_id": championship_id, "team_id": team_id}
+    )
     
     # Create lookup dict for rounds by map
     rounds_by_map = {

@@ -150,48 +150,22 @@ window.MapStatsTable = {
             return Number(normalized.toFixed(1));
         },
         mapKey(name) {
-            if (!name) return null;
-            return String(name).trim().toLowerCase();
+            return window.MapImageUtils ? window.MapImageUtils.mapKey(name) : null;
         },
         extractMapImage(entry) {
-            if (!entry) return null;
-            const curr = entry.curr || {};
-            return (
-                entry.image_sm || entry.image_lg || entry.image_sm_url || entry.image_url || entry.image ||
-                curr.image_sm || curr.image_lg || curr.image || curr.logo ||
-                entry.logo || entry.thumbnail || null
-            );
+            return window.MapImageUtils ? window.MapImageUtils.extractMapImage(entry) : null;
         },
         resolveMapImage(entry) {
-            const direct = this.extractMapImage(entry);
-            const fallbackKey = this.mapKey(entry?.map_name || entry?.mapId || entry?.pretty_name);
-            const lookup = fallbackKey && this.mapImageLookup[fallbackKey] ? this.mapImageLookup[fallbackKey] : null;
-            const resolved = direct || lookup;
-            if (!resolved) return null;
-            try {
-                return window.apiClient && typeof window.apiClient.proxyAvatar === 'function'
-                    ? window.apiClient.proxyAvatar(resolved)
-                    : resolved;
-            } catch (error) {
-                return resolved;
-            }
+            return window.MapImageUtils
+                ? window.MapImageUtils.resolveMapImage(entry, { mapImageLookup: this.mapImageLookup, apiClient: window.apiClient })
+                : null;
         },
         buildMapImageLookup(stats, existing = {}) {
-            const lookup = { ...(existing || {}) };
-            if (!Array.isArray(stats)) return lookup;
-            stats.forEach(item => {
-                const key = this.mapKey(item?.map_name || item?.mapId || item?.pretty_name);
-                const img = this.extractMapImage(item);
-                if (key && img && !lookup[key]) {
-                    lookup[key] = img;
-                }
-            });
-            return lookup;
+            return window.MapImageUtils ? window.MapImageUtils.buildMapImageLookup(stats, existing) : { ...(existing || {}) };
         },
         shouldFetchCatalog(stats) {
             if (this.catalogLoaded || this.catalogLoading) return false;
-            if (!Array.isArray(stats) || !stats.length) return false;
-            return stats.some(item => !this.extractMapImage(item) && this.mapKey(item?.map_name || item?.mapId || item?.pretty_name));
+            return window.MapImageUtils ? window.MapImageUtils.shouldFetchCatalog(stats) : false;
         },
         async ensureMapCatalog() {
             if (this.catalogLoaded || this.catalogLoading || !window.apiClient || typeof window.apiClient.getMapsCatalog !== 'function') {
@@ -203,8 +177,8 @@ window.MapStatsTable = {
                 if (Array.isArray(catalog) && catalog.length) {
                     const lookup = { ...this.mapImageLookup };
                     catalog.forEach(item => {
-                        const key = this.mapKey(item?.map_id || item?.pretty_name);
-                        const img = item?.image_sm || item?.image_lg;
+                        const key = this.mapKey(item?.map_id || item?.pretty_name || item?.map_name || item?.name);
+                        const img = item?.image_sm || item?.image_lg || item?.image;
                         if (key && img && !lookup[key]) {
                             lookup[key] = img;
                         }

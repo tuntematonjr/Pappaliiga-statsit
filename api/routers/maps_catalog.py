@@ -19,6 +19,7 @@ class MapInfo(BaseModel):
     image_lg: Optional[str] = None
 
 
+@router.get("", response_model=List[MapInfo])
 @router.get("/", response_model=List[MapInfo])
 async def list_maps():
     """Get all maps with images and pretty names from the catalog.
