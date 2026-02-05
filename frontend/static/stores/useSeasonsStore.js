@@ -61,7 +61,7 @@
                 ? numberish
                 : Number(numberish != null ? String(numberish).replace(',', '.') : Number.NaN);
         const shortLabelSource = raw.short_name || raw.abbreviation || raw.code;
-        const derivedShort = seasonNumber != null ? `S${seasonNumber}` : seasonId != null ? `S${seasonId}` : null;
+        const derivedShort = Number.isFinite(seasonNumber) ? `S${seasonNumber}` : seasonId != null ? `S${seasonId}` : null;
 
         return {
             key,

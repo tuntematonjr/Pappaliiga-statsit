@@ -62,14 +62,37 @@ window.SortableTable = {
         const { colorizeColumn, getCellStyle } = window.useCellColorization();
 
         const hasAppliedDefault = Vue.ref(false);
+        const isMobile = Vue.ref(window.innerWidth <= 768);
+        
         const hasDefaultColumn = Vue.computed(() => {
             if (!props.defaultSort || !Array.isArray(props.columns)) return false;
             return props.columns.some(col => col.key === props.defaultSort.column);
         });
 
         const visibleColumns = Vue.computed(() => {
-            if (!props.collapsedGroups || props.collapsedGroups.size === 0) return props.columns;
-            return props.columns.filter(col => !props.collapsedGroups.has(col.group));
+            let cols = props.columns;
+            
+            // Filter by collapsed groups only
+            if (props.collapsedGroups && props.collapsedGroups.size > 0) {
+                cols = cols.filter(col => !props.collapsedGroups.has(col.group));
+            }
+            
+            // Mobile filtering disabled - show all columns
+            
+            return cols;
+        });
+
+        // Update mobile state on resize
+        const handleResize = () => {
+            isMobile.value = window.innerWidth <= 768;
+        };
+        
+        Vue.onMounted(() => {
+            window.addEventListener('resize', handleResize);
+        });
+        
+        Vue.onUnmounted(() => {
+            window.removeEventListener('resize', handleResize);
         });
 
         const runSortPipeline = (rows) => {
@@ -309,82 +332,86 @@ window.SortableTable = {
     },
     template: `
         <div class="table-container">
-            <table :class="tableClass">
-                <colgroup>
-                    <col v-for="column in visibleColumns" :key="column.key" :style="column.width ? ('width:' + column.width) : null" :class="column.colClass || ''" />
-                </colgroup>
-                <thead>
-                    <tr v-if="headerGroups && headerGroups.length" class="table-group-header">
-                        <th
-                            v-for="(group, idx) in headerGroups"
-                            :key="group.label + '-' + idx"
-                            :colspan="group.colSpan"
-                            :class="getGroupClass(group)"
-                            v-bind:data-group="group.key || null"
-                            @click="group.key && onToggleGroup ? handleGroupToggle(group.key) : null"
-                            :style="{ cursor: (group.key && onToggleGroup) ? 'pointer' : 'default' }"
-                        >
-                            <span class="group-label-content">
-                                <span v-if="group.key && onToggleGroup" class="group-collapse-icon">
-                                    {{ isGroupCollapsed(group.key) ? '▶' : '▼' }}
+            <div class="table-wrapper">
+                <table :class="tableClass">
+                    <colgroup>
+                        <col v-for="column in visibleColumns" :key="column.key" :style="column.width ? ('width:' + column.width) : null" :class="column.colClass || ''" />
+                    </colgroup>
+                    <thead>
+                        <tr v-if="headerGroups && headerGroups.length" class="table-group-header">
+                            <th
+                                v-for="(group, idx) in headerGroups"
+                                :key="group.label + '-' + idx"
+                                :colspan="group.colSpan"
+                                :class="getGroupClass(group)"
+                                v-bind:data-group="group.key || null"
+                                @click="group.key && onToggleGroup ? handleGroupToggle(group.key) : null"
+                                :style="{ cursor: (group.key && onToggleGroup) ? 'pointer' : 'default' }"
+                            >
+                                <span class="group-label-content">
+                                    <span v-if="group.key && onToggleGroup" class="group-collapse-icon">
+                                        {{ isGroupCollapsed(group.key) ? '▶' : '▼' }}
+                                    </span>
+                                    {{ group.label }}
                                 </span>
-                                {{ group.label }}
-                            </span>
-                        </th>
-                    </tr>
-                    <tr>
-                        <th 
-                            v-for="column in visibleColumns" 
-                            :key="column.key"
-                            :class="getHeaderClass(column)"
-                            :style="{ textAlign: getCellAlign(column) }"
-                            @click="handleSort(column)"
-                            v-bind:data-sortable="column.sortable !== false ? true : null"
-                            v-bind:data-sort-dir="(currentSort && currentSort.column === column.key) ? currentSort.order : null"
-                            v-bind:data-key="column.key"
-                            :title="getHeaderTooltip(column)"
-                            :aria-sort="getAriaSort(column)"
-                        >
-                            <span class="th-content">
-                                {{ column.label }}
-                                <span v-if="column.sortable !== false && getSortIndicator(column.key)" class="sort-indicator">
-                                    {{ getSortIndicator(column.key) }}
+                            </th>
+                        </tr>
+                        <tr>
+                            <th 
+                                v-for="column in visibleColumns" 
+                                :key="column.key"
+                                :class="getHeaderClass(column)"
+                                :style="{ textAlign: getCellAlign(column) }"
+                                @click="handleSort(column)"
+                                v-bind:data-sortable="column.sortable !== false ? true : null"
+                                v-bind:data-sort-dir="(currentSort && currentSort.column === column.key) ? currentSort.order : null"
+                                v-bind:data-key="column.key"
+                                v-bind:data-label="column.label"
+                                :title="getHeaderTooltip(column)"
+                                :aria-sort="getAriaSort(column)"
+                            >
+                                <span class="th-content">
+                                    {{ column.label }}
+                                    <span v-if="column.sortable !== false && getSortIndicator(column.key)" class="sort-indicator">
+                                        {{ getSortIndicator(column.key) }}
+                                    </span>
                                 </span>
-                            </span>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr
-                        v-for="(row, idx) in sortedRows"
-                        :key="row.id || idx"
-                        :class="getRowClass(row, idx)"
-                        :data-row-id="resolveRowId(row, idx)"
-                    >
-                        <td 
-                            v-for="column in visibleColumns" 
-                            :key="column.key"
-                            :class="[getCellClass(column, row), column.colClass || '']"
-                            :style="{ textAlign: getCellAlign(column) }"
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="(row, idx) in sortedRows"
+                            :key="row.id || idx"
+                            :class="getRowClass(row, idx)"
+                            :data-row-id="resolveRowId(row, idx)"
                         >
-                            <!-- Special-case map_name column to use a static named slot and inline image rendering -->
-                            <template v-if="column.key === 'map_name'">
-                                <slot name="cell-map_name" :row="row" :value="row[column.key]">
-                                    <div class="map-name">
-                                        <img v-if="row.logo" :src="row.logo" alt="" class="map-logo" />
+                            <td 
+                                v-for="column in visibleColumns" 
+                                :key="column.key"
+                                :class="[getCellClass(column, row), column.colClass || '']"
+                                :style="{ textAlign: getCellAlign(column) }"
+                                :data-label="column.label"
+                            >
+                                <!-- Special-case map_name column to use a static named slot and inline image rendering -->
+                                <template v-if="column.key === 'map_name'">
+                                    <slot name="cell-map_name" :row="row" :value="row[column.key]">
+                                        <div class="map-name">
+                                            <img v-if="row.logo" :src="row.logo" alt="" class="map-logo" loading="lazy" />
+                                            {{ formatCell(row[column.key], column) }}
+                                        </div>
+                                    </slot>
+                                </template>
+                                <template v-else>
+                                    <slot :name="'cell-' + column.key" :row="row" :value="row[column.key]">
                                         {{ formatCell(row[column.key], column) }}
-                                    </div>
-                                </slot>
-                            </template>
-                            <template v-else>
-                                <slot :name="'cell-' + column.key" :row="row" :value="row[column.key]">
-                                    {{ formatCell(row[column.key], column) }}
-                                </slot>
-                            </template>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                                    </slot>
+                                </template>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     `
 };

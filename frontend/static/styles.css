@@ -389,6 +389,9 @@
     display: flex;
     flex-direction: column;
     gap: clamp(2.5rem, 5vw, 4rem);
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
 }
 
 .home-section {
@@ -3614,25 +3617,39 @@
 */
 html, body {
     box-sizing: border-box;
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
 }
 
 #app {
-    max-width: 90vw;
+    max-width: 100vw;
     margin: 0 auto;
+    overflow-x: hidden;
+    width: 100%;
+}
+
+@media (min-width: 992px) {
+    #app {
+        max-width: 90vw;
+    }
 }
 
 .layout-boundary {
-    max-width: 90vw;
+    max-width: 100vw;
+    overflow-x: hidden;
+}
+
+@media (min-width: 992px) {
+    .layout-boundary {
+        max-width: 90vw;
+    }
 }
 
 /* Keep tables and other wide components scrollable inside their containers */
 .table-container, .wide-scroll, .teams-grid, .season-grid {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-}
-
-@media (max-width: 991px) {
-    #app, .layout-boundary { max-width: 100vw; }
 }
 
 .footer-inner {
@@ -3645,9 +3662,46 @@ html, body {
     .nav-container {
         flex-direction: column;
         align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .nav-brand {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .brand-lockup {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .nav-logo {
+        height: 32px;
+    }
+
+    .nav-title {
+        font-size: 1rem;
+    }
+
+    .nav-copy {
+        display: none; /* Hide subtitle on very small screens */
     }
 
     .nav-links {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .nav-link {
+        flex: 1;
+        min-width: 80px;
+        text-align: center;
+        font-size: 0.9rem;
+    }
+}
         width: 100%;
         justify-content: space-between;
     }
@@ -3928,12 +3982,16 @@ html, body {
     flex-direction: column;
     gap: 0.5rem;
     margin-top: 1rem;
+    width: 100%;
+    max-width: 100%;
 }
 
 .division-row {
     display: flex;
     gap: 0.5rem;
     align-items: stretch;
+    width: 100%;
+    max-width: 100%;
 }
 
 .division-link {
@@ -3945,6 +4003,10 @@ html, body {
     text-decoration: none;
     transition: border-color 0.2s, color 0.2s;
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .division-link--regular {
@@ -3952,8 +4014,9 @@ html, body {
 }
 
 .division-link--playoffs {
-    flex: 1;
-    min-width: 0;
+    flex: 0 0 auto;
+    min-width: 60px;
+    max-width: 80px;
     text-align: center;
     background: var(--accent-soft);
     border-color: var(--accent);
@@ -4185,21 +4248,43 @@ img.logo.promo-logo {
 }
 
 *{box-sizing:border-box;}
+
+html {
+	overflow-x: hidden;
+	width: 100%;
+	max-width: 100vw;
+}
+
 body{
 	margin:0;
+	padding: 0;
 	background: radial-gradient(1800px 600px at 20% -10%, #152046 0%, #0b1020 55%) fixed;
 	color:var(--fg);
 	font:18px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-	min-width: 1200px;
 	min-height: 100vh;
 	background-size: cover;
+	overflow-x: hidden;
+	width: 100%;
+	max-width: 100vw;
 }
+
+@media (min-width: 1200px) {
+	body {
+		min-width: 1200px;
+	}
+}
+
 a{ color:var(--accent); text-decoration:none; }
 .muted{ color:var(--muted); }
 
 /* ---- Containers ---- */
-.container{ max-width:1800px; margin:0 auto; padding:24px; }
-.page{ max-width:1800px; margin:0 auto; padding:1.25rem 1.25rem 3rem; }
+.container{ max-width:1800px; margin:0 auto; padding:24px; width: 100%; box-sizing: border-box; }
+.page{ max-width:1800px; margin:0 auto; padding:1.25rem 1.25rem 3rem; width: 100%; box-sizing: border-box; }
+
+@media (max-width: 768px) {
+	.container { padding: 1rem; }
+	.page { padding: 1rem 1rem 2rem; }
+}
 
 /* ---- Navigation / brand ---- */
 .nav:not(:empty){ 
@@ -5729,14 +5814,20 @@ body {
 .teams-grid {
 	display: block;
 	width: 100%;
+	max-width: 100%;
 	margin: 1rem 0;
 	padding: 0;
+	overflow-x: hidden;
 }
 .teams-grid .card {
 	margin: 0 0 16px 0;
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
 }
 details.card {
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   margin: 0;
 }
@@ -10470,6 +10561,405 @@ a:focus,
     .match-card {
         break-inside: avoid;
     }
+}
+
+/* ================================================
+   MOBILE OPTIMIZATIONS
+   ================================================ */
+
+/* Mobile: Touch targets and layout improvements */
+@media (max-width: 768px) {
+    /* Increase touch targets */
+    .btn-primary,
+    .btn-secondary {
+        min-height: 44px;
+        padding: 0.85rem 1.25rem;
+        font-size: 0.95rem;
+    }
+
+    .team-tab {
+        min-height: 44px;
+        padding: 0.65rem 1.1rem;
+    }
+
+    /* Make table rows easier to tap */
+    .data-table tbody tr {
+        min-height: 48px;
+    }
+
+    .table-header {
+        padding: 0.9rem 0.6rem;
+        font-size: 0.85rem;
+    }
+
+    .table-cell {
+        padding: 0.75rem 0.6rem;
+        font-size: 0.9rem;
+    }
+
+    /* Better horizontal scroll indicators */
+    .table-wrapper {
+        position: relative;
+    }
+
+    .table-wrapper::before,
+    .table-wrapper::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 20px;
+        pointer-events: none;
+        z-index: 5;
+        transition: opacity 0.3s ease;
+    }
+
+    .table-wrapper::before {
+        left: 0;
+        background: linear-gradient(90deg, var(--bg-800) 0%, transparent 100%);
+        opacity: 0;
+    }
+
+    .table-wrapper::after {
+        right: 0;
+        background: linear-gradient(270deg, var(--bg-800) 0%, transparent 100%);
+        opacity: 0.7;
+    }
+
+    .table-wrapper.scrolled-left::before {
+        opacity: 0.7;
+    }
+
+    .table-wrapper.scrolled-right::after {
+        opacity: 0;
+    }
+
+    /* Stack stat boxes in 2 columns */
+    .stat-boxes-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    /* Reduce padding on cards */
+    .stat-box {
+        padding: 1rem 0.85rem;
+    }
+
+    .section-card {
+        padding: 1.25rem 1rem;
+    }
+
+    /* Improve division hero cards on mobile */
+    .division-hero-card {
+        padding: 0.9rem 1rem;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Compact table styling - show all columns */
+    .data-table {
+        font-size: 0.85rem;
+    }
+
+    .table-header {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .table-cell {
+        padding: 0.65rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    /* Single column sankari cards */
+    .sankari-group__cards {
+        grid-template-columns: 1fr !important;
+        gap: 1rem;
+    }
+
+    .sankari-card {
+        padding: 1.25rem 1.1rem;
+    }
+
+    /* Stack stat boxes in single column for very small screens */
+    .stat-boxes-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Reduce hero section padding */
+    .team-hero {
+        padding: 1.5rem 1rem;
+    }
+
+    .division-hero {
+        padding: 1.5rem 1rem;
+    }
+
+    /* Compact navigation */
+    .team-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .team-tab {
+        flex-shrink: 0;
+        font-size: 0.85rem;
+        padding: 0.6rem 0.9rem;
+    }
+
+    /* Better touch feedback */
+    .clickable-row,
+    .table-row {
+        transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .clickable-row:active,
+    .table-row:active {
+        transform: scale(0.98);
+        background: rgba(58, 163, 255, 0.12);
+    }
+
+    /* Improve modal/dialog sizing */
+    .modal-content,
+    .dialog {
+        max-width: 95vw;
+        margin: 1rem;
+    }
+
+    /* Fix overflow on small sections */
+    .home-section,
+    .stats-section,
+    .season-card,
+    .divisions-section {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* Ensure all cards fit within viewport */
+    .card,
+    .section-card,
+    .glass-card {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Fix division links on mobile */
+    .divisions-list {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .division-link {
+        font-size: 0.9rem;
+        padding: 0.65rem;
+    }
+
+    .division-link--playoffs {
+        min-width: 50px;
+        max-width: 60px;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Extra small screens: minimal table view */
+    .data-table {
+        font-size: 0.8rem;
+    }
+
+    .table-header {
+        padding: 0.6rem 0.4rem;
+        font-size: 0.75rem;
+    }
+
+    .table-cell {
+        padding: 0.55rem 0.4rem;
+        font-size: 0.8rem;
+    }
+
+    /* Even more compact buttons */
+    .btn-primary,
+    .btn-secondary {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    /* Reduce card padding further */
+    .section-card {
+        padding: 1rem 0.75rem;
+        border-radius: 12px;
+    }
+
+    .stat-box {
+        padding: 0.85rem 0.7rem;
+    }
+
+    /* Compact hero sections */
+    .team-hero__content {
+        gap: 1rem;
+    }
+
+    .team-hero__logo {
+        width: 80px;
+        height: 80px;
+    }
+
+    .team-hero__title {
+        font-size: 1.5rem;
+    }
+
+    /* Reduce title sizes globally */
+    .titleUnderlinePage {
+        font-size: clamp(1.3rem, 5vw, 1.6rem);
+        --title-underline-gap: 0.45rem;
+    }
+
+    .titleUnderlineSection,
+    .titleUnderlineMain {
+        font-size: clamp(1.25rem, 4.5vw, 1.5rem);
+        --title-underline-gap: 0.4rem;
+    }
+
+    .titleUnderlineCard {
+        font-size: clamp(1rem, 3.5vw, 1.15rem);
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+    /* Remove hover effects on touch devices */
+    .table-header:hover {
+        background: var(--head);
+    }
+
+    .table-row:hover {
+        background: transparent;
+    }
+
+    /* Add active states instead */
+    .table-header:active,
+    .table-header.touch-active {
+        background: rgba(58, 163, 255, 0.15);
+    }
+
+    .table-row:active,
+    .table-row.touch-active {
+        background: rgba(58, 163, 255, 0.08);
+    }
+
+    .btn-primary:active,
+    .btn-primary.touch-active {
+        transform: scale(0.97);
+    }
+
+    .btn-secondary:active,
+    .btn-secondary.touch-active {
+        transform: scale(0.97);
+    }
+
+    .clickable-row:active,
+    .clickable-row.touch-active {
+        background: rgba(58, 163, 255, 0.12);
+        transform: scale(0.98);
+    }
+
+    /* Better touch scrolling */
+    .table-wrapper,
+    .team-tabs,
+    .scroll-container {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+
+    /* Larger tap areas for interactive elements */
+    a,
+    button,
+    .clickable {
+        min-height: 44px;
+        min-width: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Disable selection on interactive elements */
+    .btn-primary,
+    .btn-secondary,
+    .team-tab,
+    .table-header {
+        -webkit-tap-highlight-color: rgba(58, 163, 255, 0.2);
+        -webkit-touch-callout: none;
+    }
+}
+
+/* Landscape phone optimization */
+@media (max-width: 896px) and (orientation: landscape) {
+    .team-hero,
+    .division-hero {
+        padding: 1.25rem 1.5rem;
+    }
+
+    .section-card {
+        padding: 1.25rem 1.5rem;
+    }
+
+    /* Optimize vertical space in landscape */
+    .stat-boxes-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Tablet optimization */
+@media (min-width: 641px) and (max-width: 1024px) {
+    /* Show more columns on tablets */
+    .data-table th:not(.col-name):not(.col-kd):not(.col-adr):not(.col-kills):not(.col-deaths):not(.col-mvps),
+    .data-table td:not(.col-name):not(.col-kd):not(.col-adr):not(.col-kills):not(.col-deaths):not(.col-mvps) {
+        display: table-cell;
+    }
+at-boxes-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Improve scroll performance */
+.table-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    will-change: scroll-position;
+}
+
+/* Add visual indicator for scrollable tables */
+.table-wrapper[data-scrollable="true"]::after {
+    content: '→';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.5rem;
+    color: var(--accent);
+    opacity: 0.5;
+    pointer-events: none;
+    animation: scrollHint 2s ease-in-out infinite;
+}
+
+@keyframes scrollHint {
+    0%, 100% {
+        opacity: 0.3;
+        transform: translateY(-50%) translateX(0);
+    }
+    50% {
+        opacity: 0.7;
+        transform: translateY(-50%) translateX(5px);
+    }
+}
+
+.table-wrapper.scrolled[data-scrollable="true"]::after {
+    display: none;
 }
 
 
