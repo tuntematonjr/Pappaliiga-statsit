@@ -421,6 +421,14 @@ window.DivisionView = {
         upcomingError() {
             return this.upcomingState.error;
         },
+        quickLinksVisible() {
+            return this.quickLinks.filter(link => {
+                if (link.id === 'upcoming') {
+                    return this.upcomingLoading || this.upcomingMatches.length > 0;
+                }
+                return true;
+            });
+        },
         sankariPlayers() {
             const source = this.divisionDetails?.player_totals || this.divisionDetails?.playerTotals || [];
             if (!Array.isArray(source)) {
@@ -1197,7 +1205,7 @@ window.DivisionView = {
                 </div>
                 <nav class="division-hero__nav" aria-label="Pikalinkit divisioonalle">
                     <a
-                        v-for="link in quickLinks"
+                        v-for="link in quickLinksVisible"
                         :key="link.id"
                         class="division-hero__nav-link"
                         :href="sectionLinkTarget(link)"
@@ -1220,7 +1228,7 @@ window.DivisionView = {
             ></error-message>
 
             <template v-else>
-                <section id="upcoming" class="division-section">
+                <section id="upcoming" class="division-section" v-if="upcomingLoading || upcomingMatches.length">
                     <upcoming-matches-list
                         :items="upcomingMatches"
                         :loading="upcomingLoading"
