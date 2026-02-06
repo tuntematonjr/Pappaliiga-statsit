@@ -89,6 +89,8 @@
                     wins: 0,
                     losses: 0,
                     matchesPlayed: 0,
+                    matches_played: 0,
+                    matches: 0,
                     roundDiff: toNumber(meta.rounds_diff ?? (meta.rounds_won ?? 0) - (meta.rounds_lost ?? 0)),
                     roundsWon: toNumber(meta.rounds_won ?? 0),
                     roundsLost: toNumber(meta.rounds_lost ?? 0),
@@ -113,6 +115,10 @@
 
             entry1.matchesPlayed += 1;
             entry2.matchesPlayed += 1;
+            entry1.matches_played += 1;
+            entry2.matches_played += 1;
+            entry1.matches += 1;
+            entry2.matches += 1;
             entry1.wins += t1Score;
             entry1.losses += t2Score;
             entry2.wins += t2Score;

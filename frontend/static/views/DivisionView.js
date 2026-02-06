@@ -477,9 +477,32 @@ window.DivisionView = {
 
             aggregates.team_count = aggregates.team_count ?? teams.length ?? details.team_count;
             aggregates.player_count = aggregates.player_count ?? details.player_count ?? players.length;
-
             if (aggregates.matches_played == null) {
-                const matchFromStandings = standings.reduce((max, team) => Math.max(max, Number(team.matches_played ?? team.matches ?? 0)), 0);
+                const playedMatches = aggregates.played_matches ?? aggregates.playedMatches;
+                if (playedMatches != null) {
+                    aggregates.matches_played = playedMatches;
+                }
+            }
+            if (aggregates.total_matches == null) {
+                const totalMatches = aggregates.total_matches ?? aggregates.totalMatches;
+                if (totalMatches != null) {
+                    aggregates.total_matches = totalMatches;
+                }
+            }
+
+            if (aggregates.matches_played == null || aggregates.matches_played === 0) {
+                const matchFromStandings = standings.reduce(
+                    (max, team) => Math.max(
+                        max,
+                        Number(
+                            team.matches_played
+                            ?? team.matchesPlayed
+                            ?? team.matches
+                            ?? 0
+                        )
+                    ),
+                    0
+                );
                 if (matchFromStandings > 0) {
                     aggregates.matches_played = matchFromStandings;
                     aggregates.total_matches = aggregates.total_matches ?? matchFromStandings;
