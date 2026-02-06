@@ -5,7 +5,14 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from db_async import query_async
+from db_async import (
+    count_played_matches,
+    count_played_matches_by_championship_ids,
+    count_played_matches_by_season,
+    count_played_matches_by_season_and_playoff,
+    count_total_matches_by_championship_ids,
+    query_async,
+)
 from division_overrides import combined_status_teams
 from division_naming import build_division_name
 from api.services.cache_helpers import (
@@ -44,14 +51,19 @@ async def _compute_seasons_list() -> List[Dict[str, Any]]:
             c.season,
             MIN(m.started_at) AS start_date,
             MAX(NULLIF(m.finished_at, 0)) AS end_date,
-            COUNT(DISTINCT c.championship_id) AS divisions_count,
-            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS finished_matches,
-            COUNT(DISTINCT m.match_id) AS total_matches
+            COUNT(DISTINCT c.championship_id) AS divisions_count
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         GROUP BY c.season
         ORDER BY c.season DESC
         """
+    )
+
+    season_ids = [int(row["season"]) for row in rows if row.get("season") is not None]
+    finished_map = await count_played_matches_by_season(
+        seasons=season_ids,
+        include_forfeits=True,
+        include_ignored=True,
     )
     
     seasons = []
@@ -59,7 +71,7 @@ async def _compute_seasons_list() -> List[Dict[str, Any]]:
         season_num = int(row["season"])
         start_ts = row.get("start_date")
         end_ts = row.get("end_date")
-        finished = int(row.get("finished_matches") or 0)
+        finished = int(finished_map.get(season_num, 0))
         # Determine status based on current time and match completion
         status = "finished"
         if end_ts is None or end_ts > int(time.time()):
@@ -131,15 +143,20 @@ async def _compute_season_summary(season: int) -> Dict[str, Any]:
         """
         SELECT
             COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 THEN m.match_id END) AS regular_total,
-            COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 AND NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS regular_played,
-            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 THEN m.match_id END) AS playoff_total,
-            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 AND NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS playoff_played
+            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 THEN m.match_id END) AS playoff_total
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         WHERE c.season = :season
         """,
         {"season": season},
     )
+    played_map = await count_played_matches_by_season_and_playoff(
+        seasons=[season],
+        include_forfeits=True,
+        include_ignored=True,
+    )
+    regular_played = int(played_map.get((season, 0), 0))
+    playoff_played = int(played_map.get((season, 1), 0))
     match_progress_data = match_progress_rows[0] if match_progress_rows else {}
     
     teams = summary_totals["teams"]
@@ -161,9 +178,9 @@ async def _compute_season_summary(season: int) -> Dict[str, Any]:
     
     # Extract match progress data
     regular_total = int(match_progress_data.get("regular_total") or 0)
-    regular_played = int(match_progress_data.get("regular_played") or 0)
+    regular_played = int(regular_played or 0)
     playoff_total = int(match_progress_data.get("playoff_total") or 0)
-    playoff_played = int(match_progress_data.get("playoff_played") or 0)
+    playoff_played = int(playoff_played or 0)
     
     # Calculate overall totals
     overall_total = regular_total + playoff_total
@@ -246,8 +263,6 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
             c.is_playoffs,
             c.parent_championship_id,
             COUNT(DISTINCT CASE WHEN m.is_forfeit = 0 THEN ct.team_id END) AS teams_count,
-            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS played_matches,
-            COUNT(DISTINCT m.match_id) AS total_matches,
             MIN(m.started_at) AS first_started,
             MAX(NULLIF(m.finished_at, 0)) AS last_finished
         FROM championships c
@@ -262,6 +277,16 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
         ORDER BY c.is_playoffs ASC, c.division_num ASC
         """,
         {"season": season},
+    )
+
+    champ_ids = [str(row["championship_id"]) for row in divisions_rows]
+    played_map = await count_played_matches_by_championship_ids(
+        championship_ids=champ_ids,
+        include_forfeits=True,
+        include_ignored=True,
+    )
+    total_map = await count_total_matches_by_championship_ids(
+        championship_ids=champ_ids,
     )
     
     # Separate regular divisions from playoffs
@@ -285,8 +310,8 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
         champ_id = str(row["championship_id"])
         division_num = int(row["division_num"])
         teams_count = int(row.get("teams_count") or 0)
-        played = int(row.get("played_matches") or 0)
-        total = int(row.get("total_matches") or 0)
+        played = int(played_map.get(champ_id) or 0)
+        total = int(total_map.get(champ_id, 0))
         
         # Determine status
         status = "waiting"
@@ -335,8 +360,8 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
         if champ_id in playoff_divisions:
             playoff_row = playoff_divisions[champ_id]
             playoff_champ_id = str(playoff_row["championship_id"])
-            playoff_played = int(playoff_row.get("played_matches") or 0)
-            playoff_total = int(playoff_row.get("total_matches") or 0)
+            playoff_played = int(played_map.get(playoff_champ_id) or 0)
+            playoff_total = int(total_map.get(playoff_champ_id, 0))
             playoff_teams = int(playoff_row.get("teams_count") or 0)
             
             playoff_status = "waiting"
@@ -748,13 +773,14 @@ async def _compute_playoff_bracket(championship_id: str) -> Dict[str, Any]:
     )
     
     bracket = []
-    played = 0
     total = len(matches_rows)
-    
+
+    played = await count_played_matches(
+        championship_id=championship_id,
+        include_forfeits=False,
+        include_ignored=True,
+    )
     for row in matches_rows:
-        if row.get("finished_at"):
-            played += 1
-        
         bracket.append({
             "round": int(row.get("round", 1)),
             "match_id": row["match_id"],
@@ -764,7 +790,7 @@ async def _compute_playoff_bracket(championship_id: str) -> Dict[str, Any]:
         })
     
     return {
-        "matches_played": played,
+        "matches_played": int(played or 0),
         "matches_total": total,
         "bracket": bracket,
     }

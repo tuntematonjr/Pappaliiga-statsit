@@ -685,6 +685,283 @@ def _build_allmaps_cte(all_maps: Sequence[str]) -> tuple[str, dict[str, str]]:
     return " UNION ALL ".join(selects), params
 
 
+def build_played_match_condition(
+    *,
+    alias: str = "m",
+    include_forfeits: bool = True,
+    include_ignored: bool = True,
+) -> str:
+    """Return SQL condition for matches that should count as played."""
+    conditions = [f"NULLIF({alias}.finished_at, 0) IS NOT NULL"]
+    if not include_forfeits:
+        conditions.append(f"COALESCE({alias}.is_forfeit, 0) = 0")
+    if not include_ignored:
+        conditions.append(f"COALESCE({alias}.ignored_due_ban, 0) = 0")
+    return " AND ".join(conditions)
+
+
+def build_match_scope_clause(
+    *,
+    alias: str = "m",
+    season: int | None = None,
+    division_num: int | None = None,
+    championship_id: str | None = None,
+    team_id: str | None = None,
+    param_prefix: str = "",
+) -> tuple[str, dict[str, Any]]:
+    """Return SQL/params for scoping matches to season/division/championship/team."""
+    conditions: list[str] = []
+    params: dict[str, Any] = {}
+
+    def _param(name: str) -> str:
+        return f"{param_prefix}{name}" if param_prefix else name
+
+    if season is not None:
+        key = _param("season")
+        conditions.append(f"{alias}.season = :{key}")
+        params[key] = season
+    if division_num is not None:
+        key = _param("division_num")
+        conditions.append(f"{alias}.division_num = :{key}")
+        params[key] = division_num
+    if championship_id is not None:
+        key = _param("championship_id")
+        conditions.append(f"{alias}.championship_id = :{key}")
+        params[key] = championship_id
+    if team_id is not None:
+        key = _param("team_id")
+        conditions.append(f"({alias}.team1_id = :{key} OR {alias}.team2_id = :{key})")
+        params[key] = team_id
+
+    return " AND ".join(conditions), params
+
+
+async def count_played_matches(
+    *,
+    season: int | None = None,
+    division_num: int | None = None,
+    championship_id: str | None = None,
+    team_id: str | None = None,
+    player_id: str | None = None,
+    is_playoff: bool | None = None,
+    parent_championship_id: str | None = None,
+    include_forfeits: bool = True,
+    include_ignored: bool = True,
+    include_forfeit_maps: bool = False,
+) -> int:
+    """Count played matches with optional season/division/championship/team/player/playoff scope."""
+    where = [build_played_match_condition(
+        alias="m",
+        include_forfeits=include_forfeits,
+        include_ignored=include_ignored,
+    )]
+    scope_clause, params = build_match_scope_clause(
+        alias="m",
+        season=season,
+        division_num=division_num,
+        championship_id=championship_id,
+        team_id=team_id,
+    )
+    if scope_clause:
+        where.append(scope_clause)
+
+    join_parts: list[str] = []
+    if is_playoff is not None or parent_championship_id is not None:
+        join_parts.append("JOIN championships c ON c.championship_id = m.championship_id")
+        if is_playoff is not None:
+            where.append("c.is_playoffs = :is_playoff")
+            params["is_playoff"] = int(is_playoff)
+        if parent_championship_id is not None:
+            where.append("c.parent_championship_id = :parent_championship_id")
+            params["parent_championship_id"] = parent_championship_id
+
+    if player_id is not None:
+        join_clause = "JOIN player_stats ps ON ps.match_id = m.match_id"
+        if not include_forfeit_maps:
+            join_clause += " AND COALESCE(ps.is_forfeit_map, 0) = 0"
+        join_parts.append(join_clause)
+        where.append("ps.player_id = :player_id")
+        params["player_id"] = player_id
+
+    join_clause = " ".join(join_parts)
+
+    sql = (
+        "SELECT COUNT(DISTINCT m.match_id) AS matches_played "
+        "FROM matches m "
+        f"{join_clause} "
+        "WHERE "
+        + " AND ".join(where)
+    )
+    rows = await query_async(sql, params)
+    return int(rows[0].get("matches_played") or 0) if rows else 0
+
+
+async def count_played_matches_by_season(
+    *,
+    seasons: Sequence[int] | None = None,
+    include_forfeits: bool = True,
+    include_ignored: bool = True,
+) -> dict[int, int]:
+    """Return played match counts per season."""
+    condition = build_played_match_condition(
+        alias="m",
+        include_forfeits=include_forfeits,
+        include_ignored=include_ignored,
+    )
+    params: dict[str, Any] = {}
+    where = [condition]
+
+    season_list: list[int] = []
+    if seasons is not None:
+        seen: set[int] = set()
+        for s in seasons:
+            try:
+                season_int = int(s)
+            except (TypeError, ValueError):
+                continue
+            if season_int in seen:
+                continue
+            seen.add(season_int)
+            season_list.append(season_int)
+        if not season_list:
+            return {}
+        placeholders = ", ".join(f":season{i}" for i in range(len(season_list)))
+        where.append(f"m.season IN ({placeholders})")
+        params.update({f"season{i}": s for i, s in enumerate(season_list)})
+
+    sql = (
+        "SELECT m.season, COUNT(DISTINCT m.match_id) AS matches_played "
+        "FROM matches m "
+        f"WHERE {' AND '.join(where)} "
+        "GROUP BY m.season"
+    )
+    rows = await query_async(sql, params)
+    results = {int(row["season"]): int(row.get("matches_played") or 0) for row in rows}
+    if seasons is not None:
+        return {s: results.get(s, 0) for s in season_list}
+    return results
+
+
+async def count_played_matches_by_championship_ids(
+    *,
+    championship_ids: Sequence[str],
+    include_forfeits: bool = True,
+    include_ignored: bool = True,
+) -> dict[str, int]:
+    """Return played match counts per championship ID."""
+    ids: list[str] = []
+    seen: set[str] = set()
+    for cid in championship_ids or []:
+        if not cid:
+            continue
+        cid_str = str(cid)
+        if cid_str in seen:
+            continue
+        seen.add(cid_str)
+        ids.append(cid_str)
+
+    if not ids:
+        return {}
+
+    condition = build_played_match_condition(
+        alias="m",
+        include_forfeits=include_forfeits,
+        include_ignored=include_ignored,
+    )
+    placeholders = ", ".join(f":cid{i}" for i in range(len(ids)))
+    params = {f"cid{i}": cid for i, cid in enumerate(ids)}
+
+    sql = (
+        "SELECT m.championship_id, COUNT(DISTINCT m.match_id) AS matches_played "
+        "FROM matches m "
+        f"WHERE {condition} AND m.championship_id IN ({placeholders}) "
+        "GROUP BY m.championship_id"
+    )
+    rows = await query_async(sql, params)
+    results = {str(row["championship_id"]): int(row.get("matches_played") or 0) for row in rows}
+    return {cid: results.get(cid, 0) for cid in ids}
+
+
+async def count_total_matches_by_championship_ids(
+    *,
+    championship_ids: Sequence[str],
+) -> dict[str, int]:
+    """Return total match counts per championship ID (includes all matches)."""
+    ids: list[str] = []
+    seen: set[str] = set()
+    for cid in championship_ids or []:
+        if not cid:
+            continue
+        cid_str = str(cid)
+        if cid_str in seen:
+            continue
+        seen.add(cid_str)
+        ids.append(cid_str)
+
+    if not ids:
+        return {}
+
+    placeholders = ", ".join(f":cid{i}" for i in range(len(ids)))
+    params = {f"cid{i}": cid for i, cid in enumerate(ids)}
+    sql = (
+        "SELECT m.championship_id, COUNT(*) AS matches_total "
+        "FROM matches m "
+        f"WHERE m.championship_id IN ({placeholders}) "
+        "GROUP BY m.championship_id"
+    )
+    rows = await query_async(sql, params)
+    results = {str(row["championship_id"]): int(row.get("matches_total") or 0) for row in rows}
+    return {cid: results.get(cid, 0) for cid in ids}
+
+
+async def count_played_matches_by_season_and_playoff(
+    *,
+    seasons: Sequence[int] | None = None,
+    include_forfeits: bool = True,
+    include_ignored: bool = True,
+) -> dict[tuple[int, int], int]:
+    """Return played match counts per (season, is_playoff)."""
+    condition = build_played_match_condition(
+        alias="m",
+        include_forfeits=include_forfeits,
+        include_ignored=include_ignored,
+    )
+    params: dict[str, Any] = {}
+    where = [condition]
+
+    season_list: list[int] = []
+    if seasons is not None:
+        seen: set[int] = set()
+        for s in seasons:
+            try:
+                season_int = int(s)
+            except (TypeError, ValueError):
+                continue
+            if season_int in seen:
+                continue
+            seen.add(season_int)
+            season_list.append(season_int)
+        if not season_list:
+            return {}
+        placeholders = ", ".join(f":season{i}" for i in range(len(season_list)))
+        where.append(f"m.season IN ({placeholders})")
+        params.update({f"season{i}": s for i, s in enumerate(season_list)})
+
+    sql = (
+        "SELECT m.season, c.is_playoffs AS is_playoff, "
+        "COUNT(DISTINCT m.match_id) AS matches_played "
+        "FROM matches m "
+        "JOIN championships c ON c.championship_id = m.championship_id "
+        f"WHERE {' AND '.join(where)} "
+        "GROUP BY m.season, c.is_playoffs"
+    )
+    rows = await query_async(sql, params)
+    return {
+        (int(row["season"]), int(row.get("is_playoff") or 0)): int(row.get("matches_played") or 0)
+        for row in rows
+    }
+
+
 # ---------------------------------------------------------------------------
 # Former db_ops_async helpers and operations
 # ---------------------------------------------------------------------------
@@ -2677,16 +2954,18 @@ async def get_all_base_divisions_for_season(conn: asyncmy.Connection, season: in
 async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) -> Row:
     """Aggregated stats for the season overview endpoints."""
     async with conn.cursor(cursors.DictCursor) as cur:
+        played_condition = build_played_match_condition(
+            alias="m",
+            include_forfeits=True,
+            include_ignored=True,
+        )
         await cur.execute(
-            """
+            f"""
             SELECT
                 (SELECT COUNT(DISTINCT tst.team_id)
                  FROM team_season_totals tst
                  JOIN championships c ON tst.division_num = c.division_num AND tst.season = c.season
                  WHERE c.championship_id = %(division_id)s) AS teams,
-                (SELECT COUNT(*)
-                 FROM matches m
-                 WHERE m.championship_id = %(division_id)s AND m.status = 'finished') AS matches_played,
                 (SELECT COUNT(*)
                  FROM matches m
                  WHERE m.championship_id = %(division_id)s) AS matches_total,
@@ -2697,12 +2976,8 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
         season_stats = await cur.fetchone()
 
         await cur.execute(
-            """
+            f"""
             SELECT
-                (SELECT COUNT(*)
-                 FROM matches m
-                 JOIN championships c ON m.championship_id = c.championship_id
-                 WHERE c.parent_championship_id = %(division_id)s AND m.status = 'finished') AS matches_played,
                 (SELECT COUNT(*)
                  FROM matches m
                  JOIN championships c ON m.championship_id = c.championship_id
@@ -2712,7 +2987,7 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
                  JOIN championships c ON m.championship_id = c.championship_id
                  JOIN teams t ON t.team_id = m.winner_team_id
                  WHERE c.parent_championship_id = %(division_id)s
-                   AND m.status = 'finished'
+                   AND {played_condition}
                    AND m.winner_team_id IS NOT NULL
                  ORDER BY m.finished_at DESC, m.scheduled_at DESC
                  LIMIT 1) AS winner_team,
@@ -2723,6 +2998,21 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
             {"division_id": division_id},
         )
         playoff_stats = await cur.fetchone()
+
+    season_played = await count_played_matches(
+        championship_id=str(division_id),
+        include_forfeits=True,
+        include_ignored=True,
+    )
+    playoff_played = await count_played_matches(
+        parent_championship_id=str(division_id),
+        include_forfeits=True,
+        include_ignored=True,
+    )
+    if season_stats is not None:
+        season_stats["matches_played"] = int(season_played or 0)
+    if playoff_stats is not None:
+        playoff_stats["matches_played"] = int(playoff_played or 0)
 
     return {
         "season": season_stats,

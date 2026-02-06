@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any, Optional
 from datetime import datetime, timezone
 
-from db_async import compute_team_map_deltas_async, get_team_matches_mirror_async, query_async
+from db_async import (
+    build_played_match_condition,
+    compute_team_map_deltas_async,
+    get_team_matches_mirror_async,
+    query_async,
+)
 from standings_utils import calculate_standings
 
 from api.exceptions import NotFoundError
@@ -1012,21 +1017,26 @@ async def _calculate_h2h_stats(
     params = {"champ_id": championship_id}
     for i, tid in enumerate(team_ids):
         params[f'team{i}'] = tid
-    
+
+    played_condition = build_played_match_condition(
+        alias="m",
+        include_forfeits=True,
+        include_ignored=True,
+    )
     matches = await query_async(
         f"""
         SELECT
-            match_id,
-            team1_id,
-            team2_id,
-            winner_team_id,
-            status,
-            best_of
-        FROM matches
-        WHERE championship_id = :champ_id
-          AND status = 'FINISHED'
-          AND team1_id IN ({placeholders})
-          AND team2_id IN ({placeholders})
+            m.match_id,
+            m.team1_id,
+            m.team2_id,
+            m.winner_team_id,
+            m.status,
+            m.best_of
+        FROM matches m
+        WHERE m.championship_id = :champ_id
+          AND {played_condition}
+          AND m.team1_id IN ({placeholders})
+          AND m.team2_id IN ({placeholders})
         """,
         params
     )

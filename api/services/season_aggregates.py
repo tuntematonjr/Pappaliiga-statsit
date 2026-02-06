@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from db_async import query_async
+from db_async import count_played_matches, query_async
 
 from api.services.cache_helpers import get_season_revision, select_season_cache
 
@@ -109,16 +109,12 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
             {"season": season},
         )
 
-    match_rows, map_round_rows = await query_async(
-        """
-        SELECT COUNT(*) AS cnt
-        FROM matches
-        WHERE season = :season
-          AND is_forfeit = 0
-          AND NULLIF(finished_at, 0) IS NOT NULL
-        """,
-        {"season": season},
-    ), await query_async(
+    matches_played = await count_played_matches(
+        season=season,
+        include_forfeits=False,
+        include_ignored=True,
+    )
+    map_round_rows = await query_async(
         """
         SELECT
             COUNT(*) AS total_maps,
@@ -129,7 +125,6 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
         {"season": season},
     )
 
-    match_row = match_rows[0] if match_rows else {}
     map_round_row = map_round_rows[0] if map_round_rows else {}
 
     maps_total = int(map_round_row.get("total_maps") or 0)
@@ -150,7 +145,7 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
         "teams": team_totals["total_teams"],
         "players": player_totals["total_players"],
         # Matches, maps, rounds, kills and deaths include played games from the regular season and playoffs.
-        "matches": int(match_row.get("cnt") or 0),
+        "matches": int(matches_played or 0),
         "maps": maps_total,
         "rounds": rounds_total,
         "kills": kills_total,

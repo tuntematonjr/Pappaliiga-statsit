@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal, Optional
 
-from db_async import query_async
+from db_async import count_played_matches, count_played_matches_by_season_and_playoff, query_async
 
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.cache_helpers import (
@@ -61,7 +61,6 @@ async def _compute_lifetime_summary_totals() -> dict[str, int]:
     (
         div_rows,
         team_rows,
-        match_rows,
         map_rows,
         map_round_rows,
         team_totals_rows,
@@ -71,13 +70,6 @@ async def _compute_lifetime_summary_totals() -> dict[str, int]:
         "SELECT COUNT(*) AS cnt FROM championships WHERE is_playoffs = 0"
     ), await query_async(
         "SELECT COUNT(DISTINCT team_id) AS cnt FROM teams"
-    ), await query_async(
-        """
-        SELECT COUNT(DISTINCT match_id) AS cnt
-        FROM matches
-        WHERE is_forfeit = 0
-          AND NULLIF(finished_at, 0) IS NOT NULL
-        """
     ), await query_async(
         "SELECT COUNT(*) AS cnt FROM maps"
     ), await query_async(
@@ -100,6 +92,10 @@ async def _compute_lifetime_summary_totals() -> dict[str, int]:
           COALESCE(SUM(deaths), 0) AS total_deaths
         FROM player_season_totals
         """
+    )
+    matches_played = await count_played_matches(
+        include_forfeits=False,
+        include_ignored=True,
     )
     player_counts = await get_player_counts(include_all_time=True)
     team_totals_row = team_totals_rows[0] if team_totals_rows else {}
@@ -124,7 +120,7 @@ async def _compute_lifetime_summary_totals() -> dict[str, int]:
         "teams": int(team_rows[0]["cnt"] if team_rows else 0),
         "players": int(player_counts.get("all_time_players") or 0),
         # Matches, maps, rounds, kills and deaths combine played games from the regular season and playoffs.
-        "matches": int(match_rows[0]["cnt"] if match_rows else 0),
+        "matches": int(matches_played or 0),
         "maps": maps_total,
         "rounds": rounds_total,
         "kills": kills_total,
@@ -328,9 +324,8 @@ async def _compute_season_stats(season: int) -> dict[str, Any]:
     progress_rows = await query_async(
         """
         SELECT
-            CASE WHEN c.slug LIKE '%%-po%%' THEN 1 ELSE 0 END AS is_playoff,
-            COUNT(DISTINCT m.match_id) AS total_matches,
-            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS played_matches
+            CASE WHEN c.is_playoffs = 1 THEN 1 ELSE 0 END AS is_playoff,
+            COUNT(DISTINCT m.match_id) AS total_matches
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         WHERE c.season = :season
@@ -338,20 +333,24 @@ async def _compute_season_stats(season: int) -> dict[str, Any]:
         """,
         {"season": season},
     )
+    played_map = await count_played_matches_by_season_and_playoff(
+        seasons=[season],
+        include_forfeits=True,
+        include_ignored=True,
+    )
+    regular_played = int(played_map.get((season, 0), 0))
+    playoff_played = int(played_map.get((season, 1), 0))
 
-    overall_played = 0
     overall_total = 0
-    regular = {"played": 0, "total": 0}
-    playoffs = {"played": 0, "total": 0}
+    regular = {"played": regular_played, "total": 0}
+    playoffs = {"played": playoff_played, "total": 0}
 
     for row in progress_rows:
         total = int(row.get("total_matches") or 0)
-        played = int(row.get("played_matches") or 0)
-        overall_played += played
         overall_total += total
         target = playoffs if row.get("is_playoff") else regular
-        target["played"] += played
         target["total"] += total
+    overall_played = regular["played"] + playoffs["played"]
 
     progress = {
         "overall": {"played": overall_played, "total": overall_total},
@@ -460,31 +459,28 @@ async def _get_season_progress(season: int, summary_totals: dict[str, Any]) -> d
         """
         SELECT
             COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 THEN m.match_id END) AS regular_total,
-            COUNT(
-                DISTINCT CASE
-                    WHEN c.is_playoffs = 0 AND NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id
-                END
-            ) AS regular_played,
-            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 THEN m.match_id END) AS playoff_total,
-            COUNT(
-                DISTINCT CASE
-                    WHEN c.is_playoffs = 1 AND NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id
-                END
-            ) AS playoff_played
+            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 THEN m.match_id END) AS playoff_total
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         WHERE c.season = :season
         """,
         {"season": season},
     )
+    played_map = await count_played_matches_by_season_and_playoff(
+        seasons=[season],
+        include_forfeits=True,
+        include_ignored=True,
+    )
+    regular_played = int(played_map.get((season, 0), 0))
+    playoff_played = int(played_map.get((season, 1), 0))
 
     progress_data = progress_rows[0] if progress_rows else {}
     match_progress_data = match_progress_rows[0] if match_progress_rows else {}
 
     regular_total = int(match_progress_data.get("regular_total") or 0)
-    regular_played = int(match_progress_data.get("regular_played") or 0)
+    regular_played = int(regular_played or 0)
     playoff_total = int(match_progress_data.get("playoff_total") or 0)
-    playoff_played = int(match_progress_data.get("playoff_played") or 0)
+    playoff_played = int(playoff_played or 0)
     overall_total = regular_total + playoff_total
     overall_played = regular_played + playoff_played
 

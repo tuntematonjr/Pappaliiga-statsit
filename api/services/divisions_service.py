@@ -3,7 +3,13 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Dict, List, Optional, Sequence
 
-from db_async import query_async
+from db_async import (
+    build_played_match_condition,
+    count_played_matches,
+    count_played_matches_by_championship_ids,
+    count_total_matches_by_championship_ids,
+    query_async,
+)
 from division_overrides import combined_status_teams
 from division_naming import build_division_name
 
@@ -118,9 +124,6 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
             c.is_playoffs AS is_playoff,
             c.parent_championship_id,
             COALESCE(tc.teams_count, 0) AS teams_count,
-            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS played_matches,
-            COUNT(DISTINCT m.match_id) AS total_matches,
-            SUM(CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN 1 ELSE 0 END) AS finished_matches,
             SUM(
                 CASE
                     WHEN UPPER(COALESCE(m.status, '')) IN ('LIVE', 'ONGOING', 'IN_PROGRESS', 'STARTED')
@@ -151,7 +154,25 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
         """,
             {"season": season, "limit": limit, "offset": offset},
         )
-        return [_apply_division_name(row) for row in rows]
+        champ_ids = [str(row["championship_id"]) for row in rows]
+        played_map = await count_played_matches_by_championship_ids(
+            championship_ids=champ_ids,
+            include_forfeits=True,
+            include_ignored=True,
+        )
+        total_map = await count_total_matches_by_championship_ids(
+            championship_ids=champ_ids,
+        )
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            champ_id = str(row["championship_id"])
+            played = int(played_map.get(champ_id, 0))
+            data = dict(row)
+            data["played_matches"] = played
+            data["finished_matches"] = played
+            data["total_matches"] = int(total_map.get(champ_id, 0))
+            result.append(_apply_division_name(data))
+        return result
 
     cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
     return cached_value
@@ -205,6 +226,11 @@ async def get_division_details(champ: dict[str, Any]) -> dict[str, Any]:
 
 
 async def _compute_division_details(championship_id: str, season: int, division_num: int, champ: dict[str, Any]) -> dict[str, Any]:
+    played_condition = build_played_match_condition(
+        alias="dmt",
+        include_forfeits=True,
+        include_ignored=True,
+    )
     team_rows = await query_async(
         """
         WITH division_matches AS (
@@ -256,13 +282,13 @@ async def _compute_division_details(championship_id: str, season: int, division_
         ),
         match_totals AS (
             SELECT
-                team_id,
-                COUNT(DISTINCT match_id) AS matches_played,
-                SUM(CASE WHEN winner_team_id = team_id THEN 1 ELSE 0 END) AS matches_won
-            FROM division_match_teams
-            WHERE team_id IS NOT NULL
-                AND NULLIF(finished_at, 0) IS NOT NULL
-            GROUP BY team_id
+                dmt.team_id,
+                COUNT(DISTINCT dmt.match_id) AS matches_played,
+                SUM(CASE WHEN dmt.winner_team_id = dmt.team_id THEN 1 ELSE 0 END) AS matches_won
+            FROM division_match_teams dmt
+            WHERE dmt.team_id IS NOT NULL
+                AND {played_condition}
+            GROUP BY dmt.team_id
         ),
         map_totals AS (
             SELECT
@@ -315,7 +341,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
         LEFT JOIN map_totals mp ON mp.team_id = t.team_id
         LEFT JOIN player_totals agg ON agg.team_id = t.team_id
         ORDER BY team_name, team_id
-        """,
+        """.format(played_condition=played_condition),
         {"champ_id": championship_id},
     )
 
@@ -708,7 +734,6 @@ async def _get_division_aggregates(
     rows = await query_async(
         """
         SELECT
-            COUNT(DISTINCT CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN m.match_id END) AS played_matches,
             COUNT(DISTINCT m.match_id) AS total_matches,
             SUM(CASE WHEN m.is_forfeit = 1 THEN 1 ELSE 0 END) AS forfeits
         FROM matches m
@@ -780,7 +805,12 @@ async def _get_division_aggregates(
     if rounds_played_total == 0 and team_rounds_total:
         rounds_played_total = dedupe_team_total(team_rounds_total)
 
-    played = int(row.get("played_matches") or 0)
+    played = await count_played_matches(
+        championship_id=championship_id,
+        include_forfeits=True,
+        include_ignored=True,
+    )
+    played = int(played or 0)
     total = int(row.get("total_matches") or 0)
     forfeits = int(row.get("forfeits") or 0)
 
