@@ -313,7 +313,6 @@
         const playoffCopy = playoffsConfigured
             ? buildProgressCopy(playoffsMatchesPlayed, playoffsMatchesTotal)
             : { label: 'Ei playoffeja', tooltip: 'Ei playoffeja', percent: 0, remaining: 0 };
-        
         const hrefId = resolveDivisionSlug(division, division.name) || divisionId;
         const playoffsHrefId =
             (typeof window !== 'undefined' && window.divisionNormalizer?.getPlayoffsHrefId
@@ -338,7 +337,7 @@
             tier: tierMeta.id,
             state: combinedStatus,
             season: {
-                teams: Number(division.season?.teams) || 0,
+                teams: null,
                 matchesPlayed: seasonMatchesPlayed,
                 matchesTotal: seasonMatchesTotal,
                 percent: seasonCopy.percent,
@@ -482,7 +481,8 @@
             label: { type: String, default: '' },
             ariaLabel: { type: String, default: '' },
             animationDelay: { type: Number, default: 0 },
-            tooltip: { type: String, default: '' }
+            tooltip: { type: String, default: '' },
+            showPercent: { type: Boolean, default: false }
         },
         computed: {
             percent() {
@@ -502,6 +502,11 @@
             },
             tooltipText() {
                 return this.tooltip || this.label;
+            },
+            displayLabel() {
+                if (!this.showPercent) return this.label;
+                if (!this.label) return `${this.percent}%`;
+                return `${this.percent}% · ${this.label}`;
             }
         },
         template: `
@@ -518,7 +523,7 @@
             >
                 <div class="division-progress__track">
                     <div class="division-progress__fill" :style="fillStyle"></div>
-                    <span class="division-progress__label">{{ label }}</span>
+                    <span class="division-progress__label">{{ displayLabel }}</span>
                 </div>
             </div>
         `
@@ -537,6 +542,23 @@
             },
             statusIcon() {
                 return STATUS_ICONS[this.division.state] || null;
+            },
+            playoffsStatusState() {
+                if (!this.division.playoffs?.hasChampionship) {
+                    return null;
+                }
+                const state = this.division.playoffs.progressState;
+                if (state === 'active') return DivisionStatus.PLAYOFFS_ACTIVE;
+                if (state === 'finished') return DivisionStatus.COMPLETE;
+                return DivisionStatus.NOT_STARTED;
+            },
+            playoffsStatusLabel() {
+                if (!this.playoffsStatusState) return '';
+                return STATUS_LABELS[this.playoffsStatusState] || STATUS_LABELS[DivisionStatus.NOT_STARTED];
+            },
+            playoffsStatusIcon() {
+                if (!this.playoffsStatusState) return null;
+                return STATUS_ICONS[this.playoffsStatusState] || null;
             },
             seasonRows() {
                 const rows = [];
@@ -587,31 +609,8 @@
                             class="division-card__title division-card__title--hero title-accent titleUnderlineCard"
                             :title="division.title"
                         >
-                            {{ division.title }}
+                            <span class="division-card__title-text">{{ division.title }}</span>
                         </h3>
-                    </div>
-                    <div class="division-card__status-row division-card__status-row--centered">
-                        <span
-                            class="division-card__badge"
-                            :class="'division-card__badge--' + stateClass(division.state)"
-                            :data-status="division.state"
-                        >
-                            <span v-if="statusIcon" class="status-pill__icon" aria-hidden="true">
-                                <svg
-                                    :viewBox="statusIcon.viewBox"
-                                    role="presentation"
-                                    focusable="false"
-                                >
-                                    <path
-                                        v-for="(path, idx) in statusIcon.paths"
-                                        :key="idx"
-                                        :d="path.d"
-                                        fill="currentColor"
-                                    ></path>
-                                </svg>
-                            </span>
-                            <span class="status-pill__label">{{ statusLabel }}</span>
-                        </span>
                     </div>
                     <p v-if="showWinnerStrip" class="division-card__winner-banner division-card__winner-banner--centered">
                         Voittaja: {{ division.season.winner }}
@@ -622,9 +621,6 @@
                         <p class="division-card__block-label">Runkosarja</p>
                         <div class="division-card__stat-lines">
                             <p class="division-card__stat-line">Joukkueet: {{ division.season.teams != null ? division.season.teams : '–' }}</p>
-                            <p class="division-card__stat-line">
-                                Ottelut: {{ division.season.matchesPlayed }}/{{ division.season.matchesTotal || division.season.matchesPlayed || 0 }} Ottelut
-                            </p>
                         </div>
                         <division-progress-bar
                             :value="division.season.matchesPlayed"
@@ -632,9 +628,33 @@
                             :state="division.season.progressState"
                             :label="division.season.progressLabel"
                             :tooltip="division.season.progressTooltip"
+                            :show-percent="true"
                             :aria-label="division.title + ' runkosarja eteneminen'"
                             :animation-delay="(division.divisionNumber * 0.15) % 2"
                         ></division-progress-bar>
+                        <div class="division-card__status-row division-card__status-row--centered">
+                            <span
+                                class="division-card__badge"
+                                :class="'division-card__badge--' + stateClass(division.state)"
+                                :data-status="division.state"
+                            >
+                                <span v-if="statusIcon" class="status-pill__icon" aria-hidden="true">
+                                    <svg
+                                        :viewBox="statusIcon.viewBox"
+                                        role="presentation"
+                                        focusable="false"
+                                    >
+                                        <path
+                                            v-for="(path, idx) in statusIcon.paths"
+                                            :key="idx"
+                                            :d="path.d"
+                                            fill="currentColor"
+                                        ></path>
+                                    </svg>
+                                </span>
+                                <span class="status-pill__label">{{ statusLabel }}</span>
+                            </span>
+                        </div>
                         <ul v-if="seasonRows.length" class="division-card__facts division-card__facts--centered" role="list">
                             <li v-for="row in seasonRows" :key="row.key">
                                 <span class="division-card__fact-label">{{ row.label }}</span>
@@ -650,21 +670,39 @@
                     <section class="division-card__block division-card__block--playoffs">
                         <p class="division-card__block-label">Playoffit</p>
                         <template v-if="division.playoffs.hasChampionship">
-                            <p class="division-card__stat-line">
-                                Ottelut: {{ division.playoffs.matchesPlayed }}/{{ division.playoffs.matchesTotal || division.playoffs.matchesPlayed || 0 }} Ottelut
-                            </p>
                             <division-progress-bar
                                 :value="division.playoffs.matchesPlayed"
                                 :max="division.playoffs.matchesTotal || division.playoffs.matchesPlayed || 0"
                                 :state="division.playoffs.progressState"
                                 :label="division.playoffs.progressLabel"
                                 :tooltip="division.playoffs.progressTooltip"
+                                :show-percent="true"
                                 :aria-label="division.title + ' playoffit eteneminen'"
                                 :animation-delay="(division.divisionNumber * 0.15 + 1) % 2"
                             ></division-progress-bar>
-                            <p class="division-card__metric-meta division-card__metric-meta--centered">
-                                {{ division.playoffs.percent }}% · {{ division.playoffs.progressLabel }}
-                            </p>
+                            <div v-if="playoffsStatusState" class="division-card__status-row division-card__status-row--centered">
+                                <span
+                                    class="division-card__badge"
+                                    :class="'division-card__badge--' + stateClass(playoffsStatusState)"
+                                    :data-status="playoffsStatusState"
+                                >
+                                    <span v-if="playoffsStatusIcon" class="status-pill__icon" aria-hidden="true">
+                                        <svg
+                                            :viewBox="playoffsStatusIcon.viewBox"
+                                            role="presentation"
+                                            focusable="false"
+                                        >
+                                            <path
+                                                v-for="(path, idx) in playoffsStatusIcon.paths"
+                                                :key="idx"
+                                                :d="path.d"
+                                                fill="currentColor"
+                                            ></path>
+                                        </svg>
+                                    </span>
+                                    <span class="status-pill__label">{{ playoffsStatusLabel }}</span>
+                                </span>
+                            </div>
                             <p v-if="division.playoffs.isFinished && division.playoffs.winner" class="division-card__note division-card__note--centered">
                                 Voittaja: {{ division.playoffs.winner }}
                             </p>
@@ -733,7 +771,9 @@
                 preferredDivisionId: getStoredDivisionId(),
                 renderCount: 0,
                 renderBatchSize: 8,
-                sentinelObserver: null
+                sentinelObserver: null,
+                teamCountOverrides: {},
+                teamCountRequests: {}
             };
         },
         computed: {
@@ -741,7 +781,14 @@
                 if (!Array.isArray(this.divisions)) {
                     return [];
                 }
+                const overrides = this.teamCountOverrides || {};
                 const mapped = this.divisions.map(buildCardModel).filter(Boolean);
+                mapped.forEach(card => {
+                    const override = overrides[card.id];
+                    if (Number.isFinite(override)) {
+                        card.season.teams = override;
+                    }
+                });
                 if (!mapped.length && this.divisions.length) {
                     if (isDevEnv) {
                         console.warn('[DivisionCardList] Falling back to raw division rendering. Normalized set empty.');
@@ -774,7 +821,8 @@
                                 season: fallbackSeason,
                                 playoffs: fallbackPlayoffs,
                                 slug: entry.slug || String(safeId),
-                                seasonNumber: entry.seasonNumber ?? entry.season_number ?? null
+                                seasonNumber: entry.seasonNumber ?? entry.season_number ?? null,
+                                raw: entry
                             });
                         })
                         .filter(Boolean);
@@ -825,6 +873,8 @@
             divisions: {
                 immediate: true,
                 handler() {
+                    this.teamCountOverrides = {};
+                    this.teamCountRequests = {};
                     this.resetVirtualWindow();
                 }
             },
@@ -849,6 +899,12 @@
                     });
                 }
                 this.$nextTick(() => this.observeSentinel());
+            },
+            visibleCards: {
+                immediate: true,
+                handler(newValue) {
+                    this.ensureTeamCounts(newValue);
+                }
             }
         },
         mounted() {
@@ -870,6 +926,35 @@
             },
             handleReset() {
                 this.$emit('reset-filters');
+            },
+            ensureTeamCounts(cards) {
+                if (typeof window === 'undefined' || !window.apiClient) {
+                    return;
+                }
+                if (!Array.isArray(cards) || !cards.length) {
+                    return;
+                }
+                cards.forEach(card => {
+                    const divisionId = card?.id;
+                    if (!divisionId) return;
+                    if (this.teamCountOverrides[divisionId] !== undefined) return;
+                    if (this.teamCountRequests[divisionId]) return;
+                    this.teamCountRequests[divisionId] = true;
+                    window.apiClient
+                        .getDivisionTeamCount(divisionId)
+                        .then(count => {
+                            if (!Number.isFinite(count)) return;
+                            this.teamCountOverrides[divisionId] = count;
+                        })
+                        .catch(error => {
+                            if (isDevEnv) {
+                                console.warn('[DivisionCardList] team count fetch failed', { divisionId, error });
+                            }
+                        })
+                        .finally(() => {
+                            delete this.teamCountRequests[divisionId];
+                        });
+                });
             },
             resetVirtualWindow() {
                 if (!Array.isArray(this.filteredCards) || !this.filteredCards.length) {

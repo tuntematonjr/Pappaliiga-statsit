@@ -827,6 +827,9 @@
             this._divisionDetailsCache = new Map();
             this._divisionCacheTtlMs = DIVISION_CACHE_TTL_MS;
             this._mapCatalogCache = null;
+            this._divisionTeamCountCache = new Map();
+            this._seasonTeamCountCache = new Map();
+            this._lifetimeUniqueTeamCountCache = null;
         }
 
         proxyAvatar(url) {
@@ -1010,6 +1013,241 @@
                     if (tracked && tracked.promise === fetchPromise) {
                         this._divisionDetailsCache.delete(cacheKey);
                     }
+                }
+                throw error;
+            }
+        }
+
+        async getDivisionTeamCount(championshipId, options = {}) {
+            if (!championshipId) {
+                throw new Error('championshipId is required');
+            }
+            const cacheKey = String(championshipId);
+            const {
+                force = false,
+                noCache = false,
+                cacheTtlMs = this._divisionCacheTtlMs,
+                ...requestOptions
+            } = options || {};
+            const skipCache = force === true || noCache === true;
+            if (!skipCache) {
+                const cached = this._divisionTeamCountCache.get(cacheKey);
+                if (cached) {
+                    if (cached.promise) {
+                        return cached.promise;
+                    }
+                    if (cached.data !== undefined && now() - cached.timestamp < cacheTtlMs) {
+                        return cached.data;
+                    }
+                    this._divisionTeamCountCache.delete(cacheKey);
+                }
+            }
+            const fetchPromise = this.getDivisionById(cacheKey, requestOptions)
+                .then(details => {
+                    const aggregates = details?.aggregates || {};
+                    const aggregateCount = Number(aggregates.team_count ?? aggregates.teams);
+                    const directCount = Number(details?.team_count ?? details?.teams_count ?? details?.total_teams);
+                    const teams = Array.isArray(details?.teams) ? details.teams : [];
+                    const resolved =
+                        (Number.isFinite(aggregateCount) && aggregateCount > 0
+                            ? aggregateCount
+                            : Number.isFinite(directCount) && directCount > 0
+                                ? directCount
+                                : teams.length) || 0;
+                    return Number.isFinite(resolved) ? resolved : 0;
+                });
+            if (!skipCache) {
+                this._divisionTeamCountCache.set(cacheKey, { promise: fetchPromise });
+            }
+            try {
+                const count = await fetchPromise;
+                if (!skipCache) {
+                    this._divisionTeamCountCache.set(cacheKey, { data: count, timestamp: now() });
+                }
+                return count;
+            } catch (error) {
+                if (!skipCache) {
+                    const tracked = this._divisionTeamCountCache.get(cacheKey);
+                    if (tracked && tracked.promise === fetchPromise) {
+                        this._divisionTeamCountCache.delete(cacheKey);
+                    }
+                }
+                throw error;
+            }
+        }
+
+        async getDivisionTeamIds(championshipId, options = {}) {
+            if (!championshipId) {
+                throw new Error('championshipId is required');
+            }
+            const details = await this.getDivisionById(championshipId, options);
+            const teams = Array.isArray(details?.teams) ? details.teams : [];
+            const ids = teams
+                .map(team => {
+                    if (team == null) return null;
+                    if (typeof team === 'string' || typeof team === 'number') return team;
+                    return (
+                        team.team_id ??
+                        team.teamId ??
+                        team.id ??
+                        team.teamID ??
+                        team.team ??
+                        team.name ??
+                        null
+                    );
+                })
+                .filter(value => value !== undefined && value !== null)
+                .map(value => String(value));
+            return ids;
+        }
+
+        async getSeasonTeamCount(seasonId, options = {}) {
+            const {
+                force = false,
+                noCache = false,
+                cacheTtlMs = this._divisionCacheTtlMs,
+                divisions,
+                ...requestOptions
+            } = options || {};
+            const cacheKey = seasonId != null ? String(seasonId) : null;
+            const skipCache = force === true || noCache === true || !cacheKey;
+            if (!skipCache) {
+                const cached = this._seasonTeamCountCache.get(cacheKey);
+                if (cached) {
+                    if (cached.promise) {
+                        return cached.promise;
+                    }
+                    if (cached.data !== undefined && now() - cached.timestamp < cacheTtlMs) {
+                        return cached.data;
+                    }
+                    this._seasonTeamCountCache.delete(cacheKey);
+                }
+            }
+            const fetchPromise = (async () => {
+                let list = Array.isArray(divisions) ? divisions : null;
+                if (!list) {
+                    if (!cacheKey) return 0;
+                    const result = await this.getDivisions(cacheKey);
+                    list = Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [];
+                }
+                const filtered = list.filter(entry => !(entry?.is_playoff || entry?.isPlayoff));
+                const ids = filtered
+                    .map(entry => entry?.division_id ?? entry?.divisionId ?? entry?.id ?? entry?.slug)
+                    .filter(value => value !== undefined && value !== null)
+                    .map(value => String(value));
+                const uniqueIds = Array.from(new Set(ids));
+                if (!uniqueIds.length) return 0;
+                const counts = await Promise.all(
+                    uniqueIds.map(id =>
+                        this.getDivisionTeamCount(id, requestOptions).catch(() => 0)
+                    )
+                );
+                return counts.reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+            })();
+            if (!skipCache) {
+                this._seasonTeamCountCache.set(cacheKey, { promise: fetchPromise });
+            }
+            try {
+                const total = await fetchPromise;
+                if (!skipCache) {
+                    this._seasonTeamCountCache.set(cacheKey, { data: total, timestamp: now() });
+                }
+                return total;
+            } catch (error) {
+                if (!skipCache) {
+                    const tracked = this._seasonTeamCountCache.get(cacheKey);
+                    if (tracked && tracked.promise === fetchPromise) {
+                        this._seasonTeamCountCache.delete(cacheKey);
+                    }
+                }
+                throw error;
+            }
+        }
+
+        async getLifetimeUniqueTeamCount(options = {}) {
+            const {
+                force = false,
+                noCache = false,
+                cacheTtlMs = this._divisionCacheTtlMs,
+                seasons,
+                includePlayoffs = false,
+                ...requestOptions
+            } = options || {};
+            const skipCache = force === true || noCache === true;
+            if (!skipCache && this._lifetimeUniqueTeamCountCache) {
+                if (this._lifetimeUniqueTeamCountCache.promise) {
+                    return this._lifetimeUniqueTeamCountCache.promise;
+                }
+                if (
+                    this._lifetimeUniqueTeamCountCache.data !== undefined &&
+                    now() - this._lifetimeUniqueTeamCountCache.timestamp < cacheTtlMs
+                ) {
+                    return this._lifetimeUniqueTeamCountCache.data;
+                }
+                this._lifetimeUniqueTeamCountCache = null;
+            }
+            const fetchPromise = (async () => {
+                const seasonList = Array.isArray(seasons) ? seasons : await this.getSeasons();
+                const seasonIds = seasonList
+                    .map(entry =>
+                        entry?.api_param ??
+                        entry?.apiParam ??
+                        entry?.id ??
+                        entry?.season_id ??
+                        entry?.seasonId ??
+                        entry?.season ??
+                        entry?.number ??
+                        entry?.key
+                    )
+                    .filter(value => value !== undefined && value !== null)
+                    .map(value => String(value));
+                const uniqueSeasonIds = Array.from(new Set(seasonIds));
+                if (!uniqueSeasonIds.length) return 0;
+
+                const uniqueTeams = new Set();
+                for (const seasonId of uniqueSeasonIds) {
+                    let list = [];
+                    try {
+                        const result = await this.getDivisions(seasonId);
+                        list = Array.isArray(result?.data) ? result.data : Array.isArray(result) ? result : [];
+                    } catch (error) {
+                        // skip season on fetch error
+                        continue;
+                    }
+                    const filtered = includePlayoffs
+                        ? list
+                        : list.filter(entry => !(entry?.is_playoff || entry?.isPlayoff));
+                    const divisionIds = filtered
+                        .map(entry => entry?.division_id ?? entry?.divisionId ?? entry?.id ?? entry?.slug)
+                        .filter(value => value !== undefined && value !== null)
+                        .map(value => String(value));
+                    const uniqueDivisionIds = Array.from(new Set(divisionIds));
+                    if (!uniqueDivisionIds.length) continue;
+                    const teamIdLists = await Promise.all(
+                        uniqueDivisionIds.map(id =>
+                            this.getDivisionTeamIds(id, requestOptions).catch(() => [])
+                        )
+                    );
+                    teamIdLists.flat().forEach(teamId => {
+                        if (teamId != null) {
+                            uniqueTeams.add(String(teamId));
+                        }
+                    });
+                }
+                return uniqueTeams.size;
+            })();
+            if (!skipCache) {
+                this._lifetimeUniqueTeamCountCache = { promise: fetchPromise };
+            }
+            try {
+                const total = await fetchPromise;
+                if (!skipCache) {
+                    this._lifetimeUniqueTeamCountCache = { data: total, timestamp: now() };
+                }
+                return total;
+            } catch (error) {
+                if (!skipCache && this._lifetimeUniqueTeamCountCache?.promise === fetchPromise) {
+                    this._lifetimeUniqueTeamCountCache = null;
                 }
                 throw error;
             }

@@ -301,7 +301,10 @@ window.HomeView = {
             seasonsStore,
             homeStore,
             divisionFilter: 'all',
-            divisionSearch: ''
+            divisionSearch: '',
+            seasonTeamCount: null,
+            seasonTeamCountKey: null,
+            globalTeamCount: null
         };
     },
     computed: {
@@ -362,7 +365,14 @@ window.HomeView = {
         },
         globalSummaryMetrics() {
             const aggregates = this.homeStore?.lifetimeSummary?.aggregates || {};
-            return buildMetricCards(aggregates, SUMMARY_METRIC_SCHEMA);
+            const metrics = buildMetricCards(aggregates, SUMMARY_METRIC_SCHEMA);
+            if (Number.isFinite(this.globalTeamCount) && this.globalTeamCount > 0) {
+                const target = metrics.find(metric => metric.key === 'teams');
+                if (target) {
+                    target.value = formatMetric(this.globalTeamCount, { digits: 0 });
+                }
+            }
+            return metrics;
         },
 
        seasonsLoading() {
@@ -431,7 +441,14 @@ window.HomeView = {
         },
         seasonSummaryMetrics() {
             const stats = this.seasonState.stats || {};
-            return buildMetricCards(stats, SUMMARY_METRIC_SCHEMA);
+            const metrics = buildMetricCards(stats, SUMMARY_METRIC_SCHEMA);
+            if (Number.isFinite(this.seasonTeamCount) && this.seasonTeamCount > 0) {
+                const target = metrics.find(metric => metric.key === 'teams');
+                if (target) {
+                    target.value = formatMetric(this.seasonTeamCount, { digits: 0 });
+                }
+            }
+            return metrics;
         },
         seasonDivisions() {
             const list = Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
@@ -467,7 +484,10 @@ window.HomeView = {
                 return 'Valitse kausi nähdäksesi kausikohtaiset luvut.';
             }
             const stats = this.seasonState.stats || {};
-            const teams = formatMetric(pickValue(stats, ['aggregates.total_teams', 'team_count', 'teams']), { digits: 0 });
+            const teamSource = Number.isFinite(this.seasonTeamCount) && this.seasonTeamCount > 0
+                ? this.seasonTeamCount
+                : pickValue(stats, ['aggregates.total_teams', 'team_count', 'teams']);
+            const teams = formatMetric(teamSource, { digits: 0 });
             const players = formatMetric(
                 pickValue(stats, ['aggregates.total_players', 'player_count', 'players']),
                 { digits: 0 }
@@ -699,6 +719,11 @@ window.HomeView = {
                     this.loadSeason(season.key, { apiParam: season.apiParam });
                 }
             }
+            this.loadGlobalTeamCount();
+            if (this.selectedSeasonKey) {
+                const season = this.seasonsStore?.getSeasonByKey(this.selectedSeasonKey);
+                this.loadSeasonTeamCount(season?.apiParam ?? season?.id ?? this.selectedSeasonKey, this.seasonDivisions);
+            }
         },
         initializeSeasonSelection(options = {}) {
             if (!this.sortedSeasons.length || !this.seasonsStore) {
@@ -836,6 +861,8 @@ window.HomeView = {
             if (!key || !this.homeStore) {
                 return;
             }
+            this.seasonTeamCount = null;
+            this.seasonTeamCountKey = null;
             const season = this.seasonsStore?.getSeasonByKey(key);
             const apiParam = options.apiParam ?? season?.apiParam ?? key;
             try {
@@ -851,8 +878,45 @@ window.HomeView = {
                         cacheTimestamp: payload?.cacheTimestamp
                     });
                 }
+                this.loadSeasonTeamCount(apiParam, payload?.divisions);
             } catch (error) {
                 console.error('Season fetch failed', error);
+            }
+        },
+        async loadSeasonTeamCount(seasonId, divisions) {
+            if (!seasonId || typeof window === 'undefined' || !window.apiClient?.getSeasonTeamCount) {
+                this.seasonTeamCount = null;
+                this.seasonTeamCountKey = seasonId ? String(seasonId) : null;
+                return;
+            }
+            const key = String(seasonId);
+            if (this.seasonTeamCountKey === key && Number.isFinite(this.seasonTeamCount) && this.seasonTeamCount > 0) {
+                return;
+            }
+            try {
+                const divisionsArg = Array.isArray(divisions) && divisions.length ? divisions : undefined;
+                const count = await window.apiClient.getSeasonTeamCount(key, { divisions: divisionsArg });
+                this.seasonTeamCount = Number.isFinite(count) ? count : null;
+                this.seasonTeamCountKey = key;
+            } catch (error) {
+                console.warn('[HomeView] Season team count fetch failed', error);
+            }
+        },
+        async loadGlobalTeamCount() {
+            if (typeof window === 'undefined' || !window.apiClient?.getLifetimeUniqueTeamCount) {
+                return;
+            }
+            if (Number.isFinite(this.globalTeamCount) && this.globalTeamCount > 0) {
+                return;
+            }
+            try {
+                const seasons = Array.isArray(this.seasonsStore?.seasons) && this.seasonsStore.seasons.length
+                    ? this.seasonsStore.seasons
+                    : undefined;
+                const count = await window.apiClient.getLifetimeUniqueTeamCount({ seasons });
+                this.globalTeamCount = Number.isFinite(count) ? count : null;
+            } catch (error) {
+                console.warn('[HomeView] Lifetime team count fetch failed', error);
             }
         },
         retrySeasons() {
@@ -868,9 +932,11 @@ window.HomeView = {
         },
         retrySummary() {
             if (!this.homeStore) return;
+            this.globalTeamCount = null;
             this.homeStore.fetchLifetimeSummary({ force: true }).catch(error => {
                 console.error('Summary refresh failed', error);
             });
+            this.loadGlobalTeamCount();
         },
         retrySeason() {
             if (!this.selectedSeasonKey) return;
@@ -889,6 +955,8 @@ window.HomeView = {
                 apiParam: season?.apiParam,
                 force: true
             });
+            this.seasonTeamCount = null;
+            this.seasonTeamCountKey = null;
         },
         getMetricIcon(key) {
             const icons = {
