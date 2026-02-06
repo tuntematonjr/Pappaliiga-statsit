@@ -75,8 +75,8 @@ const SANKARI_CARD_GROUPS = [
             },
             {
                 id: 'eagle',
-                title: 'Eläkeläis-Eagle',
-                description: 'Kun rahaa ei ole mutta rifleen, mutta luotto omaan käteen löytyy.<br>Eniten pistoolikillejä.',
+                title: 'Eläkeläis-dEagle',
+                description: 'Kun rahaa ei ole rifleen, mutta luotto omaan käteen löytyy.<br>Eniten pistooli tappoja.',
                 metricKey: 'pistolKills',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -98,7 +98,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'liiga-ruusu',
                 title: 'Liiga Ruusu',
-                description: 'Pelaa enemmän kuin ehtii nukkua. Klassinen "vielä yksi matsi" -mentaliteetti.<br>Eniten kierroksia pelattu.',
+                description: 'Vaimo kyselee koska tuut nukkumaan, mut papalla on vielä yks liiga matsi edessä.<br>Eniten kierroksia pelattu.',
                 metricKey: 'roundsPlayed',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -122,7 +122,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'tukipappajoukot',
                 title: 'Tukipappajoukot',
-                description: 'Syöttää frägejä kuin Pappa grillimakkaraa.<br>Eniten assists.',
+                description: 'Syöttää frägejä kuin Pappa grillimakkaraa.<br>Eniten assisteja.',
                 metricKey: 'assists',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -130,7 +130,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'parhaat-suonenvedot',
                 title: 'Parhaat suonenvedot',
-                description: 'Vaimo kyselee koska tuut nukkumaan, mut papalla on aim päällä.<br>Paras HS%.',
+                description: 'Alkulämmöt otettu vasta warmupissa vihun basessa, takaa parhaat suonenvedot.<br>Paras HS%.',
                 metricKey: 'hsPercent',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -168,7 +168,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'taysmaito',
                 title: 'Täysmaito',
-                description: 'Kerrankin jollain flash osuu muualle kuin omaan tiimiin.<br>Eniten onnistuneita flashbangheittoja.',
+                description: 'Kerrankin jollain flash osuu muualle kuin omaan tiimiin.<br>Eniten onnistuneita flashbängejä.',
                 metricKey: 'flashAssistPercent',
                 sortDirection: 'desc',
                 maxEntries: 4
@@ -192,7 +192,7 @@ const SANKARI_CARD_GROUPS = [
             {
                 id: 'valot-paalle',
                 title: 'Valot päälle, papat!',
-                description: 'Heittää flashin ennen kuin rundi edes alkaa.<br>Eniten heitettyjä flashbangeja.',
+                description: 'Heittää flashin ennen kuin rundi edes alkaa.<br>Eniten heitettyjä flashbängejä.',
                 metricKey: 'flashbangsThrown',
                 sortDirection: 'desc',
                 maxEntries: 4
