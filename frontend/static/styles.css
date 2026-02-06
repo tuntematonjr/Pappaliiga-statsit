@@ -222,22 +222,6 @@
     }
 }
 
-@keyframes titleUnderlineShimmer {
-    0% {
-        transform: translateX(calc(-50% - var(--title-underline-amp, 0px)));
-        background-position: 0% 50%;
-        opacity: 0.9;
-    }
-    50% {
-        opacity: 1;
-    }
-    100% {
-        transform: translateX(calc(-50% + var(--title-underline-amp, 0px)));
-        background-position: 100% 50%;
-        opacity: 0.92;
-    }
-}
-
 .title-duration-slow { --title-underline-duration: 7.25s; }
 .title-duration-fast { --title-underline-duration: 5s; }
 
@@ -3665,12 +3649,6 @@ html, body {
     overflow-x: hidden;
 }
 
-@media (min-width: 992px) {
-    .layout-boundary {
-        max-width: 90vw;
-    }
-}
-
 /* Keep tables and other wide components scrollable inside their containers */
 .table-container, .wide-scroll, .teams-grid, .season-grid {
     overflow-x: auto;
@@ -3725,15 +3703,6 @@ html, body {
         min-width: 80px;
         text-align: center;
         font-size: 0.9rem;
-    }
-}
-        width: 100%;
-        justify-content: space-between;
-    }
-
-    .nav-brand {
-        width: 100%;
-        justify-content: flex-start;
     }
 }
 
@@ -4222,11 +4191,6 @@ html, body {
 }
 
 
-/* ---- Utility color classes ---- */
-.text-ok { color: var(--ok) !important; }
-.text-warn { color: var(--warn) !important; }
-.text-err { color: var(--err) !important; }
-
 .chip { display:inline-flex; align-items:center; gap:8px; padding:4px 8px; border-radius:999px; font-size:0.9rem; font-weight:600; }
 .chip--accent { background: linear-gradient(90deg, rgba(58,163,255,0.12), rgba(125,211,252,0.08)); color: var(--accent-2); border:1px solid rgba(58,163,255,0.12); }
 .chip--ok { background: linear-gradient(90deg, rgba(57,217,138,0.07), rgba(57,217,138,0.03)); color: var(--ok); border:1px solid rgba(57,217,138,0.12); }
@@ -4235,20 +4199,10 @@ html, body {
 .chip--link { background: rgba(125, 211, 252, 0.14); border: 1px solid rgba(125, 211, 252, 0.4); color: #d5f3ff; }
 .chip--muted { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.08); color: var(--muted); }
 
-/* numeric stat coloring helpers */
-.stat-positive { color: var(--ok); font-weight:700; }
-.stat-negative { color: var(--err); font-weight:700; }
-.stat-neutral { color: var(--muted); }
-
 /* small badge used near headers */
 .badge-small { display:inline-block; padding:4px 8px; border-radius:8px; font-size:0.8rem; background: rgba(255,255,255,0.03); color:var(--muted); border:1px solid rgba(255,255,255,0.03); }
 
 
-.subtitle {
-	font-size: 0.85em;
-	color: var(--muted);
-	margin-top: 4px;
-}
 
 /* Team logos: different size for index vs division */
 img.logo.nav-logo {
@@ -4305,7 +4259,6 @@ body{
 }
 
 a{ color:var(--accent); text-decoration:none; }
-.muted{ color:var(--muted); }
 
 /* ---- Containers ---- */
 .container{ max-width:1800px; margin:0 auto; padding:24px; width: 100%; box-sizing: border-box; }
@@ -4625,15 +4578,11 @@ a{ color:var(--accent); text-decoration:none; }
 	transition: opacity 0.3s ease;
 }
 
-.stat-card:hover::before {
-	opacity: 1;
-}
-
-.stat-card:hover {
-	transform: translateY(-4px);
-	border-color: rgba(58,163,255,0.3);
-	box-shadow: 0 15px 30px rgba(58,163,255,0.2);
-}
+    .stat-card:hover {
+		transform: translateY(-4px);
+		border-color: rgba(58,163,255,0.3);
+		box-shadow: 0 15px 30px rgba(58,163,255,0.2);
+	}
 
 .stat-icon {
 	font-size: 2rem;
@@ -4731,11 +4680,6 @@ a{ color:var(--accent); text-decoration:none; }
 	animation: fadeIn 0.3s ease-in-out;
 }
 
-@keyframes fadeIn {
-	from { opacity: 0; transform: translateY(10px); }
-	to { opacity: 1; transform: translateY(0); }
-}
-
 .season-stats {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -4810,18 +4754,6 @@ a{ color:var(--accent); text-decoration:none; }
 	color: var(--muted);
 	margin-top: 4px;
 	text-align: center;
-}
-
-/* Enhanced animations and interactions */
-@keyframes fadeInUp {
-	from {
-		opacity: 0;
-		transform: translateY(30px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
 }
 
 .division-card {
@@ -5845,31 +5777,6 @@ body {
 	box-sizing: border-box;
 }
 
-/* Keyframe animations for collapsible content */
-@keyframes slideDown {
-	from {
-		opacity: 0;
-		transform: translateY(-10px);
-		max-height: 0;
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-		max-height: 2000px;
-	}
-}
-
-@keyframes fadeIn {
-	from {
-		opacity: 0;
-		transform: translateY(5px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-
 .chips {
 	display: flex;
 	flex-wrap: wrap;
@@ -5881,10 +5788,6 @@ body {
 /* Chip variants */
 .chip.small { padding: .25rem .5rem; font-size: .85rem; }
 .chip.large { padding: .5rem 1rem; font-size: 1.1rem; }
-
-.card:hover {
-	transform: none;
-}
 
 /* Team sections grid */
 .teams-grid {
@@ -7238,17 +7141,6 @@ body.is-division .card.maps-section {
     gap: 0.75rem;
     animation: fadeInUp 0.6s ease-out both;
     animation-delay: var(--animation-delay, 0s);
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 @keyframes breathingGlow {
