@@ -22,6 +22,11 @@ const router = createRouter({
             component: window.SeasonsView
         },
         {
+            path: '/season/current/upcoming',
+            name: 'season-upcoming',
+            component: window.UpcomingMatchesView
+        },
+        {
             path: '/division/:championshipId',
             name: 'division',
             component: window.DivisionView

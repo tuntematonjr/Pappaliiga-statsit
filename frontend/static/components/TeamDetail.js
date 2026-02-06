@@ -672,7 +672,8 @@ window.TeamDetail = {
         get ErrorMessage() { return window.ErrorMessage; },
         get SortableTable() { return window.SortableTable; },
         get PickBanFlow() { return window.PickBanFlow; },
-        get MatchExpandedDetails() { return window.MatchExpandedDetails; }
+        get MatchExpandedDetails() { return window.MatchExpandedDetails; },
+        get UpcomingMatchesList() { return window.UpcomingMatchesList; }
     },
     props: {
         teamId: { type: [String, Number], required: true },
@@ -680,8 +681,10 @@ window.TeamDetail = {
     },
     data() {
         const teamStore = typeof window.useTeamStore === 'function' ? window.useTeamStore() : null;
+        const upcomingStore = typeof window.useUpcomingStore === 'function' ? window.useUpcomingStore() : null;
         return {
             teamStore,
+            upcomingStore,
             selectedChampionship: this.championshipId ? String(this.championshipId) : null,
             activeTab: resolveTabFromQuery(this.$route),
             mapViewMode: 'summary', // 'summary' or 'full'
@@ -775,6 +778,32 @@ window.TeamDetail = {
                 return null;
             }
             return data;
+        },
+        upcomingParams() {
+            return {
+                teamId: this.teamId,
+                championshipId: this.currentChampionshipId,
+                limit: 6,
+                offset: 0
+            };
+        },
+        upcomingState() {
+            if (!this.upcomingStore || typeof this.upcomingStore.getEntryForParams !== 'function') {
+                return { data: [], loading: false, error: null };
+            }
+            if (!this.teamId || !this.currentChampionshipId) {
+                return { data: [], loading: false, error: null };
+            }
+            return this.upcomingStore.getEntryForParams(this.upcomingParams);
+        },
+        upcomingMatches() {
+            return Array.isArray(this.upcomingState.data) ? this.upcomingState.data : [];
+        },
+        upcomingLoading() {
+            return this.upcomingState.loading;
+        },
+        upcomingError() {
+            return this.upcomingState.error;
         },
         teamStats() {
             return this.seasonData?.teamStats || {};
@@ -1706,6 +1735,12 @@ window.TeamDetail = {
                 this.bootstrap();
             }
         },
+        currentChampionshipId: {
+            immediate: true,
+            handler() {
+                this.loadUpcoming();
+            }
+        },
         mapStats: {
             immediate: true,
             handler(newStats) {
@@ -2024,6 +2059,7 @@ window.TeamDetail = {
                     this.selectedChampionship = String(data.currentChampionshipId);
                     this.updateRoute(this.selectedChampionship, this.activeTab);
                 }
+                this.loadUpcoming();
             } catch (err) {
                 console.error('TeamDetail bootstrap failed', err);
             }
@@ -2036,12 +2072,24 @@ window.TeamDetail = {
                 console.error('TeamDetail season fetch failed', err);
             }
         },
+        async loadUpcoming(options = {}) {
+            if (!this.upcomingStore || !this.teamId || !this.currentChampionshipId) return;
+            try {
+                await this.upcomingStore.fetchUpcomingMatches(
+                    this.upcomingParams,
+                    { force: options.force === true }
+                );
+            } catch (error) {
+                console.error('[TeamDetail] upcoming matches fetch failed', error);
+            }
+        },
         selectChampionship(championshipId) {
             if (!championshipId || championshipId === this.currentChampionshipId) return;
             this.selectedChampionship = championshipId;
             this.fetchSeason(championshipId);
             this.updateRoute(championshipId, this.activeTab);
             this.expandedMatches = {};
+            this.loadUpcoming();
         },
         resolveChampionshipMeta(championshipId) {
             if (!championshipId) return { name: null, season: null };
@@ -2974,6 +3022,15 @@ window.TeamDetail = {
                 </section>
 
                 <section v-if="activeTab === 'matches'" class="team-section scout-view" id="team-tab-matches" role="tabpanel">
+                    <upcoming-matches-list
+                        :items="upcomingMatches"
+                        :loading="upcomingLoading"
+                        :error="upcomingError"
+                        title="Tulevat ottelut"
+                        :subtitle="selectedSeasonOption?.label || ''"
+                        empty-message="Ei tulevia otteluita tälle joukkueelle."
+                    ></upcoming-matches-list>
+
                     <div class="scout-panel scout-performance-trends matches-trends" ref="matchesTrendPanel">
                         <div class="section-heading section-heading--split">
                             <div class="section-heading__main">

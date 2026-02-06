@@ -321,16 +321,20 @@ window.DivisionView = {
         get MapsStats() { return window.MapsStats; },
         get CopyLink() { return window.CopyLink; },
         get SummaryStatCard() { return window.SummaryStatCard; },
-        get SankariCard() { return window.SankariCard; }
+        get SankariCard() { return window.SankariCard; },
+        get UpcomingMatchesList() { return window.UpcomingMatchesList; }
     },
     data() {
         const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
         const seasonsStore = typeof window.useSeasonsStore === 'function' ? window.useSeasonsStore() : null;
+        const upcomingStore = typeof window.useUpcomingStore === 'function' ? window.useUpcomingStore() : null;
         return {
             divisionStore,
             seasonsStore,
+            upcomingStore,
             mapColumns: DIVISION_MAP_COLUMNS,
             quickLinks: [
+                { id: 'upcoming', label: 'Tulevat ottelut' },
                 { id: 'summary', label: 'Tilastot' },
                 { id: 'standings', label: 'Joukkuavertailu' },
                 { id: 'maps', label: 'Karttatilastot' },
@@ -394,6 +398,28 @@ window.DivisionView = {
         },
         mapsError() {
             return this.mapsState.error;
+        },
+        upcomingState() {
+            if (!this.upcomingStore || !this.championshipId) {
+                return { data: [], loading: false, error: null };
+            }
+            if (typeof this.upcomingStore.getEntryForParams !== 'function') {
+                return { data: [], loading: false, error: null };
+            }
+            return this.upcomingStore.getEntryForParams({
+                championshipId: this.championshipId,
+                limit: 8,
+                offset: 0
+            });
+        },
+        upcomingMatches() {
+            return Array.isArray(this.upcomingState.data) ? this.upcomingState.data : [];
+        },
+        upcomingLoading() {
+            return this.upcomingState.loading;
+        },
+        upcomingError() {
+            return this.upcomingState.error;
         },
         sankariPlayers() {
             const source = this.divisionDetails?.player_totals || this.divisionDetails?.playerTotals || [];
@@ -715,6 +741,7 @@ window.DivisionView = {
             async handler(id) {
                 if (!id) return;
                 await this.loadDivision(id);
+                this.loadUpcoming(id);
             }
         },
         teamChipItems: {
@@ -735,9 +762,21 @@ window.DivisionView = {
             ];
             await Promise.allSettled(requests);
         },
+        async loadUpcoming(id, options = {}) {
+            if (!id || !this.upcomingStore) return;
+            try {
+                await this.upcomingStore.fetchUpcomingMatches(
+                    { championshipId: id, limit: 8, offset: 0 },
+                    { force: options.force === true }
+                );
+            } catch (error) {
+                console.error('[DivisionView] upcoming matches fetch failed', error);
+            }
+        },
         refreshAll() {
             if (!this.championshipId) return;
             this.loadDivision(this.championshipId, { force: true });
+            this.loadUpcoming(this.championshipId, { force: true });
         },
         scrollToSection(id) {
             const el = document.getElementById(id);
@@ -1181,6 +1220,17 @@ window.DivisionView = {
             ></error-message>
 
             <template v-else>
+                <section id="upcoming" class="division-section">
+                    <upcoming-matches-list
+                        :items="upcomingMatches"
+                        :loading="upcomingLoading"
+                        :error="upcomingError"
+                        title="Tulevat ottelut"
+                        :subtitle="divisionDetails?.name || ''"
+                        empty-message="Ei tulevia otteluita tälle divisioonalle."
+                    ></upcoming-matches-list>
+                </section>
+
                 <section id="summary" class="division-section">
                     <header class="division-section__heading">
                         <h2 class="title-accent titleUnderlineSection">Divisioonan tilastot</h2>

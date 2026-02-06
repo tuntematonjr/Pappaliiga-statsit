@@ -332,6 +332,16 @@ window.HomeView = {
                     logo: '/static/sosso-bot-logo.png'
                 },
                 {
+                    id: 'mobbi-cs',
+                    name: 'Mobbi CS',
+                    description: 'Pappaliigan tilastot: menneet ja tulevat kaudet, joukkueiden ja pelaajien kausikohtaiset statistiikat yhdessä paikassa. Puhdasta raakaa dataa ilman clutteria. Helposti filtteröitävissä olevat pelaaja statsit.',
+                    primaryLabel: 'Katso dataa Mobbi CS:ssä',
+                    primaryHref: 'https://cs.mobbi.dev/',
+                    // secondaryLabel: 'Komennot ja ohjeet',
+                    // secondaryHref: 'https://cultti.github.io/Sosso-Bot/',
+                    logo: 'https://cs.mobbi.dev/assets/img/og_image.png'
+                },
+                {
                     id: 'pappaliiga',
                     // eyebrow: 'Liiga',
                     name: 'Pappaliiga',
@@ -388,6 +398,20 @@ window.HomeView = {
                 return null;
             }
             return this.seasonsStore.getSeasonByKey(this.selectedSeasonKey);
+        },
+        currentSeason() {
+            if (!this.seasonsStore) return null;
+            return (
+                this.seasonsStore.currentSeason ||
+                this.seasonsStore.seasons?.find(season => season?.isActive) ||
+                this.seasonsStore.newestSeason ||
+                this.sortedSeasons?.[0] ||
+                null
+            );
+        },
+        currentSeasonLabel() {
+            if (!this.currentSeason) return 'Tulevat ottelut';
+            return this.currentSeason.label || this.currentSeason.shortLabel || `Kausi ${this.currentSeason.seasonNumber ?? this.currentSeason.id ?? ''}`.trim();
         },
         seasonState() {
             if (!this.selectedSeasonKey || !this.homeStore) {

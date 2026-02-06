@@ -165,6 +165,10 @@
             `/api/maps_catalog`,
             `/api/maps-catalog`,
             `/api/maps/catalog`
+        ],
+        upcomingMatches: query => [
+            `/api/matches/upcoming${query}`,
+            `/api/v1/matches/upcoming${query}`
         ]
     });
 
@@ -194,6 +198,21 @@
             absoluteUrl: `${origin}${normalized}`,
             displayPath: normalized
         };
+    }
+
+    function buildQueryString(params) {
+        if (!params || typeof params !== 'object') {
+            return '';
+        }
+        const entries = Object.entries(params)
+            .filter(([, value]) => value !== undefined && value !== null && value !== '');
+        if (!entries.length) {
+            return '';
+        }
+        const query = entries
+            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+            .join('&');
+        return query ? `?${query}` : '';
     }
 
     function buildRouteCandidates(key, ...args) {
@@ -1032,6 +1051,29 @@
             const items = Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload) ? payload : []);
             const targetId = String(championshipId);
             return items.filter(match => String(match?.championship_id ?? match?.championshipId ?? '') === targetId);
+        }
+
+        async getUpcomingMatches(params = {}, options = {}) {
+            const queryParams = {
+                championship_id: params.championshipId ?? params.championship_id ?? null,
+                team_id: params.teamId ?? params.team_id ?? null,
+                season: params.season ?? params.seasonId ?? params.season_id ?? null,
+                include_playoffs:
+                    typeof params.includePlayoffs === 'boolean'
+                        ? params.includePlayoffs
+                        : (typeof params.include_playoffs === 'boolean' ? params.include_playoffs : null),
+                limit: params.limit ?? null,
+                offset: params.offset ?? null
+            };
+            const query = buildQueryString(queryParams);
+            const routes = buildRouteCandidates('upcomingMatches', query);
+            const result = await fetchWithFallback(routes, options);
+            const payload = result?.data ?? result ?? {};
+            const items = Array.isArray(payload?.items) ? payload.items : (Array.isArray(payload) ? payload : []);
+            return {
+                items,
+                meta: payload?.meta || result?.meta || null
+            };
         }
 
         async getTeamInfo(teamId, options = {}) {

@@ -70,6 +70,31 @@ class MatchListResponse(CamelModel):
     meta: PaginationMeta
 
 
+class UpcomingMatchSummary(CamelModel):
+    match_id: str
+    championship_id: str
+    season: int
+    division_num: int
+    is_playoffs: bool
+    division_name: Optional[str] = None
+    division_slug: Optional[str] = None
+    status: Optional[str] = None
+    scheduled_ts: Optional[int] = None
+    scheduled_at: Optional[str] = None
+    team1_id: Optional[str] = None
+    team2_id: Optional[str] = None
+    team1_name: Optional[str] = None
+    team2_name: Optional[str] = None
+    team1_avatar: Optional[str] = None
+    team2_avatar: Optional[str] = None
+    faceit_url: Optional[str] = None
+
+
+class UpcomingMatchListResponse(CamelModel):
+    items: List[UpcomingMatchSummary]
+    meta: PaginationMeta
+
+
 def _set_revision_headers(response: Response, *, etag: str, revision: Optional[str]) -> None:
     response.headers["ETag"] = etag
     if revision:
@@ -94,6 +119,31 @@ async def get_division_matches(
     _set_revision_headers(response, etag=etag, revision=revision)
     return MatchListResponse(
         items=[MatchSummary(**row) for row in items],
+        meta=PaginationMeta(total=total, limit=limit, offset=offset),
+    )
+
+
+@router.get("/upcoming", response_model=UpcomingMatchListResponse)
+async def get_upcoming_matches(
+    response: Response,
+    championship_id: Optional[str] = Query(None),
+    team_id: Optional[str] = Query(None),
+    season: Optional[int] = Query(None),
+    include_playoffs: bool = Query(True),
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    items, total, revision, etag = await matches_service.get_upcoming_matches(
+        championship_id=championship_id,
+        team_id=team_id,
+        season=season,
+        include_playoffs=include_playoffs,
+        limit=limit,
+        offset=offset,
+    )
+    _set_revision_headers(response, etag=etag, revision=revision)
+    return UpcomingMatchListResponse(
+        items=[UpcomingMatchSummary(**row) for row in items],
         meta=PaginationMeta(total=total, limit=limit, offset=offset),
     )
 

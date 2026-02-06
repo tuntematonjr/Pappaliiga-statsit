@@ -1,19 +1,66 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timezone
 from typing import Any, Tuple
 
 from db_async import query_async
 
 from api.exceptions import NotFoundError
+from api.services.cache_helpers import (
+    get_championship_revision,
+    get_global_revision,
+    get_season_revision,
+)
 from api.utils.cache import AsyncTTLCache
 
 _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=30, maxsize=256)
+_UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=30, maxsize=256)
+
+_UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
 
 
 def _build_etag(championship_id: str, revision: Any, total: int, limit: int, offset: int) -> str:
     source = f"{championship_id}:{revision}:{total}:{limit}:{offset}"
     return hashlib.md5(source.encode("utf-8")).hexdigest()
+
+
+def _build_upcoming_etag(
+    revision: Any,
+    total: int,
+    limit: int,
+    offset: int,
+    championship_id: str | None,
+    team_id: str | None,
+    season: int | None,
+    include_playoffs: bool,
+) -> str:
+    source = f"{revision}:{total}:{limit}:{offset}:{championship_id}:{team_id}:{season}:{include_playoffs}"
+    return hashlib.md5(source.encode("utf-8")).hexdigest()
+
+
+def _coerce_epoch_ms(value: Any) -> int | None:
+    if value in (None, 0):
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        else:
+            value = value.astimezone(timezone.utc)
+        return int(value.timestamp() * 1000)
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        return None
+    if abs(numeric) < 1_000_000_000_000:
+        numeric *= 1000
+    return numeric
+
+
+def _iso_from_epoch(ms: int | None) -> str | None:
+    if ms is None:
+        return None
+    return datetime.fromtimestamp(ms / 1000, tz=timezone.utc).isoformat()
 
 
 async def get_division_matches(
@@ -221,3 +268,118 @@ async def get_match_player_stats(match_id: str) -> list[dict[str, Any]]:
             }
         )
     return normalized
+
+
+async def get_upcoming_matches(
+    *,
+    championship_id: str | None = None,
+    team_id: str | None = None,
+    season: int | None = None,
+    include_playoffs: bool = True,
+    limit: int,
+    offset: int,
+) -> Tuple[list[dict[str, Any]], int, str | None, str]:
+    if championship_id:
+        revision = await get_championship_revision(championship_id)
+    elif season is not None:
+        revision = await get_season_revision(season)
+    else:
+        revision = await get_global_revision()
+
+    statuses_sql = ", ".join([f"'{status}'" for status in _UPCOMING_STATUSES])
+    where_clauses = [f"UPPER(COALESCE(m.status, '')) IN ({statuses_sql})"]
+    params: dict[str, Any] = {"limit": limit, "offset": offset}
+
+    if championship_id:
+        where_clauses.append("m.championship_id = :champ_id")
+        params["champ_id"] = championship_id
+    if team_id:
+        where_clauses.append("(m.team1_id = :team_id OR m.team2_id = :team_id)")
+        params["team_id"] = team_id
+    if season is not None:
+        where_clauses.append("c.season = :season")
+        params["season"] = season
+    if not include_playoffs:
+        where_clauses.append("c.is_playoffs = 0")
+
+    where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+
+    async def producer() -> Tuple[list[dict[str, Any]], int, str | None, str]:
+        rows = await query_async(
+            f"""
+            SELECT
+                m.match_id,
+                m.championship_id,
+                c.season,
+                c.division_num,
+                c.is_playoffs,
+                c.name AS division_name,
+                c.slug AS division_slug,
+                m.status,
+                m.team1_id,
+                m.team2_id,
+                COALESCE(tc1.team_name, t1.name) AS team1_name,
+                COALESCE(tc2.team_name, t2.name) AS team2_name,
+                t1.avatar AS team1_avatar,
+                t2.avatar AS team2_avatar,
+                NULLIF(m.scheduled_at, 0) AS scheduled_at,
+                NULLIF(m.configured_at, 0) AS configured_at,
+                NULLIF(m.started_at, 0) AS started_at,
+                COALESCE(
+                    NULLIF(m.scheduled_at, 0),
+                    NULLIF(m.configured_at, 0),
+                    NULLIF(m.started_at, 0),
+                    NULLIF(m.activity_ts, 0)
+                ) AS scheduled_ts
+            FROM matches m
+            JOIN championships c ON c.championship_id = m.championship_id
+            LEFT JOIN teams t1 ON t1.team_id = m.team1_id
+            LEFT JOIN teams t2 ON t2.team_id = m.team2_id
+            LEFT JOIN team_championships tc1 ON tc1.team_id = m.team1_id AND tc1.championship_id = m.championship_id
+            LEFT JOIN team_championships tc2 ON tc2.team_id = m.team2_id AND tc2.championship_id = m.championship_id
+            WHERE {where_sql}
+            ORDER BY (scheduled_ts IS NULL) ASC, scheduled_ts ASC, m.match_id ASC
+            LIMIT :limit OFFSET :offset
+            """,
+            params,
+        )
+
+        count_rows = await query_async(
+            f"""
+            SELECT COUNT(*) AS total
+            FROM matches m
+            JOIN championships c ON c.championship_id = m.championship_id
+            WHERE {where_sql}
+            """,
+            {k: v for k, v in params.items() if k not in {"limit", "offset"}},
+        )
+        total = int(count_rows[0].get("total") or 0) if count_rows else 0
+
+        normalized: list[dict[str, Any]] = []
+        for row in rows:
+            scheduled_ms = _coerce_epoch_ms(row.get("scheduled_ts"))
+            normalized.append(
+                {
+                    **row,
+                    "is_playoffs": bool(row.get("is_playoffs")),
+                    "scheduled_ts": scheduled_ms,
+                    "scheduled_at": _iso_from_epoch(scheduled_ms),
+                    "faceit_url": f"https://www.faceit.com/cs2/room/{row.get('match_id')}" if row.get("match_id") else "",
+                }
+            )
+
+        etag = _build_upcoming_etag(
+            revision,
+            total,
+            limit,
+            offset,
+            championship_id,
+            team_id,
+            season,
+            include_playoffs,
+        )
+        return normalized, total, revision, etag
+
+    cache_key = (championship_id, team_id, season, include_playoffs, limit, offset, revision)
+    cached_value, _ = await _UPCOMING_MATCH_CACHE.get_or_set(cache_key, producer)
+    return cached_value

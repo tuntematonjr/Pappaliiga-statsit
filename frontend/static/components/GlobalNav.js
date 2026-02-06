@@ -33,6 +33,7 @@
             const router = useRouter();
             const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
             const teamStore = typeof window.useTeamStore === 'function' ? window.useTeamStore() : null;
+            const seasonsStore = typeof window.useSeasonsStore === 'function' ? window.useSeasonsStore() : null;
 
             function beautifyDivisionLabel(value) {
                 if (!value) return '';
@@ -122,6 +123,16 @@
                 return '';
             }
 
+            function resolveCurrentSeasonLabel() {
+                if (!seasonsStore) return '';
+                const current = seasonsStore.currentSeason || seasonsStore.seasons?.find(season => season?.isActive) || seasonsStore.newestSeason || null;
+                if (!current) return '';
+                const label = current.label || current.shortLabel || null;
+                if (label) return label;
+                const seasonId = current.id ?? current.seasonNumber ?? null;
+                return seasonId != null ? `Kausi ${seasonId}` : '';
+            }
+
             const breadcrumbs = computed(() => {
                 const crumbs = [];
                 const routeName = route.name;
@@ -136,6 +147,17 @@
                     to: { name: 'home' },
                     disabled: routeName === 'home'
                 });
+
+                if (routeName === 'season-upcoming') {
+                    const seasonLabel = resolveCurrentSeasonLabel();
+                    crumbs.push({
+                        key: 'season-upcoming',
+                        label: seasonLabel ? `Tulevat ottelut (${seasonLabel})` : 'Tulevat ottelut',
+                        icon: '📅',
+                        to: { name: 'season-upcoming' },
+                        disabled: true
+                    });
+                }
 
                 // Division/Championship context
                 if (params.championshipId) {
