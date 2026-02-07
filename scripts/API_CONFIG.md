@@ -1,41 +1,38 @@
-API configuration: env vs runtime injection
+API base URL configuration
 
-When running the SPA and backend on different origins (typical during local development), the frontend needs to know where to call the API.
+`frontend/static/api-client.js` resolves the API base URL in this order:
 
-Options
+1) `window.PL_API_URL`
+2) `window.__API_BASE__`
+3) Fallback: `${window.location.origin}/api`
 
-1) Runtime injection (recommended)
-   - The backend injects a small script into `index.html` that sets `window.__API_BASE__` before the SPA bundles load.
-   - Pros: simple, works with static files, easy to change per environment, no rebuild needed.
-   - Cons: requires backend to serve index.html (api.main already does this).
+If you run API + frontend from the same origin (default local setup with uvicorn), no extra config is needed.
 
-   Example (in `api/main.py` SPA fallback):
+## Runtime override (recommended for split origins)
 
-   ```python
-   # read index.html bytes
-   text = index_path.read_text(encoding='utf-8')
-   injection = f"<script>window.__API_BASE__ = '{api_base}';</script>"
-   text = text.replace('<!-- API Client -->', injection)
-   return Response(text, media_type='text/html')
-   ```
+Add a script before `/static/api-client.js` in `frontend/index.html`:
 
-   Or insert the script before the first `/static/api-client.js` script tag so the client picks it up automatically.
+```html
+<script>window.PL_API_URL = 'http://localhost:8000/api';</script>
+```
 
-2) Build-time / env var
-   - Pass an environment variable into the build or create a small `config.js` file during the build.
-   - Pros: no runtime replacement, works well for static hosting.
-   - Cons: requires rebuild to change the value.
+Use this when the frontend and backend run on different hosts/ports.
 
-   Example: create `frontend/static/config.js` during CI with:
-   ```bash
-   echo "window.__API_BASE__='https://api.example.com/api';" > frontend/static/config.js
-   ```
-   Then include `<script src="/static/config.js"></script>` before `api-client.js` in `index.html`.
+## Static config file option
 
-3) Proxy `/api` from frontend dev server
-   - Modify `serve_frontend.py` to forward `/api` to `http://localhost:8000`.
-   - Pros: frontend code doesn't need changes. Cons: adds proxying logic to the dev server.
+Create `frontend/static/config.js` during deploy:
 
-Recommendation
-- Use runtime injection for the backend-served SPA (easy to implement in `api/main.py`), and keep the hostname heuristic as a development fallback.
-- For static hosting (S3, Netlify), prefer build-time `config.js` or environment variable substitution during deployment.
+```bash
+echo "window.PL_API_URL='https://api.example.com/api';" > frontend/static/config.js
+```
+
+Then include it before `api-client.js`:
+
+```html
+<script src="/static/config.js"></script>
+```
+
+## Notes
+
+- `api/main.py` currently serves `frontend/index.html` as-is and does not inject API base values at runtime.
+- Keep URL scripts before `/static/api-client.js` so the client picks the value during initialization.
