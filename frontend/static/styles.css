@@ -2373,6 +2373,31 @@
     box-shadow: 0 26px 45px rgba(5, 9, 20, 0.45);
 }
 
+.division-view .upcoming-matches,
+.division-view .maps-stats.card,
+.division-view .team-comparison {
+    margin-bottom: 0;
+}
+
+.division-section-card {
+    padding: clamp(1.1rem, 2vw, 1.65rem);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.9rem, 1.5vw, 1.25rem);
+}
+
+.division-section-card .division-section__heading {
+    margin-bottom: 0;
+}
+
+.division-section-card .division-summary-grid {
+    margin-top: 0;
+}
+
+.division-section-card .division-section__empty {
+    margin: 0;
+}
+
 .division-team-module {
     display: flex;
     flex-direction: column;
@@ -2618,15 +2643,15 @@
 }
 
 .division-section--heroes {
-    margin-top: clamp(2rem, 4vw, 2.8rem);
-    margin-bottom: clamp(2.4rem, 4vw, 3.2rem);
-    padding: clamp(2.4rem, 4vw, 3.2rem) 0 clamp(2.8rem, 4vw, 3.6rem);
-    background: radial-gradient(120% 180% at 50% 30%, rgba(25, 36, 74, 0.45), rgba(10, 15, 34, 0.9));
+    margin-top: 0;
+    margin-bottom: 0;
+    padding: 0;
+    background: none;
 }
 
 .division-section--heroes .division-section__heading {
     text-align: center;
-    margin-bottom: clamp(2rem, 3vw, 2.4rem);
+    margin-bottom: clamp(0.8rem, 1.5vw, 1.1rem);
 }
 
 .division-section--heroes .division-section__heading h2 {
@@ -4902,182 +4927,200 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
     height: 24px;
     border-radius: 999px;
     overflow: hidden;
-    background: transparent;
-    border: 1px solid rgba(90, 145, 255, 0.25);
+    background:
+        linear-gradient(
+            90deg,
+            rgba(90, 200, 255, 0.88) 0%,
+            rgba(66, 238, 215, 0.84) var(--split-win, 50%),
+            rgba(248, 132, 118, 0.82) var(--split-win, 50%),
+            rgba(255, 174, 145, 0.78) 100%
+        );
+    border: 1px solid rgba(90, 145, 255, 0.3);
     z-index: 2;
     flex: 1 1 auto;
     width: 100%;
     min-width: 0;
-    /* Wavy seam driver (single source of truth):
-       Both .win and .loss read the same inherited --wave-offset, so they stay in sync.
-       Aggressive animation: 1.8s for faster, more intense wave motion. */
-    --wave-offset: 0;
-    animation: waveSeam 1.8s ease-in-out infinite;
 }
 
-.bar-split::before {
-    content: '';
+.split-shimmer {
     position: absolute;
-    top: 0;
-    bottom: 0;
-    /* Removed sharp vertical core line (user preference).
-       Keep the softer collision/interference via ::after + ripples. */
-    width: 0;
-    left: var(--split-win, 50%);
-    transform: translateX(0);
-    background: transparent;
-    box-shadow: none;
-    opacity: 0;
+    inset: 0;
     pointer-events: none;
-    z-index: 3;
-    animation: none;
+    z-index: 2;
+    background: linear-gradient(
+        110deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0) 35%,
+        rgba(255, 255, 255, 0.2) 50%,
+        rgba(255, 255, 255, 0) 65%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 220% 100%;
+    animation: splitShimmer 2.4s linear infinite;
+    mix-blend-mode: screen;
 }
 
-.bar-split::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 64px;
-    left: var(--split-win, 50%);
-    transform: translate(-50%, 0);
-    /* Energy interference gradient: collision of blue and red beams.
-       Aggressive: wider, brighter, faster pulsing. */
-    background:
-        linear-gradient(
-            90deg,
-            rgba(90, 210, 255, 0.0) 0%,
-            rgba(90, 210, 255, 0.5) 25%,
-            rgba(140, 255, 240, 0.4) 42%,
-            rgba(255, 255, 255, 0.45) 50%,
-            rgba(255, 200, 180, 0.4) 58%,
-            rgba(255, 170, 140, 0.5) 75%,
-            rgba(255, 170, 140, 0.0) 100%
-        ),
-        radial-gradient(
-            ellipse at 50% 50%,
-            rgba(255, 255, 255, 0.55) 0%,
-            rgba(255, 255, 255, 0.15) 40%,
-            rgba(255, 255, 255, 0.0) 70%
+@keyframes splitShimmer {
+    0% {
+        background-position: 130% 0;
+    }
+    100% {
+        background-position: -130% 0;
+    }
+}
+
+@keyframes clashSway {
+    0%, 100% {
+        transform: translateX(-2.2px);
+    }
+    50% {
+        transform: translateX(2.2px);
+    }
+}
+
+@keyframes winSeamIdle {
+    0%, 100% {
+        clip-path: polygon(
+            0 0, 100% 0,
+            calc(100% + 1.8px) 0%,
+            calc(100% - 1.8px) 14%,
+            calc(100% + 3.3px) 28%,
+            calc(100% - 2.7px) 42%,
+            calc(100% + 3.8px) 56%,
+            calc(100% - 2.4px) 72%,
+            calc(100% + 2.9px) 86%,
+            calc(100% + 1.8px) 100%,
+            0 100%
         );
-    opacity: calc(var(--split-divider-opacity, 0) * 1.0);
-    filter: blur(1.2px);
-    pointer-events: none;
-    z-index: 2;
-    animation: collisionPulse 1.8s ease-in-out infinite,
-        collisionDrift 1.8s ease-in-out infinite;
-}
-
-/* Wave animation: shifts wave pattern vertically to create moving seam effect.
-   Adjust --wave-offset range to control wave speed; change amplitude (3px) in clip-path for wave size. */
-@keyframes waveSeam {
-    0% {
-        --wave-offset: 0;
-    }
-    100% {
-        --wave-offset: 1;
-    }
-}
-
-/* Beam intensity pulse: brightens the core collision line */
-@keyframes beamIntensity {
-    0%, 100% {
-        opacity: calc(var(--split-divider-opacity, 0) * 0.75);
-        filter: blur(0.5px);
     }
     50% {
-        opacity: calc(var(--split-divider-opacity, 0) * 1.0);
-        filter: blur(0.3px);
+        clip-path: polygon(
+            0 0, 100% 0,
+            calc(100% + 2.1px) 0%,
+            calc(100% - 2.4px) 14%,
+            calc(100% + 4.2px) 28%,
+            calc(100% - 2px) 42%,
+            calc(100% + 4.8px) 56%,
+            calc(100% - 2.8px) 72%,
+            calc(100% + 2.2px) 86%,
+            calc(100% + 2.1px) 100%,
+            0 100%
+        );
     }
 }
 
-/* Collision pulse: energy interference field intensity variation (aggressive/fast) */
-@keyframes collisionPulse {
+@keyframes lossSeamIdle {
     0%, 100% {
-        opacity: calc(var(--split-divider-opacity, 0) * 0.8);
-        filter: blur(1.0px);
+        clip-path: polygon(
+            0 0, 100% 0, 100% 100%,
+            calc(0% - 1.8px) 100%,
+            calc(0% + 1.8px) 86%,
+            calc(0% - 3.3px) 72%,
+            calc(0% + 2.7px) 58%,
+            calc(0% - 3.8px) 44%,
+            calc(0% + 2.4px) 28%,
+            calc(0% - 2.9px) 14%,
+            calc(0% - 1.8px) 0%
+        );
     }
     50% {
-        opacity: calc(var(--split-divider-opacity, 0) * 1.2);
-        filter: blur(0.8px);
+        clip-path: polygon(
+            0 0, 100% 0, 100% 100%,
+            calc(0% - 2.1px) 100%,
+            calc(0% + 2.4px) 86%,
+            calc(0% - 4.2px) 72%,
+            calc(0% + 2px) 58%,
+            calc(0% - 4.8px) 44%,
+            calc(0% + 2.8px) 28%,
+            calc(0% - 2.2px) 14%,
+            calc(0% - 2.1px) 0%
+        );
     }
 }
 
-/* Collision drift: horizontal shimmer of interference field */
-@keyframes collisionDrift {
+@keyframes winSeamClash {
     0%, 100% {
-        transform: translate(-50%, 0);
+        clip-path: polygon(
+            0 0, 100% 0,
+            calc(100% + 2.8px) 0%,
+            calc(100% - 3px) 12%,
+            calc(100% + 6.5px) 24%,
+            calc(100% - 4.6px) 36%,
+            calc(100% + 7.8px) 50%,
+            calc(100% - 4.9px) 64%,
+            calc(100% + 6px) 76%,
+            calc(100% - 3.1px) 88%,
+            calc(100% + 2.8px) 100%,
+            0 100%
+        );
+        transform: translateX(1.8px);
+        filter: brightness(1.02) saturate(1.05);
     }
-    33% {
-        transform: translate(calc(-50% + 2px), 0);
-    }
-    66% {
-        transform: translate(calc(-50% - 2px), 0);
+    50% {
+        clip-path: polygon(
+            0 0, 100% 0,
+            calc(100% + 3.8px) 0%,
+            calc(100% - 4px) 12%,
+            calc(100% + 8.6px) 24%,
+            calc(100% - 5.8px) 36%,
+            calc(100% + 10px) 50%,
+            calc(100% - 6.2px) 64%,
+            calc(100% + 7.8px) 76%,
+            calc(100% - 4px) 88%,
+            calc(100% + 3.8px) 100%,
+            0 100%
+        );
+        transform: translateX(-2.6px);
+        filter: brightness(1.14) saturate(1.15);
     }
 }
 
-/* Ripple effects: expanding energy rings from seam collision.
-   Adjust animation duration (1.8s, 1.8s + 0.6s delay) to control ripple frequency.
-   Modify scale values for ripple size. */
-.seam-ripple {
-    position: absolute;
-    top: 50%;
-    left: var(--split-win, 50%);
-    width: 20px;
-    height: 20px;
-    transform: translate(-50%, -50%) scale(0);
-    border-radius: 50%;
-    border: 1.5px solid rgba(255, 255, 255, 0.5);
-    box-shadow:
-        0 0 8px rgba(140, 210, 255, 0.4),
-        0 0 12px rgba(255, 170, 140, 0.3),
-        inset 0 0 6px rgba(255, 255, 255, 0.2);
-    opacity: 0;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.seam-ripple-1 {
-    animation: rippleExpand 1.8s ease-out infinite;
-}
-
-.seam-ripple-2 {
-    animation: rippleExpand 1.8s ease-out 0.6s infinite;
-}
-
-/* Ripple expand animation: ring grows and fades */
-@keyframes rippleExpand {
-    0% {
-        transform: translate(-50%, -50%) scale(0.3);
-        opacity: 0.8;
+@keyframes lossSeamClash {
+    0%, 100% {
+        clip-path: polygon(
+            0 0, 100% 0, 100% 100%,
+            calc(0% - 2.8px) 100%,
+            calc(0% + 3px) 88%,
+            calc(0% - 6.5px) 76%,
+            calc(0% + 4.6px) 64%,
+            calc(0% - 7.8px) 50%,
+            calc(0% + 4.9px) 36%,
+            calc(0% - 6px) 24%,
+            calc(0% + 3.1px) 12%,
+            calc(0% - 2.8px) 0%
+        );
+        transform: translateX(-1.8px);
+        filter: brightness(1.02) saturate(1.05);
     }
-    60% {
-        opacity: 0.4;
-    }
-    100% {
-        transform: translate(-50%, -50%) scale(2.5);
-        opacity: 0;
+    50% {
+        clip-path: polygon(
+            0 0, 100% 0, 100% 100%,
+            calc(0% - 3.8px) 100%,
+            calc(0% + 4px) 88%,
+            calc(0% - 8.6px) 76%,
+            calc(0% + 5.8px) 64%,
+            calc(0% - 10px) 50%,
+            calc(0% + 6.2px) 36%,
+            calc(0% - 7.8px) 24%,
+            calc(0% + 4px) 12%,
+            calc(0% - 3.8px) 0%
+        );
+        transform: translateX(2.6px);
+        filter: brightness(1.14) saturate(1.15);
     }
 }
 
 /* Accessibility: disable animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
-    .bar-split {
+    .split-shimmer {
         animation: none;
-        /* Static wavy seam: subtle organic edge without animation */
-        --wave-offset: 0.25;
+        opacity: 0.35;
+        background-position: 50% 0;
     }
-    .bar-split::before {
+    .bar-split .win,
+    .bar-split .loss {
         animation: none;
-        opacity: calc(var(--split-divider-opacity, 0) * 0.8);
-    }
-    .bar-split::after {
-        animation: none;
-        opacity: calc(var(--split-divider-opacity, 0) * 0.75);
-    }
-    .seam-ripple {
-        animation: none;
-        opacity: 0;
+        transform: none;
     }
 }
 
@@ -5096,26 +5139,7 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
         radial-gradient(circle at 100% 50%, rgba(170, 255, 255, 0.28), transparent 58%),
         linear-gradient(90deg, rgba(90, 200, 255, 0.95), rgba(60, 255, 210, 0.9));
     background-blend-mode: screen;
-    /* Wavy seam: IMPORTANT: anchor to the segment's own edge (100%),
-       not to --split-win (container %) to avoid gaps/misalignment.
-       Aggressive wave: 5px amplitude for more dramatic motion. */
-    clip-path: polygon(
-        0 0,
-        100% 0,
-        calc(100% - 0.5px + sin(var(--wave-offset, 0) * 6.283) * 5px) calc(0% + 0 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.1) * 6.283) * 5px) calc(0% + 1 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.2) * 6.283) * 5px) calc(0% + 2 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.3) * 6.283) * 5px) calc(0% + 3 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.4) * 6.283) * 5px) calc(0% + 4 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.5) * 6.283) * 5px) calc(0% + 5 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.6) * 6.283) * 5px) calc(0% + 6 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.7) * 6.283) * 5px) calc(0% + 7 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.8) * 6.283) * 5px) calc(0% + 8 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 0.9) * 6.283) * 5px) calc(0% + 9 * 10%),
-        calc(100% - 0.5px + sin((var(--wave-offset, 0) + 1.0) * 6.283) * 5px) 100%,
-        0 100%
-    );
-    /* No animation here; parent (.bar-split) animates --wave-offset for perfect sync. */
+    animation: winSeamIdle 3.05s ease-in-out infinite;
 }
 
 .bar-split .loss {
@@ -5124,25 +5148,19 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
         radial-gradient(circle at 0% 50%, rgba(255, 190, 160, 0.28), transparent 58%),
         linear-gradient(90deg, rgba(249, 112, 102, 0.8), rgba(255, 174, 145, 0.7));
     background-blend-mode: screen;
-    /* Complementary wavy edge on loss side.
-       Aggressive wave: 5px amplitude for more dramatic motion. */
-    clip-path: polygon(
-        0 0,
-        100% 0,
-        100% 100%,
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 1.0) * 6.283) * 5px) 100%,
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.9) * 6.283) * 5px) calc(100% - 1 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.8) * 6.283) * 5px) calc(100% - 2 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.7) * 6.283) * 5px) calc(100% - 3 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.6) * 6.283) * 5px) calc(100% - 4 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.5) * 6.283) * 5px) calc(100% - 5 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.4) * 6.283) * 5px) calc(100% - 6 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.3) * 6.283) * 5px) calc(100% - 7 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.2) * 6.283) * 5px) calc(100% - 8 * 10%),
-        calc(0% + 0.5px + sin((var(--wave-offset, 0) + 0.1) * 6.283) * 5px) calc(100% - 9 * 10%),
-        calc(0% + 0.5px + sin(var(--wave-offset, 0) * 6.283) * 5px) 0%
-    );
-    /* No animation here; parent (.bar-split) animates --wave-offset for perfect sync. */
+    animation: lossSeamIdle 3.65s ease-in-out infinite -0.45s;
+}
+
+.bar-split--clash .win {
+    animation:
+        winSeamClash 3.15s ease-in-out infinite,
+        clashSway 3.85s ease-in-out infinite;
+}
+
+.bar-split--clash .loss {
+    animation:
+        lossSeamClash 4.25s ease-in-out infinite -0.7s,
+        clashSway 4.9s ease-in-out infinite reverse -0.35s;
 }
 
 .bar-split--animating .win,
@@ -9173,6 +9191,54 @@ a:focus,
     background: rgba(120, 170, 245, 0.12);
 }
 
+.matches-table tbody tr.match-row--upcoming {
+    background: linear-gradient(90deg, rgba(61, 105, 179, 0.1), rgba(61, 105, 179, 0.03));
+}
+
+.matches-table tbody tr.match-row--upcoming:hover {
+    background: linear-gradient(90deg, rgba(77, 125, 206, 0.16), rgba(77, 125, 206, 0.06));
+}
+
+.match-date-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.match-date-cell__day {
+    color: #d9e6ff;
+    font-weight: 600;
+}
+
+.match-date-cell__time {
+    color: rgba(186, 206, 244, 0.78);
+    font-size: 0.8rem;
+}
+
+.match-score--win {
+    color: var(--ok);
+    font-weight: 700;
+}
+
+.match-score--loss {
+    color: var(--err);
+    font-weight: 700;
+}
+
+.match-status-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid rgba(123, 180, 255, 0.5);
+    background: rgba(84, 146, 231, 0.14);
+    color: #b8dcff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
 /* Expand button in match rows */
 .match-expand-cell {
     padding: 4px 8px !important;
@@ -9250,20 +9316,34 @@ a:focus,
 }
 
 .veto-panel-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #d4dff3;
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: #e6efff;
     margin: 0;
+}
+
+.veto-panel-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.veto-panel-subtitle {
+    margin: 0;
+    font-size: 0.78rem;
+    color: rgba(186, 206, 244, 0.8);
+    letter-spacing: 0.02em;
 }
 
 .veto-panel-format {
     display: inline-block;
-    padding: 4px 8px;
+    padding: 5px 9px;
     background: rgba(120, 150, 200, 0.15);
     color: #7896c8;
-    border-radius: 3px;
-    font-size: 12px;
-    font-weight: 600;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
 }
 
 @keyframes slideDown {
@@ -9381,11 +9461,67 @@ a:focus,
 .match-map-name {
     font-weight: 700;
     color: #e8eefc;
+    font-size: 1.05rem;
+    line-height: 1.2;
 }
 
 .match-map-score {
-    font-size: 0.9rem;
+    font-size: 0.86rem;
     color: #a5b4d4;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.match-map-score__team {
+    color: #8aa0c8;
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.match-map-score__rounds {
+    font-weight: 700;
+    color: #d5e2fb;
+}
+
+.match-map-score__value {
+    color: inherit;
+}
+
+.match-map-score__value--win {
+    color: var(--ok);
+}
+
+.match-map-score__value--loss {
+    color: var(--err);
+}
+
+.match-map-score__sep {
+    color: #8aa0c8;
+}
+
+.team-link {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.18s ease, text-decoration-color 0.18s ease;
+}
+
+.team-link:hover {
+    color: #f4f8ff;
+}
+
+.match-details-panel .team-link {
+    text-decoration-line: underline;
+    text-decoration-color: rgba(164, 202, 255, 0.35);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+
+.match-details-panel .team-link:hover {
+    text-decoration-color: rgba(164, 202, 255, 0.75);
 }
 
 .match-map-metrics {
@@ -9402,11 +9538,19 @@ a:focus,
     margin-top: 8px;
 }
 
+.metric-grid--compare {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+}
+
 .metric-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     color: #c7d3ee;
     margin-bottom: 6px;
 }
@@ -9415,19 +9559,62 @@ a:focus,
     margin-bottom: 0;
 }
 
+.metric-row--rd {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(120, 150, 200, 0.14);
+}
+
 .metric-label {
     color: #8aa0c8;
+}
+
+.metric-label--rd {
+    font-weight: 600;
+    color: #a9bce0;
+}
+
+.metric-label--center {
+    text-align: center;
+    color: #95add7;
+    min-width: 66px;
 }
 
 .metric-value {
     font-weight: 600;
 }
 
+.metric-value--left {
+    text-align: right;
+    justify-self: end;
+}
+
+.metric-value--right {
+    text-align: left;
+    justify-self: start;
+}
+
 .metric-col__title {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #d4dff3;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #dce8ff;
     margin-bottom: 6px;
+}
+
+.metric-col__title--left {
+    text-align: right;
+}
+
+.metric-col__title--center {
+    text-align: center;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8ea7d4;
+}
+
+.metric-col__title--right {
+    text-align: left;
 }
 
 .match-map-players {
@@ -10349,6 +10536,92 @@ a:focus,
     gap: 0.75rem;
 }
 
+.team-section--players {
+    display: flex;
+    flex-direction: column;
+    gap: 0.95rem;
+}
+
+.players-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+}
+
+.players-summary-card {
+    background: rgba(12, 18, 36, 0.72);
+    border: 1px solid rgba(120, 150, 200, 0.18);
+    border-radius: 12px;
+    padding: 0.72rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.players-summary-card__label {
+    font-size: 0.72rem;
+    color: #93a9cf;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+}
+
+.players-summary-card__value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #eff5ff;
+    line-height: 1.15;
+}
+
+.players-summary-card__meta {
+    font-size: 0.76rem;
+    color: #9db1d6;
+}
+
+.players-table-toolbar {
+    margin-bottom: 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.players-table-toolbar__hint {
+    color: #a8bbde;
+    font-size: 0.78rem;
+}
+
+.players-abbrev-list {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.players-abbrev-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid rgba(120, 150, 200, 0.32);
+    background: rgba(120, 150, 200, 0.12);
+    color: #b8cae7;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.players-sortable-table .table-group-header th {
+    font-size: 0.64rem;
+    letter-spacing: 0.11em;
+    padding: 7px 10px;
+}
+
+.players-sortable-table .table-sortable thead tr:not(.table-group-header) th {
+    font-size: 0.73rem;
+}
+
 .avatar-placeholder {
     width: 36px;
     height: 36px;
@@ -10367,6 +10640,24 @@ a:focus,
 .player-sub {
     color: var(--muted);
     font-size: 0.85rem;
+}
+
+.player-rate {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    line-height: 1.2;
+}
+
+.player-rate__main {
+    color: #dce8ff;
+    font-weight: 600;
+}
+
+.player-rate__pct {
+    color: #9db1d6;
+    font-size: 0.74rem;
 }
 
 .players-charts {
@@ -10438,6 +10729,17 @@ a:focus,
 .stacked-seg--deaths { background: rgba(249, 112, 102, 0.35); }
 .stacked-seg--assists { background: rgba(125, 211, 252, 0.25); color: #cdefff; }
 
+@media (max-width: 900px) {
+    .players-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .players-table-toolbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
 .stacked-seg--picks { background: rgba(58, 163, 255, 0.25); }
 .stacked-seg--picks-opp { background: rgba(125, 211, 252, 0.2); }
 .stacked-seg--bans { background: rgba(249, 112, 102, 0.25); }
@@ -10460,15 +10762,24 @@ a:focus,
 
 .veto-steps {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.8rem;
 }
 
 .veto-step {
-    padding: 0.75rem;
-    border-radius: 10px;
+    padding: 0.78rem;
+    border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.02);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.veto-step__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
 }
 
 .veto-step--ban { border-color: rgba(249, 112, 102, 0.35); }
@@ -10477,29 +10788,49 @@ a:focus,
 .veto-step--overflow { border-color: rgba(255, 206, 86, 0.35); }
 
 .veto-step__order {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(120, 150, 200, 0.12);
+    border: 1px solid rgba(120, 150, 200, 0.25);
     font-weight: 700;
+    font-size: 0.76rem;
+    color: #d4e2ff;
 }
 
 .veto-step__title {
-    color: var(--muted);
+    color: rgba(186, 206, 244, 0.86);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 700;
 }
 
 .veto-step__map {
     font-weight: 700;
+    font-size: 1.08rem;
+    color: #ecf4ff;
+    line-height: 1.15;
+    margin-top: 0.15rem;
 }
 
 .veto-step__actor {
-    color: var(--muted);
-    font-size: 0.9rem;
+    color: rgba(186, 206, 244, 0.86);
+    font-size: 0.95rem;
+    margin-top: 0.2rem;
 }
 
 .veto-step__map-image {
     width: 100%;
-    height: 60px;
-    margin: 0.5rem 0;
+    height: 68px;
+    margin: 0.45rem 0 0.5rem;
     border-radius: 6px;
     overflow: hidden;
     background: rgba(120, 150, 200, 0.08);
+    border: 1px solid rgba(120, 150, 200, 0.18);
 }
 
 .veto-step__map-image img {

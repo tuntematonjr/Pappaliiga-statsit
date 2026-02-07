@@ -20,7 +20,7 @@ const DIVISION_MAP_COLUMNS = [
     { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '88px' },
     { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '88px' },
     { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '94px' },
-    { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 2, width: '88px' },
+    { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 0, width: '88px' },
     { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '88px' },
     { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '88px' },
     { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '88px' },
@@ -997,10 +997,19 @@ window.DivisionView = {
         },
         upcomingMatchTimestamp(match) {
             if (!match || typeof match !== 'object') return Number.POSITIVE_INFINITY;
+            const globalUtils = typeof window !== 'undefined' ? window.matchTimeUtils : null;
+            if (globalUtils && typeof globalUtils.getScheduledTs === 'function') {
+                const globalTs = globalUtils.getScheduledTs(match);
+                if (Number.isFinite(globalTs) && globalTs > 0) return globalTs;
+            }
             const raw = match.scheduled_ts ?? match.scheduledTs ?? match.scheduled_at ?? match.scheduledAt ?? match.ts ?? null;
             const numeric = Number(raw);
-            if (!Number.isFinite(numeric) || numeric <= 0) return Number.POSITIVE_INFINITY;
-            return Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric;
+            if (Number.isFinite(numeric) && numeric > 0) {
+                return Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric;
+            }
+            const parsed = Date.parse(String(raw));
+            if (Number.isFinite(parsed) && parsed > 0) return parsed;
+            return Number.POSITIVE_INFINITY;
         },
         upcomingMatchId(match) {
             if (!match || typeof match !== 'object') return '';
@@ -1372,6 +1381,7 @@ window.DivisionView = {
             <template v-else>
                 <section id="upcoming" class="division-section" v-if="upcomingLoading || upcomingMatches.length">
                     <upcoming-matches-list
+                        class="division-surface"
                         :items="upcomingMatches"
                         :loading="upcomingLoading"
                         :error="upcomingError"
@@ -1381,26 +1391,24 @@ window.DivisionView = {
                 </section>
 
                 <section id="summary" class="division-section">
-                    <header class="division-section__heading">
-                        <h2 class="title-accent titleUnderlineSection">Divisioonan tilastot</h2>
-                    </header>
-                    <div class="summary-card-grid division-summary-grid" role="list">
-                        <summary-stat-card
-                            v-for="metric in divisionSummaryMetrics"
-                            :key="metric.key"
-                            :icon="metric.icon"
-                            :label="metric.label"
-                            :value="metric.value"
-                            :subtitle="metric.subtitle || ''"
-                        ></summary-stat-card>
+                    <div class="division-surface glass-card division-section-card">
+                        <header class="division-section__heading">
+                            <h2 class="title-accent titleUnderlineSection">Divisioonan tilastot</h2>
+                        </header>
+                        <div class="summary-card-grid division-summary-grid" role="list">
+                            <summary-stat-card
+                                v-for="metric in divisionSummaryMetrics"
+                                :key="metric.key"
+                                :icon="metric.icon"
+                                :label="metric.label"
+                                :value="metric.value"
+                                :subtitle="metric.subtitle || ''"
+                            ></summary-stat-card>
+                        </div>
                     </div>
                 </section>
 
                 <section id="standings" class="division-section division-section--stacked">
-                    <header class="division-section__heading division-team-heading">
-                        <h2 class="title-accent titleUnderlineSection">Joukkuavertailu</h2>
-                        <p class="division-section__lede">Klikkaa joukkueen nimeä avataksesi joukkuesivun.</p>
-                    </header>
                     <div class="division-team-module">
                         <div class="division-team-panels">
                             <team-comparison-board
@@ -1409,7 +1417,9 @@ window.DivisionView = {
                                 :teams="teams"
                                 :loading="standingsLoading"
                                 :error="standingsError"
-                                :show-header="false"
+                                :title="'Joukkuevertailu'"
+                                :subtitle="'Klikkaa joukkueen nimeä avataksesi joukkuesivun.'"
+                                :show-header="true"
                                 :show-rank="false"
                                 :sticky-header="true"
                                 :highlight-team-id="activeTeamChipId"
@@ -1422,9 +1432,6 @@ window.DivisionView = {
                 </section>
 
                 <section id="maps" class="division-section">
-                    <header class="division-section__heading">
-                        <h2 class="title-accent titleUnderlineSection">Karttatilastot</h2>
-                    </header>
                     <maps-stats
                         class="division-surface glass-card"
                         title="Karttatilastot"
@@ -1433,34 +1440,36 @@ window.DivisionView = {
                         :map-stats="mapStats"
                         :columns="mapColumns"
                         heading-variant="main"
-                        :show-header="false"
+                        :show-header="true"
                         :sticky-header="true"
                     ></maps-stats>
                 </section>
 
                 <section id="heroes" class="division-section division-section--heroes">
-                    <header class="division-section__heading">
-                        <h2 class="title-accent titleUnderlineSection">Divarin Sankarit</h2>
-                    </header>
-                    <loading-spinner
-                        v-if="sankariLoading && !hasSankariGroups"
-                        message="Sankareita kootaan..."
-                    ></loading-spinner>
-                    <p v-else-if="!hasSankariGroups" class="division-section__empty">Sankaritilastoja ei löytynyt tälle divisioonalle.</p>
-                    <div v-else class="sankari-groups">
-                        <div v-for="group in sankariGroups" :key="group.id" class="sankari-group">
-                            <div class="sankari-group__label">
-                                <h3 class="sankari-group__title title-accent titleUnderlineCard">{{ group.groupTitle }}</h3>
-                            </div>
-                            <div class="sankari-group__cards">
-                                <sankari-card
-                                    v-for="card in group.cards"
-                                    :key="card.id"
-                                    :title="card.title"
-                                    :description="card.description"
-                                    :tooltip="card.tooltip"
-                                    :entries="card.entries"
-                                ></sankari-card>
+                    <div class="division-surface glass-card division-section-card division-section-card--heroes">
+                        <header class="division-section__heading">
+                            <h2 class="title-accent titleUnderlineSection">Divarin Sankarit</h2>
+                        </header>
+                        <loading-spinner
+                            v-if="sankariLoading && !hasSankariGroups"
+                            message="Sankareita kootaan..."
+                        ></loading-spinner>
+                        <p v-else-if="!hasSankariGroups" class="division-section__empty">Sankaritilastoja ei löytynyt tälle divisioonalle.</p>
+                        <div v-else class="sankari-groups">
+                            <div v-for="group in sankariGroups" :key="group.id" class="sankari-group">
+                                <div class="sankari-group__label">
+                                    <h3 class="sankari-group__title title-accent titleUnderlineCard">{{ group.groupTitle }}</h3>
+                                </div>
+                                <div class="sankari-group__cards">
+                                    <sankari-card
+                                        v-for="card in group.cards"
+                                        :key="card.id"
+                                        :title="card.title"
+                                        :description="card.description"
+                                        :tooltip="card.tooltip"
+                                        :entries="card.entries"
+                                    ></sankari-card>
+                                </div>
                             </div>
                         </div>
                     </div>

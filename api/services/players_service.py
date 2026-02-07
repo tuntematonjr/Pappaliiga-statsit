@@ -21,18 +21,33 @@ async def fetch_player(player_id: str) -> dict[str, Any]:
     cache_key = ("fetch_player", player_id, revision)
 
     async def _compute():
-        rows = await query_async(
-            """
-            SELECT player_id, nickname, country, avatar, faceit_url
-            FROM players
-            WHERE player_id = :player_id
-            """,
-            {"player_id": player_id},
-        )
+        try:
+            rows = await query_async(
+                """
+                SELECT player_id, nickname, country, avatar, faceit_url
+                FROM players
+                WHERE player_id = :player_id
+                """,
+                {"player_id": player_id},
+            )
+        except Exception:
+            # Older schemas may not have all optional columns yet.
+            rows = await query_async(
+                """
+                SELECT player_id, nickname
+                FROM players
+                WHERE player_id = :player_id
+                """,
+                {"player_id": player_id},
+            )
         if not rows:
             raise NotFoundError(f"Player '{player_id}' not found")
-        player = rows[0]
+        player = dict(rows[0])
+        player.setdefault("country", None)
         player.setdefault("avatar", DEFAULT_AVATAR)
+        player.setdefault("faceit_url", None)
+        if not player.get("nickname"):
+            player["nickname"] = str(player.get("player_id") or player_id)
         return player
 
     cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)

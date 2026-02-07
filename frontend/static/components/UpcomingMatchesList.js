@@ -4,8 +4,30 @@
     function coerceEpochMs(value) {
         if (value === null || value === undefined || value === 0) return null;
         const numeric = Number(value);
-        if (!Number.isFinite(numeric) || numeric <= 0) return null;
-        return Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric;
+        if (Number.isFinite(numeric) && numeric > 0) {
+            return Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric;
+        }
+        const parsed = Date.parse(String(value));
+        if (!Number.isFinite(parsed) || parsed <= 0) return null;
+        return parsed;
+    }
+
+    function getScheduledTs(raw) {
+        if (!raw || typeof raw !== 'object') return null;
+        const scheduledRaw = raw.scheduled_ts
+            ?? raw.scheduledTs
+            ?? raw.scheduled_at
+            ?? raw.scheduledAt
+            ?? raw.scheduled
+            ?? raw.start_ts
+            ?? raw.startTs
+            ?? raw.start_at
+            ?? raw.startAt
+            ?? raw.date
+            ?? raw.datetime
+            ?? raw.ts
+            ?? null;
+        return coerceEpochMs(scheduledRaw);
     }
 
     function normalizeTeam(raw, fallbackLabel) {
@@ -28,8 +50,7 @@
         const season = raw.season ?? raw.season_id ?? raw.seasonId ?? null;
         const isPlayoffs = Boolean(raw.is_playoffs ?? raw.isPlayoffs ?? raw.is_playoff ?? raw.isPlayoff);
         const status = raw.status ?? null;
-        const scheduledRaw = raw.scheduled_ts ?? raw.scheduledTs ?? raw.scheduled_at ?? raw.scheduledAt ?? raw.ts ?? null;
-        const scheduledTs = coerceEpochMs(scheduledRaw);
+        const scheduledTs = getScheduledTs(raw);
         const team1 = normalizeTeam(
             raw.team1 || {
                 team_id: raw.team1_id ?? raw.team1Id ?? null,
@@ -78,6 +99,16 @@
             return 'Aika tarkentuu';
         }
     }
+
+    const existingMatchTimeUtils = (typeof window !== 'undefined' && window.matchTimeUtils && typeof window.matchTimeUtils === 'object')
+        ? window.matchTimeUtils
+        : {};
+    window.matchTimeUtils = Object.freeze({
+        ...existingMatchTimeUtils,
+        coerceEpochMs,
+        getScheduledTs,
+        formatDateTime
+    });
 
     window.UpcomingMatchesList = {
         name: 'UpcomingMatchesList',

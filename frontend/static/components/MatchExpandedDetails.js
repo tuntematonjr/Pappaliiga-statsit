@@ -82,6 +82,21 @@ window.MatchExpandedDetails = {
         }
     },
     methods: {
+        championshipId() {
+            return this.$route?.params?.championshipId || this.$route?.query?.championship || null;
+        },
+        teamRoute(teamId, teamName = '') {
+            const championshipId = this.championshipId();
+            if (!championshipId || !teamId) return null;
+            return {
+                name: 'team-detail',
+                params: { championshipId: String(championshipId), teamId: String(teamId) },
+                query: {
+                    championship: String(championshipId),
+                    ...(teamName ? { team_name: teamName } : {})
+                }
+            };
+        },
         mapKey(name) {
             if (!name) return null;
             return String(name).trim().toLowerCase();
@@ -148,6 +163,16 @@ window.MatchExpandedDetails = {
         mapScoreAgainst(map) {
             return map?.ra ?? map?.score_team2 ?? map?.scoreAgainst ?? 0;
         },
+        mapScoreClass(map, side = 'left') {
+            const left = Number(this.mapScoreFor(map) ?? 0);
+            const right = Number(this.mapScoreAgainst(map) ?? 0);
+            if (!Number.isFinite(left) || !Number.isFinite(right) || left === right) return '';
+            const leftWins = left > right;
+            if (side === 'left') {
+                return leftWins ? 'match-map-score__value--win' : 'match-map-score__value--loss';
+            }
+            return leftWins ? 'match-map-score__value--loss' : 'match-map-score__value--win';
+        },
         mapName(map) {
             return map?.map || map?.map_name || map?.mapName || '';
         },
@@ -169,16 +194,7 @@ window.MatchExpandedDetails = {
     },
     template: `
         <div class="match-details-panel">
-            <div class="match-details-header">
-                <div class="match-details-pills">
-                    <span v-if="formatLabel" class="pill">{{ formatLabel }}</span>
-                    <span class="pill" v-if="opponentName">vs {{ opponentName }}</span>
-                    <span class="pill" v-if="dateLabel">{{ dateLabel }}</span>
-                    <span class="pill" v-if="scoreLabel">Score {{ scoreLabel }}</span>
-                </div>
-            </div>
-
-            <pick-ban-flow :entry="vetoEntry" :map-catalog="mapCatalog"></pick-ban-flow>
+            <pick-ban-flow :entry="vetoEntry" :map-catalog="mapCatalog" :match-maps="mapEntries"></pick-ban-flow>
 
             <div class="match-maps">
                 <div class="section-heading">
@@ -207,57 +223,64 @@ window.MatchExpandedDetails = {
                             </div>
                             <div class="match-map-meta">
                                 <div class="match-map-name">{{ beautifyMapName(mapName(map)) }}</div>
-                                <div class="match-map-score">{{ mapScoreFor(map) }} - {{ mapScoreAgainst(map) }}</div>
+                                <div class="match-map-score">
+                                    <router-link v-if="teamRoute(teamId, teamName)" :to="teamRoute(teamId, teamName)" class="match-map-score__team team-link">{{ teamName }}</router-link>
+                                    <span v-else class="match-map-score__team">{{ teamName }}</span>
+                                    <span class="match-map-score__rounds">
+                                        <span :class="['match-map-score__value', mapScoreClass(map, 'left')]">{{ mapScoreFor(map) }}</span>
+                                        <span class="match-map-score__sep"> - </span>
+                                        <span :class="['match-map-score__value', mapScoreClass(map, 'right')]">{{ mapScoreAgainst(map) }}</span>
+                                    </span>
+                                    <router-link v-if="teamRoute(opponentId, opponentName)" :to="teamRoute(opponentId, opponentName)" class="match-map-score__team team-link">{{ opponentName }}</router-link>
+                                    <span v-else class="match-map-score__team">{{ opponentName }}</span>
+                                </div>
                             </div>
                         </div>
                         <div class="match-map-metrics">
-                            <div class="metric-row">
-                                <span class="metric-label">RD +/-</span>
-                                <span class="metric-value">{{ formatSigned(mapScoreFor(map) - mapScoreAgainst(map)) }}</span>
+                            <div class="metric-row metric-row--rd">
+                                <span class="metric-label metric-label--rd">RD +/-</span>
+                                <span class="metric-value" :class="(mapScoreFor(map) - mapScoreAgainst(map)) >= 0 ? 'stat-positive' : 'stat-negative'">{{ formatSigned(mapScoreFor(map) - mapScoreAgainst(map)) }}</span>
                             </div>
-                            <div class="metric-grid">
-                                <div class="metric-col">
-                                    <div class="metric-col__title">{{ teamName }}</div>
-                                    <div class="metric-row">
-                                        <span class="metric-label">ADR</span>
-                                        <span class="metric-value">{{ formatNumber(map.left?.adr, 1) }}</span>
-                                    </div>
-                                    <div class="metric-row">
-                                        <span class="metric-label">avgKD</span>
-                                        <span class="metric-value">{{ formatNumber(map.left?.kd, 2) }}</span>
-                                    </div>
-                                    <div class="metric-row">
-                                        <span class="metric-label">Damage</span>
-                                        <span class="metric-value">{{ formatNumber(map.left?.dmg, 0) }}</span>
-                                    </div>
+                            <div class="metric-grid metric-grid--compare">
+                                <div class="metric-col__title metric-col__title--left">
+                                    <router-link v-if="teamRoute(teamId, teamName)" :to="teamRoute(teamId, teamName)" class="team-link">{{ teamName }}</router-link>
+                                    <span v-else>{{ teamName }}</span>
                                 </div>
-                                <div class="metric-col">
-                                    <div class="metric-col__title">{{ opponentName }}</div>
-                                    <div class="metric-row">
-                                        <span class="metric-label">ADR</span>
-                                        <span class="metric-value">{{ formatNumber(map.right?.adr, 1) }}</span>
-                                    </div>
-                                    <div class="metric-row">
-                                        <span class="metric-label">avgKD</span>
-                                        <span class="metric-value">{{ formatNumber(map.right?.kd, 2) }}</span>
-                                    </div>
-                                    <div class="metric-row">
-                                        <span class="metric-label">Damage</span>
-                                        <span class="metric-value">{{ formatNumber(map.right?.dmg, 0) }}</span>
-                                    </div>
+                                <div class="metric-col__title metric-col__title--center">Stat</div>
+                                <div class="metric-col__title metric-col__title--right">
+                                    <router-link v-if="teamRoute(opponentId, opponentName)" :to="teamRoute(opponentId, opponentName)" class="team-link">{{ opponentName }}</router-link>
+                                    <span v-else>{{ opponentName }}</span>
                                 </div>
+
+                                <span class="metric-value metric-value--left">{{ formatNumber(map.left?.adr, 1) }}</span>
+                                <span class="metric-label metric-label--center">ADR</span>
+                                <span class="metric-value metric-value--right">{{ formatNumber(map.right?.adr, 1) }}</span>
+
+                                <span class="metric-value metric-value--left">{{ formatNumber(map.left?.kd, 2) }}</span>
+                                <span class="metric-label metric-label--center">avgKD</span>
+                                <span class="metric-value metric-value--right">{{ formatNumber(map.right?.kd, 2) }}</span>
+
+                                <span class="metric-value metric-value--left">{{ formatNumber(map.left?.dmg, 0) }}</span>
+                                <span class="metric-label metric-label--center">Damage</span>
+                                <span class="metric-value metric-value--right">{{ formatNumber(map.right?.dmg, 0) }}</span>
                             </div>
                         </div>
                         <div class="match-map-players">
                             <div class="map-players" v-if="playersAvailable(mapRoundIndex(map))">
                                 <div class="map-players__team">
-                                    <div class="map-players__label">{{ teamName }}</div>
+                                    <div class="map-players__label">
+                                        <router-link v-if="teamRoute(teamId, teamName)" :to="teamRoute(teamId, teamName)" class="team-link">{{ teamName }}</router-link>
+                                        <span v-else>{{ teamName }}</span>
+                                    </div>
                                     <div class="map-players__list">
                                         <span v-for="player in playersForTeam(mapRoundIndex(map), teamId)" :key="player.playerId || player.player_id" class="map-player-pill">{{ player.nickname || player.playerId || player.player_id }}</span>
                                     </div>
                                 </div>
                                 <div class="map-players__team">
-                                    <div class="map-players__label">{{ opponentName }}</div>
+                                    <div class="map-players__label">
+                                        <router-link v-if="teamRoute(opponentId, opponentName)" :to="teamRoute(opponentId, opponentName)" class="team-link">{{ opponentName }}</router-link>
+                                        <span v-else>{{ opponentName }}</span>
+                                    </div>
                                     <div class="map-players__list">
                                         <span v-for="player in playersForTeam(mapRoundIndex(map), opponentId)" :key="player.playerId || player.player_id" class="map-player-pill">{{ player.nickname || player.playerId || player.player_id }}</span>
                                     </div>

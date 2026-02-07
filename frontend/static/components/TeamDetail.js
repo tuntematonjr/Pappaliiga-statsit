@@ -2,31 +2,31 @@
 // Every DB-backed field is surfaced as a stat, column, chart point or tooltip.
 
 const PLAYER_COLUMNS = [
-    { key: 'nickname', label: 'Pelaaja', sortable: true, colClass: 'col-name' },
-    { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true },
-    { key: 'roundsPlayed', label: 'R', sortable: true, numeric: true },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd' },
-    { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 2 },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr' },
-    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1 },
-    { key: 'kills', label: 'Kills', sortable: true, numeric: true },
-    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true },
-    { key: 'assists', label: 'A', sortable: true, numeric: true },
-    { key: 'damage', label: 'Dmg', sortable: true, numeric: true },
-    { key: 'utilityDamage', label: 'U-Dmg', sortable: true, numeric: true },
-    { key: 'mvps', label: 'MVP', sortable: true, numeric: true },
-    { key: 'sniperKills', label: 'AWP', sortable: true, numeric: true },
-    { key: 'pistolKills', label: 'Pistol', sortable: true, numeric: true },
-    { key: 'entryLine', label: 'Entry', sortable: true, numeric: true },
-    { key: 'clutch1v1Line', label: '1v1', sortable: true, numeric: true },
-    { key: 'clutch1v2Line', label: '1v2', sortable: true, numeric: true },
-    { key: 'clutchKills', label: 'Clutch K', sortable: true, numeric: true },
-    { key: 'mk2k', label: '2K', sortable: true, numeric: true },
-    { key: 'mk3k', label: '3K', sortable: true, numeric: true },
-    { key: 'mk4k', label: '4K', sortable: true, numeric: true },
-    { key: 'mk5k', label: 'Ace', sortable: true, numeric: true },
-    { key: 'enemiesFlashed', label: 'Flashed', sortable: true, numeric: true },
-    { key: 'flashSuccessLine', label: 'Flash%', sortable: true, numeric: true }
+    { key: 'nickname', label: 'Pelaaja', sortable: true, colClass: 'col-name', group: 'identity' },
+    { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true, group: 'volume' },
+    { key: 'roundsPlayed', label: 'R', sortable: true, numeric: true, group: 'volume' },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd', group: 'core' },
+    { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 2, group: 'core' },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr', group: 'core' },
+    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, group: 'core' },
+    { key: 'kills', label: 'Kills', sortable: true, numeric: true, group: 'combat' },
+    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, group: 'combat' },
+    { key: 'assists', label: 'A', sortable: true, numeric: true, group: 'combat' },
+    { key: 'clutchKills', label: 'Clutch K', sortable: true, numeric: true, group: 'combat' },
+    { key: 'entryLine', label: 'Entry', sortable: true, numeric: true, group: 'impact' },
+    { key: 'clutch1v1Line', label: '1v1', sortable: true, numeric: true, group: 'impact' },
+    { key: 'clutch1v2Line', label: '1v2', sortable: true, numeric: true, group: 'impact' },
+    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, group: 'impact' },
+    { key: 'damage', label: 'Dmg', sortable: true, numeric: true, group: 'utility' },
+    { key: 'utilityDamage', label: 'U-Dmg', sortable: true, numeric: true, group: 'utility' },
+    { key: 'enemiesFlashed', label: 'Flashed', sortable: true, numeric: true, group: 'utility' },
+    { key: 'flashSuccessLine', label: 'Flash%', sortable: true, numeric: true, group: 'utility' },
+    { key: 'mk2k', label: '2K', sortable: true, numeric: true, group: 'multis' },
+    { key: 'mk3k', label: '3K', sortable: true, numeric: true, group: 'multis' },
+    { key: 'mk4k', label: '4K', sortable: true, numeric: true, group: 'multis' },
+    { key: 'mk5k', label: 'Ace', sortable: true, numeric: true, group: 'multis' },
+    { key: 'sniperKills', label: 'AWP', sortable: true, numeric: true, group: 'weapons' },
+    { key: 'pistolKills', label: 'Pistol', sortable: true, numeric: true, group: 'weapons' }
 ];
 
 const MAP_GROUP_META = {
@@ -50,6 +50,17 @@ const SCOUT_GROUP_META = {
     performance: { label: 'Suorituskyky', className: 'group-performance group-divider' },
     veto: { label: 'Bannit', className: 'group-veto group-divider' },
     series: { label: 'Decider/OT', className: 'group-series group-divider' }
+};
+
+const PLAYER_GROUP_META = {
+    identity: { label: 'Pelaaja', className: 'group-map group-divider' },
+    volume: { label: 'Määrä', className: 'group-usage group-divider' },
+    core: { label: 'Ydin', className: 'group-performance group-divider' },
+    combat: { label: 'Taistelu', className: 'group-combat group-divider' },
+    impact: { label: 'Impact', className: 'group-results group-divider' },
+    utility: { label: 'Utility', className: 'group-utility group-divider' },
+    multis: { label: 'Multi-kills', className: 'group-multikill group-divider' },
+    weapons: { label: 'Aseet', className: 'group-weapons group-divider' }
 };
 
 function buildColumnGroups(columns, groupMeta) {
@@ -126,6 +137,41 @@ function toNumber(value, fallback = 0) {
     if (Number.isFinite(numeric)) return numeric;
     const parsed = Number(String(value).replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function coerceEpochSeconds(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+        return Math.abs(numeric) >= 1_000_000_000_000 ? Math.round(numeric / 1000) : Math.round(numeric);
+    }
+    const parsed = Date.parse(String(value));
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return Math.round(parsed / 1000);
+}
+
+function scheduledMatchTsSeconds(match) {
+    const globalUtils = typeof window !== 'undefined' ? window.matchTimeUtils : null;
+    if (globalUtils && typeof globalUtils.getScheduledTs === 'function') {
+        const ms = globalUtils.getScheduledTs(match);
+        if (Number.isFinite(ms) && ms > 0) {
+            return Math.round(ms / 1000);
+        }
+    }
+    return coerceEpochSeconds(
+        match?.scheduled_ts
+        ?? match?.scheduledTs
+        ?? match?.scheduled_at
+        ?? match?.scheduledAt
+        ?? match?.scheduled
+        ?? match?.start_ts
+        ?? match?.startTs
+        ?? match?.start_at
+        ?? match?.startAt
+        ?? match?.date
+        ?? match?.datetime
+        ?? match?.ts
+    );
 }
 
 function formatNumber(value, decimals = 0) {
@@ -254,10 +300,16 @@ function mapKey(name) {
     return String(name || '').trim().toLowerCase();
 }
 
-function formatDate(ts) {
+function formatMatchDate(ts) {
     if (!ts) return '';
     const d = new Date(ts * 1000);
     return d.toLocaleDateString('fi-FI', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatMatchTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    return d.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
 }
 
 function normalizeSeasonData(pageData) {
@@ -567,10 +619,11 @@ function normalizeMatch(match, teamId = null) {
     const matchRating = maps.length ? safeDivide(maps.reduce((sum, m) => sum + (m.kd || 0), 0), maps.length) : 0;
     const teamScore = mapWins;
     const oppScore = mapLosses;
+    const ts = scheduledMatchTsSeconds(match);
 
     return {
         matchId,
-        ts: toNumber(match.ts),
+        ts: ts || 0,
         status: match.status || (playedFlag ? 'finished' : 'scheduled'),
         bestOf: bestOf || Math.max(1, maps.length),
         played,
@@ -672,8 +725,7 @@ window.TeamDetail = {
         get ErrorMessage() { return window.ErrorMessage; },
         get SortableTable() { return window.SortableTable; },
         get PickBanFlow() { return window.PickBanFlow; },
-        get MatchExpandedDetails() { return window.MatchExpandedDetails; },
-        get UpcomingMatchesList() { return window.UpcomingMatchesList; }
+        get MatchExpandedDetails() { return window.MatchExpandedDetails; }
     },
     props: {
         teamId: { type: [String, Number], required: true },
@@ -783,7 +835,7 @@ window.TeamDetail = {
             return {
                 teamId: this.teamId,
                 championshipId: this.currentChampionshipId,
-                limit: 6,
+                limit: 100,
                 offset: 0
             };
         },
@@ -796,14 +848,24 @@ window.TeamDetail = {
             }
             return this.upcomingStore.getEntryForParams(this.upcomingParams);
         },
-        upcomingMatches() {
-            return Array.isArray(this.upcomingState.data) ? this.upcomingState.data : [];
-        },
-        upcomingLoading() {
-            return this.upcomingState.loading;
-        },
-        upcomingError() {
-            return this.upcomingState.error;
+        upcomingScheduleByMatchId() {
+            const scheduleMap = {};
+            const globalUtils = typeof window !== 'undefined' ? window.matchTimeUtils : null;
+            const rows = Array.isArray(this.upcomingState.data) ? this.upcomingState.data : [];
+            rows.forEach(match => {
+                if (!match || typeof match !== 'object') return;
+                const matchId = match.match_id ?? match.matchId ?? null;
+                if (!matchId) return;
+                let scheduledMs = null;
+                if (globalUtils && typeof globalUtils.getScheduledTs === 'function') {
+                    scheduledMs = globalUtils.getScheduledTs(match);
+                } else {
+                    scheduledMs = scheduledMatchTsSeconds(match) * 1000;
+                }
+                if (!Number.isFinite(scheduledMs) || scheduledMs <= 0) return;
+                scheduleMap[String(matchId)] = Math.round(scheduledMs / 1000);
+            });
+            return scheduleMap;
         },
         teamStats() {
             return this.seasonData?.teamStats || {};
@@ -1077,7 +1139,7 @@ window.TeamDetail = {
         },
         vetoTrendColumns() {
             return this.vetoTrendMatches.map((match, idx) => {
-                const dateLabel = formatDate(match.ts);
+                const dateLabel = formatMatchDate(match.ts);
                 const opponent = match.opponentName || match.team2Name || 'Vastustaja';
                 const resultKey = getMatchResult(match);
                 const resultLabel = resultKey === 'win' ? 'W' : resultKey === 'loss' ? 'L' : resultKey === 'draw' ? 'D' : 'Kesken';
@@ -1173,7 +1235,7 @@ window.TeamDetail = {
                     const actionBan = veto?.actions?.[key]?.ban || null;
                     const actionInfo = actionPick || actionBan;
                     const opponent = match.opponentName || match.team2Name || 'Vastustaja';
-                    const dateLabel = formatDate(match.ts);
+                    const dateLabel = formatMatchDate(match.ts);
                     const resultKey = getMatchResult(match);
                     const resultLabel = resultKey === 'win' ? 'W' : resultKey === 'loss' ? 'L' : resultKey === 'draw' ? 'D' : 'Kesken';
                     const scoreLabel = (match.teamScore != null && match.oppScore != null) ? `${match.teamScore}-${match.oppScore}` : '';
@@ -1283,7 +1345,7 @@ window.TeamDetail = {
                             points.push({
                                 id: `${match.matchId}-ff-${idx}`,
                                 ts: match.ts,
-                                dateLabel: formatDate(match.ts),
+                                dateLabel: formatMatchDate(match.ts),
                                 opponent,
                                 matchLabel: opponent || 'Vastustaja',
                                 mapLabel: 'Luovutus',
@@ -1306,7 +1368,7 @@ window.TeamDetail = {
                     points.push({
                         id: map.id || `${match.matchId}-map-${idx}`,
                         ts: match.ts,
-                        dateLabel: formatDate(match.ts),
+                        dateLabel: formatMatchDate(match.ts),
                         opponent,
                         matchLabel: opponent || 'Vastustaja',
                         mapLabel: map.mapName || 'Kartta',
@@ -1458,13 +1520,23 @@ window.TeamDetail = {
         // Match history uses every field: status/best_of/played/opponent info/avatars/maps scores/picks/forfeit/ADR/KD plus Faceit URL
         matchesList() {
             const matches = Array.isArray(this.seasonData?.matchHistory) ? this.seasonData.matchHistory : [];
-            const normalized = matches.map(m => normalizeMatch(m, this.teamId)).filter(Boolean);
+            const normalized = matches.map(m => {
+                const row = normalizeMatch(m, this.teamId);
+                if (!row) return null;
+                if (!row.played) {
+                    const scheduledTs = this.upcomingScheduleByMatchId[String(row.matchId)] || 0;
+                    if (scheduledTs > 0) {
+                        row.ts = scheduledTs;
+                    }
+                }
+                return row;
+            }).filter(Boolean);
             return normalized.sort((a, b) => {
                 const at = a.ts ?? 0;
                 const bt = b.ts ?? 0;
                 if (!at && bt) return 1; // missing dates go to bottom
                 if (at && !bt) return -1;
-                return bt - at; // newest first for tables
+                return at - bt; // oldest first for tables
             });
         },
         rawMatchesById() {
@@ -1622,11 +1694,47 @@ window.TeamDetail = {
             const players = Array.isArray(this.seasonData?.playerStats) ? this.seasonData.playerStats : [];
             return players.map((p, idx) => normalizePlayer(p, idx)).filter(Boolean);
         },
+        playerHeaderGroups() {
+            return buildColumnGroups(PLAYER_COLUMNS, PLAYER_GROUP_META);
+        },
         playerDefaultSort() {
             return { column: 'adr', order: 'desc', numeric: true };
         },
-        playersByRating() {
-            return [...this.players].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        playerSummaryCards() {
+            if (!this.players.length) return [];
+            const totals = this.players.reduce((acc, row) => {
+                acc.maps += toNumber(row.mapsPlayed);
+                acc.rounds += toNumber(row.roundsPlayed);
+                acc.adrWeighted += toNumber(row.adr) * Math.max(1, toNumber(row.roundsPlayed));
+                acc.kdWeighted += toNumber(row.kd) * Math.max(1, toNumber(row.roundsPlayed));
+                acc.entryWins += toNumber(row.entryWins);
+                acc.entryCount += toNumber(row.entryCount);
+                acc.flashSuccesses += toNumber(row.flashSuccesses);
+                acc.flashCount += toNumber(row.flashCount);
+                return acc;
+            }, {
+                maps: 0,
+                rounds: 0,
+                adrWeighted: 0,
+                kdWeighted: 0,
+                entryWins: 0,
+                entryCount: 0,
+                flashSuccesses: 0,
+                flashCount: 0
+            });
+            const weightedRounds = Math.max(1, totals.rounds);
+            const avgAdr = totals.adrWeighted / weightedRounds;
+            const avgKd = totals.kdWeighted / weightedRounds;
+            const entryPct = totals.entryCount ? (totals.entryWins / totals.entryCount) * 100 : 0;
+            const flashPct = totals.flashCount ? (totals.flashSuccesses / totals.flashCount) * 100 : 0;
+            return [
+                { key: 'players', label: 'Pelaajia', value: formatNumber(this.players.length), meta: 'Aktiivinen rosteri' },
+                { key: 'maps', label: 'Kartat yhteensä', value: formatNumber(totals.maps), meta: `${formatNumber(totals.rounds)} erää` },
+                { key: 'adr', label: 'ADR keskiarvo', value: formatNumber(avgAdr, 1), meta: 'Painotettu erillä' },
+                { key: 'kd', label: 'K/D keskiarvo', value: formatNumber(avgKd, 2), meta: 'Painotettu erillä' },
+                { key: 'entry', label: 'Entry onnistuminen', value: formatPercent(entryPct, 1), meta: `${formatNumber(totals.entryWins)} / ${formatNumber(totals.entryCount)}` },
+                { key: 'flash', label: 'Flash onnistuminen', value: formatPercent(flashPct, 1), meta: `${formatNumber(totals.flashSuccesses)} / ${formatNumber(totals.flashCount)}` }
+            ];
         },
         playerStackedKda() {
             return this.players.map(p => ({
@@ -1819,6 +1927,12 @@ window.TeamDetail = {
         this.teardownMatchesChartObserver();
     },
     methods: {
+        formatDate(ts) {
+            return formatMatchDate(ts);
+        },
+        formatTime(ts) {
+            return formatMatchTime(ts);
+        },
         heatTooltip(metricLabel, value, extra = '') {
             const parts = [metricLabel, `Arvo ${value}`];
             if (extra) parts.push(extra);
@@ -2047,6 +2161,12 @@ window.TeamDetail = {
             if (point.result === 'draw') return 'Tasapeli';
             return '';
         },
+        matchScoreClass(match) {
+            const result = getMatchResult(match);
+            if (result === 'win') return 'match-score--win';
+            if (result === 'loss') return 'match-score--loss';
+            return '';
+        },
         formatTrendValue(metric, value) {
             if (!metric) return formatNumber(value, 2);
             return metric.format ? metric.format(value) : formatNumber(value, metric.decimals || 0);
@@ -2080,7 +2200,7 @@ window.TeamDetail = {
                     { force: options.force === true }
                 );
             } catch (error) {
-                console.error('[TeamDetail] upcoming matches fetch failed', error);
+                console.error('[TeamDetail] upcoming schedule fetch failed', error);
             }
         },
         selectChampionship(championshipId) {
@@ -2090,6 +2210,19 @@ window.TeamDetail = {
             this.updateRoute(championshipId, this.activeTab);
             this.expandedMatches = {};
             this.loadUpcoming();
+        },
+        matchOpponentRoute(match) {
+            const championshipId = this.currentChampionshipId;
+            const opponentId = match?.opponent?.team_id || null;
+            if (!championshipId || !opponentId) return null;
+            return {
+                name: 'team-detail',
+                params: { championshipId, teamId: String(opponentId) },
+                query: {
+                    championship: championshipId,
+                    ...(match?.opponentName ? { team_name: match.opponentName } : {})
+                }
+            };
         },
         resolveChampionshipMeta(championshipId) {
             if (!championshipId) return { name: null, season: null };
@@ -2279,6 +2412,8 @@ window.TeamDetail = {
                     ? (String(step.selectedByTeamId) === String(this.teamId) ? 'team' : 'opponent')
                     : 'system';
                 const mapName = beautifyMapName(step.mapName) || 'Kartta';
+                const actorTeamId = step.selectedByTeamId
+                    || (actor === 'team' ? this.teamId : (actor === 'opponent' ? match?.opponent?.team_id : null));
                 return {
                     ...step,
                     action,
@@ -2286,7 +2421,8 @@ window.TeamDetail = {
                     step: idx + 1,
                     label: this.actionLabel(action),
                     mapName,
-                    teamName: step.selectedByTeamName || (actor === 'team' ? teamName : opponentName)
+                    teamName: step.selectedByTeamName || (actor === 'team' ? teamName : opponentName),
+                    teamId: actorTeamId ? String(actorTeamId) : null
                 };
             });
 
@@ -2301,7 +2437,8 @@ window.TeamDetail = {
                     step: normalized.length + 1,
                     label: 'Decider',
                     mapName: deciderName,
-                    teamName: 'Decider'
+                    teamName: 'Decider',
+                    teamId: null
                 });
                 usedNames.add(deciderName);
             }
@@ -2313,7 +2450,8 @@ window.TeamDetail = {
                     step: normalized.length + 1,
                     label: 'Overflow',
                     mapName: overflowName,
-                    teamName: 'Overflow'
+                    teamName: 'Overflow',
+                    teamId: null
                 });
             }
             return normalized.map((step, idx) => ({ ...step, step: idx + 1 }));
@@ -2340,7 +2478,6 @@ window.TeamDetail = {
         },
         formatPercent,
         formatNumber,
-        formatDate,
         getMatchResult,
         teamLogo() {
             return this.teamInfo?.avatar || '';
@@ -3022,15 +3159,6 @@ window.TeamDetail = {
                 </section>
 
                 <section v-if="activeTab === 'matches'" class="team-section scout-view" id="team-tab-matches" role="tabpanel">
-                    <upcoming-matches-list
-                        :items="upcomingMatches"
-                        :loading="upcomingLoading"
-                        :error="upcomingError"
-                        title="Tulevat ottelut"
-                        :subtitle="selectedSeasonOption?.label || ''"
-                        empty-message="Ei tulevia otteluita tälle joukkueelle."
-                    ></upcoming-matches-list>
-
                     <div class="scout-panel scout-performance-trends matches-trends" ref="matchesTrendPanel">
                         <div class="section-heading section-heading--split">
                             <div class="section-heading__main">
@@ -3272,7 +3400,7 @@ window.TeamDetail = {
                                 <tbody>
                                     <template v-for="match in matchesList" :key="match.matchId">
                                         <tr
-                                            :class="{ 'match-row--highlight': match.matchId === matchesHoverMatchId }"
+                                            :class="{ 'match-row--highlight': match.matchId === matchesHoverMatchId, 'match-row--upcoming': !match.played }"
                                             @mouseenter="setMatchesHover(match.matchId)"
                                             @mouseleave="clearMatchesHover"
                                         >
@@ -3288,11 +3416,32 @@ window.TeamDetail = {
                                                     <span class="chevron">›</span>
                                                 </button>
                                             </td>
-                                            <td>{{ formatDate(match.ts) }}</td>
-                                            <td :title="vetoSummaryLookup[match.matchId] || ''">{{ match.opponentName || match.team2Name || 'Vastustaja' }}</td>
+                                            <td>
+                                                <div class="match-date-cell">
+                                                    <span class="match-date-cell__day">{{ formatDate(match.ts) }}</span>
+                                                    <span class="match-date-cell__time">{{ formatTime(match.ts) }}</span>
+                                                </div>
+                                            </td>
+                                            <td :title="vetoSummaryLookup[match.matchId] || ''">
+                                                <router-link
+                                                    v-if="matchOpponentRoute(match)"
+                                                    :to="matchOpponentRoute(match)"
+                                                    class="team-link"
+                                                >{{ match.opponentName || match.team2Name || 'Vastustaja' }}</router-link>
+                                                <span v-else>{{ match.opponentName || match.team2Name || 'Vastustaja' }}</span>
+                                            </td>
                                             <td>BO{{ match.bestOf }}</td>
-                                            <td>{{ match.teamScore }} - {{ match.oppScore }}</td>
-                                            <td :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'">{{ match.roundDiff }}</td>
+                                            <td>
+                                                <span v-if="match.played" :class="matchScoreClass(match)">{{ match.teamScore }} - {{ match.oppScore }}</span>
+                                                <span v-else class="cell-muted">Tulossa</span>
+                                            </td>
+                                            <td>
+                                                <span
+                                                    v-if="match.played"
+                                                    :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'"
+                                                >{{ match.roundDiff }}</span>
+                                                <span v-else class="cell-muted">-</span>
+                                            </td>
                                             <td>
                                                 <div class="micro-stack" v-if="match.maps && match.maps.length">
                                                     <span v-for="map in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
@@ -3300,7 +3449,7 @@ window.TeamDetail = {
                                                 <span v-else class="cell-muted">Ei karttoja</span>
                                             </td>
                                             <td>
-                                                <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">FACEIT</a>
+                                                <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">Faceit Lobbys</a>
                                                 <span v-else class="cell-muted">-</span>
                                             </td>
                                         </tr>
@@ -3331,16 +3480,34 @@ window.TeamDetail = {
                     </div>
                 </section>
 
-                <section v-if="activeTab === 'players'" class="team-section" id="team-tab-players" role="tabpanel">
+                <section v-if="activeTab === 'players'" class="team-section team-section--players" id="team-tab-players" role="tabpanel">
                     <h2 class="section-title titleUnderline">Pelaajat</h2>
+                    <div v-if="playerSummaryCards.length" class="players-summary-grid">
+                        <article v-for="card in playerSummaryCards" :key="card.key" class="players-summary-card">
+                            <div class="players-summary-card__label">{{ card.label }}</div>
+                            <div class="players-summary-card__value">{{ card.value }}</div>
+                            <div class="players-summary-card__meta">{{ card.meta }}</div>
+                        </article>
+                    </div>
                     <div v-if="players.length" class="table-wrapper">
+                        <div class="players-table-toolbar">
+                            <span class="players-table-toolbar__hint">Kaikki pelaajametriikat näkyvissä. Klikkaa saraketta lajitellaksesi.</span>
+                            <div class="players-abbrev-list">
+                                <span class="players-abbrev-chip">K/R = Kills per round</span>
+                                <span class="players-abbrev-chip">U-Dmg = Utility damage</span>
+                                <span class="players-abbrev-chip">Entry = Entry wins / attempts</span>
+                                <span class="players-abbrev-chip">Flash% = Flash successes / flashes</span>
+                            </div>
+                        </div>
                         <sortable-table
+                            class="players-sortable-table"
                             :columns="PLAYER_COLUMNS"
+                            :header-groups="playerHeaderGroups"
                             :data="players"
                             :default-sort="playerDefaultSort"
-                            :colorize-columns="['rating','kd','adr','kr']"
+                            :colorize-columns="['kd','adr','kr']"
                             :sticky-header="true"
-                            :compact="true"
+                            :compact="false"
                         >
                             <template #cell-nickname="{ row }">
                                 <div class="player-cell">
@@ -3372,16 +3539,28 @@ window.TeamDetail = {
                                 <span>{{ formatPercent(row.hsPct || 0, 1) }}</span>
                             </template>
                             <template #cell-entryLine="{ row }">
-                                <span>{{ row.entryWins }}/{{ row.entryCount }} ({{ formatPercent(row.entryLine || 0, 1) }})</span>
+                                <div class="player-rate">
+                                    <span class="player-rate__main">{{ row.entryWins }}/{{ row.entryCount }}</span>
+                                    <span class="player-rate__pct">{{ formatPercent(row.entryLine || 0, 1) }}</span>
+                                </div>
                             </template>
                             <template #cell-clutch1v1Line="{ row }">
-                                <span>{{ row.cl1v1Wins }}/{{ row.cl1v1Attempts }} ({{ formatPercent(row.cl1v1Line || 0, 1) }})</span>
+                                <div class="player-rate">
+                                    <span class="player-rate__main">{{ row.cl1v1Wins }}/{{ row.cl1v1Attempts }}</span>
+                                    <span class="player-rate__pct">{{ formatPercent(row.cl1v1Line || 0, 1) }}</span>
+                                </div>
                             </template>
                             <template #cell-clutch1v2Line="{ row }">
-                                <span>{{ row.cl1v2Wins }}/{{ row.cl1v2Attempts }} ({{ formatPercent(row.cl1v2Line || 0, 1) }})</span>
+                                <div class="player-rate">
+                                    <span class="player-rate__main">{{ row.cl1v2Wins }}/{{ row.cl1v2Attempts }}</span>
+                                    <span class="player-rate__pct">{{ formatPercent(row.cl1v2Line || 0, 1) }}</span>
+                                </div>
                             </template>
                             <template #cell-flashSuccessLine="{ row }">
-                                <span>{{ row.flashSuccesses }}/{{ row.flashCount }} ({{ formatPercent(row.flashSuccessLine || 0, 1) }})</span>
+                                <div class="player-rate">
+                                    <span class="player-rate__main">{{ row.flashSuccesses }}/{{ row.flashCount }}</span>
+                                    <span class="player-rate__pct">{{ formatPercent(row.flashSuccessLine || 0, 1) }}</span>
+                                </div>
                             </template>
                         </sortable-table>
                     </div>
@@ -3391,22 +3570,8 @@ window.TeamDetail = {
                             <p class="empty-state-description">Tälle kaudelle ei ole pelaajatietoja saatavilla.</p>
                         </div>
                     </div>
-                    <div class="players-charts" v-if="playersByRating.length">
+                    <div class="players-charts" v-if="playerStackedKda.length">
                         <div class="glass-card">
-                            <div class="section-heading">
-                                <h3>Pelaajien rating</h3>
-                            </div>
-                            <div class="bar-chart bar-chart--horizontal">
-                                <div v-for="p in playersByRating" :key="p.playerId" class="bar-chart__row">
-                                    <span class="bar-chart__label">{{ p.nickname }}</span>
-                                    <div class="bar-chart__track">
-                                        <div class="bar-chart__track-fill" :style="{ width: Math.min(100, p.rating / 2 * 100) + '%' }"></div>
-                                    </div>
-                                    <span class="bar-chart__value">{{ formatNumber(p.rating, 2) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="glass-card" v-if="playerStackedKda.length">
                             <div class="section-heading">
                                 <h3>K/D/A per pelaaja</h3>
                             </div>

@@ -4,6 +4,21 @@
             if (!name) return null;
             return String(name).trim().toLowerCase();
         },
+        mapKeys(...values) {
+            const keys = new Set();
+            values.forEach(value => {
+                const key = this.mapKey(value);
+                if (!key) return;
+                keys.add(key);
+                if (key.startsWith('de_')) {
+                    const shortKey = key.slice(3);
+                    if (shortKey) keys.add(shortKey);
+                } else {
+                    keys.add(`de_${key}`);
+                }
+            });
+            return Array.from(keys);
+        },
         extractMapImage(entry) {
             if (!entry) return null;
             const curr = entry.curr || {};
@@ -19,30 +34,61 @@
             const lookup = { ...(existing || {}) };
             if (!Array.isArray(stats)) return lookup;
             stats.forEach(item => {
-                const key = this.mapKey(item?.map_name || item?.mapId || item?.pretty_name || item?.mapName || item?.map);
                 const img = this.extractMapImage(item);
-                if (key && img && !lookup[key]) {
-                    lookup[key] = img;
-                }
+                if (!img) return;
+                const keys = this.mapKeys(
+                    item?.map_id,
+                    item?.mapId,
+                    item?.pretty_name,
+                    item?.prettyName,
+                    item?.map_name,
+                    item?.mapName,
+                    item?.name,
+                    item?.map
+                );
+                keys.forEach(key => {
+                    if (!lookup[key]) lookup[key] = img;
+                });
             });
             return lookup;
         },
         resolveMapImage(entry, options = {}) {
             if (!entry) return null;
             const direct = this.extractMapImage(entry);
-            const key = this.mapKey(entry.map_name || entry.mapName || entry.map || entry.mapId || entry.pretty_name);
+            const keys = this.mapKeys(
+                entry.map_id,
+                entry.mapId,
+                entry.pretty_name,
+                entry.prettyName,
+                entry.map_name,
+                entry.mapName,
+                entry.name,
+                entry.map
+            );
             const lookup = options.mapImageLookup || null;
             const catalog = options.mapCatalog || null;
             let resolved = direct;
 
-            if (!resolved && key && lookup && lookup[key]) {
-                resolved = lookup[key];
+            if (!resolved && lookup && keys.length) {
+                const lookupHit = keys.find(key => lookup[key]);
+                if (lookupHit) {
+                    resolved = lookup[lookupHit];
+                }
             }
 
-            if (!resolved && key && Array.isArray(catalog)) {
+            if (!resolved && keys.length && Array.isArray(catalog)) {
                 const match = catalog.find(item => {
-                    const itemKey = this.mapKey(item?.map_id || item?.pretty_name || item?.map_name || item?.name || item?.mapName);
-                    return itemKey && itemKey === key;
+                    const itemKeys = this.mapKeys(
+                        item?.map_id,
+                        item?.mapId,
+                        item?.pretty_name,
+                        item?.prettyName,
+                        item?.map_name,
+                        item?.mapName,
+                        item?.name,
+                        item?.map
+                    );
+                    return itemKeys.some(key => keys.includes(key));
                 });
                 resolved = this.extractMapImage(match);
             }
@@ -60,7 +106,19 @@
         },
         shouldFetchCatalog(stats) {
             if (!Array.isArray(stats) || !stats.length) return false;
-            return stats.some(item => !this.extractMapImage(item) && this.mapKey(item?.map_name || item?.mapId || item?.pretty_name || item?.mapName || item?.map));
+            return stats.some(item => {
+                if (this.extractMapImage(item)) return false;
+                return this.mapKeys(
+                    item?.map_id,
+                    item?.mapId,
+                    item?.pretty_name,
+                    item?.prettyName,
+                    item?.map_name,
+                    item?.mapName,
+                    item?.name,
+                    item?.map
+                ).length > 0;
+            });
         }
     };
 

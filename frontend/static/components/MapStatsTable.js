@@ -35,7 +35,7 @@ window.MapStatsTable = {
                 { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '88px' },
                 { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '88px' },
                 { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '94px' },
-                { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 2, width: '88px' },
+                { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 0, width: '88px' },
                 { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '88px' },
                 { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '88px' },
                 { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '88px' },
@@ -50,7 +50,7 @@ window.MapStatsTable = {
                 { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '104px' },
                 { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '104px' }
             ],
-            defaultColorizeColumns: ['kd', 'adr', 'kr', 'udpr'],
+            defaultColorizeColumns: [],
             defaultSort: { column: 'maps_played', order: 'desc', numeric: true },
             mapImageLookup: {},
             catalogLoaded: false,

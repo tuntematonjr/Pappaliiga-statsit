@@ -39,6 +39,10 @@ window.SplitBar = {
         showShimmer: {
             type: Boolean,
             default: true
+        },
+        showClash: {
+            type: Boolean,
+            default: true
         }
     },
     data() {
@@ -103,10 +107,14 @@ window.SplitBar = {
             if (!this.total) return '50%';
             return `${Math.round(this.winPercentage)}%`;
         },
+        hasClashMeeting() {
+            return this.total === 0 || (this.wins > 0 && this.losses > 0);
+        },
         barClass() {
             const classes = ['bar-split'];
             if (this.showShimmer && this.total > 0) classes.push('bar-shimmer');
             if (this.isAnimating) classes.push('bar-split--animating');
+            if (this.showClash && this.hasClashMeeting) classes.push('bar-split--clash');
             return classes.join(' ');
         }
     },
@@ -148,22 +156,11 @@ window.SplitBar = {
         }
     },
     template: `
-        <div class="bar-split-shell" :style="{ height: height, '--split-win': winTargetWidth, '--split-divider-opacity': (total > 0 && wins > 0 && losses > 0) ? 1 : 0 }">
+        <div class="bar-split-shell" :style="{ height: height, '--split-win': winTargetWidth }">
             <div :class="barClass" :style="{ height: '100%' }">
-                <!-- SVG mask definition for wavy seam -->
-                <svg width="0" height="0" style="position: absolute;">
-                    <defs>
-                        <clipPath id="wavySeamWin" clipPathUnits="objectBoundingBox">
-                            <!-- Creates organic wave boundary; wave moves via CSS animation on parent -->
-                            <path class="wavy-seam-path" d="M 0 0 L 1 0 Q 0.998 0.15, 1 0.25 Q 1.002 0.35, 1 0.5 Q 0.998 0.65, 1 0.75 Q 1.002 0.85, 1 1 L 0 1 Z" vector-effect="non-scaling-stroke" />
-                        </clipPath>
-                    </defs>
-                </svg>
                 <div :class="winClass" :style="winStyle"></div>
                 <div :class="lossClass" :style="lossStyle"></div>
-                <!-- Ripple effects at seam -->
-                <div class="seam-ripple seam-ripple-1"></div>
-                <div class="seam-ripple seam-ripple-2"></div>
+                <div v-if="showShimmer && total > 0" class="split-shimmer" aria-hidden="true"></div>
                 <span v-if="showLabels" class="label label-left">{{ leftText || (wins + 'W') }}</span>
                 <span v-if="showLabels" class="label label-right">{{ rightText || (losses + 'L') }}</span>
                 <span v-if="showPercent && total>0" class="label label-center">{{ centerPercent }}</span>
