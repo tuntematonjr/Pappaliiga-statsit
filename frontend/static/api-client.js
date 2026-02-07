@@ -13,6 +13,18 @@
     const MEMORY_CACHE = new Map();
     const PERSIST_KEY = 'pl:cache:v1';
     const CACHE_META_KEY = 'pl:cache:meta';
+    const MAX_PERSISTED_ENTRIES = Math.max(
+        25,
+        Number((typeof window !== 'undefined' && window.PL_API_PERSIST_MAX_KEYS) || 120)
+    );
+    const MAX_PERSISTED_ENTRY_CHARS = Math.max(
+        4096,
+        Number((typeof window !== 'undefined' && window.PL_API_PERSIST_MAX_ENTRY_CHARS) || 120000)
+    );
+    const persistentCacheState = {
+        enabled: true,
+        quotaWarned: false
+    };
     const BREAKERS = new Map();
     const CONSECUTIVE_FAILURE_LIMIT = 3;
     const FAILURE_WINDOW_MS = 60000;
@@ -259,6 +271,14 @@
         return Date.now();
     }
 
+    function isQuotaExceededError(error) {
+        if (!error) return false;
+        if (error.name === 'QuotaExceededError') return true;
+        if (error.code === 22 || error.code === 1014) return true;
+        const message = String(error.message || '').toLowerCase();
+        return message.includes('quota') || message.includes('storage full');
+    }
+
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
@@ -279,16 +299,77 @@
     }
 
     function writePersistentCache(cache, meta) {
-        if (typeof window === 'undefined' || !window.localStorage) return;
+        if (typeof window === 'undefined' || !window.localStorage || !persistentCacheState.enabled) {
+            return false;
+        }
         try {
             window.localStorage.setItem(PERSIST_KEY, JSON.stringify(cache));
             window.localStorage.setItem(CACHE_META_KEY, JSON.stringify(meta));
+            return true;
         } catch (error) {
+            if (isQuotaExceededError(error)) {
+                const prunedCount = prunePersistentStore(Math.max(25, Math.floor(MAX_PERSISTED_ENTRIES * 0.6)));
+                if (prunedCount > 0) {
+                    try {
+                        window.localStorage.setItem(PERSIST_KEY, JSON.stringify(cache));
+                        window.localStorage.setItem(CACHE_META_KEY, JSON.stringify(meta));
+                        return true;
+                    } catch (retryError) {
+                        error = retryError;
+                    }
+                }
+                persistentCacheState.enabled = false;
+                if (!persistentCacheState.quotaWarned) {
+                    persistentCacheState.quotaWarned = true;
+                    console.warn(
+                        '[apiClient] Persistent cache quota exceeded, disabling localStorage cache for this session.',
+                        error
+                    );
+                }
+                return false;
+            }
             console.warn('[apiClient] Failed to write persistent cache', error);
+            return false;
         }
     }
 
     const persistentStore = readPersistentCache();
+    prunePersistentStore(MAX_PERSISTED_ENTRIES);
+
+    function prunePersistentStore(maxEntries = MAX_PERSISTED_ENTRIES) {
+        const data = persistentStore?.data;
+        const meta = persistentStore?.meta;
+        if (!data || !meta) {
+            return 0;
+        }
+        const ttlCutoff = now() - DEFAULTS.cacheTtlMs;
+        let removed = 0;
+        const keys = Object.keys(data);
+        keys.forEach(key => {
+            const entry = data[key];
+            const timestamp = Number(entry?.timestamp || 0);
+            if (!entry || !Number.isFinite(timestamp) || timestamp < ttlCutoff) {
+                delete data[key];
+                delete meta[key];
+                removed += 1;
+            }
+        });
+        const remainingKeys = Object.keys(data);
+        if (remainingKeys.length > maxEntries) {
+            const ordered = remainingKeys.sort((a, b) => {
+                const aTs = Number(data[a]?.timestamp || 0);
+                const bTs = Number(data[b]?.timestamp || 0);
+                return aTs - bTs;
+            });
+            const toDrop = ordered.slice(0, remainingKeys.length - maxEntries);
+            toDrop.forEach(key => {
+                delete data[key];
+                delete meta[key];
+                removed += 1;
+            });
+        }
+        return removed;
+    }
 
     function makeCacheKey(path) {
         return `${DEFAULTS.baseUrl}|${path}`;
@@ -308,13 +389,25 @@
         return null;
     }
 
-    function writeCacheEntry(key, payload, etag) {
+    function writeCacheEntry(key, payload, etag, options = {}) {
         if (!key) return;
         const entry = { data: payload, timestamp: now(), etag: etag || null };
         MEMORY_CACHE.set(key, entry);
+        if (!persistentCacheState.enabled || options.persistCache === false) {
+            return;
+        }
+        const payloadSize = Number(options.payloadSize || 0);
+        if (Number.isFinite(payloadSize) && payloadSize > MAX_PERSISTED_ENTRY_CHARS) {
+            return;
+        }
         persistentStore.data[key] = entry;
         persistentStore.meta[key] = { cachedAt: entry.timestamp };
-        writePersistentCache(persistentStore.data, persistentStore.meta);
+        prunePersistentStore(MAX_PERSISTED_ENTRIES);
+        const wrote = writePersistentCache(persistentStore.data, persistentStore.meta);
+        if (!wrote && !persistentCacheState.enabled) {
+            delete persistentStore.data[key];
+            delete persistentStore.meta[key];
+        }
     }
 
     function resolveRequestTarget(path, options = {}) {
@@ -651,7 +744,10 @@
                 const text = await response.text();
                 const data = text ? JSON.parse(text) : null;
                 const etag = response.headers.get('ETag');
-                writeCacheEntry(target.cacheKey, data, etag);
+                writeCacheEntry(target.cacheKey, data, etag, {
+                    persistCache: options.persistCache !== false,
+                    payloadSize: text ? text.length : 0
+                });
                 breaker.recordSuccess();
                 meta.fromCache = false;
                 meta.cacheTimestamp = now();
@@ -1256,7 +1352,10 @@
         async _fetchDivisionDetails(championshipId, requestOptions = {}) {
             const encodedId = encodeURIComponent(championshipId);
             const routes = buildRouteCandidates('divisionDetails', encodedId);
-            const result = await fetchWithFallback(routes, requestOptions);
+            const result = await fetchWithFallback(routes, {
+                ...requestOptions,
+                persistCache: false
+            });
             const payload = result?.data ?? result ?? {};
             const normalized = ensureSnakeCaseDeep(payload) || {};
             if (!Array.isArray(normalized.teams)) {

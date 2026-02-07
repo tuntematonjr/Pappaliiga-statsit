@@ -79,15 +79,6 @@
         }
     }
 
-    function statusLabel(status) {
-        if (!status) return 'Tulossa';
-        const value = String(status).toLowerCase();
-        if (['scheduled', 'configured', 'pending', 'ready'].includes(value)) return 'Tulossa';
-        if (['live', 'ongoing', 'in_progress', 'started'].includes(value)) return 'Käynnissä';
-        if (['finished', 'closed', 'over', 'completed'].includes(value)) return 'Pelattu';
-        return 'Tulossa';
-    }
-
     window.UpcomingMatchesList = {
         name: 'UpcomingMatchesList',
         components: {
@@ -103,7 +94,10 @@
             emptyMessage: { type: String, default: 'Ei tulevia otteluita.' },
             showDivision: { type: Boolean, default: false },
             showFaceit: { type: Boolean, default: true },
-            showHeader: { type: Boolean, default: true }
+            showHeader: { type: Boolean, default: true },
+            groupByDayDivision: { type: Boolean, default: false },
+            showWeekSeparators: { type: Boolean, default: true },
+            separatorGranularity: { type: String, default: 'week' }
         },
         computed: {
             normalizedItems() {
@@ -117,11 +111,107 @@
                         if (at !== bt) return at - bt;
                         return String(a.matchId || '').localeCompare(String(b.matchId || ''));
                     });
+            },
+            dayDivisionGroups() {
+                if (!this.groupByDayDivision) return [];
+                const dayMap = new Map();
+                for (const match of this.normalizedItems) {
+                    const dayKey = this.dayBucket(match.scheduledTs);
+                    if (!dayMap.has(dayKey)) {
+                        dayMap.set(dayKey, {
+                            key: dayKey,
+                            ts: match.scheduledTs ?? Number.POSITIVE_INFINITY,
+                            label: this.dayLabel(match.scheduledTs),
+                            divisionMap: new Map()
+                        });
+                    }
+                    const dayGroup = dayMap.get(dayKey);
+                    const divisionKey = this.divisionGroupKey(match);
+                    if (!dayGroup.divisionMap.has(divisionKey)) {
+                        dayGroup.divisionMap.set(divisionKey, {
+                            key: divisionKey,
+                            label: this.divisionLabel(match),
+                            sortOrder: this.divisionSortOrder(match),
+                            matches: []
+                        });
+                    }
+                    dayGroup.divisionMap.get(divisionKey).matches.push(match);
+                }
+                return Array.from(dayMap.values())
+                    .sort((a, b) => a.ts - b.ts)
+                    .map(day => ({
+                        key: day.key,
+                        label: day.label,
+                        divisions: Array.from(day.divisionMap.values()).sort((a, b) => {
+                            if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+                            return String(a.label || '').localeCompare(String(b.label || ''), 'fi');
+                        })
+                    }));
             }
         },
         methods: {
             formatDateTime,
-            statusLabel,
+            dayBucket(ts) {
+                if (!ts || !Number.isFinite(Number(ts))) return 'unknown-day';
+                const date = new Date(Number(ts));
+                if (Number.isNaN(date.getTime())) return 'unknown-day';
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            },
+            dayLabel(ts) {
+                if (!ts || !Number.isFinite(Number(ts))) return 'Päivä avoin';
+                const date = new Date(Number(ts));
+                if (Number.isNaN(date.getTime())) return 'Päivä avoin';
+                try {
+                    return date.toLocaleDateString('fi-FI', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long'
+                    });
+                } catch (error) {
+                    return this.dayBucket(ts);
+                }
+            },
+            weekBucket(ts) {
+                if (!ts || !Number.isFinite(Number(ts))) return 'unknown';
+                const date = new Date(Number(ts));
+                if (Number.isNaN(date.getTime())) return 'unknown';
+                const day = date.getDay();
+                const mondayOffset = (day + 6) % 7;
+                const monday = new Date(date);
+                monday.setHours(0, 0, 0, 0);
+                monday.setDate(monday.getDate() - mondayOffset);
+                return monday.toISOString().slice(0, 10);
+            },
+            weekNumber(ts) {
+                if (!ts || !Number.isFinite(Number(ts))) return null;
+                const date = new Date(Number(ts));
+                if (Number.isNaN(date.getTime())) return null;
+                const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+                const dayNum = utcDate.getUTCDay() || 7;
+                utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNum);
+                const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+                const weekNo = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+                return Number.isFinite(weekNo) ? weekNo : null;
+            },
+            weekLabel(ts) {
+                const weekNo = this.weekNumber(ts);
+                if (!weekNo) return 'Ajankohta avoin';
+                return `Viikko ${weekNo}`;
+            },
+            separatorBucket(ts) {
+                return this.separatorGranularity === 'day' ? this.dayBucket(ts) : this.weekBucket(ts);
+            },
+            separatorLabel(ts) {
+                return this.separatorGranularity === 'day' ? this.dayLabel(ts) : this.weekLabel(ts);
+            },
+            hasWeekChange(index, match) {
+                if (index === 0) return true;
+                const previous = this.normalizedItems[index - 1];
+                return this.separatorBucket(previous?.scheduledTs) !== this.separatorBucket(match?.scheduledTs);
+            },
             resolveAvatar(src) {
                 if (!src) return DEFAULT_TEAM_LOGO;
                 try {
@@ -139,6 +229,28 @@
                 const base = item.divisionName || (item.divisionNum != null ? `Divisioona ${item.divisionNum}` : 'Divisioona');
                 return item.isPlayoffs ? `${base} (Playoffs)` : base;
             },
+            divisionGroupKey(item) {
+                if (!item) return 'division-unknown';
+                return String(
+                    item.championshipId ??
+                    item.divisionSlug ??
+                    item.divisionNum ??
+                    item.divisionName ??
+                    'division-unknown'
+                );
+            },
+            divisionSortOrder(item) {
+                if (!item || typeof item !== 'object') return Number.POSITIVE_INFINITY;
+                const direct = Number(item.divisionNum);
+                if (Number.isFinite(direct)) return direct;
+                const label = this.divisionLabel(item);
+                const match = String(label).match(/(\d+)/);
+                if (match) {
+                    const parsed = Number(match[1]);
+                    if (Number.isFinite(parsed)) return parsed;
+                }
+                return Number.POSITIVE_INFINITY;
+            },
             divisionRoute(item) {
                 if (!item?.championshipId) return null;
                 return {
@@ -150,6 +262,10 @@
                         ...(item.season != null ? { championship_season: item.season } : {})
                     }
                 };
+            },
+            divisionGroupRoute(divisionGroup) {
+                if (!divisionGroup || !Array.isArray(divisionGroup.matches) || !divisionGroup.matches.length) return null;
+                return this.divisionRoute(divisionGroup.matches[0]);
             },
             teamRoute(item, team) {
                 if (!item?.championshipId || !team?.id) return null;
@@ -172,9 +288,6 @@
                         <h2 class="title-accent titleUnderlineSection">{{ title }}</h2>
                         <p v-if="subtitle" class="upcoming-matches__subtitle">{{ subtitle }}</p>
                     </div>
-                    <div class="upcoming-matches__count" v-if="normalizedItems.length">
-                        {{ normalizedItems.length }} ottelua
-                    </div>
                 </header>
 
                 <loading-spinner
@@ -188,13 +301,68 @@
 
                 <div v-else>
                     <p v-if="!normalizedItems.length" class="upcoming-matches__empty">{{ emptyMessage }}</p>
-                    <ul v-else class="upcoming-matches__list">
-                        <li v-for="match in normalizedItems" :key="match.matchId" class="upcoming-match-card">
-                            <div class="upcoming-match-card__meta">
-                                <div class="upcoming-match-card__date">{{ formatDateTime(match.scheduledTs) }}</div>
-                                <div class="upcoming-match-card__status">{{ statusLabel(match.status) }}</div>
+                    <div v-else-if="groupByDayDivision" class="upcoming-matches__groups">
+                        <section v-for="dayGroup in dayDivisionGroups" :key="dayGroup.key" class="upcoming-day-group">
+                            <div class="upcoming-matches__week-separator upcoming-matches__week-separator--day">
+                                <span>{{ dayGroup.label }}</span>
                             </div>
-
+                            <div v-for="division in dayGroup.divisions" :key="dayGroup.key + '-' + division.key" class="upcoming-division-group">
+                                <div class="upcoming-matches__week-separator upcoming-matches__week-separator--division">
+                                    <router-link
+                                        v-if="divisionGroupRoute(division)"
+                                        :to="divisionGroupRoute(division)"
+                                        class="upcoming-matches__group-link"
+                                    >{{ division.label }}</router-link>
+                                    <span v-else class="upcoming-matches__group-label">{{ division.label }}</span>
+                                </div>
+                                <ul class="upcoming-matches__list upcoming-matches__list--grouped">
+                                    <li v-for="(match, index) in division.matches" :key="'match-' + (match.matchId || (dayGroup.key + '-' + division.key + '-' + index))" class="upcoming-match-card">
+                                        <div class="upcoming-match-card__teams">
+                                            <div class="upcoming-match-card__team upcoming-match-card__team--left">
+                                                <img :src="resolveAvatar(match.team1.avatar)" :alt="match.team1.name" class="upcoming-match-card__logo">
+                                                <router-link
+                                                    v-if="teamRoute(match, match.team1)"
+                                                    :to="teamRoute(match, match.team1)"
+                                                    class="upcoming-match-card__team-name"
+                                                >{{ match.team1.name }}</router-link>
+                                                <span v-else class="upcoming-match-card__team-name">{{ match.team1.name }}</span>
+                                            </div>
+                                            <span class="upcoming-match-card__vs">vs</span>
+                                            <div class="upcoming-match-card__team upcoming-match-card__team--right">
+                                                <img :src="resolveAvatar(match.team2.avatar)" :alt="match.team2.name" class="upcoming-match-card__logo">
+                                                <router-link
+                                                    v-if="teamRoute(match, match.team2)"
+                                                    :to="teamRoute(match, match.team2)"
+                                                    class="upcoming-match-card__team-name"
+                                                >{{ match.team2.name }}</router-link>
+                                                <span v-else class="upcoming-match-card__team-name">{{ match.team2.name }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="upcoming-match-card__actions">
+                                            <div class="upcoming-match-card__date">{{ formatDateTime(match.scheduledTs) }}</div>
+                                            <a
+                                                v-if="showFaceit && match.faceitUrl"
+                                                class="upcoming-match-card__link btn-secondary"
+                                                :href="match.faceitUrl"
+                                                target="_blank"
+                                                rel="noopener"
+                                            >Faceit Lobby</a>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </section>
+                    </div>
+                    <ul v-else class="upcoming-matches__list">
+                        <template v-for="(match, index) in normalizedItems">
+                            <li
+                                v-if="showWeekSeparators && hasWeekChange(index, match)"
+                                :key="'separator-' + separatorBucket(match.scheduledTs) + '-' + index"
+                                class="upcoming-matches__week-separator"
+                            >
+                                <span>{{ separatorLabel(match.scheduledTs) }}</span>
+                            </li>
+                            <li :key="'match-' + (match.matchId || index)" class="upcoming-match-card">
                             <div class="upcoming-match-card__teams">
                                 <div class="upcoming-match-card__team upcoming-match-card__team--left">
                                     <img :src="resolveAvatar(match.team1.avatar)" :alt="match.team1.name" class="upcoming-match-card__logo">
@@ -224,14 +392,18 @@
                                 <span v-else class="upcoming-match-card__division-link">{{ divisionLabel(match) }}</span>
                             </div>
 
-                            <a
-                                v-if="showFaceit && match.faceitUrl"
-                                class="upcoming-match-card__link btn-secondary"
-                                :href="match.faceitUrl"
-                                target="_blank"
-                                rel="noopener"
-                            >Faceit Linkki</a>
-                        </li>
+                            <div class="upcoming-match-card__actions">
+                                <div class="upcoming-match-card__date">{{ formatDateTime(match.scheduledTs) }}</div>
+                                <a
+                                    v-if="showFaceit && match.faceitUrl"
+                                    class="upcoming-match-card__link btn-secondary"
+                                    :href="match.faceitUrl"
+                                    target="_blank"
+                                    rel="noopener"
+                                >Faceit Lobby</a>
+                            </div>
+                            </li>
+                        </template>
                     </ul>
                 </div>
             </section>

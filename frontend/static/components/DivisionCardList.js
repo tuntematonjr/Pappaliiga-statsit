@@ -56,6 +56,13 @@
     });
     const STORAGE_KEY = 'pappaliiga:last-division';
     const isDevEnv = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const verboseCardLogs = Boolean(
+        typeof window !== 'undefined' && window.PAPPALIIGA_DEBUG_CARD_MODEL === true
+    );
+    const verboseListLogs = Boolean(
+        typeof window !== 'undefined' && window.PAPPALIIGA_DEBUG_DIVISION_LIST === true
+    );
+    const loggedCardDebugIds = new Set();
 
     function getStoredDivisionId() {
         try {
@@ -262,16 +269,19 @@
             return null;
         }
         
-        // Debug logging in dev mode
-        if (isDevEnv && division.tier === 0) {
-            console.log('[buildCardModel] Processing division:', {
-                id: division.id || division.divisionId || division.division_id,
-                name: division.name,
-                season: division.season,
-                status: division.status,
-                bestPlayer: division.bestPlayer || division.best_player,
-                mvpTeam: division.mvpTeam || division.mvp_team
-            });
+        if (verboseCardLogs && division.tier === 0) {
+            const divisionId = String(division.id || division.divisionId || division.division_id || '');
+            if (divisionId && !loggedCardDebugIds.has(divisionId)) {
+                loggedCardDebugIds.add(divisionId);
+                console.log('[buildCardModel] Processing division:', {
+                    id: divisionId,
+                    name: division.name,
+                    season: division.season,
+                    status: division.status,
+                    bestPlayer: division.bestPlayer || division.best_player,
+                    mvpTeam: division.mvpTeam || division.mvp_team
+                });
+            }
         }
         
         const tierMeta = inferTierMeta(division);
@@ -851,7 +861,7 @@
                         const bNum = Number(b.divisionNumber) || 0;
                         return aNum - bNum;
                     });
-                if (isDevEnv) {
+                if (verboseListLogs) {
                     console.info(
                         `[DivisionCardList] filtered ${sorted.length} cards (status=${filterState}, search="${this.searchQuery}")`
                     );
@@ -885,14 +895,14 @@
                 this.resetVirtualWindow();
             },
             cardModels(newValue) {
-                if (isDevEnv) {
+                if (verboseListLogs) {
                     console.info('[DivisionCardList] cardModels updated', {
                         count: Array.isArray(newValue) ? newValue.length : 0
                     });
                 }
             },
             filteredCards(newValue) {
-                if (isDevEnv) {
+                if (verboseListLogs) {
                     const totalVisible = Array.isArray(newValue) ? newValue.length : 0;
                     console.info('[DivisionCardList] filteredCards updated', {
                         visibleDivisions: totalVisible

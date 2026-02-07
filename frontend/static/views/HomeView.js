@@ -1031,6 +1031,7 @@ window.HomeView = {
                             :class="{
                                 'logo-card--armafinland': callout.id === 'armafi',
                                 'logo-card--sosso-bot': callout.id === 'sosso-bot',
+                                'logo-card--mobbi-cs': callout.id === 'mobbi-cs',
                                 'logo-card--pappaliiga': callout.id === 'pappaliiga'
                             }"
                         >

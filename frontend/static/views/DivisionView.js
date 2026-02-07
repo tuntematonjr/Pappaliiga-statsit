@@ -1,7 +1,7 @@
 const DIVISION_METRIC_SCHEMA = [
     { id: 'teams', key: ['team_count', 'teams.length', 'aggregates.team_count'], label: 'Joukkueet', digits: 0 },
     { id: 'players', key: ['player_count', 'aggregates.player_count'], label: 'Pelaajat', digits: 0 },
-    { id: 'matches', key: ['aggregates.matches_played', 'aggregates.total_matches', 'matches_played'], label: 'Ottelut', digits: 0 },
+    { id: 'matches', key: ['aggregates.played_matches', 'aggregates.matches_played', 'played_matches', 'matches_played'], label: 'Ottelut', digits: 0 },
     { id: 'maps', key: ['aggregates.maps_played_total', 'maps_played_total', 'maps_played'], label: 'Karttoja pelattu', digits: 0 },
     { id: 'rounds', key: ['aggregates.rounds_played_total', 'rounds_played_total', 'rounds'], label: 'Erää pelattu', digits: 0 },
     { id: 'adr', key: ['aggregates.median_adr', 'median_adr'], label: 'Median ADR', digits: 1 },
@@ -241,6 +241,8 @@ const SANKARI_METRIC_META = {
 };
 
 const DIVISION_DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
+const DIVISION_UPCOMING_FETCH_MIN_LIMIT = 16;
+const DIVISION_UPCOMING_FETCH_MAX_LIMIT = 40;
 
 function pickValue(obj, keys) {
     if (!obj) return undefined;
@@ -288,6 +290,30 @@ function formatMetric(value, schema) {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     }).format(numeric);
+}
+
+function formatIntegerMetric(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return '0';
+    }
+    return new Intl.NumberFormat('fi-FI', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(Math.max(0, Math.trunc(numeric)));
+}
+
+function formatPercentMetric(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return null;
+    }
+    const rounded = Math.round(numeric * 10) / 10;
+    const hasDecimal = Math.abs(rounded % 1) > 0;
+    return new Intl.NumberFormat('fi-FI', {
+        minimumFractionDigits: hasDecimal ? 1 : 0,
+        maximumFractionDigits: 1
+    }).format(rounded);
 }
 
 function buildMetricCards(source, schema) {
@@ -408,12 +434,46 @@ window.DivisionView = {
             }
             return this.upcomingStore.getEntryForParams({
                 championshipId: this.championshipId,
-                limit: 8,
+                limit: this.upcomingFetchLimit,
                 offset: 0
             });
         },
+        upcomingFetchLimit() {
+            const detailsCount = Number(this.divisionDetails?.team_count ?? this.divisionDetails?.teams_count ?? NaN);
+            const standingsCount = Array.isArray(this.standings) ? this.standings.length : 0;
+            const fallbackTeams = Number.isFinite(detailsCount) && detailsCount > 0 ? detailsCount : standingsCount;
+            if (!fallbackTeams) return DIVISION_UPCOMING_FETCH_MIN_LIMIT;
+            const calculated = Math.ceil(fallbackTeams * 2);
+            return Math.min(DIVISION_UPCOMING_FETCH_MAX_LIMIT, Math.max(DIVISION_UPCOMING_FETCH_MIN_LIMIT, calculated));
+        },
         upcomingMatches() {
-            return Array.isArray(this.upcomingState.data) ? this.upcomingState.data : [];
+            const items = Array.isArray(this.upcomingState.data) ? this.upcomingState.data : [];
+            if (!items.length) return [];
+
+            const earliestByTeam = new Map();
+            for (const match of items) {
+                const teamIds = this.extractUpcomingTeamIds(match);
+                if (!teamIds.length) continue;
+                const ts = this.upcomingMatchTimestamp(match);
+                for (const teamId of teamIds) {
+                    const current = earliestByTeam.get(teamId);
+                    if (!current) {
+                        earliestByTeam.set(teamId, { match, ts });
+                        continue;
+                    }
+                    if (ts < current.ts) {
+                        earliestByTeam.set(teamId, { match, ts });
+                    }
+                }
+            }
+
+            const selected = Array.from(new Set(Array.from(earliestByTeam.values()).map(entry => entry.match)));
+            return selected.sort((a, b) => {
+                const at = this.upcomingMatchTimestamp(a);
+                const bt = this.upcomingMatchTimestamp(b);
+                if (at !== bt) return at - bt;
+                return String(this.upcomingMatchId(a)).localeCompare(String(this.upcomingMatchId(b)));
+            });
         },
         upcomingLoading() {
             return this.upcomingState.loading;
@@ -512,42 +572,52 @@ window.DivisionView = {
             aggregates.team_count = aggregates.team_count ?? teams.length ?? details.team_count;
             aggregates.player_count = aggregates.player_count ?? details.player_count ?? players.length;
             if (aggregates.matches_played == null) {
-                const playedMatches = aggregates.played_matches ?? aggregates.playedMatches;
+                const playedMatches =
+                    aggregates.played_matches
+                    ?? aggregates.playedMatches
+                    ?? details.played_matches
+                    ?? details.matches_played
+                    ?? details.playedMatches
+                    ?? details.matchesPlayed;
                 if (playedMatches != null) {
                     aggregates.matches_played = playedMatches;
                 }
             }
+            if (aggregates.played_matches == null && aggregates.matches_played != null) {
+                aggregates.played_matches = aggregates.matches_played;
+            }
             if (aggregates.total_matches == null) {
-                const totalMatches = aggregates.total_matches ?? aggregates.totalMatches;
+                const totalMatches =
+                    aggregates.total_matches
+                    ?? aggregates.totalMatches
+                    ?? aggregates.matches_total
+                    ?? aggregates.matchesTotal
+                    ?? details.total_matches
+                    ?? details.matches_total
+                    ?? details.totalMatches
+                    ?? details.matchesTotal;
                 if (totalMatches != null) {
                     aggregates.total_matches = totalMatches;
                 }
             }
 
-            if (aggregates.matches_played == null || aggregates.matches_played === 0) {
-                const matchFromStandings = standings.reduce(
-                    (max, team) => Math.max(
-                        max,
-                        Number(
-                            team.matches_played
-                            ?? team.matchesPlayed
-                            ?? team.matches
-                            ?? 0
-                        )
+            if (aggregates.matches_played == null && standings.length) {
+                const teamMatchTotal = standings.reduce(
+                    (sum, team) => sum + Number(
+                        team.matches_played
+                        ?? team.matchesPlayed
+                        ?? team.matches
+                        ?? 0
                     ),
                     0
                 );
-                if (matchFromStandings > 0) {
-                    aggregates.matches_played = matchFromStandings;
-                    aggregates.total_matches = aggregates.total_matches ?? matchFromStandings;
+                if (teamMatchTotal > 0) {
+                    aggregates.matches_played = Math.round(teamMatchTotal / 2);
+                    aggregates.played_matches = aggregates.matches_played;
                 }
             }
             if (aggregates.maps_played_total == null && maps.length) {
                 aggregates.maps_played_total = maps.reduce((sum, entry) => sum + Number(entry.maps_played ?? entry.curr?.maps_played ?? 0), 0);
-            }
-            if ((aggregates.matches_played == null || aggregates.matches_played === 0) && aggregates.maps_played_total > 0) {
-                aggregates.matches_played = aggregates.maps_played_total;
-                aggregates.total_matches = aggregates.total_matches ?? aggregates.maps_played_total;
             }
             if (aggregates.rounds_played_total == null && maps.length) {
                 aggregates.rounds_played_total = maps.reduce((sum, entry) => sum + Number(entry.rounds_played ?? entry.curr?.rounds_played ?? 0), 0);
@@ -647,12 +717,51 @@ window.DivisionView = {
             if (label.includes('käynn') || label.includes('kaynn')) return 'active';
             return 'idle';
         },
+        matchProgressMetric() {
+            const aggregates = this.derivedAggregates || {};
+            const playedRaw =
+                aggregates.played_matches
+                ?? aggregates.matches_played
+                ?? this.divisionDetails?.played_matches
+                ?? this.divisionDetails?.matches_played
+                ?? 0;
+            const totalRaw =
+                aggregates.total_matches
+                ?? this.divisionDetails?.total_matches
+                ?? this.divisionDetails?.matches_total
+                ?? 0;
+            const played = Math.max(0, Math.trunc(this.toNumber(playedRaw, 0)));
+            const total = Math.max(0, Math.trunc(this.toNumber(totalRaw, 0)));
+            const cappedPlayed = total > 0 ? Math.min(played, total) : played;
+            const percent = total > 0 ? (cappedPlayed / total) * 100 : null;
+            return {
+                played: cappedPlayed,
+                total,
+                percent
+            };
+        },
         divisionSummaryMetrics() {
             if (!this.statMetrics.length) return [];
-            return this.statMetrics.map(metric => ({
-                ...metric,
-                icon: this.getMetricIcon(metric.key)
-            }));
+            const matchProgress = this.matchProgressMetric;
+            return this.statMetrics.map(metric => {
+                const base = {
+                    ...metric,
+                    icon: this.getMetricIcon(metric.key),
+                    subtitle: ''
+                };
+                if (metric.key !== 'matches') {
+                    return base;
+                }
+                const playedLabel = formatIntegerMetric(matchProgress.played);
+                const totalLabel = formatIntegerMetric(matchProgress.total);
+                const ratioLabel = matchProgress.total > 0 ? `${playedLabel} / ${totalLabel}` : playedLabel;
+                const percentLabel = matchProgress.percent != null ? `${formatPercentMetric(matchProgress.percent)} % pelattu` : '';
+                return {
+                    ...base,
+                    value: ratioLabel,
+                    subtitle: percentLabel
+                };
+            });
         },
         teams() {
             return Array.isArray(this.divisionDetails?.teams) ? this.divisionDetails.teams : [];
@@ -774,7 +883,7 @@ window.DivisionView = {
             if (!id || !this.upcomingStore) return;
             try {
                 await this.upcomingStore.fetchUpcomingMatches(
-                    { championshipId: id, limit: 8, offset: 0 },
+                    { championshipId: id, limit: this.upcomingFetchLimit, offset: 0 },
                     { force: options.force === true }
                 );
             } catch (error) {
@@ -863,6 +972,39 @@ window.DivisionView = {
             } catch (error) {
                 return src || DIVISION_DEFAULT_TEAM_LOGO;
             }
+        },
+        normalizeUpcomingTeamId(value) {
+            if (value === null || value === undefined || value === '') return null;
+            return String(value);
+        },
+        extractUpcomingTeamIds(match) {
+            if (!match || typeof match !== 'object') return [];
+            const ids = [
+                match.team1_id,
+                match.team1Id,
+                match.team2_id,
+                match.team2Id,
+                match.team1?.id,
+                match.team1?.team_id,
+                match.team1?.teamId,
+                match.team2?.id,
+                match.team2?.team_id,
+                match.team2?.teamId
+            ]
+                .map(value => this.normalizeUpcomingTeamId(value))
+                .filter(Boolean);
+            return Array.from(new Set(ids));
+        },
+        upcomingMatchTimestamp(match) {
+            if (!match || typeof match !== 'object') return Number.POSITIVE_INFINITY;
+            const raw = match.scheduled_ts ?? match.scheduledTs ?? match.scheduled_at ?? match.scheduledAt ?? match.ts ?? null;
+            const numeric = Number(raw);
+            if (!Number.isFinite(numeric) || numeric <= 0) return Number.POSITIVE_INFINITY;
+            return Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric;
+        },
+        upcomingMatchId(match) {
+            if (!match || typeof match !== 'object') return '';
+            return match.match_id ?? match.matchId ?? '';
         },
         toNumber(value, fallback = 0) {
             if (value === null || value === undefined) return fallback;
@@ -1234,7 +1376,6 @@ window.DivisionView = {
                         :loading="upcomingLoading"
                         :error="upcomingError"
                         title="Tulevat ottelut"
-                        :subtitle="divisionDetails?.name || ''"
                         empty-message="Ei tulevia otteluita tälle divisioonalle."
                     ></upcoming-matches-list>
                 </section>
@@ -1250,6 +1391,7 @@ window.DivisionView = {
                             :icon="metric.icon"
                             :label="metric.label"
                             :value="metric.value"
+                            :subtitle="metric.subtitle || ''"
                         ></summary-stat-card>
                     </div>
                 </section>

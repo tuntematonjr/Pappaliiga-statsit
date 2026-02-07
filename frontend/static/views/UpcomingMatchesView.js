@@ -11,7 +11,8 @@ window.UpcomingMatchesView = {
         return {
             seasonsStore,
             upcomingStore,
-            limit: 50
+            limit: 50,
+            groupedViewEnabled: true
         };
     },
     computed: {
@@ -71,6 +72,9 @@ window.UpcomingMatchesView = {
             } catch (error) {
                 console.error('[UpcomingMatchesView] upcoming fetch failed', error);
             }
+        },
+        toggleGrouping() {
+            this.groupedViewEnabled = !this.groupedViewEnabled;
         }
     },
     template: `
@@ -78,6 +82,11 @@ window.UpcomingMatchesView = {
             <header class="upcoming-view__header">
                 <h1 class="title-accent titleUnderlinePage">Tulevat ottelut</h1>
                 <p class="upcoming-view__subtitle">{{ currentSeasonLabel }}</p>
+                <div class="upcoming-view__controls">
+                    <button type="button" class="btn-secondary upcoming-view__toggle" @click="toggleGrouping">
+                        {{ groupedViewEnabled ? 'Nayta vain aikajarjestys' : 'Nayta paiva- ja divisioonaryhmittely' }}
+                    </button>
+                </div>
             </header>
 
             <loading-spinner
@@ -92,6 +101,9 @@ window.UpcomingMatchesView = {
                 :loading="upcomingState.loading"
                 :error="upcomingState.error"
                 :show-division="true"
+                :group-by-day-division="groupedViewEnabled"
+                :show-week-separators="!groupedViewEnabled"
+                separator-granularity="day"
                 :show-header="false"
                 empty-message="Tälle kaudelle ei löytynyt tulevia otteluita."
             ></upcoming-matches-list>

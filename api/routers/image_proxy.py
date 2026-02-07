@@ -21,8 +21,8 @@ from fastapi.responses import Response
 
 logger = logging.getLogger(__name__)
 
-# Simple in-memory cache structure: url -> (expiry_ts, content_type, bytes)
-_CACHE: dict[str, tuple[float, str, bytes]] = {}
+# Simple in-memory cache structure: url -> (expiry_ts, content_type, bytes, source)
+_CACHE: dict[str, tuple[float, str, bytes, str]] = {}
 _CACHE_LOCK = asyncio.Lock()
 
 # Configuration
@@ -67,11 +67,18 @@ def _load_default_fallback() -> Optional[tuple[str, bytes]]:
     return _DEFAULT_FALLBACK_CACHE
 
 
-async def _store_and_respond(cache_key: str, content_type: str, data: bytes) -> Response:
+async def _store_and_respond(cache_key: str, content_type: str, data: bytes, source: str) -> Response:
     expiry = time.time() + CACHE_TTL
     async with _CACHE_LOCK:
-        _CACHE[cache_key] = (expiry, content_type, data)
-    return Response(content=data, media_type=content_type, headers={"Cache-Control": f"public, max-age={CACHE_TTL}"})
+        _CACHE[cache_key] = (expiry, content_type, data, source)
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={
+            "Cache-Control": f"public, max-age={CACHE_TTL}",
+            "X-Proxy-Image-Source": source,
+        },
+    )
 
 
 async def _serve_remote_fallback(
@@ -108,7 +115,7 @@ async def _serve_remote_fallback(
         return None
 
     logger.debug("proxy-image: served remote fallback for %s", cache_key)
-    return await _store_and_respond(cache_key, content_type, data)
+    return await _store_and_respond(cache_key, content_type, data, "fallback_remote")
 
 
 async def _serve_default_fallback(cache_key: str) -> Optional[Response]:
@@ -118,7 +125,7 @@ async def _serve_default_fallback(cache_key: str) -> Optional[Response]:
 
     content_type, data = fallback
     logger.debug("proxy-image: served local fallback for %s", cache_key)
-    return await _store_and_respond(cache_key, content_type, data)
+    return await _store_and_respond(cache_key, content_type, data, "fallback_local")
 
 
 @router.get("/proxy-image")
@@ -153,8 +160,16 @@ async def proxy_image(url: str = Query(..., description="Remote image URL to pro
     async with _CACHE_LOCK:
         entry = _CACHE.get(url)
         if entry and entry[0] >= time.time():
-            _, content_type, data = entry
-            return Response(content=data, media_type=content_type, headers={"Cache-Control": f"public, max-age={CACHE_TTL}"})
+            _, content_type, data, source = entry
+            cache_source = f"cache:{source}"
+            return Response(
+                content=data,
+                media_type=content_type,
+                headers={
+                    "Cache-Control": f"public, max-age={CACHE_TTL}",
+                    "X-Proxy-Image-Source": cache_source,
+                },
+            )
 
     # Fetch from remote
     async with httpx.AsyncClient(timeout=FETCH_TIMEOUT, follow_redirects=True) as client:
@@ -199,4 +214,4 @@ async def proxy_image(url: str = Query(..., description="Remote image URL to pro
         if len(data) > MAX_BYTES:
             raise HTTPException(status_code=413, detail="Image too large")
 
-        return await _store_and_respond(url, content_type, data)
+        return await _store_and_respond(url, content_type, data, "faceit")
