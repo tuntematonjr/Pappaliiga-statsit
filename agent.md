@@ -8,8 +8,6 @@ Keep the codebase working, docs accurate, and changes minimal and testable.
 
 ## Local Run
 - Start API + frontend: `python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000`
-- Scripted start (Linux/macOS): `./scripts/dev_start_simple.sh 8000 .venv/bin/activate`
-- Scripted start (PowerShell): `.\scripts\dev_start_simple.ps1 -Port 8000 -VenvPath ".\venv\Scripts\Activate.ps1"`
 
 ## Docs Policy
 - Keep Markdown files short and current.

@@ -31,12 +31,8 @@ Apply schema:
 mysql -u <user> -p <database> < mariadb_schema.sql
 ```
 
-Backfill existing rows:
-
-```bash
-python tools/backfill_team_championships.py --dry-run
-python tools/backfill_team_championships.py
-```
+Backfill existing rows by running a one-time SQL insert from existing
+`matches`/`teams` data if needed.
 
 ## Limitations
 - Only names are historized.
