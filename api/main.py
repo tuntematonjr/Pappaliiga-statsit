@@ -22,6 +22,7 @@ from db_async import close_pool, get_pool
 from .routers import championships, divisions, matches, players, stats, teams, seasons, debug
 from .routers import maps_catalog, image_proxy, season_view
 from .routers import share_preview
+from .routers import faceit_webhooks
 from .routers import sync_events
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.cache_reheat import reheat_main_page
@@ -73,18 +74,12 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[warn] Cache reheat failed to start: {exc}")
 
-    if _sync_event_routes_enabled:
-        token = (os.getenv("SYNC_EVENT_TOKEN") or "").strip()
-        if token:
-            await get_sync_event_queue().start()
-        else:
-            logger.warning("ENABLE_SYNC_EVENT_ROUTES is true but SYNC_EVENT_TOKEN is missing; sync event routes disabled")
+    await get_sync_event_queue().start()
     
     yield
     
     # Shutdown: close pool
-    if _sync_event_routes_enabled and (os.getenv("SYNC_EVENT_TOKEN") or "").strip():
-        await get_sync_event_queue().stop()
+    await get_sync_event_queue().stop()
     await close_pool()
     print("[info] Database pool closed")
 
@@ -129,6 +124,7 @@ app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 app.include_router(season_view.router, prefix="/api", tags=["season-view"])
 app.include_router(share_preview.router, tags=["share-preview"])
+app.include_router(faceit_webhooks.router, tags=["faceit-webhooks"])
 if _sync_event_routes_enabled:
     if (os.getenv("SYNC_EVENT_TOKEN") or "").strip():
         app.include_router(sync_events.router, tags=["sync-events"])

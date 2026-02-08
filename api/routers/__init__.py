@@ -3,6 +3,7 @@
 from . import (
     championships,
     divisions,
+    faceit_webhooks,
     image_proxy,
     maps_catalog,
     matches,
@@ -17,6 +18,7 @@ from . import (
 __all__ = [
     "championships",
     "divisions",
+    "faceit_webhooks",
     "matches",
     "players",
     "share_preview",
