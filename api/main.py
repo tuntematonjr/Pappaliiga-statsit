@@ -9,6 +9,8 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 import asyncio
+import logging
+import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +28,14 @@ from api.services.cache_reheat import reheat_main_page
 # Track app start time for uptime calculation
 import time
 _app_start_time = time.time()
+logger = logging.getLogger(__name__)
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 # Load environment variables from .env file if present
 env_path = Path(__file__).parent.parent / ".env"
@@ -75,8 +85,8 @@ app = FastAPI(
 # CORS configuration for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure for production
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
@@ -90,7 +100,11 @@ if (frontend_dir / "static").exists():
 
 # Include routers
 app.include_router(seasons.router, prefix="/api/seasons", tags=["seasons"])
-app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
+if _env_bool("ENABLE_DEBUG_ROUTES", default=False):
+    if (os.getenv("DEBUG_API_TOKEN") or "").strip():
+        app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
+    else:
+        logger.warning("ENABLE_DEBUG_ROUTES is true but DEBUG_API_TOKEN is missing; debug routes disabled")
 app.include_router(divisions.router, prefix="/api/divisions", tags=["divisions"])
 app.include_router(championships.router, prefix="/api/championships", tags=["championships"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
@@ -150,8 +164,9 @@ async def health_check():
             "uptime": uptime,
             "database": "connected"
         }
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database unhealthy: {e}")
+    except Exception:
+        logger.exception("Health check failed")
+        raise HTTPException(status_code=503, detail="Database unhealthy")
 
 
 @app.get("/api/health")
@@ -195,10 +210,10 @@ async def bad_request_handler(request, exc: BadRequestError):
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     """Catch-all exception handler."""
-    print(f"Unhandled exception: {exc}")
+    logger.exception("Unhandled exception while serving %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)},
+        content={"detail": "Internal server error"},
     )
 
 

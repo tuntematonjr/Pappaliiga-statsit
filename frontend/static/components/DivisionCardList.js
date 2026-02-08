@@ -547,28 +547,77 @@
         },
         emits: ['remember'],
         computed: {
+            playoffsPendingStart() {
+                return Boolean(
+                    this.division.playoffs?.hasChampionship &&
+                    this.division.season?.isFinished &&
+                    this.division.playoffs.matchesPlayed === 0 &&
+                    !this.division.playoffs.isFinished
+                );
+            },
+            displayStatusState() {
+                return this.playoffsPendingStart ? DivisionStatus.NOT_STARTED : this.division.state;
+            },
             statusLabel() {
-                return STATUS_LABELS[this.division.state] || STATUS_LABELS[DivisionStatus.NOT_STARTED];
+                return STATUS_LABELS[this.displayStatusState] || STATUS_LABELS[DivisionStatus.NOT_STARTED];
             },
             statusIcon() {
-                return STATUS_ICONS[this.division.state] || null;
+                return STATUS_ICONS[this.displayStatusState] || null;
             },
-            playoffsStatusState() {
-                if (!this.division.playoffs?.hasChampionship) {
-                    return null;
+            progressStage() {
+                if (this.division.state === DivisionStatus.COMPLETE) {
+                    return 'complete';
                 }
-                const state = this.division.playoffs.progressState;
-                if (state === 'active') return DivisionStatus.PLAYOFFS_ACTIVE;
-                if (state === 'finished') return DivisionStatus.COMPLETE;
-                return DivisionStatus.NOT_STARTED;
+                if (
+                    this.division.playoffs?.hasChampionship &&
+                    this.division.season?.isFinished
+                ) {
+                    return 'playoffs';
+                }
+                return 'regular';
             },
-            playoffsStatusLabel() {
-                if (!this.playoffsStatusState) return '';
-                return STATUS_LABELS[this.playoffsStatusState] || STATUS_LABELS[DivisionStatus.NOT_STARTED];
+            progressModel() {
+                if (this.progressStage === 'complete') {
+                    return {
+                        value: 100,
+                        max: 100,
+                        state: 'finished',
+                        label: '100%',
+                        tooltip: 'Divisioona valmis',
+                        showPercent: false
+                    };
+                }
+                if (this.progressStage === 'playoffs') {
+                    return {
+                        value: this.division.playoffs.matchesPlayed,
+                        max: this.division.playoffs.matchesTotal || this.division.playoffs.matchesPlayed || 0,
+                        state: this.division.playoffs.progressState,
+                        label: this.division.playoffs.progressLabel,
+                        tooltip: this.division.playoffs.progressTooltip,
+                        showPercent: true
+                    };
+                }
+                return {
+                    value: this.division.season.matchesPlayed,
+                    max: this.division.season.matchesTotal || this.division.season.matchesPlayed || 0,
+                    state: this.division.season.progressState,
+                    label: this.division.season.progressLabel,
+                    tooltip: this.division.season.progressTooltip,
+                    showPercent: true
+                };
             },
-            playoffsStatusIcon() {
-                if (!this.playoffsStatusState) return null;
-                return STATUS_ICONS[this.playoffsStatusState] || null;
+            showPlayoffsCTA() {
+                if (!this.division.playoffs?.hasChampionship) {
+                    return false;
+                }
+                if (!this.division.playoffs.href) {
+                    return false;
+                }
+                return Boolean(
+                    this.division.playoffs.matchesPlayed > 0 ||
+                    this.division.playoffs.isFinished ||
+                    this.division.playoffs.winner
+                );
             },
             seasonRows() {
                 const rows = [];
@@ -595,9 +644,6 @@
                     return true;
                 }
                 return playoffsWinner === seasonWinner;
-            },
-            playoffsCtaDisabled() {
-                return !this.division.season.isFinished;
             }
         },
         methods: {
@@ -612,7 +658,7 @@
             stateClass
         },
         template: `
-            <article class="division-card" role="listitem" :class="'division-card--' + stateClass(division.state)">
+            <article class="division-card" role="listitem" :class="'division-card--' + stateClass(displayStatusState)">
                 <header class="division-card__header division-card__header--centered">
                     <div class="division-card__title-row division-card__title-row--centered">
                         <h3
@@ -628,25 +674,24 @@
                 </header>
                 <div class="division-card__body">
                     <section class="division-card__block division-card__block--regular">
-                        <p class="division-card__block-label">Runkosarja</p>
                         <div class="division-card__stat-lines">
                             <p class="division-card__stat-line">Joukkueet: {{ division.season.teams != null ? division.season.teams : '–' }}</p>
                         </div>
                         <division-progress-bar
-                            :value="division.season.matchesPlayed"
-                            :max="division.season.matchesTotal || division.season.matchesPlayed || 0"
-                            :state="division.season.progressState"
-                            :label="division.season.progressLabel"
-                            :tooltip="division.season.progressTooltip"
-                            :show-percent="true"
-                            :aria-label="division.title + ' runkosarja eteneminen'"
+                            :value="progressModel.value"
+                            :max="progressModel.max"
+                            :state="progressModel.state"
+                            :label="progressModel.label"
+                            :tooltip="progressModel.tooltip"
+                            :show-percent="progressModel.showPercent"
+                            :aria-label="division.title + ' eteneminen'"
                             :animation-delay="(division.divisionNumber * 0.15) % 2"
                         ></division-progress-bar>
                         <div class="division-card__status-row division-card__status-row--centered">
                             <span
                                 class="division-card__badge"
-                                :class="'division-card__badge--' + stateClass(division.state)"
-                                :data-status="division.state"
+                                :class="'division-card__badge--' + stateClass(displayStatusState)"
+                                :data-status="displayStatusState"
                             >
                                 <span v-if="statusIcon" class="status-pill__icon" aria-hidden="true">
                                     <svg
@@ -665,6 +710,9 @@
                                 <span class="status-pill__label">{{ statusLabel }}</span>
                             </span>
                         </div>
+                        <p v-if="division.playoffs.isFinished && division.playoffs.winner" class="division-card__note division-card__note--centered">
+                            Playoff-voittaja: {{ division.playoffs.winner }}
+                        </p>
                         <ul v-if="seasonRows.length" class="division-card__facts division-card__facts--centered" role="list">
                             <li v-for="row in seasonRows" :key="row.key">
                                 <span class="division-card__fact-label">{{ row.label }}</span>
@@ -672,86 +720,19 @@
                             </li>
                         </ul>
                     </section>
-                    <div class="division-card__action-row">
+                    <div class="division-card__action-row division-card__action-row--split">
                         <a class="division-card__action division-card__action--primary" :href="division.href" @click="handleCTA">
                             Avaa divisioona
                         </a>
+                        <a
+                            v-if="showPlayoffsCTA"
+                            class="division-card__action division-card__action--ghost"
+                            :href="division.playoffs.href"
+                            @click="handlePlayoffsCTA"
+                        >
+                            Näytä playoffit
+                        </a>
                     </div>
-                    <section class="division-card__block division-card__block--playoffs">
-                        <p class="division-card__block-label">Playoffit</p>
-                        <template v-if="division.playoffs.hasChampionship">
-                            <division-progress-bar
-                                :value="division.playoffs.matchesPlayed"
-                                :max="division.playoffs.matchesTotal || division.playoffs.matchesPlayed || 0"
-                                :state="division.playoffs.progressState"
-                                :label="division.playoffs.progressLabel"
-                                :tooltip="division.playoffs.progressTooltip"
-                                :show-percent="true"
-                                :aria-label="division.title + ' playoffit eteneminen'"
-                                :animation-delay="(division.divisionNumber * 0.15 + 1) % 2"
-                            ></division-progress-bar>
-                            <div v-if="playoffsStatusState" class="division-card__status-row division-card__status-row--centered">
-                                <span
-                                    class="division-card__badge"
-                                    :class="'division-card__badge--' + stateClass(playoffsStatusState)"
-                                    :data-status="playoffsStatusState"
-                                >
-                                    <span v-if="playoffsStatusIcon" class="status-pill__icon" aria-hidden="true">
-                                        <svg
-                                            :viewBox="playoffsStatusIcon.viewBox"
-                                            role="presentation"
-                                            focusable="false"
-                                        >
-                                            <path
-                                                v-for="(path, idx) in playoffsStatusIcon.paths"
-                                                :key="idx"
-                                                :d="path.d"
-                                                fill="currentColor"
-                                            ></path>
-                                        </svg>
-                                    </span>
-                                    <span class="status-pill__label">{{ playoffsStatusLabel }}</span>
-                                </span>
-                            </div>
-                            <p v-if="division.playoffs.isFinished && division.playoffs.winner" class="division-card__note division-card__note--centered">
-                                Voittaja: {{ division.playoffs.winner }}
-                            </p>
-                            <div class="division-card__action-row">
-                                <button
-                                    v-if="playoffsCtaDisabled"
-                                    type="button"
-                                    class="division-card__action division-card__action--ghost division-card__action--disabled"
-                                    title="Runkosarja kesken"
-                                    aria-label="Playoffit avautuvat, kun runkosarja on valmis"
-                                    disabled
-                                >
-                                    Näytä playoffit
-                                </button>
-                                <a
-                                    v-else
-                                    class="division-card__action division-card__action--ghost"
-                                    :href="division.playoffs.href"
-                                    @click="handlePlayoffsCTA"
-                                >
-                                    Näytä playoffit
-                                </a>
-                            </div>
-                        </template>
-                        <template v-else>
-                            <p class="division-card__stat-line division-card__stat-line--muted">Ei playoffeja</p>
-                            <div class="division-card__action-row">
-                                <button
-                                    type="button"
-                                    class="division-card__action division-card__action--ghost division-card__action--disabled"
-                                    title="Ei playoffeja"
-                                    aria-label="Playoffit eivät ole saatavilla tälle divisioonalle"
-                                    disabled
-                                >
-                                    Näytä playoffit
-                                </button>
-                            </div>
-                        </template>
-                    </section>
                 </div>
             </article>
         `

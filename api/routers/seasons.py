@@ -1,6 +1,7 @@
 """Seasons API endpoints for aggregated season data."""
 from __future__ import annotations
 
+import logging
 from typing import List
 
 from fastapi import APIRouter, HTTPException
@@ -9,6 +10,7 @@ from api.models import CamelModel
 from api.services import seasons_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class SeasonListItem(CamelModel):
@@ -138,7 +140,8 @@ async def list_seasons():
         seasons = await seasons_service.get_seasons_list()
         return [SeasonListItem(**s) for s in seasons]
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Failed to list seasons")
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @router.get("/{season_id}/summary", response_model=SeasonSummary)
@@ -148,7 +151,8 @@ async def get_season_summary(season_id: int):
         summary = await seasons_service.get_season_summary(season_id)
         return SeasonSummary(**summary)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Failed to fetch season summary for season_id=%s", season_id)
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @router.get("/{season_id}/divisions", response_model=List[DivisionWithStats])
@@ -158,7 +162,8 @@ async def get_season_divisions(season_id: int):
         divisions = await seasons_service.get_season_divisions(season_id)
         return [DivisionWithStats(**d) for d in divisions]
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Failed to fetch season divisions for season_id=%s", season_id)
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @router.get("/{season_id}/divisions/{division_id}/stats", response_model=DivisionDetailedStats)
@@ -170,4 +175,9 @@ async def get_division_detailed_stats(season_id: int, division_id: str):
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception(
+            "Failed to fetch division detailed stats for season_id=%s division_id=%s",
+            season_id,
+            division_id,
+        )
+        raise HTTPException(status_code=500, detail="Internal server error") from exc

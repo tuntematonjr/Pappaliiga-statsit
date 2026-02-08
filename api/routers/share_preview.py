@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from html import escape
+import logging
+import os
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -14,6 +16,7 @@ from api.services import divisions_service, players_service
 from api.services import teams_service
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 frontend_dir = Path(__file__).parent.parent.parent / "frontend"
 index_path = frontend_dir / "index.html"
@@ -35,6 +38,10 @@ BOT_UA_MARKERS = (
 
 DEFAULT_IMAGE = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
 UNOFFICIAL_NOTE = "Epävirallinen Pappaliigan CS stasti sivu Armafinlandin toimesta."
+DEFAULT_PUBLIC_BASES = (
+    "https://pappa.aukko.net",
+    "https://papan.xn--per-sla.aukko.net",
+)
 
 
 def _is_preview_crawler(user_agent: str) -> bool:
@@ -46,12 +53,68 @@ def is_preview_crawler_request(request: Request) -> bool:
     return _is_preview_crawler(request.headers.get("user-agent", ""))
 
 
+def _canonical_host(host: str) -> str:
+    value = (host or "").strip().rstrip(".").lower()
+    if not value:
+        return ""
+    try:
+        return value.encode("idna").decode("ascii")
+    except UnicodeError:
+        return value
+
+
+def _configured_public_bases() -> list[str]:
+    """Return validated public bases from env or secure defaults."""
+    values: list[str] = []
+    raw_many = (os.getenv("PUBLIC_BASE_URLS") or "").strip()
+    raw_single = (os.getenv("PUBLIC_BASE_URL") or "").strip()
+
+    if raw_many:
+        values.extend(part.strip() for part in raw_many.split(","))
+    elif raw_single:
+        values.append(raw_single)
+    else:
+        values.extend(DEFAULT_PUBLIC_BASES)
+
+    bases: list[str] = []
+    seen: set[str] = set()
+    for raw in values:
+        if not raw:
+            continue
+        parsed = urlparse(raw)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            logger.warning("Ignoring invalid public base URL value: %r", raw)
+            continue
+        base = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+        if base in seen:
+            continue
+        seen.add(base)
+        bases.append(base)
+    return bases
+
+
+def _request_base(request: Request) -> str:
+    bases = _configured_public_bases()
+    if not bases:
+        # Last-resort safe fallback if all env values are invalid.
+        return DEFAULT_PUBLIC_BASES[0]
+
+    request_host = _canonical_host(request.url.hostname or "")
+    for base in bases:
+        parsed = urlparse(base)
+        base_host = _canonical_host(parsed.hostname or "")
+        if request_host and request_host == base_host:
+            return base
+    return bases[0]
+
+
 def _absolute_url(request: Request, maybe_relative: str) -> str:
     if not maybe_relative:
         return ""
     if maybe_relative.startswith(("http://", "https://")):
         return maybe_relative
-    return urljoin(str(request.base_url), maybe_relative.lstrip("/"))
+    base = _request_base(request)
+    return urljoin(f"{base}/", maybe_relative.lstrip("/"))
 
 
 def _build_description(payload: dict) -> str:
@@ -74,7 +137,7 @@ def _build_description(payload: dict) -> str:
 
 
 def _canonical_for_path(request: Request, full_path: str) -> str:
-    base = str(request.base_url).rstrip("/")
+    base = _request_base(request)
     if not full_path:
         return f"{base}/"
     return f"{base}/{full_path.lstrip('/')}"

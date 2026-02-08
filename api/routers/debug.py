@@ -1,11 +1,12 @@
 """Debug endpoints for cache inspection."""
 from __future__ import annotations
 
+import hmac
 import logging
+import os
 import sys
-import traceback
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from api.services.cache_helpers import (
     ACTIVE_CACHE,
@@ -16,7 +17,18 @@ from api.services.cache_helpers import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+
+
+def _require_debug_token(x_debug_token: str | None = Header(default=None, alias="X-Debug-Token")) -> None:
+    expected = (os.getenv("DEBUG_API_TOKEN") or "").strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="Debug routes are not configured")
+    provided = (x_debug_token or "").strip()
+    if not provided or not hmac.compare_digest(provided, expected):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+router = APIRouter(dependencies=[Depends(_require_debug_token)])
 
 
 def _format_ttl(seconds: float) -> str:
@@ -219,5 +231,4 @@ async def cache_stats():
         "entries_detail": entries_detail,
     }
     
-    logger.info(f"Returning result: {result}")
     return result
