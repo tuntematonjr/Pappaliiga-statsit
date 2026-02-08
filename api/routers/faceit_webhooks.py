@@ -40,6 +40,7 @@ _ORGANIZER_ID = (os.getenv("FACEIT_WEBHOOK_ORGANIZER_ID") or faceit_config.PAPPA
 _LOG_DIR = Path(os.getenv("FACEIT_WEBHOOK_LOG_DIR", "logs/faceit_webhooks")).expanduser()
 _LOG_RAW = (os.getenv("FACEIT_WEBHOOK_LOG_RAW") or "1").strip().lower() in {"1", "true", "yes", "on"}
 _DEDUPE_TTL_SECONDS = max(60, _int_env("FACEIT_WEBHOOK_DEDUPE_TTL", 21600))
+_MATCH_SYNC_EVENT = "match_status_finished"
 _SEEN_EVENT_IDS: dict[str, float] = {}
 _SEEN_LOCK = asyncio.Lock()
 _REDACTED_HEADERS = {"authorization", "x-sync-event-token"}
@@ -86,6 +87,7 @@ async def faceit_webhook_status() -> dict[str, Any]:
         "ok": True,
         "listener": "faceit",
         "organizer_id": _ORGANIZER_ID,
+        "match_sync_event": _MATCH_SYNC_EVENT,
         "sync_queue": get_sync_event_queue().stats(),
         "dedupe_cache_size": len(_SEEN_EVENT_IDS),
     }
@@ -106,48 +108,32 @@ async def receive_faceit_webhook(
     retry_count = _safe_int(event.get("retry_count"), default=0)
     payload = event.get("payload")
     payload = payload if isinstance(payload, dict) else {}
+    queue = get_sync_event_queue()
 
     first_seen = await _mark_seen_event_id(event_id)
-    if not first_seen:
-        return {
-            "ok": True,
-            "accepted": False,
-            "deduped": True,
-            "reason": "duplicate_event_id",
-            "event": webhook_event,
-            "event_id": event_id,
-            "queue": get_sync_event_queue().stats(),
-        }
-
-    organizer_id = str(payload.get("organizer_id") or "").strip()
-    if _ORGANIZER_ID and organizer_id and organizer_id != _ORGANIZER_ID:
-        return {
-            "ok": True,
-            "accepted": False,
-            "reason": "organizer_mismatch",
-            "event": webhook_event,
-            "event_id": event_id,
-            "organizer_id": organizer_id,
-            "expected_organizer_id": _ORGANIZER_ID,
-        }
-
-    queue = get_sync_event_queue()
+    deduped = not first_seen
     accepted = False
+    reason = ""
     target_id = ""
     kind = ""
+    organizer_id = str(payload.get("organizer_id") or "").strip()
+    if deduped:
+        reason = "duplicate_event_id"
+    elif _ORGANIZER_ID and organizer_id and organizer_id != _ORGANIZER_ID:
+        reason = "organizer_mismatch"
+    else:
+        if webhook_event == _MATCH_SYNC_EVENT:
+            target_id = str(payload.get("id") or "").strip()
+            if target_id:
+                accepted = await queue.enqueue_match(target_id)
+                kind = "match"
+            else:
+                reason = "missing_match_id"
+        else:
+            reason = "unsupported_event"
 
-    if webhook_event.startswith("match_status_"):
-        target_id = str(payload.get("id") or "").strip()
-        if target_id:
-            accepted = await queue.enqueue_match(target_id)
-            kind = "match"
-    elif webhook_event.startswith("championship_status_"):
-        entity = payload.get("entity")
-        entity = entity if isinstance(entity, dict) else {}
-        target_id = str(entity.get("id") or "").strip()
-        if target_id:
-            accepted = await queue.enqueue_championship(target_id, full=False)
-            kind = "championship"
+    if not kind and not reason:
+        reason = "unsupported_or_missing_target"
 
     record_path = None
     if _LOG_RAW:
@@ -157,6 +143,8 @@ async def receive_faceit_webhook(
             "event_id": event_id,
             "retry_count": retry_count,
             "accepted": accepted,
+            "deduped": deduped,
+            "reason": reason or None,
             "kind": kind,
             "target_id": target_id,
             "headers": _redact_headers(dict(request.headers)),
@@ -164,13 +152,16 @@ async def receive_faceit_webhook(
         }
         record_path = await _append_raw_event(record)
 
-    if not kind or not target_id:
+    if reason:
         return {
             "ok": True,
-            "accepted": False,
-            "reason": "unsupported_or_missing_target",
+            "accepted": accepted,
+            "deduped": deduped,
+            "reason": reason,
             "event": webhook_event,
             "event_id": event_id,
+            "organizer_id": organizer_id or None,
+            "expected_organizer_id": _ORGANIZER_ID or None,
             "queue": queue.stats(),
             "logged_to": record_path,
         }
