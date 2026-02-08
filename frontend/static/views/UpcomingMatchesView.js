@@ -108,7 +108,6 @@ window.UpcomingMatchesView = {
                 empty-message="Tälle kaudelle ei löytynyt tulevia otteluita."
             ></upcoming-matches-list>
 
-            <footer class="footer">Pappaliiga Stats</footer>
         </div>
     `
 };
