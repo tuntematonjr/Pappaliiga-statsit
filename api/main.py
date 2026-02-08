@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import asyncio
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,6 +19,7 @@ from db_async import close_pool, get_pool
 
 from .routers import championships, divisions, matches, players, stats, teams, seasons, debug
 from .routers import maps_catalog, image_proxy, season_view
+from .routers import share_preview
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.cache_reheat import reheat_main_page
 
@@ -99,14 +100,18 @@ app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 app.include_router(season_view.router, prefix="/api", tags=["season-view"])
+app.include_router(share_preview.router, tags=["share-preview"])
 
 
 @app.get("/")
-async def root():
+async def root(request: Request):
     """Serve the frontend index.html."""
     frontend_dir = Path(__file__).parent.parent / "frontend"
     index_path = frontend_dir / "index.html"
-    
+
+    if share_preview.is_preview_crawler_request(request):
+        return await share_preview.build_preview_for_spa_path(request, "")
+
     if index_path.exists():
         return FileResponse(str(index_path))
     else:
@@ -158,15 +163,18 @@ async def api_health():
 # This catches all routes not matched by API or static files
 # and returns index.html for Vue Router to handle
 @app.get("/{full_path:path}")
-async def spa_fallback(full_path: str):
+async def spa_fallback(full_path: str, request: Request):
     """Serve index.html for all routes (SPA fallback for Vue Router)."""
     # Don't intercept API routes or static files
     if full_path.startswith("api/") or full_path.startswith("static/"):
         raise HTTPException(status_code=404, detail="Not found")
-    
+
+    if share_preview.is_preview_crawler_request(request):
+        return await share_preview.build_preview_for_spa_path(request, full_path)
+
     frontend_dir = Path(__file__).parent.parent / "frontend"
     index_path = frontend_dir / "index.html"
-    
+
     if index_path.exists():
         return FileResponse(str(index_path))
     else:
