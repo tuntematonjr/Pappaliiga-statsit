@@ -110,6 +110,7 @@ class TeamMapStats(CamelModel):
 class MatchFull(CamelModel):
     match_id: str
     ts: int
+    scheduled_at: Optional[int] = None
     status: str
     best_of: int
     played: int

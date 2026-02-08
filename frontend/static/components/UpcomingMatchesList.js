@@ -1,15 +1,22 @@
 (function () {
     const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
+    const MIN_VALID_MATCH_EPOCH_MS = Date.UTC(2001, 0, 1);
+
+    function isLikelyPlaceholderMatchTsMs(value) {
+        if (!Number.isFinite(value) || value <= 0) return true;
+        return value < MIN_VALID_MATCH_EPOCH_MS;
+    }
 
     function coerceEpochMs(value) {
         if (value === null || value === undefined || value === 0) return null;
         const numeric = Number(value);
         if (Number.isFinite(numeric) && numeric > 0) {
-            return Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric;
+            const ms = Math.abs(numeric) < 1_000_000_000_000 ? numeric * 1000 : numeric;
+            return isLikelyPlaceholderMatchTsMs(ms) ? null : ms;
         }
         const parsed = Date.parse(String(value));
         if (!Number.isFinite(parsed) || parsed <= 0) return null;
-        return parsed;
+        return isLikelyPlaceholderMatchTsMs(parsed) ? null : parsed;
     }
 
     function getScheduledTs(raw) {

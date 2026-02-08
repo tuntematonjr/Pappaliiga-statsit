@@ -268,6 +268,7 @@ async def fetch_team_matches(team_id: str, championship_id: Optional[str] = None
         result.append({
             "match_id": match["match_id"],
             "ts": match["ts"],
+            "scheduled_at": match.get("scheduled_at"),
             "status": match["status"],
             "best_of": match["best_of"],
             "played": match["played"],

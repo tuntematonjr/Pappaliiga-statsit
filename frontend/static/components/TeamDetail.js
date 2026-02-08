@@ -139,15 +139,24 @@ function toNumber(value, fallback = 0) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+const MIN_VALID_MATCH_EPOCH_SECONDS = Math.round(Date.UTC(2001, 0, 1) / 1000);
+
+function isLikelyPlaceholderMatchTs(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return true;
+    return seconds < MIN_VALID_MATCH_EPOCH_SECONDS;
+}
+
 function coerceEpochSeconds(value) {
     if (value === null || value === undefined || value === '') return null;
     const numeric = Number(value);
     if (Number.isFinite(numeric) && numeric > 0) {
-        return Math.abs(numeric) >= 1_000_000_000_000 ? Math.round(numeric / 1000) : Math.round(numeric);
+        const seconds = Math.abs(numeric) >= 1_000_000_000_000 ? Math.round(numeric / 1000) : Math.round(numeric);
+        return isLikelyPlaceholderMatchTs(seconds) ? null : seconds;
     }
     const parsed = Date.parse(String(value));
     if (!Number.isFinite(parsed) || parsed <= 0) return null;
-    return Math.round(parsed / 1000);
+    const seconds = Math.round(parsed / 1000);
+    return isLikelyPlaceholderMatchTs(seconds) ? null : seconds;
 }
 
 function scheduledMatchTsSeconds(match) {
@@ -155,7 +164,10 @@ function scheduledMatchTsSeconds(match) {
     if (globalUtils && typeof globalUtils.getScheduledTs === 'function') {
         const ms = globalUtils.getScheduledTs(match);
         if (Number.isFinite(ms) && ms > 0) {
-            return Math.round(ms / 1000);
+            const seconds = Math.round(ms / 1000);
+            if (!isLikelyPlaceholderMatchTs(seconds)) {
+                return seconds;
+            }
         }
     }
     return coerceEpochSeconds(
@@ -164,6 +176,10 @@ function scheduledMatchTsSeconds(match) {
         ?? match?.scheduled_at
         ?? match?.scheduledAt
         ?? match?.scheduled
+        ?? match?.finished_ts
+        ?? match?.finishedTs
+        ?? match?.finished_at
+        ?? match?.finishedAt
         ?? match?.start_ts
         ?? match?.startTs
         ?? match?.start_at
@@ -622,13 +638,21 @@ function normalizeMatch(match, teamId = null) {
     const mapWins = maps.filter(m => m.scoreFor > m.scoreAgainst).length;
     const mapLosses = maps.filter(m => m.scoreFor < m.scoreAgainst).length;
     const mapDraws = maps.length - mapWins - mapLosses;
-    const roundsFor = maps.reduce((sum, m) => sum + m.scoreFor, 0);
-    const roundsAgainst = maps.reduce((sum, m) => sum + m.scoreAgainst, 0);
-    const roundDiff = roundsFor - roundsAgainst;
+    let roundsFor = maps.reduce((sum, m) => sum + m.scoreFor, 0);
+    let roundsAgainst = maps.reduce((sum, m) => sum + m.scoreAgainst, 0);
     const played = maps.length || playedFlag;
     const matchRating = maps.length ? safeDivide(maps.reduce((sum, m) => sum + (m.kd || 0), 0), maps.length) : 0;
-    const teamScore = mapWins;
-    const oppScore = mapLosses;
+    const seriesMaps = Math.max(1, bestOf || 2);
+    let teamScore = mapWins;
+    let oppScore = mapLosses;
+    if (!maps.length && matchIsForfeit && matchWinnerId) {
+        const teamWon = String(matchWinnerId) === String(teamId);
+        teamScore = teamWon ? seriesMaps : 0;
+        oppScore = teamWon ? 0 : seriesMaps;
+        roundsFor = teamWon ? (seriesMaps * 13) : 0;
+        roundsAgainst = teamWon ? 0 : (seriesMaps * 13);
+    }
+    const roundDiff = roundsFor - roundsAgainst;
     const ts = scheduledMatchTsSeconds(match);
 
     return {
@@ -2342,6 +2366,18 @@ window.TeamDetail = {
             if (result === 'loss') return 'match-score--loss';
             return '';
         },
+        isForfeitOnlyMatch(match) {
+            if (!match) return false;
+            const maps = Array.isArray(match.maps) ? match.maps : [];
+            return !!match.isForfeit && maps.length === 0;
+        },
+        forfeitScoreLabel(match) {
+            if (!this.isForfeitOnlyMatch(match)) return '';
+            const result = getMatchResult(match);
+            if (result === 'win') return 'Forfeit win';
+            if (result === 'loss') return 'Forfeit loss';
+            return 'Forfeit';
+        },
         formatTrendValue(metric, value) {
             if (!metric) return formatNumber(value, 2);
             return metric.format ? metric.format(value) : formatNumber(value, metric.decimals || 0);
@@ -3640,7 +3676,14 @@ window.TeamDetail = {
                                             </td>
                                             <td>BO{{ match.bestOf }}</td>
                                             <td>
-                                                <span v-if="match.played" :class="matchScoreClass(match)">{{ match.teamScore }} - {{ match.oppScore }}</span>
+                                                <span
+                                                    v-if="match.played && isForfeitOnlyMatch(match)"
+                                                    :class="matchScoreClass(match)"
+                                                >{{ forfeitScoreLabel(match) }}</span>
+                                                <span
+                                                    v-else-if="match.played"
+                                                    :class="matchScoreClass(match)"
+                                                >{{ match.teamScore }} - {{ match.oppScore }}</span>
                                                 <span v-else class="cell-muted">Tulossa</span>
                                             </td>
                                             <td>
@@ -3654,7 +3697,7 @@ window.TeamDetail = {
                                                 <div class="micro-stack" v-if="match.maps && match.maps.length">
                                                     <span v-for="map in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
                                                 </div>
-                                                <span v-else class="cell-muted">Ei karttoja</span>
+                                                <span v-else class="cell-muted">-</span>
                                             </td>
                                             <td>
                                                 <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">Faceit Lobbys</a>
