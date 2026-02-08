@@ -2961,6 +2961,13 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
             include_forfeits=True,
             include_ignored=True,
         )
+        # Some playoff rows can miss finished_at even when the result is final.
+        # Treat winner/status as a completion fallback for season-view progress.
+        played_or_completed_condition = (
+            f"({played_condition} "
+            "OR m.winner_team_id IS NOT NULL "
+            "OR LOWER(COALESCE(m.status, '')) IN ('finished', 'completed', 'done'))"
+        )
         await cur.execute(
             f"""
             SELECT
@@ -2989,7 +2996,7 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
                  JOIN championships c ON m.championship_id = c.championship_id
                  JOIN teams t ON t.team_id = m.winner_team_id
                  WHERE c.parent_championship_id = %(division_id)s
-                   AND {played_condition}
+                   AND {played_or_completed_condition}
                    AND m.winner_team_id IS NOT NULL
                  ORDER BY m.finished_at DESC, m.scheduled_at DESC
                  LIMIT 1) AS winner_team,
@@ -3001,20 +3008,35 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
         )
         playoff_stats = await cur.fetchone()
 
-    season_played = await count_played_matches(
-        championship_id=str(division_id),
-        include_forfeits=True,
-        include_ignored=True,
-    )
-    playoff_played = await count_played_matches(
-        parent_championship_id=str(division_id),
-        include_forfeits=True,
-        include_ignored=True,
-    )
+    async with conn.cursor(cursors.DictCursor) as cur:
+        await cur.execute(
+            f"""
+            SELECT COUNT(DISTINCT m.match_id) AS matches_played
+            FROM matches m
+            WHERE m.championship_id = %(division_id)s
+              AND {played_or_completed_condition}
+            """,
+            {"division_id": str(division_id)},
+        )
+        season_played_row = await cur.fetchone()
+        await cur.execute(
+            f"""
+            SELECT COUNT(DISTINCT m.match_id) AS matches_played
+            FROM matches m
+            JOIN championships c ON c.championship_id = m.championship_id
+            WHERE c.parent_championship_id = %(division_id)s
+              AND {played_or_completed_condition}
+            """,
+            {"division_id": str(division_id)},
+        )
+        playoff_played_row = await cur.fetchone()
+
+    season_played = int((season_played_row or {}).get("matches_played") or 0)
+    playoff_played = int((playoff_played_row or {}).get("matches_played") or 0)
     if season_stats is not None:
-        season_stats["matches_played"] = int(season_played or 0)
+        season_stats["matches_played"] = season_played
     if playoff_stats is not None:
-        playoff_stats["matches_played"] = int(playoff_played or 0)
+        playoff_stats["matches_played"] = playoff_played
 
     return {
         "season": season_stats,
