@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
+from asyncmy import errors as asyncmy_errors
 import httpx
 
 from utils import format_hms, log_stage
@@ -167,6 +168,13 @@ def normalize_finished_at(value: Any) -> Optional[int]:
     if not ts or ts <= 0:
         return None
     return ts
+
+
+def _is_retryable_db_error(exc: Exception) -> bool:
+    if isinstance(exc, asyncmy_errors.OperationalError):
+        code = exc.args[0] if exc.args else 0
+        return code in (1020, 1205, 1213)
+    return False
 
 
 def _is_played_match_state(status: str, finished_at: Optional[int]) -> bool:
@@ -357,14 +365,17 @@ def _derive_team_ids(details: Dict[str, Any], rounds: Sequence[Dict[str, Any]]) 
 def _normalize_team_ref(ref: Any, team1_id: Optional[str], team2_id: Optional[str]) -> Optional[str]:
     if ref is None:
         return None
-    value = str(ref).lower()
+    value = str(ref).strip()
+    if not value:
+        return None
+    lower = value.lower()
     if _is_bye_value(value):
         return None
-    if value in {"faction1", "1", "team1"}:
+    if lower in {"faction1", "1", "team1"}:
         return team1_id
-    if value in {"faction2", "2", "team2"}:
+    if lower in {"faction2", "2", "team2"}:
         return team2_id
-    return str(ref)
+    return value
 
 
 def _extract_map_rows_from_stats(
@@ -991,146 +1002,237 @@ async def sync_match_async(
         snapshot_ts: int | None = None
         map_lookup: dict[int, int] = {}
         skip_heavy_persist = False
+        async def _run_core_persist() -> None:
+            nonlocal payload_hash, existing_payload_hash, snapshot_ts, map_lookup, skip_heavy_persist
+            existing_payload_hash = None
+            snapshot_ts = None
+            map_lookup = {}
+            skip_heavy_persist = False
 
-        async with connection(label=f"match:{match_id}:core") as core_conn:
-            async with core_conn.cursor() as cur:
-                await cur.execute("SELECT payload_hash FROM matches WHERE match_id = %s", (match_id,))
-                existing_row = await cur.fetchone()
-                if existing_row:
-                    existing_payload_hash = str(existing_row[0] or "").strip() or None
-
-                await cur.execute(
-                    "SELECT championship_id FROM championships WHERE championship_id = %s",
-                    (match_championship_id,),
-                )
-                champ_exists = await cur.fetchone()
-
-            if not champ_exists:
-                LOGGER.warning(
-                    "Championship %s MISSING for match %s! Looking for alternative championship with S%d D%d playoffs=%d",
-                    match_championship_id,
-                    match_id,
-                    ctx.season,
-                    ctx.division_num,
-                    1 if ctx.is_playoffs else 0,
-                )
+            async with connection(label=f"match:{match_id}:core") as core_conn:
                 async with core_conn.cursor() as cur:
-                    await cur.execute(
-                        "SELECT championship_id FROM championships WHERE season = %s AND division_num = %s AND is_playoffs = %s LIMIT 1",
-                        (ctx.season, ctx.division_num, 1 if ctx.is_playoffs else 0),
-                    )
-                    alternative = await cur.fetchone()
+                    await cur.execute("SELECT payload_hash FROM matches WHERE match_id = %s", (match_id,))
+                    existing_row = await cur.fetchone()
+                    if existing_row:
+                        existing_payload_hash = str(existing_row[0] or "").strip() or None
 
-                if alternative:
-                    alternative_id = alternative[0]
-                    LOGGER.info("Found alternative championship %s - remapping match %s", alternative_id, match_id)
-                    normalised.match_row["championship_id"] = alternative_id
-                    normalised.match_row["payload_hash"] = _compute_match_payload_hash(normalised)
-                    payload_hash = normalised.match_row.get("payload_hash")
-                else:
-                    LOGGER.error(
-                        "No alternative championship found for S%d D%d playoffs=%d - match %s will fail FK constraint!",
+                    await cur.execute(
+                        "SELECT championship_id FROM championships WHERE championship_id = %s",
+                        (match_championship_id,),
+                    )
+                    champ_exists = await cur.fetchone()
+
+                if not champ_exists:
+                    LOGGER.warning(
+                        "Championship %s MISSING for match %s! Looking for alternative championship with S%d D%d playoffs=%d",
+                        match_championship_id,
+                        match_id,
                         ctx.season,
                         ctx.division_num,
                         1 if ctx.is_playoffs else 0,
-                        match_id,
                     )
+                    async with core_conn.cursor() as cur:
+                        await cur.execute(
+                            "SELECT championship_id FROM championships WHERE season = %s AND division_num = %s AND is_playoffs = %s LIMIT 1",
+                            (ctx.season, ctx.division_num, 1 if ctx.is_playoffs else 0),
+                        )
+                        alternative = await cur.fetchone()
 
-            if normalised.team_rows:
-                await upsert_teams_bulk_async(
-                    normalised.team_rows,
-                    conn=core_conn,
-                    label=f"match:{match_id}:teams",
-                )
-                team_champ_rows = [
-                    {
-                        "team_id": row["team_id"],
-                        "championship_id": normalised.match_row["championship_id"],
-                        "team_name": row.get("name"),
-                    }
-                    for row in normalised.team_rows
-                ]
-                await upsert_team_championships_bulk_async(
-                    team_champ_rows,
-                    conn=core_conn,
-                    label=f"match:{match_id}:team_champs",
-                )
-            if normalised.player_rows:
-                await upsert_players_bulk_async(
-                    normalised.player_rows,
-                    conn=core_conn,
-                    label=f"match:{match_id}:players",
-                )
-            if map_catalog_rows:
-                for row in map_catalog_rows:
-                    try:
-                        await upsert_map_catalog_async(core_conn, row, commit=False)
-                    except Exception:
-                        LOGGER.debug("Failed to upsert maps_catalog entry for %s", row.get("map_id"), exc_info=True)
+                    if alternative:
+                        alternative_id = alternative[0]
+                        LOGGER.info("Found alternative championship %s - remapping match %s", alternative_id, match_id)
+                        normalised.match_row["championship_id"] = alternative_id
+                        normalised.match_row["payload_hash"] = _compute_match_payload_hash(normalised)
+                        payload_hash = normalised.match_row.get("payload_hash")
+                    else:
+                        LOGGER.error(
+                            "No alternative championship found for S%d D%d playoffs=%d - match %s will fail FK constraint!",
+                            ctx.season,
+                            ctx.division_num,
+                            1 if ctx.is_playoffs else 0,
+                            match_id,
+                        )
 
-            await upsert_match_async(core_conn, normalised.match_row, commit=False)
-
-            if match_is_played and payload_hash and existing_payload_hash == payload_hash:
-                skip_heavy_persist = True
-            else:
-                if normalised.map_rows:
-                    await upsert_maps_bulk_async(
-                        normalised.match_row["match_id"],
-                        ctx.season,
-                        ctx.division_num,
-                        normalised.map_rows,
+                if normalised.team_rows:
+                    await upsert_teams_bulk_async(
+                        normalised.team_rows,
                         conn=core_conn,
-                        label=f"match:{match_id}:maps",
+                        label=f"match:{match_id}:teams",
                     )
+                    team_champ_rows = [
+                        {
+                            "team_id": row["team_id"],
+                            "championship_id": normalised.match_row["championship_id"],
+                            "team_name": row.get("name"),
+                        }
+                        for row in normalised.team_rows
+                    ]
+                    await upsert_team_championships_bulk_async(
+                        team_champ_rows,
+                        conn=core_conn,
+                        label=f"match:{match_id}:team_champs",
+                    )
+                # Ensure every team FK referenced by this payload exists in `teams`.
+                known_team_ids = {
+                    str(row.get("team_id"))
+                    for row in normalised.team_rows
+                    if row.get("team_id")
+                }
+                referenced_team_ids: set[str] = set()
+                for candidate in (
+                    normalised.match_row.get("team1_id"),
+                    normalised.match_row.get("team2_id"),
+                    normalised.match_row.get("winner_team_id"),
+                ):
+                    if candidate:
+                        referenced_team_ids.add(str(candidate))
+                for row in normalised.map_rows:
+                    tid = row.get("winner_team_id")
+                    if tid:
+                        referenced_team_ids.add(str(tid))
+                for row in normalised.team_stats:
+                    for key in ("team_id", "opponent_team_id"):
+                        tid = row.get(key)
+                        if tid:
+                            referenced_team_ids.add(str(tid))
+                for row in normalised.player_stats:
+                    for key in ("team_id", "opponent_team_id"):
+                        tid = row.get(key)
+                        if tid:
+                            referenced_team_ids.add(str(tid))
 
-                map_lookup = await get_map_id_lookup_async(core_conn, match_id)
-                if normalised.match_row.get("finished_at"):
-                    snapshot_ts = await create_snapshot_ts_async(
-                        core_conn,
-                        ctx.season,
-                        ctx.division_num,
-                        match_id=match_id,
-                        label=f"match:{match_id}:snapshot",
+                missing_team_rows = [
+                    {"team_id": tid, "name": None, "avatar": None}
+                    for tid in sorted(referenced_team_ids - known_team_ids)
+                ]
+                if missing_team_rows:
+                    LOGGER.warning(
+                        "Match %s referenced %d team_id(s) missing from team payload; inserting placeholder team rows",
+                        match_id,
+                        len(missing_team_rows),
                     )
+                    await upsert_teams_bulk_async(
+                        missing_team_rows,
+                        conn=core_conn,
+                        label=f"match:{match_id}:teams-fk-guard",
+                    )
+                if normalised.player_rows:
+                    await upsert_players_bulk_async(
+                        normalised.player_rows,
+                        conn=core_conn,
+                        label=f"match:{match_id}:players",
+                    )
+                if map_catalog_rows:
+                    for row in map_catalog_rows:
+                        try:
+                            await upsert_map_catalog_async(core_conn, row, commit=False)
+                        except Exception:
+                            LOGGER.debug("Failed to upsert maps_catalog entry for %s", row.get("map_id"), exc_info=True)
+
+                await upsert_match_async(core_conn, normalised.match_row, commit=False)
+
+                if match_is_played and payload_hash and existing_payload_hash == payload_hash:
+                    skip_heavy_persist = True
+                else:
+                    if normalised.map_rows:
+                        await upsert_maps_bulk_async(
+                            normalised.match_row["match_id"],
+                            ctx.season,
+                            ctx.division_num,
+                            normalised.map_rows,
+                            conn=core_conn,
+                            label=f"match:{match_id}:maps",
+                        )
+
+                    map_lookup = await get_map_id_lookup_async(core_conn, match_id)
+                    if normalised.match_row.get("finished_at"):
+                        snapshot_ts = await create_snapshot_ts_async(
+                            core_conn,
+                            ctx.season,
+                            ctx.division_num,
+                            match_id=match_id,
+                            label=f"match:{match_id}:snapshot",
+                        )
+
+        max_core_attempts = 3
+        for attempt in range(1, max_core_attempts + 1):
+            try:
+                await _run_core_persist()
+                break
+            except Exception as exc:
+                if attempt < max_core_attempts and _is_retryable_db_error(exc):
+                    delay = 0.1 * (2 ** (attempt - 1))
+                    LOGGER.warning(
+                        "Retrying core persist for match %s after %s (attempt %d/%d, sleep %.2fs)",
+                        match_id,
+                        getattr(exc, "args", exc),
+                        attempt,
+                        max_core_attempts,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise
 
         if not skip_heavy_persist:
-            async with connection(label=f"match:{match_id}:stats") as stats_conn:
-                await replace_map_votes_async(
-                    match_id,
-                    ctx.season,
-                    ctx.division_num,
-                    normalised.map_votes,
-                    conn=stats_conn,
-                    label=f"match:{match_id}:votes",
-                )
+            async def _run_stats_persist() -> None:
+                async with connection(label=f"match:{match_id}:stats") as stats_conn:
+                    await replace_map_votes_async(
+                        match_id,
+                        ctx.season,
+                        ctx.division_num,
+                        normalised.map_votes,
+                        conn=stats_conn,
+                        label=f"match:{match_id}:votes",
+                    )
 
-                await delete_stats_for_match_async(
-                    match_id,
-                    conn=stats_conn,
-                    label=f"match:{match_id}:delete-stats",
-                )
+                    await delete_stats_for_match_async(
+                        match_id,
+                        conn=stats_conn,
+                        label=f"match:{match_id}:delete-stats",
+                    )
 
-                await upsert_player_stats_bulk_async(
-                    ctx.season,
-                    ctx.division_num,
-                    match_id,
-                    map_lookup,
-                    normalised.player_stats,
-                    forfeit_lookup,
-                    conn=stats_conn,
-                    label=f"match:{match_id}:player-stats",
-                )
+                    await upsert_player_stats_bulk_async(
+                        ctx.season,
+                        ctx.division_num,
+                        match_id,
+                        map_lookup,
+                        normalised.player_stats,
+                        forfeit_lookup,
+                        conn=stats_conn,
+                        label=f"match:{match_id}:player-stats",
+                    )
 
-                await upsert_team_stats_bulk_async(
-                    ctx.season,
-                    ctx.division_num,
-                    match_id,
-                    map_lookup,
-                    normalised.team_stats,
-                    forfeit_lookup,
-                    conn=stats_conn,
-                    label=f"match:{match_id}:team-stats",
-                )
+                    await upsert_team_stats_bulk_async(
+                        ctx.season,
+                        ctx.division_num,
+                        match_id,
+                        map_lookup,
+                        normalised.team_stats,
+                        forfeit_lookup,
+                        conn=stats_conn,
+                        label=f"match:{match_id}:team-stats",
+                    )
+
+            max_stats_attempts = 3
+            for attempt in range(1, max_stats_attempts + 1):
+                try:
+                    await _run_stats_persist()
+                    break
+                except Exception as exc:
+                    if attempt < max_stats_attempts and _is_retryable_db_error(exc):
+                        delay = 0.1 * (2 ** (attempt - 1))
+                        LOGGER.warning(
+                            "Retrying stats persist for match %s after %s (attempt %d/%d, sleep %.2fs)",
+                            match_id,
+                            getattr(exc, "args", exc),
+                            attempt,
+                            max_stats_attempts,
+                            delay,
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    raise
 
             affected_team_ids = sorted({str(tid) for tid in normalised.affected_teams if tid})
             affected_player_ids = sorted({str(pid) for pid in normalised.affected_players if pid})
