@@ -34,6 +34,7 @@ BOT_UA_MARKERS = (
 )
 
 DEFAULT_IMAGE = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
+UNOFFICIAL_NOTE = "Epävirallinen Pappaliigan CS stasti sivu Armafinlandin toimesta."
 
 
 def _is_preview_crawler(user_agent: str) -> bool:
@@ -57,7 +58,7 @@ def _build_description(payload: dict) -> str:
     season_data = payload.get("season_data") or {}
     stats = season_data.get("stats") or {}
     if not stats:
-        return "Joukkueen tilastot, kartat, pelaajat ja otteluhistoria."
+        return f"Joukkueen tilastot, kartat, pelaajat ja otteluhistoria. {UNOFFICIAL_NOTE}"
 
     season = stats.get("season")
     division_num = stats.get("division_num")
@@ -67,7 +68,8 @@ def _build_description(payload: dict) -> str:
     win_rate = float(stats.get("win_rate") or 0.0) * 100.0
     return (
         f"Kausi {season}, divisioona {division_num}. "
-        f"Ottelut {matches_played}, voitot {wins}, tappiot {losses}, voittoprosentti {win_rate:.1f}%."
+        f"Ottelut {matches_played}, voitot {wins}, tappiot {losses}, voittoprosentti {win_rate:.1f}%. "
+        f"{UNOFFICIAL_NOTE}"
     )
 
 
@@ -83,21 +85,21 @@ def _fallback_preview_meta(full_path: str) -> tuple[str, str]:
     if not normalized:
         return (
             "Pappaliiga Stats - Etusivu",
-            "Pappaliiga CS2 tilastot: joukkueet, pelaajat, divisioonat ja ottelut.",
+            f"Pappaliiga CS2 tilastot: joukkueet, pelaajat, divisioonat ja ottelut. {UNOFFICIAL_NOTE}",
         )
     if normalized == "seasons":
         return (
             "Pappaliiga Stats - Kaudet",
-            "Selaa kausia, divisioonia ja niiden etenemistä.",
+            f"Selaa kausia, divisioonia ja niiden etenemistä. {UNOFFICIAL_NOTE}",
         )
     if normalized == "season/current/upcoming":
         return (
             "Pappaliiga Stats - Tulevat Ottelut",
-            "Katso ajankohtaiset tulevat ottelut ja aikataulut.",
+            f"Katso ajankohtaiset tulevat ottelut ja aikataulut. {UNOFFICIAL_NOTE}",
         )
     return (
         "Pappaliiga Stats",
-        "Pappaliiga CS2 tilastot: joukkueet, pelaajat, divisioonat ja ottelut.",
+        f"Pappaliiga CS2 tilastot: joukkueet, pelaajat, divisioonat ja ottelut. {UNOFFICIAL_NOTE}",
     )
 
 
@@ -106,7 +108,7 @@ async def build_preview_for_spa_path(request: Request, full_path: str) -> HTMLRe
     parts = [p for p in normalized.split("/") if p]
 
     title = "Pappaliiga Stats"
-    description = "Pappaliiga CS2 tilastot: joukkueet, pelaajat, divisioonat ja ottelut."
+    description = f"Pappaliiga CS2 tilastot: joukkueet, pelaajat, divisioonat ja ottelut. {UNOFFICIAL_NOTE}"
     image_url = _absolute_url(request, DEFAULT_IMAGE)
 
     if len(parts) >= 2 and parts[0] == "team":
@@ -121,7 +123,7 @@ async def build_preview_for_spa_path(request: Request, full_path: str) -> HTMLRe
             image_url = _absolute_url(request, team.get("avatar") or DEFAULT_IMAGE)
         except NotFoundError:
             title = f"Team {team_id} - Pappaliiga Stats"
-            description = "Joukkueen tilastosivu."
+            description = f"Joukkueen tilastosivu. {UNOFFICIAL_NOTE}"
     elif len(parts) >= 2 and parts[0] == "division":
         championship_id = parts[1]
         try:
@@ -129,21 +131,24 @@ async def build_preview_for_spa_path(request: Request, full_path: str) -> HTMLRe
             division_name = champ.get("name") or f"Divisioona {champ.get('division_num')}"
             season = champ.get("season")
             title = f"{division_name} - Pappaliiga Stats"
-            description = f"Kausi {season}, divisioona {champ.get('division_num')} tilastot ja sarjataulukko."
+            description = (
+                f"Kausi {season}, divisioona {champ.get('division_num')} tilastot ja sarjataulukko. "
+                f"{UNOFFICIAL_NOTE}"
+            )
         except NotFoundError:
             title = f"Division {championship_id} - Pappaliiga Stats"
-            description = "Divisioonan tilastosivu."
+            description = f"Divisioonan tilastosivu. {UNOFFICIAL_NOTE}"
     elif len(parts) >= 2 and parts[0] == "player":
         player_id = parts[1]
         try:
             player = await players_service.fetch_player(player_id)
             nickname = player.get("nickname") or player_id
             title = f"{nickname} - Pappaliiga Stats"
-            description = "Pelaajan tilastot, karttadata ja kausihistoria."
+            description = f"Pelaajan tilastot, karttadata ja kausihistoria. {UNOFFICIAL_NOTE}"
             image_url = _absolute_url(request, player.get("avatar") or DEFAULT_IMAGE)
         except NotFoundError:
             title = f"Player {player_id} - Pappaliiga Stats"
-            description = "Pelaajan tilastosivu."
+            description = f"Pelaajan tilastosivu. {UNOFFICIAL_NOTE}"
     else:
         title, description = _fallback_preview_meta(normalized)
 
@@ -170,7 +175,7 @@ def _build_preview_html(*, title: str, description: str, image_url: str, canonic
   <meta name="description" content="{safe_description}">
   <link rel="canonical" href="{safe_url}">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Pappaliiga Stats">
+  <meta property="og:site_name" content="Pappaliiga Stats (Armafinland, unofficial)">
   <meta property="og:locale" content="fi_FI">
   <meta property="og:title" content="{safe_title}">
   <meta property="og:description" content="{safe_description}">
