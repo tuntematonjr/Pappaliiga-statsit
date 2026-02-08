@@ -1477,12 +1477,16 @@ async def delete_stats_for_match_async(
     *,
     label: str = "delete-stats",
 ) -> None:
-    """Delete stats rows for a match."""
-    async with connection(label=label) as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("DELETE FROM player_stats WHERE match_id = %s", (match_id,))
-            await cur.execute("DELETE FROM team_stats WHERE match_id = %s", (match_id,))
+    """Delete stats rows for a match with deadlock-safe retries."""
+
+    async def _op():
+        async with connection(label=label) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("DELETE FROM player_stats WHERE match_id = %s", (match_id,))
+                await cur.execute("DELETE FROM team_stats WHERE match_id = %s", (match_id,))
             await conn.commit()
+
+    await _retry_on_deadlock(_op, label=label)
 
 
 async def upsert_player_stats_bulk_async(
