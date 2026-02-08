@@ -564,14 +564,38 @@
             statusIcon() {
                 return STATUS_ICONS[this.displayStatusState] || null;
             },
-            progressStage() {
+            playoffsHasStarted() {
+                if (!this.division.playoffs?.hasChampionship) {
+                    return false;
+                }
+                return Boolean(
+                    this.division.playoffs.matchesPlayed > 0 ||
+                    this.division.playoffs.isFinished ||
+                    this.division.playoffs.winner
+                );
+            },
+            isDivisionComplete() {
                 if (this.division.state === DivisionStatus.COMPLETE) {
+                    return true;
+                }
+                if (this.division.playoffs?.hasChampionship) {
+                    return Boolean(
+                        this.division.playoffs.winner ||
+                        (this.division.playoffs.matchesTotal > 0 &&
+                            this.division.playoffs.matchesPlayed >= this.division.playoffs.matchesTotal)
+                    );
+                }
+                return Boolean(
+                    this.division.season.winner ||
+                    (this.division.season.matchesTotal > 0 &&
+                        this.division.season.matchesPlayed >= this.division.season.matchesTotal)
+                );
+            },
+            progressStage() {
+                if (this.isDivisionComplete) {
                     return 'complete';
                 }
-                if (
-                    this.division.playoffs?.hasChampionship &&
-                    this.division.season?.isFinished
-                ) {
+                if (this.playoffsHasStarted) {
                     return 'playoffs';
                 }
                 return 'regular';
@@ -613,11 +637,7 @@
                 if (!this.division.playoffs.href) {
                     return false;
                 }
-                return Boolean(
-                    this.division.playoffs.matchesPlayed > 0 ||
-                    this.division.playoffs.isFinished ||
-                    this.division.playoffs.winner
-                );
+                return this.playoffsHasStarted;
             },
             seasonRows() {
                 const rows = [];
