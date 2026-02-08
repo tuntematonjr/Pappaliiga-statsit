@@ -2,31 +2,31 @@
 // Every DB-backed field is surfaced as a stat, column, chart point or tooltip.
 
 const PLAYER_COLUMNS = [
-    { key: 'nickname', label: 'Pelaaja', sortable: true, colClass: 'col-name', group: 'identity' },
-    { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true, group: 'volume' },
-    { key: 'roundsPlayed', label: 'R', sortable: true, numeric: true, group: 'volume' },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd', group: 'core' },
-    { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 2, group: 'core' },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr', group: 'core' },
-    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, group: 'core' },
-    { key: 'kills', label: 'Kills', sortable: true, numeric: true, group: 'combat' },
-    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, group: 'combat' },
-    { key: 'assists', label: 'A', sortable: true, numeric: true, group: 'combat' },
-    { key: 'clutchKills', label: 'Clutch K', sortable: true, numeric: true, group: 'combat' },
-    { key: 'entryLine', label: 'Entry', sortable: true, numeric: true, group: 'impact' },
-    { key: 'clutch1v1Line', label: '1v1', sortable: true, numeric: true, group: 'impact' },
-    { key: 'clutch1v2Line', label: '1v2', sortable: true, numeric: true, group: 'impact' },
-    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, group: 'impact' },
-    { key: 'damage', label: 'Dmg', sortable: true, numeric: true, group: 'utility' },
-    { key: 'utilityDamage', label: 'U-Dmg', sortable: true, numeric: true, group: 'utility' },
-    { key: 'enemiesFlashed', label: 'Flashed', sortable: true, numeric: true, group: 'utility' },
-    { key: 'flashSuccessLine', label: 'Flash%', sortable: true, numeric: true, group: 'utility' },
-    { key: 'mk2k', label: '2K', sortable: true, numeric: true, group: 'multis' },
-    { key: 'mk3k', label: '3K', sortable: true, numeric: true, group: 'multis' },
-    { key: 'mk4k', label: '4K', sortable: true, numeric: true, group: 'multis' },
-    { key: 'mk5k', label: 'Ace', sortable: true, numeric: true, group: 'multis' },
-    { key: 'sniperKills', label: 'AWP', sortable: true, numeric: true, group: 'weapons' },
-    { key: 'pistolKills', label: 'Pistol', sortable: true, numeric: true, group: 'weapons' }
+    { key: 'nickname', label: 'Pelaaja', sortable: true, colClass: 'col-name', group: 'identity', tooltip: 'Pelaajan nimi, roolibadget ja kauden kartta/erämäärä.' },
+    { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true, group: 'volume', tooltip: 'Pelattujen karttojen määrä tällä kaudella.' },
+    { key: 'roundsPlayed', label: 'R', sortable: true, numeric: true, group: 'volume', tooltip: 'Pelattujen erien kokonaismäärä.' },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd', group: 'core', tooltip: 'Tapot / kuolemat. Yli 1.00 tarkoittaa enemmän tappoja kuin kuolemia.' },
+    { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 2, group: 'core', tooltip: 'Kills per round: tapot per pelattu erä.' },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr', group: 'core', tooltip: 'Average Damage per Round: keskimääräinen vahinko per erä.' },
+    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, group: 'core', tooltip: 'Headshot-osuus prosenteissa kaikista tapoista.' },
+    { key: 'kills', label: 'Kills', sortable: true, numeric: true, group: 'combat', tooltip: 'Kaikki tapot yhteensä.' },
+    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, group: 'combat', tooltip: 'Kaikki kuolemat yhteensä.' },
+    { key: 'assists', label: 'A', sortable: true, numeric: true, group: 'combat', tooltip: 'Assistit yhteensä.' },
+    { key: 'clutchKills', label: 'Clutch K', sortable: true, numeric: true, group: 'combat', tooltip: 'Tapot clutch-tilanteissa.' },
+    { key: 'entryLine', label: 'Entry', sortable: true, numeric: true, group: 'impact', tooltip: 'Entry-voitot / entry-yritykset sekä onnistumisprosentti.' },
+    { key: 'clutch1v1Line', label: '1v1', sortable: true, numeric: true, group: 'impact', tooltip: 'Voitetut 1v1 clutchit / yritykset.' },
+    { key: 'clutch1v2Line', label: '1v2', sortable: true, numeric: true, group: 'impact', tooltip: 'Voitetut 1v2 clutchit / yritykset.' },
+    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, group: 'impact', tooltip: 'MVP-merkintöjen määrä.' },
+    { key: 'damage', label: 'Dmg', sortable: true, numeric: true, group: 'utility', tooltip: 'Kokonaisvahinko kaikissa kartoissa.' },
+    { key: 'utilityDamage', label: 'U-Dmg', sortable: true, numeric: true, group: 'utility', tooltip: 'Utility-vahinko yhteensä (kranaatit ym.).' },
+    { key: 'enemiesFlashed', label: 'Flashed', sortable: true, numeric: true, group: 'utility', tooltip: 'Kuinka monta vastustajaa pelaaja on väläyttänyt.' },
+    { key: 'flashSuccessLine', label: 'Flash%', sortable: true, numeric: true, group: 'utility', tooltip: 'Flash-successit / heitetyt flashit sekä onnistumisprosentti.' },
+    { key: 'mk2k', label: '2K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 2 tappoa.' },
+    { key: 'mk3k', label: '3K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 3 tappoa.' },
+    { key: 'mk4k', label: '4K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 4 tappoa.' },
+    { key: 'mk5k', label: 'Ace', sortable: true, numeric: true, group: 'multis', tooltip: 'Ace: kierrokset, joissa pelaaja tappoi koko vastustajajoukkueen (5K).' },
+    { key: 'sniperKills', label: 'AWP', sortable: true, numeric: true, group: 'weapons', tooltip: 'Sniper/AWP-tappojen määrä.' },
+    { key: 'pistolKills', label: 'Pistol', sortable: true, numeric: true, group: 'weapons', tooltip: 'Pistoolitappojen määrä.' }
 ];
 
 const MAP_GROUP_META = {
@@ -212,6 +212,16 @@ function formatSignedNumber(value, decimals = 0) {
 
 function clampValue(value, min, max) {
     return Math.min(max, Math.max(min, value));
+}
+
+function computeMedian(values = []) {
+    const list = values.filter(v => Number.isFinite(v)).sort((a, b) => a - b);
+    if (!list.length) return null;
+    const mid = Math.floor(list.length / 2);
+    if (list.length % 2 === 0) {
+        return (list[mid - 1] + list[mid]) / 2;
+    }
+    return list[mid];
 }
 
 function buildIndexGrid(count, maxTicks = 4) {
@@ -769,7 +779,9 @@ window.TeamDetail = {
             matchPlayerStatsState: {},
             mapCatalog: [],
             mapCatalogLoading: false,
-            mapCatalogLoaded: false
+            mapCatalogLoaded: false,
+            playerBaselineMode: 'avg',
+            divisionPlayerBaselinesState: {}
         };
     },
     computed: {
@@ -1736,6 +1748,21 @@ window.TeamDetail = {
                 { key: 'flash', label: 'Flash onnistuminen', value: formatPercent(flashPct, 1), meta: `${formatNumber(totals.flashSuccesses)} / ${formatNumber(totals.flashCount)}` }
             ];
         },
+        playerBaselineState() {
+            const key = this.currentChampionshipId ? String(this.currentChampionshipId) : null;
+            if (!key) return { loading: false, error: null, avg: {}, median: {} };
+            return this.divisionPlayerBaselinesState[key] || { loading: false, error: null, avg: {}, median: {} };
+        },
+        activePlayerBaselines() {
+            const mode = this.playerBaselineMode === 'median' ? 'median' : 'avg';
+            return this.playerBaselineState?.[mode] || {};
+        },
+        playerBaselineHint() {
+            if (this.playerBaselineState.loading) return 'Haetaan divisioonan vertailuarvoja...';
+            if (this.playerBaselineState.error) return this.playerBaselineState.error;
+            const modeLabel = this.playerBaselineMode === 'median' ? 'mediaani' : 'keskiarvo';
+            return `Värikoodaus suhteessa divisioonan ${modeLabel}arvoihin.`;
+        },
         playerStackedKda() {
             return this.players.map(p => ({
                 label: p.nickname,
@@ -1821,9 +1848,12 @@ window.TeamDetail = {
             const roles = this.seasonData?.playerRoles || [];
             const lookup = {};
             roles.forEach(pr => {
-                lookup[pr.playerId] = {
+                const playerId = pr.playerId ?? pr.player_id;
+                if (!playerId) return;
+                lookup[playerId] = {
                     roles: pr.roles || [],
-                    primaryRole: pr.primaryRole || null
+                    primaryRole: pr.primaryRole ?? pr.primary_role ?? null,
+                    roleStats: pr.roleStats || pr.role_stats || null
                 };
             });
             return lookup;
@@ -1847,6 +1877,7 @@ window.TeamDetail = {
             immediate: true,
             handler() {
                 this.loadUpcoming();
+                this.ensureDivisionPlayerBaselines(this.currentChampionshipId);
             }
         },
         mapStats: {
@@ -1982,6 +2013,150 @@ window.TeamDetail = {
         setTrendMode(mode) {
             if (mode !== 'map' && mode !== 'cumulative') return;
             this.performanceTrendMode = mode;
+        },
+        setPlayerBaselineMode(mode) {
+            if (mode !== 'avg' && mode !== 'median') return;
+            this.playerBaselineMode = mode;
+        },
+        playerBaselineMetricKey(metricKey) {
+            if (this.playerBaselineMode === 'median') {
+                if (metricKey === 'kd') return 'median_kd';
+                if (metricKey === 'adr') return 'median_adr';
+                if (metricKey === 'kr') return 'median_kr';
+                if (metricKey === 'hsPct') return 'median_hs_pct';
+                if (metricKey === 'flashSuccessLine') return 'median_flash_success_pct';
+                return null;
+            }
+            if (metricKey === 'kd') return 'avg_kd';
+            if (metricKey === 'adr') return 'avg_adr';
+            if (metricKey === 'kr') return 'avg_kr';
+            if (metricKey === 'hsPct') return 'avg_hs_pct';
+            if (metricKey === 'flashSuccessLine') return 'avg_flash_success_pct';
+            return null;
+        },
+        playerMetricBaseline(metricKey) {
+            const baselineKey = this.playerBaselineMetricKey(metricKey);
+            if (!baselineKey) return null;
+            const value = toNumber(this.activePlayerBaselines?.[baselineKey], null);
+            return Number.isFinite(value) ? value : null;
+        },
+        playerMetricValue(row, metricKey) {
+            if (!row) return null;
+            if (metricKey === 'hsPct') return toNumber(row.hsPct, null);
+            if (metricKey === 'flashSuccessLine') return toNumber(row.flashSuccessLine, null);
+            return toNumber(row[metricKey], null);
+        },
+        playerMetricClass(row, metricKey) {
+            const baseline = this.playerMetricBaseline(metricKey);
+            const value = this.playerMetricValue(row, metricKey);
+            if (!Number.isFinite(baseline) || !Number.isFinite(value)) return '';
+            const epsilonByMetric = {
+                kd: 0.01,
+                adr: 0.2,
+                kr: 0.005,
+                hsPct: 0.15,
+                flashSuccessLine: 0.15
+            };
+            const epsilon = epsilonByMetric[metricKey] ?? 0.01;
+            const diff = value - baseline;
+            if (Math.abs(diff) <= epsilon) return 'player-metric-tone--neutral';
+            return diff > 0 ? 'player-metric-tone--positive' : 'player-metric-tone--negative';
+        },
+        playerMetricTitle(row, metricKey, label, decimals = 2, asPercent = false) {
+            const baseline = this.playerMetricBaseline(metricKey);
+            const value = this.playerMetricValue(row, metricKey);
+            if (!Number.isFinite(baseline) || !Number.isFinite(value)) return '';
+            const modeLabel = this.playerBaselineMode === 'median' ? 'median' : 'avg';
+            const metricValue = asPercent ? formatPercent(value, 1) : formatNumber(value, decimals);
+            const baselineValue = asPercent ? formatPercent(baseline, 1) : formatNumber(baseline, decimals);
+            return `${label}: ${metricValue} · Div ${modeLabel}: ${baselineValue}`;
+        },
+        buildDivisionPlayerBaselines(divisionAverages = {}, divisionDetails = {}) {
+            const playerTotals = Array.isArray(divisionDetails?.player_totals) ? divisionDetails.player_totals : [];
+            const qualified = playerTotals.filter(row => toNumber(row?.maps_played, 0) >= 3);
+            const sourceRows = qualified.length ? qualified : playerTotals;
+            const collect = key => sourceRows
+                .map(row => toNumber(row?.[key], null))
+                .filter(value => Number.isFinite(value));
+            const mean = values => {
+                if (!values.length) return null;
+                return values.reduce((sum, value) => sum + value, 0) / values.length;
+            };
+            const flashSuccessPcts = sourceRows
+                .map(row => {
+                    const flashCount = toNumber(row?.flash_count, 0);
+                    const flashSuccesses = toNumber(row?.flash_successes, 0);
+                    if (!flashCount) return null;
+                    return (flashSuccesses / flashCount) * 100;
+                })
+                .filter(value => Number.isFinite(value));
+
+            const avg = {
+                avg_kd: toNumber(divisionAverages?.avg_kd, null),
+                avg_adr: toNumber(divisionAverages?.avg_adr, null),
+                avg_kr: toNumber(divisionAverages?.avg_kr, null),
+                avg_hs_pct: toNumber(divisionAverages?.avg_hs_pct, null),
+                avg_flash_success_pct: mean(flashSuccessPcts)
+            };
+            if (!Number.isFinite(avg.avg_kd)) avg.avg_kd = mean(collect('kd'));
+            if (!Number.isFinite(avg.avg_adr)) avg.avg_adr = mean(collect('adr'));
+            if (!Number.isFinite(avg.avg_kr)) avg.avg_kr = mean(collect('kr'));
+            if (!Number.isFinite(avg.avg_hs_pct)) avg.avg_hs_pct = mean(collect('hs_pct'));
+
+            const median = {
+                median_kd: computeMedian(collect('kd')),
+                median_adr: computeMedian(collect('adr')),
+                median_kr: computeMedian(collect('kr')),
+                median_hs_pct: computeMedian(collect('hs_pct')),
+                median_flash_success_pct: computeMedian(flashSuccessPcts)
+            };
+
+            return { avg, median };
+        },
+        async ensureDivisionPlayerBaselines(championshipId) {
+            if (!championshipId || !window.apiClient) return;
+            const key = String(championshipId);
+            const existing = this.divisionPlayerBaselinesState[key];
+            const hasAvg = !!Object.keys(existing?.avg || {}).length;
+            const hasMedian = !!Object.keys(existing?.median || {}).length;
+            if ((hasAvg || hasMedian) && !existing?.error) return;
+            if (existing?.loading) return;
+
+            this.divisionPlayerBaselinesState = {
+                ...this.divisionPlayerBaselinesState,
+                [key]: {
+                    loading: true,
+                    error: null,
+                    avg: existing?.avg || {},
+                    median: existing?.median || {}
+                }
+            };
+            try {
+                const [divisionAverages, divisionDetails] = await Promise.all([
+                    window.apiClient.getDivisionAverages(key).catch(() => ({})),
+                    window.apiClient.getDivisionById(key).catch(() => ({}))
+                ]);
+                const baselines = this.buildDivisionPlayerBaselines(divisionAverages, divisionDetails);
+                this.divisionPlayerBaselinesState = {
+                    ...this.divisionPlayerBaselinesState,
+                    [key]: {
+                        loading: false,
+                        error: null,
+                        avg: baselines.avg || {},
+                        median: baselines.median || {}
+                    }
+                };
+            } catch (error) {
+                this.divisionPlayerBaselinesState = {
+                    ...this.divisionPlayerBaselinesState,
+                    [key]: {
+                        loading: false,
+                        error: 'Divisioonan vertailuarvojen lataus epäonnistui.',
+                        avg: {},
+                        median: {}
+                    }
+                };
+            }
         },
         updateTrendChartWidth() {
             const panel = this.$refs.performanceTrendPanel;
@@ -2487,8 +2662,41 @@ window.TeamDetail = {
             if (!roleData || !roleData.roles || roleData.roles.length === 0) return [];
             return roleData.roles.map(role => ({
                 label: role,
-                isPrimary: role === roleData.primaryRole
+                isPrimary: role === roleData.primaryRole,
+                tooltip: this.getRoleBadgeTooltip(role, roleData)
             }));
+        },
+        getRoleBadgeTooltip(role, roleData = null) {
+            const descriptions = {
+                Rifler: 'Perusrooli: tasainen kivääripelaaja.',
+                AWPer: 'AWP-painotteinen pelaaja, korkea sniper-osuus.',
+                'Entry Fragger': 'Avaa tilanteita ensimmäisiin kaksinkamppailuihin.',
+                Support: 'Tukee utilityllä ja assist-arvolla joukkuetta.',
+                Clutcher: 'Vahva clutch-pelaaja tiukoissa lopputilanteissa.',
+                'Utility Expert': 'Korostuu utility-vahingossa ja väläytysvaikutuksessa.',
+                Playmaker: 'Luo aktiivisesti ratkaisuja fragien ja aloitteiden kautta.',
+                Closer: 'Viimeistelee kierroksia clutch- ja fragivaikutuksella.',
+                Initiator: 'Käynnistää tilanteita, korkea entry-aktiivisuus.',
+                Sharpshooter: 'Tarkka tähtääjä, painotus pitkän kantaman osumiin.',
+                Anchor: 'Pitää asemat ja pelaa vakaasti matalammalla riskillä.',
+                'Utility Core': 'Joukkueen utility-rungon kantava pelaaja.',
+                'Team Player': 'Monipuolinen joukkuerooli tuki- ja tempoarvolla.'
+            };
+            const stats = roleData?.roleStats || {};
+            const statChunks = [];
+            const awpRate = toNumber(stats.awpRate ?? stats.awp_rate, null);
+            const entrySuccess = toNumber(stats.entrySuccess ?? stats.entry_success, null);
+            const assistRate = toNumber(stats.assistRate ?? stats.assist_rate, null);
+            const clutchSuccess = toNumber(stats.clutchSuccess ?? stats.clutch_success, null);
+            if (Number.isFinite(awpRate)) statChunks.push(`AWP ${formatNumber(awpRate, 1)}%`);
+            if (Number.isFinite(entrySuccess)) statChunks.push(`Entry ${formatNumber(entrySuccess, 1)}%`);
+            if (Number.isFinite(assistRate)) statChunks.push(`Assist ${formatNumber(assistRate, 1)}%`);
+            if (Number.isFinite(clutchSuccess)) statChunks.push(`Clutch ${formatNumber(clutchSuccess, 1)}%`);
+
+            const prefix = role === roleData?.primaryRole ? 'Ensisijainen rooli. ' : '';
+            const base = descriptions[role] || 'Pelaajan roolibadge.';
+            if (!statChunks.length) return `${prefix}${base}`;
+            return `${prefix}${base} (${statChunks.join(' · ')})`;
         },
         getPerformanceBadge(teamValue, divAvg, metricKey) {
             if (!divAvg || teamValue == null) return null;
@@ -3492,6 +3700,21 @@ window.TeamDetail = {
                     <div v-if="players.length" class="table-wrapper">
                         <div class="players-table-toolbar">
                             <span class="players-table-toolbar__hint">Kaikki pelaajametriikat näkyvissä. Klikkaa saraketta lajitellaksesi.</span>
+                            <div class="players-baseline-toggle">
+                                <span class="players-baseline-toggle__label">Väritys:</span>
+                                <button
+                                    type="button"
+                                    class="players-baseline-toggle__btn"
+                                    :class="{ 'players-baseline-toggle__btn--active': playerBaselineMode === 'avg' }"
+                                    @click="setPlayerBaselineMode('avg')"
+                                >Div avg</button>
+                                <button
+                                    type="button"
+                                    class="players-baseline-toggle__btn"
+                                    :class="{ 'players-baseline-toggle__btn--active': playerBaselineMode === 'median' }"
+                                    @click="setPlayerBaselineMode('median')"
+                                >Div median</button>
+                            </div>
                             <div class="players-abbrev-list">
                                 <span class="players-abbrev-chip">K/R = Kills per round</span>
                                 <span class="players-abbrev-chip">U-Dmg = Utility damage</span>
@@ -3499,13 +3722,14 @@ window.TeamDetail = {
                                 <span class="players-abbrev-chip">Flash% = Flash successes / flashes</span>
                             </div>
                         </div>
+                        <div class="players-baseline-status">{{ playerBaselineHint }}</div>
                         <sortable-table
                             class="players-sortable-table"
                             :columns="PLAYER_COLUMNS"
                             :header-groups="playerHeaderGroups"
                             :data="players"
                             :default-sort="playerDefaultSort"
-                            :colorize-columns="['kd','adr','kr']"
+                            :colorize-columns="[]"
                             :sticky-header="true"
                             :compact="false"
                         >
@@ -3515,7 +3739,13 @@ window.TeamDetail = {
                                     <div>
                                         <div class="player-name">
                                             {{ row.nickname }}
-                                            <span v-for="badge in getPlayerRoleBadges(row.playerId)" :key="badge.label" class="role-badge" :class="{ 'role-badge--primary': badge.isPrimary }" :title="badge.isPrimary ? 'Ensisijainen rooli' : ''">{{ badge.label }}</span>
+                                            <span
+                                                v-for="badge in getPlayerRoleBadges(row.playerId)"
+                                                :key="badge.label"
+                                                class="role-badge"
+                                                :class="{ 'role-badge--primary': badge.isPrimary }"
+                                                :title="badge.tooltip || ''"
+                                            >{{ badge.label }}</span>
                                         </div>
                                         <div class="player-sub">Maps {{ row.mapsPlayed }} · Rnds {{ row.roundsPlayed }}</div>
                                     </div>
@@ -3530,36 +3760,58 @@ window.TeamDetail = {
                                 </div>
                             </template>
                             <template #cell-kd="{ row }">
-                                <span class="stat-strong">{{ formatNumber(row.kd, 2) }}</span>
+                                <span
+                                    class="stat-strong"
+                                    :class="playerMetricClass(row, 'kd')"
+                                    :title="playerMetricTitle(row, 'kd', 'K/D', 2)"
+                                >{{ formatNumber(row.kd, 2) }}</span>
                             </template>
                             <template #cell-adr="{ row }">
-                                <span class="stat-strong">{{ formatNumber(row.adr, 1) }}</span>
+                                <span
+                                    class="stat-strong"
+                                    :class="playerMetricClass(row, 'adr')"
+                                    :title="playerMetricTitle(row, 'adr', 'ADR', 1)"
+                                >{{ formatNumber(row.adr, 1) }}</span>
+                            </template>
+                            <template #cell-kr="{ row }">
+                                <span
+                                    class="stat-strong"
+                                    :class="playerMetricClass(row, 'kr')"
+                                    :title="playerMetricTitle(row, 'kr', 'K/R', 2)"
+                                >{{ formatNumber(row.kr, 2) }}</span>
                             </template>
                             <template #cell-hsPct="{ row }">
-                                <span>{{ formatPercent(row.hsPct || 0, 1) }}</span>
+                                <span
+                                    :class="playerMetricClass(row, 'hsPct')"
+                                    :title="playerMetricTitle(row, 'hsPct', 'HS%', 1, true)"
+                                >{{ formatPercent(row.hsPct || 0, 1) }}</span>
                             </template>
                             <template #cell-entryLine="{ row }">
-                                <div class="player-rate">
+                                <div class="player-rate" :title="'Entry: voitetut avausduelit / kaikki avausduelit.'">
                                     <span class="player-rate__main">{{ row.entryWins }}/{{ row.entryCount }}</span>
                                     <span class="player-rate__pct">{{ formatPercent(row.entryLine || 0, 1) }}</span>
                                 </div>
                             </template>
                             <template #cell-clutch1v1Line="{ row }">
-                                <div class="player-rate">
+                                <div class="player-rate" :title="'1v1 clutchit: voitetut / yritykset.'">
                                     <span class="player-rate__main">{{ row.cl1v1Wins }}/{{ row.cl1v1Attempts }}</span>
                                     <span class="player-rate__pct">{{ formatPercent(row.cl1v1Line || 0, 1) }}</span>
                                 </div>
                             </template>
                             <template #cell-clutch1v2Line="{ row }">
-                                <div class="player-rate">
+                                <div class="player-rate" :title="'1v2 clutchit: voitetut / yritykset.'">
                                     <span class="player-rate__main">{{ row.cl1v2Wins }}/{{ row.cl1v2Attempts }}</span>
                                     <span class="player-rate__pct">{{ formatPercent(row.cl1v2Line || 0, 1) }}</span>
                                 </div>
                             </template>
                             <template #cell-flashSuccessLine="{ row }">
-                                <div class="player-rate">
+                                <div class="player-rate" :title="'Flash%: onnistuneet flashit / kaikki heitetyt flashit.'">
                                     <span class="player-rate__main">{{ row.flashSuccesses }}/{{ row.flashCount }}</span>
-                                    <span class="player-rate__pct">{{ formatPercent(row.flashSuccessLine || 0, 1) }}</span>
+                                    <span
+                                        class="player-rate__pct"
+                                        :class="playerMetricClass(row, 'flashSuccessLine')"
+                                        :title="playerMetricTitle(row, 'flashSuccessLine', 'Flash%', 1, true)"
+                                    >{{ formatPercent(row.flashSuccessLine || 0, 1) }}</span>
                                 </div>
                             </template>
                         </sortable-table>

@@ -93,6 +93,10 @@
             `/api/matches/division/${divisionId}`,
             `/api/v1/matches/division/${divisionId}`
         ],
+        divisionAverages: championshipId => [
+            `/api/stats/division/${championshipId}/averages`,
+            `/api/v1/stats/division/${championshipId}/averages`
+        ],
         teamInfo: teamId => [
             `/api/teams/${teamId}`,
             `/api/teams/${teamId}/info`,
@@ -1124,6 +1128,17 @@
                 }
                 throw error;
             }
+        }
+
+        async getDivisionAverages(championshipId, options = {}) {
+            if (!championshipId) {
+                throw new Error('championshipId is required');
+            }
+            const encodedId = encodeURIComponent(championshipId);
+            const routes = buildRouteCandidates('divisionAverages', encodedId);
+            const result = await fetchWithFallback(routes, options);
+            const payload = result?.data ?? result ?? {};
+            return ensureSnakeCaseDeep(payload) || {};
         }
 
         async getDivisionTeamCount(championshipId, options = {}) {

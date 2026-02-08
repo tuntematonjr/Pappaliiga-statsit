@@ -1203,8 +1203,30 @@ async def get_division_averages(championship_id: str) -> dict[str, float]:
     }
 
 
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def _median(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2 == 0:
+        return (ordered[mid - 1] + ordered[mid]) / 2.0
+    return ordered[mid]
+
+
+def _percentile_rank(values: list[float], value: float) -> float:
+    if not values:
+        return 0.0
+    lower = sum(1 for x in values if x < value)
+    equal = sum(1 for x in values if x == value)
+    return (lower + (equal * 0.5)) / len(values)
+
+
 async def detect_player_roles(championship_id: str, team_id: str) -> list[dict[str, Any]]:
-    """Detect player roles based on statistical patterns."""
+    """Detect player roles with team-relative scoring and sample-size guards."""
     champ_rows = await query_async(
         "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
         {"champ_id": championship_id},
@@ -1245,37 +1267,197 @@ async def detect_player_roles(championship_id: str, team_id: str) -> list[dict[s
         {"season": season, "div": division_num, "team_id": team_id}
     )
     
-    players_with_roles = []
+    if not rows:
+        return []
+
+    MIN_MAPS = 3
+    MIN_ROUNDS = 60
+    MIN_ENTRY_ATTEMPTS = 24
+    MIN_CLUTCH_ATTEMPTS = 6
+
+    players = []
     for row in rows:
-        awp_rate = float(row.get("awp_rate") or 0.0)
-        entry_success = float(row.get("entry_success") or 0.0)
-        assist_rate = float(row.get("assist_rate") or 0.0)
-        clutch_success = float(row.get("clutch_success") or 0.0)
+        maps_played = int(row.get("maps_played") or 0)
+        rounds_played = int(row.get("rounds_played") or 0)
+        sniper_kills = int(row.get("sniper_kills") or 0)
         entry_count = int(row.get("entry_count") or 0)
+        entry_wins = int(row.get("entry_wins") or 0)
+        assists = int(row.get("assists") or 0)
         utility_damage = int(row.get("utility_damage") or 0)
         enemies_flashed = int(row.get("enemies_flashed") or 0)
-        
-        # Role detection logic
-        roles = []
-        if awp_rate > 0.15:  # More than 15% of rounds using AWP
-            roles.append("AWPer")
-        if entry_count > 50 and entry_success > 0.45:  # High entry attempts with decent success
-            roles.append("Entry Fragger")
-        if assist_rate > 0.15 or (utility_damage > 1000 and enemies_flashed > 100):
-            roles.append("Support")
-        if clutch_success > 0.35 and row.get("cl_1v1_attempts", 0) > 10:
-            roles.append("Clutcher")
-        
-        # Default to Rifler if no specific role identified
-        if not roles:
-            roles.append("Rifler")
-        
-        players_with_roles.append({
+        cl_1v1_attempts = int(row.get("cl_1v1_attempts") or 0)
+        cl_1v1_wins = int(row.get("cl_1v1_wins") or 0)
+        kills = int(row.get("kills") or 0)
+        clutch_kills = int(row.get("clutch_kills") or 0)
+
+        round_den = rounds_played if rounds_played > 0 else 1
+        awp_rate = sniper_kills / round_den
+        entry_success = (entry_wins / entry_count) if entry_count > 0 else 0.0
+        assist_rate = assists / round_den
+        clutch_success = (cl_1v1_wins / cl_1v1_attempts) if cl_1v1_attempts > 0 else 0.0
+        entry_rate = entry_count / round_den
+        utility_per_round = utility_damage / round_den
+        flashed_per_round = enemies_flashed / round_den
+        clutch_attempt_rate = cl_1v1_attempts / round_den
+        frag_rate = kills / round_den
+        clutch_kill_rate = clutch_kills / round_den
+
+        players.append({
             "player_id": row["player_id"],
             "nickname": row["nickname"],
-            "maps_played": int(row["maps_played"] or 0),
+            "maps_played": maps_played,
+            "rounds_played": rounds_played,
+            "entry_count": entry_count,
+            "cl_1v1_attempts": cl_1v1_attempts,
+            "awp_rate": awp_rate,
+            "entry_success": entry_success,
+            "assist_rate": assist_rate,
+            "clutch_success": clutch_success,
+            "entry_rate": entry_rate,
+            "utility_per_round": utility_per_round,
+            "flashed_per_round": flashed_per_round,
+            "clutch_attempt_rate": clutch_attempt_rate,
+            "frag_rate": frag_rate,
+            "clutch_kill_rate": clutch_kill_rate,
+        })
+
+    stable_players = [
+        p for p in players
+        if p["maps_played"] >= MIN_MAPS and p["rounds_played"] >= MIN_ROUNDS
+    ]
+    sample_players = stable_players if len(stable_players) >= 3 else players
+
+    def sample_values(metric: str, predicate=None) -> list[float]:
+        values = []
+        for p in sample_players:
+            if predicate and not predicate(p):
+                continue
+            values.append(float(p[metric]))
+        return values
+
+    awp_values = sample_values("awp_rate")
+    entry_rate_values = sample_values("entry_rate")
+    assist_values = sample_values("assist_rate")
+    utility_values = sample_values("utility_per_round")
+    flashed_values = sample_values("flashed_per_round")
+    clutch_attempt_values = sample_values("clutch_attempt_rate")
+    frag_values = sample_values("frag_rate")
+    clutch_kill_values = sample_values("clutch_kill_rate")
+
+    entry_success_values = sample_values("entry_success", lambda p: p["entry_count"] >= MIN_ENTRY_ATTEMPTS)
+    clutch_success_values = sample_values("clutch_success", lambda p: p["cl_1v1_attempts"] >= MIN_CLUTCH_ATTEMPTS)
+
+    entry_success_median = _median(entry_success_values) if entry_success_values else 0.45
+    clutch_success_median = _median(clutch_success_values) if clutch_success_values else 0.35
+    assist_median = _median(assist_values) if assist_values else 0.12
+    utility_median = _median(utility_values) if utility_values else 0.0
+    flashed_median = _median(flashed_values) if flashed_values else 0.0
+    frag_median = _median(frag_values) if frag_values else 0.0
+    clutch_kill_median = _median(clutch_kill_values) if clutch_kill_values else 0.0
+
+    players_with_roles = []
+    for p in players:
+        awp_rate = p["awp_rate"]
+        entry_success = p["entry_success"]
+        assist_rate = p["assist_rate"]
+        clutch_success = p["clutch_success"]
+        entry_count = p["entry_count"]
+        cl_1v1_attempts = p["cl_1v1_attempts"]
+
+        awp_pct = _percentile_rank(awp_values, awp_rate)
+        entry_rate_pct = _percentile_rank(entry_rate_values, p["entry_rate"])
+        assist_pct = _percentile_rank(assist_values, assist_rate)
+        utility_pct = _percentile_rank(utility_values, p["utility_per_round"])
+        flashed_pct = _percentile_rank(flashed_values, p["flashed_per_round"])
+        clutch_attempt_pct = _percentile_rank(clutch_attempt_values, p["clutch_attempt_rate"])
+        frag_pct = _percentile_rank(frag_values, p["frag_rate"])
+        clutch_kill_pct = _percentile_rank(clutch_kill_values, p["clutch_kill_rate"])
+        entry_success_pct = _percentile_rank(entry_success_values, entry_success) if entry_success_values else 0.0
+        clutch_success_pct = _percentile_rank(clutch_success_values, clutch_success) if clutch_success_values else 0.0
+
+        awp_score = (0.6 * awp_pct) + (0.4 * _clamp01((awp_rate - 0.04) / 0.16))
+        entry_score = (0.55 * entry_rate_pct) + (0.45 * entry_success_pct)
+        support_score = (0.45 * assist_pct) + (0.35 * utility_pct) + (0.20 * flashed_pct)
+        clutch_score = (0.55 * clutch_success_pct) + (0.45 * clutch_attempt_pct)
+        utility_expert_score = (0.6 * utility_pct) + (0.4 * flashed_pct)
+        playmaker_score = (0.5 * frag_pct) + (0.3 * entry_rate_pct) + (0.2 * clutch_attempt_pct)
+        closer_score = (0.55 * clutch_success_pct) + (0.30 * clutch_kill_pct) + (0.15 * frag_pct)
+
+        candidates: list[tuple[str, float]] = []
+        if awp_rate >= 0.04 and awp_score >= 0.56:
+            candidates.append(("AWPer", awp_score))
+        if entry_count >= MIN_ENTRY_ATTEMPTS and entry_success >= max(0.42, entry_success_median) and entry_score >= 0.55:
+            candidates.append(("Entry Fragger", entry_score))
+        if (assist_rate >= max(0.10, assist_median * 0.9) or p["utility_per_round"] >= 3.0) and support_score >= 0.53:
+            candidates.append(("Support", support_score))
+        if cl_1v1_attempts >= MIN_CLUTCH_ATTEMPTS and clutch_success >= max(0.30, clutch_success_median) and clutch_score >= 0.57:
+            candidates.append(("Clutcher", clutch_score))
+        if (
+            p["utility_per_round"] >= max(2.2, utility_median * 0.9)
+            and p["flashed_per_round"] >= max(0.08, flashed_median * 0.85)
+            and utility_expert_score >= 0.58
+        ):
+            candidates.append(("Utility Expert", utility_expert_score))
+        if p["frag_rate"] >= max(0.60, frag_median * 0.95) and playmaker_score >= 0.58:
+            candidates.append(("Playmaker", playmaker_score))
+        if (
+            cl_1v1_attempts >= MIN_CLUTCH_ATTEMPTS
+            and clutch_success >= max(0.30, clutch_success_median)
+            and p["clutch_kill_rate"] >= max(0.012, clutch_kill_median * 0.9)
+            and closer_score >= 0.60
+        ):
+            candidates.append(("Closer", closer_score))
+
+        # Identity badges with lighter gates so every player gets a meaningful style label.
+        initiator_score = (0.65 * entry_rate_pct) + (0.35 * entry_success_pct)
+        sharpshooter_score = (0.70 * awp_pct) + (0.30 * awp_score)
+        anchor_score = (0.50 * (1.0 - entry_rate_pct)) + (0.30 * assist_pct) + (0.20 * utility_pct)
+        utility_core_score = (0.45 * utility_pct) + (0.35 * flashed_pct) + (0.20 * assist_pct)
+        team_player_score = (0.40 * assist_pct) + (0.30 * utility_pct) + (0.30 * clutch_attempt_pct)
+
+        if entry_count >= 12 and initiator_score >= 0.50:
+            candidates.append(("Initiator", initiator_score))
+        if awp_rate >= 0.02 and sharpshooter_score >= 0.50:
+            candidates.append(("Sharpshooter", sharpshooter_score))
+        if p["entry_rate"] <= max(0.12, _median(entry_rate_values) if entry_rate_values else 0.12) and anchor_score >= 0.50:
+            candidates.append(("Anchor", anchor_score))
+        if utility_core_score >= 0.50:
+            candidates.append(("Utility Core", utility_core_score))
+        if team_player_score >= 0.48:
+            candidates.append(("Team Player", team_player_score))
+
+        best_by_name: dict[str, float] = {}
+        for name, score in candidates:
+            previous = best_by_name.get(name)
+            if previous is None or score > previous:
+                best_by_name[name] = score
+        ranked = sorted(best_by_name.items(), key=lambda item: item[1], reverse=True)
+        roles = ["Rifler"]
+        fallback_pool = [
+            ("Sharpshooter", sharpshooter_score),
+            ("Initiator", initiator_score),
+            ("Utility Core", utility_core_score),
+            ("Anchor", anchor_score),
+            ("Team Player", team_player_score),
+        ]
+        fallback_ranked = sorted(fallback_pool, key=lambda item: item[1], reverse=True)
+
+        secondary_ranked = [(name, score) for name, score in ranked if score >= 0.58]
+        if not secondary_ranked:
+            secondary_ranked = fallback_ranked
+
+        for name, _score in secondary_ranked:
+            if len(roles) >= 3:
+                break
+            if name not in roles:
+                roles.append(name)
+
+        players_with_roles.append({
+            "player_id": p["player_id"],
+            "nickname": p["nickname"],
+            "maps_played": p["maps_played"],
             "roles": roles,
-            "primary_role": roles[0] if roles else "Rifler",
+            "primary_role": "Rifler",
             "role_stats": {
                 "awp_rate": round(awp_rate * 100, 1),
                 "entry_success": round(entry_success * 100, 1),
@@ -1283,7 +1465,7 @@ async def detect_player_roles(championship_id: str, team_id: str) -> list[dict[s
                 "clutch_success": round(clutch_success * 100, 1)
             }
         })
-    
+
     return players_with_roles
 
 

@@ -284,6 +284,19 @@ window.SortableTable = {
             if (column && (column.key === 'nickname' || (column.colClass && column.colClass.indexOf('col-name') !== -1))) return 'left';
             return 'center';
         },
+        getCellTooltip(column, row) {
+            if (!column) return '';
+            if (typeof column.cellTooltip === 'function') {
+                try {
+                    return column.cellTooltip(row, column) || '';
+                } catch (_err) {
+                    return '';
+                }
+            }
+            if (typeof column.cellTooltip === 'string') return column.cellTooltip;
+            if (typeof column.tooltip === 'string') return column.tooltip;
+            return '';
+        },
         formatCell(value, column) {
             if (value == null) return '-';
             if (column.format) return column.format(value);
@@ -392,6 +405,7 @@ window.SortableTable = {
                                 :class="[getCellClass(column, row), column.colClass || '']"
                                 :style="{ textAlign: getCellAlign(column) }"
                                 :data-label="column.label"
+                                :title="getCellTooltip(column, row)"
                             >
                                 <!-- Special-case map_name column to use a static named slot and inline image rendering -->
                                 <template v-if="column.key === 'map_name'">
