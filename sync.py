@@ -86,7 +86,6 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--season", type=int, default=None, help="Sync only the provided season number (overrides --all-seasons)")
     parser.add_argument("--verify", action="store_true", help="Run post-sync verification queries")
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
-    parser.add_argument("--end-on-error", action="store_true", help="Stop immediately if a division sync fails")
     parser.add_argument("--refresh-divisions", action="store_true", help="Refresh divisions.json from Faceit before syncing")
     parser.add_argument(
         "--refresh-min-season",
@@ -107,6 +106,25 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=getattr(faceit_config, "MAX_DB_WRITER_CONCURRENCY", 3),
         help="Maximum number of concurrent DB writer tasks (default: MAX_DB_WRITER_CONCURRENCY)",
+    )
+    parser.add_argument(
+        "--max-match-concurrency",
+        type=int,
+        default=getattr(faceit_config, "MAX_MATCH_SYNC_CONCURRENCY", 4),
+        help="Maximum number of matches to sync concurrently within one championship",
+    )
+    parser.set_defaults(validate_avatars=False)
+    parser.add_argument(
+        "--validate-avatars",
+        dest="validate_avatars",
+        action="store_true",
+        help="Enable outbound avatar URL validation during sync (disabled by default for performance)",
+    )
+    parser.add_argument(
+        "--skip-avatar-validation",
+        dest="validate_avatars",
+        action="store_false",
+        help=argparse.SUPPRESS,
     )
     return parser
 
@@ -286,12 +304,15 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
 
     overrides = load_division_overrides()
     max_concurrency = max(1, args.max_concurrency)
-    end_on_error = bool(getattr(args, "end_on_error", False))
 
     if args.match_id:
         LOGGER.info("Refreshing single match %s", args.match_id)
         try:
-            championship_id = await update_single_match_async(args.match_id, diagnostics=diagnostics)
+            championship_id = await update_single_match_async(
+                args.match_id,
+                validate_avatars=bool(args.validate_avatars),
+                diagnostics=diagnostics,
+            )
             if championship_id:
                 LOGGER.info("Match %s refreshed (championship %s)", args.match_id, championship_id)
         except Exception as exc:
@@ -373,7 +394,7 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
 
             sem = asyncio.Semaphore(max_concurrency)
 
-            async def sync_division(entry: dict[str, Any]) -> ChampionshipSyncResult | None:
+            async def sync_division(entry: dict[str, Any]) -> ChampionshipSyncResult:
                 async with sem:
                     championship_id = entry["championship_id"]
                     division = entry["division"]
@@ -389,8 +410,10 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
                             full=args.full,
                             overrides=overrides,
                             division=division,
-                            end_on_error=end_on_error,
+                            end_on_error=True,
                             db_semaphore=db_semaphore,
+                            max_match_concurrency=max(1, int(args.max_match_concurrency)),
+                            validate_avatars=bool(args.validate_avatars),
                             diagnostics=diagnostics,
                         )
                         LOGGER.info(
@@ -402,28 +425,19 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
                         return result
                     except Exception as exc:
                         LOGGER.exception("Championship sync failed for %s: %s", championship_id, exc)
-                        if end_on_error:
-                            raise
-                        return None
+                        raise
 
             try:
                 season_results = await asyncio.gather(
                     *(sync_division(entry) for entry in season_championships)
                 )
             except Exception as exc:
-                if end_on_error:
-                    abort_exc = exc
-                    LOGGER.error(
-                        "Aborting remaining syncs because --end-on-error was supplied (season %s)",
-                        season,
-                    )
-                    break
-                raise
+                abort_exc = exc
+                LOGGER.error("Aborting remaining syncs after division failure (season %s)", season)
+                break
 
             processed_championships = 0
             for result in season_results:
-                if not result:
-                    continue
                 processed_championships += 1
                 season_synced_matches += len(result.synced_match_ids)
                 season_skipped_matches += result.skipped_matches
@@ -474,6 +488,8 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
     throttle_wait = float(rate_stats.get("throttle_wait_seconds", 0.0))
     hourly_events = int(rate_stats.get("hourly_wait_events", 0))
     hourly_wait = float(rate_stats.get("hourly_wait_seconds", 0.0))
+    pacer_events = int(rate_stats.get("pacer_wait_events", 0))
+    pacer_wait = float(rate_stats.get("pacer_wait_seconds", 0.0))
     total_requests = int(rate_stats.get("request_count_total", 0))
     avg_per_minute = float(rate_stats.get("average_requests_per_minute", 0.0))
 
@@ -497,6 +513,12 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
             "Hourly cap enforced %d time(s); cumulative scheduled wait %s",
             hourly_events,
             format_hms(hourly_wait),
+        )
+    if pacer_events:
+        LOGGER.info(
+            "Global request pacing delayed %d request(s); cumulative pacing wait %s",
+            pacer_events,
+            format_hms(pacer_wait),
         )
 
     if args.verify and not abort_exc:

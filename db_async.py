@@ -95,7 +95,7 @@ class _PoolTracker:
     # TODO(pipeline-diagnostics): drop this tracker once hangs are resolved.
 
     def __init__(self) -> None:
-        self.enabled = os.environ.get("DB_POOL_DEBUG", "1") != "0"
+        self.enabled = os.environ.get("DB_POOL_DEBUG", "0") != "0"
         self.active: Dict[int, _PoolLease] = {}
         self.events: deque[Dict[str, Any]] = deque(maxlen=500)
         self.waiting = 0
@@ -517,6 +517,30 @@ async def _ensure_table_columns_async(
         await conn.commit()
 
 
+async def _ensure_table_indexes_async(
+    conn: Any,
+    table: str,
+    indexes: dict[str, str],
+) -> None:
+    async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            SELECT DISTINCT index_name
+            FROM information_schema.statistics
+            WHERE table_schema = DATABASE()
+              AND table_name = %s
+            """,
+            (table,),
+        )
+        existing = {row[0] for row in await cur.fetchall()}
+        missing = [(name, ddl) for name, ddl in indexes.items() if name not in existing]
+        for name, ddl in missing:
+            LOGGER.info("Adding missing index %s.%s", table, name)
+            await cur.execute(f"ALTER TABLE `{table}` ADD INDEX `{name}` {ddl}")
+    if missing:
+        await conn.commit()
+
+
 async def create_schema_async(force: bool = False) -> None:
     """Create tables if they are missing.
 
@@ -553,8 +577,26 @@ async def create_schema_async(force: bool = False) -> None:
             "zeus_kills": "INT(10) UNSIGNED NOT NULL DEFAULT 0",
             "first_kills": "INT(10) UNSIGNED NOT NULL DEFAULT 0",
         }
+        match_columns = {
+            "payload_hash": "CHAR(64) NULL",
+        }
+        await _ensure_table_columns_async(conn, "matches", match_columns)
         await _ensure_table_columns_async(conn, "player_season_totals", player_totals_columns)
         await _ensure_table_columns_async(conn, "player_season_totals_prev", player_totals_columns)
+
+        match_indexes = {
+            "idx_matches_season_division_team1_finished": "(season, division_num, team1_id, finished_at)",
+            "idx_matches_season_division_team2_finished": "(season, division_num, team2_id, finished_at)",
+        }
+        player_stats_indexes = {
+            "idx_player_stats_player_match_round": "(player_id, match_id, round_index)",
+        }
+        team_stats_indexes = {
+            "idx_team_stats_team_match_round": "(team_id, match_id, round_index)",
+        }
+        await _ensure_table_indexes_async(conn, "matches", match_indexes)
+        await _ensure_table_indexes_async(conn, "player_stats", player_stats_indexes)
+        await _ensure_table_indexes_async(conn, "team_stats", team_stats_indexes)
 
 
 async def reset_db_async(confirm: bool = False) -> None:
@@ -987,8 +1029,8 @@ def _is_retryable_error(exc: Exception) -> bool:
     """Check if database exception is retryable (deadlock or lock timeout)."""
     if isinstance(exc, asyncmy_errors.OperationalError):
         error_code = exc.args[0] if exc.args else 0
-        # 1213 = Deadlock, 1205 = Lock wait timeout
-        return error_code in (1213, 1205)
+        # 1213 = Deadlock, 1205 = Lock wait timeout, 1020 = record changed since last read
+        return error_code in (1213, 1205, 1020)
     return False
 
 
@@ -1042,6 +1084,21 @@ async def _retry_on_deadlock(
     if last_exc:
         raise last_exc
     return None
+
+
+def _normalize_id_list(values: Sequence[Any]) -> list[str]:
+    """Return de-duplicated non-empty IDs as strings while preserving order."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if value is None:
+            continue
+        item = str(value).strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
 
 _TS_EXPR = (
     "COALESCE(m.finished_at, m.started_at, m.scheduled_at, m.configured_at, m.last_seen_at, 0)"
@@ -1209,6 +1266,8 @@ async def upsert_championship_async(
 async def upsert_map_catalog_async(
     conn: asyncmy.Connection,
     row: Row,
+    *,
+    commit: bool = True,
 ) -> None:
     sql = """
         INSERT INTO maps_catalog (map_id, pretty_name, image_sm, image_lg)
@@ -1220,10 +1279,16 @@ async def upsert_map_catalog_async(
     """
     async with conn.cursor() as cur:
         await cur.execute(sql, row)
-        await conn.commit()
+        if commit:
+            await conn.commit()
 
 
-async def upsert_match_async(conn: asyncmy.Connection, row: Row) -> None:
+async def upsert_match_async(
+    conn: asyncmy.Connection,
+    row: Row,
+    *,
+    commit: bool = True,
+) -> None:
     match_id = row["match_id"]
     async with conn.cursor() as cur:
         await cur.execute(
@@ -1232,13 +1297,13 @@ async def upsert_match_async(conn: asyncmy.Connection, row: Row) -> None:
               match_id, championship_id, season, division_num, best_of,
               configured_at, started_at, finished_at, scheduled_at, status,
               last_seen_at, activity_ts, team1_id, team2_id, winner_team_id,
-              is_forfeit, ignored_due_ban
+              is_forfeit, ignored_due_ban, payload_hash
             )
             VALUES (
               %(match_id)s, %(championship_id)s, %(season)s, %(division_num)s, %(best_of)s,
               %(configured_at)s, %(started_at)s, %(finished_at)s, %(scheduled_at)s, %(status)s,
               %(last_seen_at)s, %(activity_ts)s, %(team1_id)s, %(team2_id)s, %(winner_team_id)s,
-              %(is_forfeit)s, %(ignored_due_ban)s
+              %(is_forfeit)s, %(ignored_due_ban)s, %(payload_hash)s
             )
             ON DUPLICATE KEY UPDATE
               championship_id = VALUES(championship_id),
@@ -1256,11 +1321,13 @@ async def upsert_match_async(conn: asyncmy.Connection, row: Row) -> None:
               team2_id = VALUES(team2_id),
               winner_team_id = VALUES(winner_team_id),
               is_forfeit = VALUES(is_forfeit),
-              ignored_due_ban = VALUES(ignored_due_ban)
+              ignored_due_ban = VALUES(ignored_due_ban),
+              payload_hash = VALUES(payload_hash)
             """,
             row,
         )
-        await conn.commit()
+        if commit:
+            await conn.commit()
     LOGGER.debug("upserted match %s", match_id)
 
 
@@ -1274,13 +1341,20 @@ async def upsert_teams_bulk_async(
     if not rows:
         return
 
-    async def _op():
-        async with _write_connection(conn, label=f"upsert-{label}") as target_conn:
-            async with target_conn.cursor() as cur:
-                await cur.executemany(_TEAM_UPSERT_SQL, rows)
-                await target_conn.commit()
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.executemany(_TEAM_UPSERT_SQL, rows)
 
-    await _retry_on_deadlock(_op, label=f"upsert-{label}")
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=f"upsert-{label}") as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=f"upsert-{label}")
 
 
 async def upsert_team_championships_bulk_async(
@@ -1300,18 +1374,26 @@ async def upsert_team_championships_bulk_async(
       team_name = CASE WHEN VALUES(team_name) <> '' THEN VALUES(team_name) ELSE team_championships.team_name END
     """
 
-    async def _op():
-        async with _write_connection(conn, label=f"upsert-{label}") as target_conn:
-            async with target_conn.cursor() as cur:
-                await cur.executemany(sql, rows)
-                await target_conn.commit()
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.executemany(sql, rows)
 
-    await _retry_on_deadlock(_op, label=f"upsert-{label}")
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=f"upsert-{label}") as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=f"upsert-{label}")
 
 
 async def upsert_players_bulk_async(
     rows: Sequence[Row],
     *,
+    conn: asyncmy.Connection | None = None,
     label: str = "players",
 ) -> None:
     """Upsert multiple players."""
@@ -1338,10 +1420,21 @@ async def upsert_players_bulk_async(
     ]
     if not params:
         return
-    async with connection(label=f"upsert-{label}") as conn:
-        async with conn.cursor() as cur:
+
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
             await cur.executemany(sql, params)
-            await conn.commit()
+
+    if conn is not None:
+        await _retry_on_deadlock(lambda: _op(conn), label=f"upsert-{label}")
+        return
+
+    async def _owned_op():
+        async with connection(label=f"upsert-{label}") as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=f"upsert-{label}")
 
 
 async def upsert_maps_bulk_async(
@@ -1350,6 +1443,7 @@ async def upsert_maps_bulk_async(
     division_num: int,
     maps: Sequence[Row],
     *,
+    conn: asyncmy.Connection | None = None,
     label: str = "maps",
 ) -> None:
     """Upsert maps for a match; deletes stale rows not present in payload."""
@@ -1369,24 +1463,31 @@ async def upsert_maps_bulk_async(
     keep_rounds = [int(item["round_index"]) for item in rows if item.get("round_index") is not None]
     keep_rounds_clause = ", ".join(str(r) for r in keep_rounds) if keep_rounds else ""
 
-    async def _op():
-        async with connection(label=f"upsert-{label}") as conn:
-            async with conn.cursor() as cur:
-                await cur.executemany(_MAP_UPSERT_SQL, rows)
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.executemany(_MAP_UPSERT_SQL, rows)
 
-                # Delete maps no longer present (round index mismatch)
-                delete_sql = """
-                    DELETE FROM maps
-                    WHERE match_id = %s
-                      AND round_index IS NOT NULL
-                """
-                params: list[Any] = [match_id]
-                if keep_rounds_clause:
-                    delete_sql += f" AND round_index NOT IN ({keep_rounds_clause})"
-                await cur.execute(delete_sql, params)
-            await conn.commit()
+            # Delete maps no longer present (round index mismatch)
+            delete_sql = """
+                DELETE FROM maps
+                WHERE match_id = %s
+                  AND round_index IS NOT NULL
+            """
+            params: list[Any] = [match_id]
+            if keep_rounds_clause:
+                delete_sql += f" AND round_index NOT IN ({keep_rounds_clause})"
+            await cur.execute(delete_sql, params)
 
-    await _retry_on_deadlock(_op, label=f"upsert-{label}")
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=f"upsert-{label}") as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=f"upsert-{label}")
 
 
 async def clear_obsolete_maps_async(
@@ -1431,13 +1532,18 @@ async def replace_map_votes_async(
     division_num: int,
     votes: Sequence[Row],
     *,
+    conn: asyncmy.Connection | None = None,
     label: str = "map-votes",
 ) -> None:
     if not votes:
-        async with connection(label=label) as conn:
+        if conn is not None:
             async with conn.cursor() as cur:
                 await cur.execute("DELETE FROM map_votes WHERE match_id = %s", (match_id,))
-            await conn.commit()
+            return
+        async with connection(label=label) as owned_conn:
+            async with owned_conn.cursor() as cur:
+                await cur.execute("DELETE FROM map_votes WHERE match_id = %s", (match_id,))
+            await owned_conn.commit()
         return
 
     rows = [
@@ -1450,43 +1556,58 @@ async def replace_map_votes_async(
         for vote in votes
     ]
 
-    async def _op():
-        async with connection(label=label) as conn:
-            async with conn.cursor() as cur:
-                await cur.execute("DELETE FROM map_votes WHERE match_id = %s", (match_id,))
-                await cur.executemany(
-                    """
-                    INSERT INTO map_votes (
-                      match_id, season, division_num, map_name, status,
-                      selected_by_faction, selected_by_team_id, round_num
-                    )
-                    VALUES (
-                      %(match_id)s, %(season)s, %(division_num)s, %(map_name)s, %(status)s,
-                      %(selected_by_faction)s, %(selected_by_team_id)s, %(round_num)s
-                    )
-                    """,
-                    rows,
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.execute("DELETE FROM map_votes WHERE match_id = %s", (match_id,))
+            await cur.executemany(
+                """
+                INSERT INTO map_votes (
+                  match_id, season, division_num, map_name, status,
+                  selected_by_faction, selected_by_team_id, round_num
                 )
-            await conn.commit()
+                VALUES (
+                  %(match_id)s, %(season)s, %(division_num)s, %(map_name)s, %(status)s,
+                  %(selected_by_faction)s, %(selected_by_team_id)s, %(round_num)s
+                )
+                """,
+                rows,
+            )
 
-    await _retry_on_deadlock(_op, label=label)
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=label) as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=label)
 
 
 async def delete_stats_for_match_async(
     match_id: str,
     *,
+    conn: asyncmy.Connection | None = None,
     label: str = "delete-stats",
 ) -> None:
     """Delete stats rows for a match with deadlock-safe retries."""
 
-    async def _op():
-        async with connection(label=label) as conn:
-            async with conn.cursor() as cur:
-                await cur.execute("DELETE FROM player_stats WHERE match_id = %s", (match_id,))
-                await cur.execute("DELETE FROM team_stats WHERE match_id = %s", (match_id,))
-            await conn.commit()
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.execute("DELETE FROM player_stats WHERE match_id = %s", (match_id,))
+            await cur.execute("DELETE FROM team_stats WHERE match_id = %s", (match_id,))
 
-    await _retry_on_deadlock(_op, label=label)
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=label) as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=label)
 
 
 async def upsert_player_stats_bulk_async(
@@ -1497,6 +1618,7 @@ async def upsert_player_stats_bulk_async(
     player_rows: Sequence[Row],
     forfeit_lookup: Mapping[int, bool],
     *,
+    conn: asyncmy.Connection | None = None,
     label: str = "player-stats",
 ) -> None:
     """Upsert player stats for a match."""
@@ -1571,13 +1693,20 @@ async def upsert_player_stats_bulk_async(
             }
         )
 
-    async def _op():
-        async with connection(label=label) as conn:
-            async with conn.cursor() as cur:
-                await cur.executemany(_PLAYER_STAT_UPSERT_SQL, rows)
-            await conn.commit()
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.executemany(_PLAYER_STAT_UPSERT_SQL, rows)
 
-    await _retry_on_deadlock(_op, label=label)
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=label) as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=label)
 
 
 async def upsert_team_stats_bulk_async(
@@ -1588,6 +1717,7 @@ async def upsert_team_stats_bulk_async(
     team_rows: Sequence[Row],
     forfeit_lookup: Mapping[int, bool],
     *,
+    conn: asyncmy.Connection | None = None,
     label: str = "team-stats",
 ) -> None:
     if not team_rows:
@@ -1607,62 +1737,82 @@ async def upsert_team_stats_bulk_async(
             }
         )
 
-    async def _op():
-        async with connection(label=label) as conn:
-            async with conn.cursor() as cur:
-                await cur.executemany(_TEAM_STAT_UPSERT_SQL, rows)
-            await conn.commit()
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.executemany(_TEAM_STAT_UPSERT_SQL, rows)
 
-    await _retry_on_deadlock(_op, label=label)
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=label) as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=label)
 
 
-async def upsert_team_season_totals_async(
+async def upsert_team_season_totals_bulk_async(
     season: int,
     division_num: int,
-    team_id: str,
+    team_ids: Sequence[str],
     *,
     snapshot_ts: int | None = None,
-    label: str = "team-season-totals",
+    label: str = "team-season-totals-bulk",
 ) -> None:
-    """Upsert aggregated season totals for a team (inline, no stored proc).
-    
-    Note: Aggregates ONLY regular season matches (is_playoffs=0), not playoffs.
-    """
+    """Upsert aggregated season totals for multiple teams in one query."""
+    team_id_list = _normalize_id_list(team_ids)
+    if not team_id_list:
+        return
+
+    placeholders = ", ".join(["%s"] * len(team_id_list))
+
     async def _op():
         async with connection(label=label) as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    """
+                    f"""
                     INSERT INTO team_season_totals (
                       season, division_num, team_id,
                       matches_played, matches_won, maps_played, maps_won,
                       rounds_won, rounds_lost
                     )
                     SELECT
-                      %s AS season, %s AS division_num, %s AS team_id,
-                      COUNT(DISTINCT m.match_id) AS matches_played,
-                      COUNT(DISTINCT CASE WHEN m.winner_team_id = %s THEN m.match_id END) AS matches_won,
+                      %s AS season, %s AS division_num, mt.team_id,
+                      COUNT(DISTINCT mt.match_id) AS matches_played,
+                      COUNT(DISTINCT CASE WHEN mt.winner_team_id = mt.team_id THEN mt.match_id END) AS matches_won,
                       COUNT(mp.map_id) AS maps_played,
-                      SUM(CASE WHEN mp.winner_team_id = %s THEN 1 ELSE 0 END) AS maps_won,
+                      SUM(CASE WHEN mp.winner_team_id = mt.team_id THEN 1 ELSE 0 END) AS maps_won,
                       SUM(
-                        CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team1,0)
-                             WHEN m.team2_id = %s THEN COALESCE(mp.score_team2,0)
-                             ELSE 0 END
+                        CASE WHEN mt.team_slot = 1 THEN COALESCE(mp.score_team1,0)
+                             ELSE COALESCE(mp.score_team2,0) END
                       ) AS rounds_won,
                       SUM(
-                        CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team2,0)
-                             WHEN m.team2_id = %s THEN COALESCE(mp.score_team1,0)
-                             ELSE 0 END
+                        CASE WHEN mt.team_slot = 1 THEN COALESCE(mp.score_team2,0)
+                             ELSE COALESCE(mp.score_team1,0) END
                       ) AS rounds_lost
-                    FROM matches m
-                    JOIN championships c ON m.championship_id = c.championship_id
-                    LEFT JOIN maps mp ON mp.match_id = m.match_id
-                    WHERE m.season = %s
-                      AND m.division_num = %s
-                      AND (m.team1_id = %s OR m.team2_id = %s)
-                      AND c.is_playoffs = 0
-                      AND NULLIF(m.finished_at, 0) IS NOT NULL
-                    GROUP BY season, division_num, team_id
+                    FROM (
+                      SELECT m.match_id, m.winner_team_id, m.team1_id AS team_id, 1 AS team_slot
+                      FROM matches m
+                      JOIN championships c ON m.championship_id = c.championship_id
+                      WHERE m.season = %s
+                        AND m.division_num = %s
+                        AND m.team1_id IN ({placeholders})
+                        AND c.is_playoffs = 0
+                        AND NULLIF(m.finished_at, 0) IS NOT NULL
+                      UNION ALL
+                      SELECT m.match_id, m.winner_team_id, m.team2_id AS team_id, 2 AS team_slot
+                      FROM matches m
+                      JOIN championships c ON m.championship_id = c.championship_id
+                      WHERE m.season = %s
+                        AND m.division_num = %s
+                        AND m.team2_id IN ({placeholders})
+                        AND c.is_playoffs = 0
+                        AND NULLIF(m.finished_at, 0) IS NOT NULL
+                    ) mt
+                    LEFT JOIN maps mp ON mp.match_id = mt.match_id
+                    GROUP BY mt.team_id
                     ON DUPLICATE KEY UPDATE
                       matches_played = VALUES(matches_played),
                       matches_won = VALUES(matches_won),
@@ -1674,90 +1824,58 @@ async def upsert_team_season_totals_async(
                     (
                         season,
                         division_num,
-                        team_id,
-                        team_id,
-                        team_id,
-                        team_id,
-                        team_id,
-                        team_id,
-                        team_id,
                         season,
                         division_num,
-                        team_id,
-                        team_id,
+                        *team_id_list,
+                        season,
+                        division_num,
+                        *team_id_list,
                     ),
                 )
                 if snapshot_ts is not None:
                     await cur.execute(
-                        """
-                                            INSERT IGNORE INTO team_season_totals_prev (
-                                                season, division_num, team_id,
-                                                matches_played, matches_won, maps_played, maps_won,
-                                                rounds_won, rounds_lost, snapshot_ts
-                                            )
-                                            SELECT
-                                                %s AS season, %s AS division_num, %s AS team_id,
-                                                COUNT(DISTINCT m.match_id) AS matches_played,
-                                                COUNT(DISTINCT CASE WHEN m.winner_team_id = %s THEN m.match_id END) AS matches_won,
-                                                COUNT(mp.map_id) AS maps_played,
-                                                SUM(CASE WHEN mp.winner_team_id = %s THEN 1 ELSE 0 END) AS maps_won,
-                                                SUM(
-                                                    CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team1,0)
-                                                             WHEN m.team2_id = %s THEN COALESCE(mp.score_team2,0)
-                                                             ELSE 0 END
-                                                ) AS rounds_won,
-                                                SUM(
-                                                    CASE WHEN m.team1_id = %s THEN COALESCE(mp.score_team2,0)
-                                                             WHEN m.team2_id = %s THEN COALESCE(mp.score_team1,0)
-                                                             ELSE 0 END
-                                                ) AS rounds_lost,
-                                                %s AS snapshot_ts
-                                            FROM matches m
-                                            JOIN championships c ON m.championship_id = c.championship_id
-                                            LEFT JOIN maps mp ON mp.match_id = m.match_id
-                                            WHERE m.season = %s
-                                                AND m.division_num = %s
-                                                AND (m.team1_id = %s OR m.team2_id = %s)
-                                                AND c.is_playoffs = 0
-                                                AND NULLIF(m.finished_at, 0) IS NOT NULL
-                                            GROUP BY season, division_num, team_id
-                                            """,
-                        (
-                            season,
-                            division_num,
-                            team_id,
-                            team_id,
-                            team_id,
-                            team_id,
-                            team_id,
-                            team_id,
-                            team_id,
-                            snapshot_ts,
-                            season,
-                            division_num,
-                            team_id,
-                            team_id,
-                        ),
+                        f"""
+                        INSERT IGNORE INTO team_season_totals_prev (
+                          season, division_num, team_id,
+                          matches_played, matches_won, maps_played, maps_won,
+                          rounds_won, rounds_lost, snapshot_ts
+                        )
+                        SELECT
+                          season, division_num, team_id,
+                          matches_played, matches_won, maps_played, maps_won,
+                          rounds_won, rounds_lost, %s AS snapshot_ts
+                        FROM team_season_totals
+                        WHERE season = %s
+                          AND division_num = %s
+                          AND team_id IN ({placeholders})
+                        """,
+                        (snapshot_ts, season, division_num, *team_id_list),
                     )
             await conn.commit()
 
     await _retry_on_deadlock(_op, label=label)
 
 
-async def upsert_player_season_totals_async(
+async def upsert_player_season_totals_bulk_async(
     season: int,
     division_num: int,
-    player_id: str,
+    player_ids: Sequence[str],
     *,
     snapshot_ts: int | None = None,
-    label: str = "player-season-totals",
+    label: str = "player-season-totals-bulk",
 ) -> None:
-    """Upsert aggregated season totals for a player (inline, no stored proc)."""
+    """Upsert aggregated season totals for multiple players in one query."""
+    player_id_list = _normalize_id_list(player_ids)
+    if not player_id_list:
+        return
+
+    placeholders = ", ".join(["%s"] * len(player_id_list))
+
     async def _op():
         async with connection(label=label) as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    """
+                    f"""
                     INSERT INTO player_season_totals (
                       season, division_num, player_id, team_id,
                       maps_played, rounds_played, kills, deaths, assists,
@@ -1770,7 +1888,7 @@ async def upsert_player_season_totals_async(
                       adr, kr, kd, hs_pct, damage
                     )
                     SELECT
-                      %s AS season, %s AS division_num, %s AS player_id,
+                      %s AS season, %s AS division_num, ps.player_id,
                       MAX(ps.team_id) AS team_id,
                       COUNT(DISTINCT ps.match_id) AS maps_played,
                       SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
@@ -1810,7 +1928,9 @@ async def upsert_player_season_totals_async(
                     FROM player_stats ps
                     JOIN matches m ON m.match_id = ps.match_id
                     LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                    WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
+                    WHERE m.season = %s
+                      AND m.division_num = %s
+                      AND ps.player_id IN ({placeholders})
                     GROUP BY ps.player_id
                     ON DUPLICATE KEY UPDATE
                       team_id = VALUES(team_id),
@@ -1850,85 +1970,75 @@ async def upsert_player_season_totals_async(
                       hs_pct = VALUES(hs_pct),
                       damage = VALUES(damage)
                     """,
-                    (season, division_num, player_id, season, division_num, player_id),
+                    (
+                        season,
+                        division_num,
+                        season,
+                        division_num,
+                        *player_id_list,
+                    ),
                 )
                 if snapshot_ts is not None:
                     await cur.execute(
-                        """
-                                            INSERT IGNORE INTO player_season_totals_prev (
-                                                season, division_num, player_id, team_id,
-                                                maps_played, rounds_played, kills, deaths, assists,
-                                                mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                                                utility_damage, enemies_flashed, flash_count, flash_successes,
-                                                utility_count, utility_successes, utility_enemies,
-                                                mk_2k, mk_3k, mk_4k, mk_5k,
-                                                clutch_kills, cl_1v1_attempts, cl_1v1_wins,
-                                                cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
-                                                adr, kr, kd, hs_pct, damage,
-                                                snapshot_ts
-                                            )
-                                            SELECT
-                                                %s AS season, %s AS division_num, %s AS player_id,
-                                                MAX(ps.team_id) AS team_id,
-                                                COUNT(DISTINCT ps.match_id) AS maps_played,
-                                                SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
-                                                SUM(ps.kills) AS kills,
-                                                SUM(ps.deaths) AS deaths,
-                                                SUM(ps.assists) AS assists,
-                                                SUM(ps.mvps) AS mvps,
-                                                SUM(ps.headshots) AS headshots,
-                                                SUM(ps.sniper_kills) AS sniper_kills,
-                                                SUM(ps.pistol_kills) AS pistol_kills,
-                                                SUM(ps.knife_kills) AS knife_kills,
-                                                SUM(ps.zeus_kills) AS zeus_kills,
-                                                SUM(ps.first_kills) AS first_kills,
-                                                SUM(ps.utility_damage) AS utility_damage,
-                                                SUM(ps.enemies_flashed) AS enemies_flashed,
-                                                SUM(ps.flash_count) AS flash_count,
-                                                SUM(ps.flash_successes) AS flash_successes,
-                                                SUM(ps.utility_count) AS utility_count,
-                                                SUM(ps.utility_successes) AS utility_successes,
-                                                SUM(ps.utility_enemies) AS utility_enemies,
-                                                SUM(ps.mk_2k) AS mk_2k,
-                                                SUM(ps.mk_3k) AS mk_3k,
-                                                SUM(ps.mk_4k) AS mk_4k,
-                                                SUM(ps.mk_5k) AS mk_5k,
-                                                SUM(ps.clutch_kills) AS clutch_kills,
-                                                SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
-                                                SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
-                                                SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
-                                                SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
-                                                SUM(ps.entry_count) AS entry_count,
-                                                SUM(ps.entry_wins) AS entry_wins,
-                                                COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
-                                                COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
-                                                COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                                                AVG(ps.hs_pct) AS hs_pct,
-                                                SUM(ps.damage) AS damage,
-                                                %s AS snapshot_ts
-                                            FROM player_stats ps
-                                            JOIN matches m ON m.match_id = ps.match_id
-                                            LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                                            WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
-                                            GROUP BY ps.player_id
+                        f"""
+                        INSERT IGNORE INTO player_season_totals_prev (
+                          season, division_num, player_id, team_id,
+                          maps_played, rounds_played, kills, deaths, assists,
+                          mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
+                          utility_damage, enemies_flashed, flash_count, flash_successes,
+                          utility_count, utility_successes, utility_enemies,
+                          mk_2k, mk_3k, mk_4k, mk_5k,
+                          clutch_kills, cl_1v1_attempts, cl_1v1_wins,
+                          cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
+                          adr, kr, kd, hs_pct, damage,
+                          snapshot_ts
+                        )
+                        SELECT
+                          season, division_num, player_id, team_id,
+                          maps_played, rounds_played, kills, deaths, assists,
+                          mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
+                          utility_damage, enemies_flashed, flash_count, flash_successes,
+                          utility_count, utility_successes, utility_enemies,
+                          mk_2k, mk_3k, mk_4k, mk_5k,
+                          clutch_kills, cl_1v1_attempts, cl_1v1_wins,
+                          cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
+                          adr, kr, kd, hs_pct, damage,
+                          %s AS snapshot_ts
+                        FROM player_season_totals
+                        WHERE season = %s
+                          AND division_num = %s
+                          AND player_id IN ({placeholders})
                         """,
-                        (season, division_num, player_id, snapshot_ts, season, division_num, player_id),
+                        (snapshot_ts, season, division_num, *player_id_list),
                     )
             await conn.commit()
 
     await _retry_on_deadlock(_op, label=label)
 
 
-async def upsert_team_map_season_totals_async(
+async def upsert_team_map_season_totals_bulk_async(
     season: int,
     division_num: int,
-    team_id: str,
+    team_ids: Sequence[str],
     *,
-    map_name: str | None = None,
+    map_names: Sequence[str] | None = None,
     snapshot_ts: int | None = None,
-    label: str = "team-map-season-totals",
+    label: str = "team-map-season-totals-bulk",
 ) -> None:
-    """Upsert aggregated map-level season totals for a team (inline)."""
+    """Upsert aggregated map totals for multiple teams in one query."""
+    team_id_list = _normalize_id_list(team_ids)
+    if not team_id_list:
+        return
+    map_name_list = _normalize_id_list(map_names or [])
+
+    placeholders = ", ".join(["%s"] * len(team_id_list))
+    map_filter_sql = ""
+    map_filter_params: tuple[Any, ...] = ()
+    if map_name_list:
+        map_placeholders = ", ".join(["%s"] * len(map_name_list))
+        map_filter_sql = f" AND mp.map_name IN ({map_placeholders})"
+        map_filter_params = tuple(map_name_list)
+
     async def _op():
         async with connection(label=label) as conn:
             async with conn.cursor() as cur:
@@ -1941,14 +2051,14 @@ async def upsert_team_map_season_totals_async(
                       kills, deaths, mvps, rd, kd, adr, damage, utility_damage
                     )
                     SELECT
-                      %s AS season, %s AS division_num, %s AS team_id, mp.map_name,
+                      %s AS season, %s AS division_num, ts.team_id, mp.map_name,
                       COUNT(*) AS played,
                       0 AS picks,
                       0 AS opp_picks,
                       SUM(CASE WHEN ts.win = 1 THEN 1 ELSE 0 END) AS wins,
                       COUNT(*) AS games,
                       0, 0, 0, 0, 0,
-                      SUM(COALESCE(ts.final_score,0)) AS kills, -- reuse field as rounds_for placeholder
+                      SUM(COALESCE(ts.final_score,0)) AS kills,
                       SUM(COALESCE(opp.final_score,0)) AS deaths,
                       SUM(COALESCE(ps.mvps,0)) AS mvps,
                       SUM(COALESCE(ts.final_score,0) - COALESCE(opp.final_score,0)) AS rd,
@@ -1967,11 +2077,13 @@ async def upsert_team_map_season_totals_async(
                       ON ps.match_id = ts.match_id
                      AND ps.round_index = ts.round_index
                      AND ps.team_id = ts.team_id
-                                    WHERE m.season = %s AND m.division_num = %s AND ts.team_id = %s
-                                        AND ts.is_forfeit_map = 0
-                                        AND mp.is_forfeit = 0
-                    { "AND mp.map_name = %s" if map_name else "" }
-                    GROUP BY mp.map_name
+                    WHERE m.season = %s
+                      AND m.division_num = %s
+                      AND ts.team_id IN ({placeholders})
+                      AND ts.is_forfeit_map = 0
+                      AND mp.is_forfeit = 0
+                      {map_filter_sql}
+                    GROUP BY ts.team_id, mp.map_name
                     ON DUPLICATE KEY UPDATE
                       played = VALUES(played),
                       wins = VALUES(wins),
@@ -1987,91 +2099,73 @@ async def upsert_team_map_season_totals_async(
                     (
                         season,
                         division_num,
-                        team_id,
                         season,
                         division_num,
-                        team_id,
-                        map_name,
-                    )
-                    if map_name
-                    else (season, division_num, team_id, season, division_num, team_id),
+                        *team_id_list,
+                        *map_filter_params,
+                    ),
                 )
                 if snapshot_ts is not None:
+                    snapshot_map_filter_sql = ""
+                    snapshot_map_filter_params: tuple[Any, ...] = ()
+                    if map_name_list:
+                        snapshot_map_placeholders = ", ".join(["%s"] * len(map_name_list))
+                        snapshot_map_filter_sql = f" AND map_name IN ({snapshot_map_placeholders})"
+                        snapshot_map_filter_params = tuple(map_name_list)
                     await cur.execute(
                         f"""
-                                            INSERT IGNORE INTO team_map_season_totals_prev (
-                                                season, division_num, team_id, map_name,
-                                                played, picks, opp_picks, wins, games,
-                                                ban1, ban2, opp_ban, total_own_ban, decov,
-                                                kills, deaths, mvps, rd, kd, adr, damage, utility_damage,
-                                                snapshot_ts
-                                            )
-                                            SELECT
-                                                %s AS season, %s AS division_num, %s AS team_id, mp.map_name,
-                                                COUNT(*) AS played,
-                                                0 AS picks,
-                                                0 AS opp_picks,
-                                                SUM(CASE WHEN ts.win = 1 THEN 1 ELSE 0 END) AS wins,
-                                                COUNT(*) AS games,
-                                                0, 0, 0, 0, 0,
-                                                SUM(COALESCE(ts.final_score,0)) AS kills,
-                                                SUM(COALESCE(opp.final_score,0)) AS deaths,
-                                                SUM(COALESCE(ps.mvps,0)) AS mvps,
-                                                SUM(COALESCE(ts.final_score,0) - COALESCE(opp.final_score,0)) AS rd,
-                                                COALESCE(SUM(COALESCE(ts.final_score,0)) / NULLIF(SUM(COALESCE(opp.final_score,0)),0), SUM(COALESCE(ts.final_score,0))) AS kd,
-                                                0 AS adr,
-                                                SUM(COALESCE(ps.damage,0)) AS damage,
-                                                SUM(COALESCE(ps.utility_damage,0)) AS utility_damage,
-                                                %s AS snapshot_ts
-                                            FROM team_stats ts
-                                            JOIN matches m ON m.match_id = ts.match_id
-                                            JOIN maps mp ON mp.match_id = ts.match_id AND mp.round_index = ts.round_index
-                                            LEFT JOIN team_stats opp
-                                                ON opp.match_id = ts.match_id
-                                             AND opp.team_id <> ts.team_id
-                                             AND opp.round_index = ts.round_index
-                                            LEFT JOIN player_stats ps
-                                                ON ps.match_id = ts.match_id
-                                             AND ps.round_index = ts.round_index
-                                             AND ps.team_id = ts.team_id
-                                            WHERE m.season = %s AND m.division_num = %s AND ts.team_id = %s
-                                                AND ts.is_forfeit_map = 0
-                                                AND mp.is_forfeit = 0
-                                            {"AND mp.map_name = %s" if map_name else ""}
-                                            GROUP BY mp.map_name
+                        INSERT IGNORE INTO team_map_season_totals_prev (
+                          season, division_num, team_id, map_name,
+                          played, picks, opp_picks, wins, games,
+                          ban1, ban2, opp_ban, total_own_ban, decov,
+                          kills, deaths, mvps, rd, kd, adr, damage, utility_damage,
+                          snapshot_ts
+                        )
+                        SELECT
+                          season, division_num, team_id, map_name,
+                          played, picks, opp_picks, wins, games,
+                          ban1, ban2, opp_ban, total_own_ban, decov,
+                          kills, deaths, mvps, rd, kd, adr, damage, utility_damage,
+                          %s AS snapshot_ts
+                        FROM team_map_season_totals
+                        WHERE season = %s
+                          AND division_num = %s
+                          AND team_id IN ({placeholders})
+                          {snapshot_map_filter_sql}
                         """,
                         (
-                            season,
-                            division_num,
-                            team_id,
                             snapshot_ts,
                             season,
                             division_num,
-                            team_id,
-                            map_name,
-                        )
-                        if map_name
-                        else (season, division_num, team_id, snapshot_ts, season, division_num, team_id),
+                            *team_id_list,
+                            *snapshot_map_filter_params,
+                        ),
                     )
             await conn.commit()
 
     await _retry_on_deadlock(_op, label=label)
 
 
-async def upsert_player_map_season_totals_async(
+async def upsert_player_map_season_totals_bulk_async(
     season: int,
     division_num: int,
-    player_id: str,
+    player_ids: Sequence[str],
     *,
     snapshot_ts: int | None = None,
-    label: str = "player-map-season-totals",
+    label: str = "player-map-season-totals-bulk",
 ) -> None:
-    """Upsert aggregated map-level season totals for a player."""
+    """Upsert aggregated map totals for multiple players in one query."""
+    player_id_list = _normalize_id_list(player_ids)
+    if not player_id_list:
+        return
+
+    placeholders = ", ".join(["%s"] * len(player_id_list))
+
     async def _op():
         async with connection(label=label) as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    """
+                    f"""
                     INSERT INTO player_map_season_totals (
                       season, division_num, player_id, team_id, map_name,
                       maps_played, rounds_played, kills, deaths, assists,
@@ -2084,7 +2178,7 @@ async def upsert_player_map_season_totals_async(
                       adr, kr, kd, hs_pct, mvps, damage
                     )
                     SELECT
-                      %s AS season, %s AS division_num, %s AS player_id,
+                      %s AS season, %s AS division_num, ps.player_id,
                       MAX(ps.team_id) AS team_id,
                       COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
                       COUNT(DISTINCT ps.match_id) AS maps_played,
@@ -2125,8 +2219,10 @@ async def upsert_player_map_season_totals_async(
                     FROM player_stats ps
                     JOIN matches m ON m.match_id = ps.match_id
                     LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                    WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
-                    GROUP BY COALESCE(mp.map_name, CONCAT('map_', ps.map_id))
+                    WHERE m.season = %s
+                      AND m.division_num = %s
+                      AND ps.player_id IN ({placeholders})
+                    GROUP BY ps.player_id, COALESCE(mp.map_name, CONCAT('map_', ps.map_id))
                     ON DUPLICATE KEY UPDATE
                       team_id = VALUES(team_id),
                       maps_played = VALUES(maps_played),
@@ -2165,70 +2261,46 @@ async def upsert_player_map_season_totals_async(
                       mvps = VALUES(mvps),
                       damage = VALUES(damage)
                     """,
-                    (season, division_num, player_id, season, division_num, player_id),
+                    (
+                        season,
+                        division_num,
+                        season,
+                        division_num,
+                        *player_id_list,
+                    ),
                 )
                 if snapshot_ts is not None:
                     await cur.execute(
-                        """
-                                            INSERT IGNORE INTO player_map_season_totals_prev (
-                                                season, division_num, player_id, team_id, map_name,
-                                                maps_played, rounds_played, kills, deaths, assists,
-                                                headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                                                utility_damage, enemies_flashed, flash_count, flash_successes,
-                                                utility_count, utility_successes, utility_enemies,
-                                                mk_2k, mk_3k, mk_4k, mk_5k,
-                                                entry_count, entry_wins, clutch_kills,
-                                                cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
-                                                adr, kr, kd, hs_pct, mvps, damage,
-                                                snapshot_ts
-                                            )
-                                            SELECT
-                                                %s AS season, %s AS division_num, %s AS player_id,
-                                                MAX(ps.team_id) AS team_id,
-                                                COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
-                                                COUNT(DISTINCT ps.match_id) AS maps_played,
-                                                SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
-                                                SUM(ps.kills) AS kills,
-                                                SUM(ps.deaths) AS deaths,
-                                                SUM(ps.assists) AS assists,
-                                                SUM(ps.headshots) AS headshots,
-                                                SUM(ps.sniper_kills) AS sniper_kills,
-                                                SUM(ps.pistol_kills) AS pistol_kills,
-                                                SUM(ps.knife_kills) AS knife_kills,
-                                                SUM(ps.zeus_kills) AS zeus_kills,
-                                                SUM(ps.first_kills) AS first_kills,
-                                                SUM(ps.utility_damage) AS utility_damage,
-                                                SUM(ps.enemies_flashed) AS enemies_flashed,
-                                                SUM(ps.flash_count) AS flash_count,
-                                                SUM(ps.flash_successes) AS flash_successes,
-                                                SUM(ps.utility_count) AS utility_count,
-                                                SUM(ps.utility_successes) AS utility_successes,
-                                                SUM(ps.utility_enemies) AS utility_enemies,
-                                                SUM(ps.mk_2k) AS mk_2k,
-                                                SUM(ps.mk_3k) AS mk_3k,
-                                                SUM(ps.mk_4k) AS mk_4k,
-                                                SUM(ps.mk_5k) AS mk_5k,
-                                                SUM(ps.entry_count) AS entry_count,
-                                                SUM(ps.entry_wins) AS entry_wins,
-                                                SUM(ps.clutch_kills) AS clutch_kills,
-                                                SUM(ps.cl_1v1_attempts) AS cl_1v1_attempts,
-                                                SUM(ps.cl_1v1_wins) AS cl_1v1_wins,
-                                                SUM(ps.cl_1v2_attempts) AS cl_1v2_attempts,
-                                                SUM(ps.cl_1v2_wins) AS cl_1v2_wins,
-                                                COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
-                                                COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
-                                                COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                                                AVG(ps.hs_pct) AS hs_pct,
-                                                SUM(ps.mvps) AS mvps,
-                                                SUM(ps.damage) AS damage,
-                                                %s AS snapshot_ts
-                                            FROM player_stats ps
-                                            JOIN matches m ON m.match_id = ps.match_id
-                                            LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-                                            WHERE m.season = %s AND m.division_num = %s AND ps.player_id = %s
-                                            GROUP BY COALESCE(mp.map_name, CONCAT('map_', ps.map_id))
+                        f"""
+                        INSERT IGNORE INTO player_map_season_totals_prev (
+                          season, division_num, player_id, team_id, map_name,
+                          maps_played, rounds_played, kills, deaths, assists,
+                          headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
+                          utility_damage, enemies_flashed, flash_count, flash_successes,
+                          utility_count, utility_successes, utility_enemies,
+                          mk_2k, mk_3k, mk_4k, mk_5k,
+                          entry_count, entry_wins, clutch_kills,
+                          cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
+                          adr, kr, kd, hs_pct, mvps, damage,
+                          snapshot_ts
+                        )
+                        SELECT
+                          season, division_num, player_id, team_id, map_name,
+                          maps_played, rounds_played, kills, deaths, assists,
+                          headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
+                          utility_damage, enemies_flashed, flash_count, flash_successes,
+                          utility_count, utility_successes, utility_enemies,
+                          mk_2k, mk_3k, mk_4k, mk_5k,
+                          entry_count, entry_wins, clutch_kills,
+                          cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
+                          adr, kr, kd, hs_pct, mvps, damage,
+                          %s AS snapshot_ts
+                        FROM player_map_season_totals
+                        WHERE season = %s
+                          AND division_num = %s
+                          AND player_id IN ({placeholders})
                         """,
-                        (season, division_num, player_id, snapshot_ts, season, division_num, player_id),
+                        (snapshot_ts, season, division_num, *player_id_list),
                     )
             await conn.commit()
 
@@ -2291,96 +2363,6 @@ async def upsert_team_stats_for_match_async(
     async with conn.cursor() as cur:
         await cur.executemany(_TEAM_STAT_UPSERT_SQL, rows)
     await conn.commit()
-
-
-async def replace_team_season_totals_async(
-    conn: asyncmy.Connection,
-    season: int,
-    division_num: int,
-    *,
-    snapshot_ts: int | None = None,
-) -> None:
-    async with conn.cursor(cursors.DictCursor) as cur:
-        await cur.execute(
-            """
-            SELECT DISTINCT team_id
-            FROM matches
-            WHERE season = %s AND division_num = %s
-              AND team_id IS NOT NULL
-            """.replace("team_id IS NOT NULL", "team1_id IS NOT NULL OR team2_id IS NOT NULL"),
-            (season, division_num),
-        )
-        team_ids = {row.get("team1_id") for row in await cur.fetchall() if row.get("team1_id")}
-        # Also include team2_id
-        await cur.execute(
-            "SELECT DISTINCT team2_id FROM matches WHERE season = %s AND division_num = %s AND team2_id IS NOT NULL",
-            (season, division_num),
-        )
-        team_ids.update({row[0] for row in await cur.fetchall() if row[0]})
-    for tid in team_ids:
-        await upsert_team_season_totals_async(season, division_num, tid, snapshot_ts=snapshot_ts)
-
-
-async def replace_player_season_totals_async(
-    conn: asyncmy.Connection,
-    season: int,
-    division_num: int,
-    *,
-    snapshot_ts: int | None = None,
-) -> None:
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            SELECT DISTINCT ps.player_id
-            FROM player_stats ps
-            JOIN matches m ON m.match_id = ps.match_id
-            WHERE m.season = %s AND m.division_num = %s
-            """,
-            (season, division_num),
-        )
-        player_ids = [row[0] for row in await cur.fetchall()]
-    for pid in player_ids:
-        await upsert_player_season_totals_async(season, division_num, pid, snapshot_ts=snapshot_ts)
-
-
-async def replace_team_map_season_totals_async(
-    conn: asyncmy.Connection,
-    season: int,
-    division_num: int,
-) -> None:
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            SELECT DISTINCT team_id
-            FROM team_stats ts
-            JOIN matches m ON m.match_id = ts.match_id
-            WHERE m.season = %s AND m.division_num = %s
-            """,
-            (season, division_num),
-        )
-        team_ids = [row[0] for row in await cur.fetchall()]
-    for tid in team_ids:
-        await upsert_team_map_season_totals_async(season, division_num, tid)
-
-
-async def replace_player_map_season_totals_async(
-    conn: asyncmy.Connection,
-    season: int,
-    division_num: int,
-) -> None:
-    async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            SELECT DISTINCT ps.player_id
-            FROM player_stats ps
-            JOIN matches m ON m.match_id = ps.match_id
-            WHERE m.season = %s AND m.division_num = %s
-            """,
-            (season, division_num),
-        )
-        player_ids = [row[0] for row in await cur.fetchall()]
-    for pid in player_ids:
-        await upsert_player_map_season_totals_async(season, division_num, pid)
 
 
 async def create_snapshot_ts_async(
@@ -2973,7 +2955,7 @@ async def get_division_stats_for_v3(conn: asyncmy.Connection, division_id: int) 
             "OR LOWER(COALESCE(m.status, '')) IN ('finished', 'completed', 'done'))"
         )
         await cur.execute(
-            f"""
+            """
             SELECT
                 (SELECT COUNT(DISTINCT tst.team_id)
                  FROM team_season_totals tst

@@ -611,11 +611,6 @@ async def fetch_team_map_stats_comprehensive(championship_id: str, team_id: str)
     if not champ_rows:
         raise NotFoundError(f"Championship {championship_id} not found")
     
-    champ = champ_rows[0]
-    season = champ["season"]
-    division_num = champ["division_num"]
-    is_playoffs = bool(champ.get("is_playoffs"))
-    
     # Base map stats derived from matches in this championship
     map_deltas = await compute_team_map_deltas_async(championship_id, team_id)
     if not map_deltas:

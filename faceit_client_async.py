@@ -17,11 +17,13 @@ from faceit_config import (
 
 LOGGER = logging.getLogger(__name__)
 
-MAX_HTTP_CONCURRENCY = 8
+MAX_HTTP_CONCURRENCY = 9
 HTTP_TIMEOUT = httpx.Timeout(20.0, connect=10.0, read=20.0, write=20.0)
 MAX_RETRIES = 5
 HOURLY_LIMIT = int(os.environ.get("FACEIT_HOURLY_LIMIT", "0"))
 HOURLY_WINDOW_SECONDS = 3600.0
+MAX_REQUESTS_PER_SECOND = max(1.0, float(os.environ.get("FACEIT_MAX_REQUESTS_PER_SECOND", "38")))
+MAX_RETRY_AFTER_SECONDS = max(1.0, float(os.environ.get("FACEIT_MAX_RETRY_AFTER_SECONDS", "45")))
 
 BASE_SLEEP = 0.10
 MAX_SLEEP = 1.50
@@ -81,6 +83,29 @@ class AdaptiveLimiter:
 
 
 _LIMITER = AdaptiveLimiter(BASE_SLEEP, MAX_SLEEP, BACKOFF_FACTOR, RECOVER_FACTOR, RECOVER_STEPS)
+
+
+class RequestPacer:
+    """Global request pacer shared by all concurrent workers."""
+
+    def __init__(self, requests_per_second: float) -> None:
+        self._interval = (1.0 / requests_per_second) if requests_per_second > 0 else 0.0
+        self._next_slot = 0.0
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> float:
+        if self._interval <= 0:
+            return 0.0
+        loop = asyncio.get_running_loop()
+        async with self._lock:
+            now = loop.time()
+            if self._next_slot <= now:
+                self._next_slot = now + self._interval
+                return 0.0
+            wait_seconds = self._next_slot - now
+            self._next_slot += self._interval
+        await asyncio.sleep(wait_seconds)
+        return wait_seconds
 
 
 class HourlyLimiter:
@@ -175,21 +200,27 @@ class HourlyLimiter:
 
 
 _HOURLY_LIMITER = HourlyLimiter(HOURLY_LIMIT, HOURLY_WINDOW_SECONDS)
+_REQUEST_PACER = RequestPacer(MAX_REQUESTS_PER_SECOND)
 
 _rate_limit_hits = 0
 _rate_limit_wait = 0.0
 _hourly_wait_events = 0
 _hourly_wait_seconds = 0.0
+_pacer_wait_events = 0
+_pacer_wait_seconds = 0.0
 _rate_lock = asyncio.Lock()
 
 
 async def reset_rate_limit_stats() -> None:
     global _rate_limit_hits, _rate_limit_wait, _hourly_wait_events, _hourly_wait_seconds
+    global _pacer_wait_events, _pacer_wait_seconds
     async with _rate_lock:
         _rate_limit_hits = 0
         _rate_limit_wait = 0.0
         _hourly_wait_events = 0
         _hourly_wait_seconds = 0.0
+        _pacer_wait_events = 0
+        _pacer_wait_seconds = 0.0
     await _HOURLY_LIMITER.reset()
 
 
@@ -210,6 +241,15 @@ async def _record_hourly_wait(wait_seconds: float) -> None:
         _hourly_wait_seconds += wait_seconds
 
 
+async def _record_pacer_wait(wait_seconds: float) -> None:
+    global _pacer_wait_events, _pacer_wait_seconds
+    if wait_seconds <= 0:
+        return
+    async with _rate_lock:
+        _pacer_wait_events += 1
+        _pacer_wait_seconds += wait_seconds
+
+
 async def get_rate_limit_stats() -> Dict[str, float]:
     async with _rate_lock:
         base_stats = {
@@ -217,6 +257,8 @@ async def get_rate_limit_stats() -> Dict[str, float]:
             "throttle_wait_seconds": float(_rate_limit_wait),
             "hourly_wait_events": float(_hourly_wait_events),
             "hourly_wait_seconds": float(_hourly_wait_seconds),
+            "pacer_wait_events": float(_pacer_wait_events),
+            "pacer_wait_seconds": float(_pacer_wait_seconds),
         }
     hourly_snapshot = await _HOURLY_LIMITER.snapshot()
     base_stats.update(hourly_snapshot)
@@ -301,6 +343,9 @@ async def _request_json(
         reraise=True,
     ):
         with attempt:
+            pacer_wait = await _REQUEST_PACER.acquire()
+            if pacer_wait:
+                await _record_pacer_wait(pacer_wait)
             await _LIMITER.sleep()
             hourly_wait = await _HOURLY_LIMITER.acquire()
             if hourly_wait:
@@ -328,6 +373,15 @@ async def _request_json(
 
                 if wait_seconds <= 0:
                     wait_seconds = await _LIMITER.delay_hint()
+                if wait_seconds > MAX_RETRY_AFTER_SECONDS:
+                    LOGGER.warning(
+                        "Capping Retry-After %.2fs to %.2fs for %s %s",
+                        wait_seconds,
+                        MAX_RETRY_AFTER_SECONDS,
+                        method,
+                        url,
+                    )
+                    wait_seconds = MAX_RETRY_AFTER_SECONDS
 
                 LOGGER.warning(
                     "Rate limit hit (attempt %d) for %s %s – waiting %.2fs before retry (Retry-After=%s)",

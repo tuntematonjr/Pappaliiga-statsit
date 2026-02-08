@@ -22,8 +22,10 @@ from db_async import close_pool, get_pool
 from .routers import championships, divisions, matches, players, stats, teams, seasons, debug
 from .routers import maps_catalog, image_proxy, season_view
 from .routers import share_preview
+from .routers import sync_events
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.cache_reheat import reheat_main_page
+from api.services.sync_event_queue import get_sync_event_queue
 
 # Track app start time for uptime calculation
 import time
@@ -36,6 +38,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
 
 # Load environment variables from .env file if present
 env_path = Path(__file__).parent.parent / ".env"
@@ -55,6 +58,8 @@ except ImportError:
         # best-effort only; if this fails the environment should be provided externally
         pass
 
+_sync_event_routes_enabled = _env_bool("ENABLE_SYNC_EVENT_ROUTES", default=False)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,10 +72,19 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(reheat_main_page())
     except Exception as exc:
         print(f"[warn] Cache reheat failed to start: {exc}")
+
+    if _sync_event_routes_enabled:
+        token = (os.getenv("SYNC_EVENT_TOKEN") or "").strip()
+        if token:
+            await get_sync_event_queue().start()
+        else:
+            logger.warning("ENABLE_SYNC_EVENT_ROUTES is true but SYNC_EVENT_TOKEN is missing; sync event routes disabled")
     
     yield
     
     # Shutdown: close pool
+    if _sync_event_routes_enabled and (os.getenv("SYNC_EVENT_TOKEN") or "").strip():
+        await get_sync_event_queue().stop()
     await close_pool()
     print("[info] Database pool closed")
 
@@ -115,6 +129,11 @@ app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 app.include_router(season_view.router, prefix="/api", tags=["season-view"])
 app.include_router(share_preview.router, tags=["share-preview"])
+if _sync_event_routes_enabled:
+    if (os.getenv("SYNC_EVENT_TOKEN") or "").strip():
+        app.include_router(sync_events.router, tags=["sync-events"])
+    else:
+        logger.warning("ENABLE_SYNC_EVENT_ROUTES is true but SYNC_EVENT_TOKEN is missing; sync events routes disabled")
 
 
 @app.get("/")

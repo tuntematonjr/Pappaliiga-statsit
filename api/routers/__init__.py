@@ -9,6 +9,7 @@ from . import (
     players,
     share_preview,
     season_view,
+    sync_events,
     stats,
     teams,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "players",
     "share_preview",
     "season_view",
+    "sync_events",
     "stats",
     "teams",
     "maps_catalog",

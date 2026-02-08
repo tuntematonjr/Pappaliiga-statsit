@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import logging
 import re
 import time
 from datetime import datetime, timedelta, timezone
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
@@ -28,7 +29,6 @@ from division_naming import build_division_name
 
 from db_async import (
     DEFAULT_TEAM_AVATAR,
-    clear_obsolete_maps_async,
     connection,
     delete_stats_for_match_async,
     fetch_all,
@@ -39,20 +39,22 @@ from db_async import (
     upsert_map_catalog_async,
     upsert_maps_bulk_async,
     upsert_match_async,
-    upsert_player_map_season_totals_async,
-    upsert_player_season_totals_async,
+    upsert_player_map_season_totals_bulk_async,
+    upsert_player_season_totals_bulk_async,
     upsert_player_stats_bulk_async,
     upsert_players_bulk_async,
     upsert_team_championships_bulk_async,
-    upsert_team_map_season_totals_async,
-    upsert_team_season_totals_async,
+    upsert_team_map_season_totals_bulk_async,
+    upsert_team_season_totals_bulk_async,
     upsert_team_stats_bulk_async,
     upsert_teams_bulk_async,
 )
 
 LOGGER = logging.getLogger(__name__)
 
-PENDING_REFRESH_INTERVAL_SECONDS = 15 * 60  # avoid re-fetching pending matches more than every 15 minutes
+PENDING_REFRESH_INTERVAL_SECONDS = 15 * 60  # base interval for pending match refresh
+PENDING_UNCHANGED_REFRESH_INTERVAL_SECONDS = 60 * 60  # when pending state/activity is unchanged
+PENDING_FORCE_REFRESH_INTERVAL_SECONDS = 6 * 60 * 60  # always refresh eventually as a safety net
 TEAM_REFRESH_INTERVAL_SECONDS = 24 * 60 * 60  # throttle team refresh to once per day
 
 __all__ = [
@@ -61,6 +63,67 @@ __all__ = [
     "sync_match_async",
     "update_single_match_async",
 ]
+
+_DIVISION_BY_CHAMPIONSHIP: Dict[str, Dict[str, Any]] = {
+    str(item.get("championship_id")): dict(item)
+    for item in faceit_config.DIVISIONS
+    if item.get("championship_id")
+}
+_DEFAULT_OVERRIDES_CACHE: Mapping[str, dict[str, List[dict[str, str]]]] | None = None
+
+
+def _get_division_by_championship_id(championship_id: str) -> Dict[str, Any] | None:
+    return _DIVISION_BY_CHAMPIONSHIP.get(str(championship_id))
+
+
+def _get_default_overrides() -> Mapping[str, dict[str, List[dict[str, str]]]]:
+    global _DEFAULT_OVERRIDES_CACHE
+    if _DEFAULT_OVERRIDES_CACHE is None:
+        _DEFAULT_OVERRIDES_CACHE = load_division_overrides()
+    return _DEFAULT_OVERRIDES_CACHE
+
+
+def _canonical_json_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(k): _canonical_json_value(v) for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))}
+    if isinstance(value, list):
+        canonical_items = [_canonical_json_value(item) for item in value]
+        return sorted(
+            canonical_items,
+            key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=True),
+        )
+    if isinstance(value, set):
+        return sorted(_canonical_json_value(item) for item in value)
+    return value
+
+
+def _compute_match_payload_hash(normalised: "NormalisedMatch") -> str:
+    match_row = normalised.match_row
+    payload = {
+        "match": {
+            "championship_id": match_row.get("championship_id"),
+            "best_of": match_row.get("best_of"),
+            "configured_at": match_row.get("configured_at"),
+            "started_at": match_row.get("started_at"),
+            "finished_at": match_row.get("finished_at"),
+            "scheduled_at": match_row.get("scheduled_at"),
+            "status": match_row.get("status"),
+            "team1_id": match_row.get("team1_id"),
+            "team2_id": match_row.get("team2_id"),
+            "winner_team_id": match_row.get("winner_team_id"),
+            "is_forfeit": match_row.get("is_forfeit"),
+            "ignored_due_ban": match_row.get("ignored_due_ban"),
+        },
+        "teams": normalised.team_rows,
+        "players": normalised.player_rows,
+        "maps": normalised.map_rows,
+        "map_votes": normalised.map_votes,
+        "player_stats": normalised.player_stats,
+        "team_stats": normalised.team_stats,
+    }
+    canonical = _canonical_json_value(payload)
+    encoded = json.dumps(canonical, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 @dataclass(slots=True)
@@ -104,6 +167,22 @@ def normalize_finished_at(value: Any) -> Optional[int]:
     if not ts or ts <= 0:
         return None
     return ts
+
+
+def _is_played_match_state(status: str, finished_at: Optional[int]) -> bool:
+    return bool(finished_at) or status in {"finished", "closed", "over", "completed", "cancelled"}
+
+
+def _match_list_activity_ts(item: Mapping[str, Any] | None) -> int:
+    if not item:
+        return 0
+    return max(
+        0,
+        safe_int(item.get("finished_at"), 0) or 0,
+        safe_int(item.get("started_at"), 0) or 0,
+        safe_int(item.get("scheduled_at"), 0) or 0,
+        safe_int(item.get("configured_at"), 0) or 0,
+    )
 
 
 def safe_float(value: Any, default: Optional[float] = 0.0) -> Optional[float]:
@@ -573,6 +652,8 @@ async def _validate_team_avatars(team_payloads: Sequence[Dict[str, Any]]) -> Lis
 async def _build_championship_team_payloads(
     championship_id: str,
     status_entries: Sequence[Dict[str, Any]],
+    *,
+    validate_avatars: bool = False,
 ) -> List[Dict[str, Any]]:
     status_lookup = {entry.get("team_id"): entry for entry in status_entries if entry.get("team_id")}
     team_payloads: List[Dict[str, Any]] = []
@@ -610,6 +691,8 @@ async def _build_championship_team_payloads(
         ]
 
     stale_payloads = await _filter_stale_team_payloads(team_payloads)
+    if not validate_avatars:
+        return stale_payloads
     return await _validate_team_avatars(stale_payloads)
 
 
@@ -801,6 +884,7 @@ async def sync_match_async(
     *,
     is_playoffs: bool,
     banned_lookup: Dict[str, Dict[str, Any]],
+    db_semaphore: asyncio.Semaphore | None = None,
     diagnostics: SyncDiagnostics | None = None,
 ) -> NormalisedMatch:
     overall_start = time.perf_counter()
@@ -856,209 +940,253 @@ async def sync_match_async(
         for row in normalised.map_rows
         if row.get("round_index") is not None
     }
+    normalised.match_row["payload_hash"] = _compute_match_payload_hash(normalised)
 
     persist_start = time.perf_counter()
+    match_status = str(normalised.match_row.get("status") or "").lower()
+    match_is_played = bool(normalised.match_row.get("finished_at")) or match_status in {
+        "finished",
+        "closed",
+        "over",
+        "completed",
+    }
 
-    match_championship_id = normalised.match_row.get("championship_id")
-    async with connection(label=f"match:{match_id}:champ-check") as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                "SELECT championship_id FROM championships WHERE championship_id = %s",
-                (match_championship_id,),
-            )
-            champ_exists = await cur.fetchone()
-
-        if not champ_exists:
-            LOGGER.warning(
-                "Championship %s MISSING for match %s! Looking for alternative championship with S%d D%d playoffs=%d",
-                match_championship_id,
-                match_id,
-                ctx.season,
-                ctx.division_num,
-                1 if ctx.is_playoffs else 0,
-            )
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    "SELECT championship_id FROM championships WHERE season = %s AND division_num = %s AND is_playoffs = %s LIMIT 1",
-                    (ctx.season, ctx.division_num, 1 if ctx.is_playoffs else 0),
-                )
-                alternative = await cur.fetchone()
-
-            if alternative:
-                alternative_id = alternative[0]
-                LOGGER.info("Found alternative championship %s - remapping match %s", alternative_id, match_id)
-                normalised.match_row["championship_id"] = alternative_id
-            else:
-                LOGGER.error(
-                    "No alternative championship found for S%d D%d playoffs=%d - match %s will fail FK constraint!",
-                    ctx.season,
-                    ctx.division_num,
-                    1 if ctx.is_playoffs else 0,
-                    match_id,
-                )
-
-    if normalised.team_rows:
-        await upsert_teams_bulk_async(
-            normalised.team_rows,
-            label=f"match:{match_id}:teams",
-        )
-        # Save historical team names for this championship
-        team_champ_rows = [
-            {
-                "team_id": row["team_id"],
-                "championship_id": normalised.match_row["championship_id"],
-                "team_name": row.get("name"),
-            }
-            for row in normalised.team_rows
-        ]
-        await upsert_team_championships_bulk_async(
-            team_champ_rows,
-            label=f"match:{match_id}:team_champs",
-        )
-    if normalised.player_rows:
-        await upsert_players_bulk_async(
-            normalised.player_rows,
-            label=f"match:{match_id}:players",
-        )
-
-    async with connection(label=f"match:{match_id}:match") as conn:
-        await upsert_match_async(conn, normalised.match_row)
-
-    if normalised.map_rows:
-        await upsert_maps_bulk_async(
-            normalised.match_row["match_id"],
-            ctx.season,
-            ctx.division_num,
-            normalised.map_rows,
-            label=f"match:{match_id}:maps",
-        )
-
-    snapshot_ts: int | None = None
-    async with connection(label=f"match:{match_id}:lookup") as conn:
-        map_lookup = await get_map_id_lookup_async(conn, match_id)
-        if normalised.match_row.get("finished_at"):
-            snapshot_ts = await create_snapshot_ts_async(
-                conn,
-                ctx.season,
-                ctx.division_num,
-                match_id=match_id,
-                label=f"match:{match_id}:snapshot",
-            )
-
-    await replace_map_votes_async(
-        match_id,
-        ctx.season,
-        ctx.division_num,
-        normalised.map_votes,
-        label=f"match:{match_id}:votes",
-    )
-
-    await delete_stats_for_match_async(
-        match_id,
-        label=f"match:{match_id}:delete-stats",
-    )
-
-    await upsert_player_stats_bulk_async(
-        ctx.season,
-        ctx.division_num,
-        match_id,
-        map_lookup,
-        normalised.player_stats,
-        forfeit_lookup,
-        label=f"match:{match_id}:player-stats",
-    )
-
-    await upsert_team_stats_bulk_async(
-        ctx.season,
-        ctx.division_num,
-        match_id,
-        map_lookup,
-        normalised.team_stats,
-        forfeit_lookup,
-        label=f"match:{match_id}:team-stats",
-    )
-
-    await clear_obsolete_maps_async(
-        match_id,
-        [row["round_index"] for row in normalised.map_rows],
-        label=f"match:{match_id}:clear-maps",
-    )
-
-    affected_team_ids: Set[str] = {str(tid) for tid in normalised.affected_teams if tid}
-    team_map_updates: dict[str, set[str]] = defaultdict(set)
-    if affected_team_ids:
-        for map_row in normalised.map_rows:
-            raw_map = (map_row.get("map_name") or "").strip()
-            if raw_map:
-                map_key = raw_map
-            else:
-                round_index = map_row.get("round_index")
-                map_key = f"map_{round_index}" if round_index is not None else "unknown"
-            for tid in affected_team_ids:
-                team_map_updates[tid].add(map_key)
-
-    for team_id in affected_team_ids:
-        await upsert_team_season_totals_async(
-            ctx.season,
-            ctx.division_num,
-            team_id,
-            snapshot_ts=snapshot_ts,
-            label=f"match:{match_id}:team-season:{team_id}",
-        )
-        for map_key in team_map_updates.get(team_id, ()):
-            await upsert_team_map_season_totals_async(
-                ctx.season,
-                ctx.division_num,
-                team_id,
-                map_name=map_key,
-                snapshot_ts=snapshot_ts,
-                label=f"match:{match_id}:team-map:{team_id}:{map_key}",
-            )
-
-    for player_id in normalised.affected_players:
-        await upsert_player_season_totals_async(
-            ctx.season,
-            ctx.division_num,
-            player_id,
-            snapshot_ts=snapshot_ts,
-            label=f"match:{match_id}:player-season:{player_id}",
-        )
-        await upsert_player_map_season_totals_async(
-            ctx.season,
-            ctx.division_num,
-            player_id,
-            snapshot_ts=snapshot_ts,
-            label=f"match:{match_id}:player-map:{player_id}",
-        )
-
+    map_catalog_rows: list[dict[str, str]] = []
     try:
         voting = (details or {}).get("voting") or {}
         map_section = voting.get("map") if isinstance(voting, dict) else None
         entities = map_section.get("entities") if isinstance(map_section, dict) else None
         if isinstance(entities, list):
-            async with connection(label=f"match:{match_id}:map-assets") as conn:
-                for ent in entities:
-                    if not isinstance(ent, dict):
-                        continue
-                    map_id = ent.get("guid") or ent.get("game_map_id") or ent.get("class_name")
-                    pretty = ent.get("name") or map_id
-                    image_sm = ent.get("image_sm") or ent.get("image") or ""
-                    image_lg = ent.get("image_lg") or image_sm or ""
-                    if map_id:
-                        try:
-                            await upsert_map_catalog_async(
-                                conn,
-                                {
-                                    "map_id": map_id,
-                                    "pretty_name": pretty,
-                                    "image_sm": image_sm,
-                                    "image_lg": image_lg,
-                                },
-                            )
-                        except Exception:
-                            LOGGER.debug("Failed to upsert maps_catalog entry for %s", map_id, exc_info=True)
+            seen_map_ids: set[str] = set()
+            for ent in entities:
+                if not isinstance(ent, dict):
+                    continue
+                map_id = ent.get("guid") or ent.get("game_map_id") or ent.get("class_name")
+                if not map_id:
+                    continue
+                map_id = str(map_id).strip()
+                if not map_id or map_id in seen_map_ids:
+                    continue
+                seen_map_ids.add(map_id)
+                pretty = ent.get("name") or map_id
+                image_sm = ent.get("image_sm") or ent.get("image") or ""
+                image_lg = ent.get("image_lg") or image_sm or ""
+                map_catalog_rows.append(
+                    {
+                        "map_id": map_id,
+                        "pretty_name": str(pretty or map_id),
+                        "image_sm": str(image_sm or ""),
+                        "image_lg": str(image_lg or ""),
+                    }
+                )
     except Exception:
-        LOGGER.debug("Failed to process Faceit map images for match %s", match_id, exc_info=True)
+        LOGGER.debug("Failed to parse Faceit map images for match %s", match_id, exc_info=True)
+
+    if db_semaphore is not None:
+        await db_semaphore.acquire()
+    try:
+        match_championship_id = normalised.match_row.get("championship_id")
+        payload_hash = normalised.match_row.get("payload_hash")
+        existing_payload_hash: str | None = None
+        snapshot_ts: int | None = None
+        map_lookup: dict[int, int] = {}
+        skip_heavy_persist = False
+
+        async with connection(label=f"match:{match_id}:core") as core_conn:
+            async with core_conn.cursor() as cur:
+                await cur.execute("SELECT payload_hash FROM matches WHERE match_id = %s", (match_id,))
+                existing_row = await cur.fetchone()
+                if existing_row:
+                    existing_payload_hash = str(existing_row[0] or "").strip() or None
+
+                await cur.execute(
+                    "SELECT championship_id FROM championships WHERE championship_id = %s",
+                    (match_championship_id,),
+                )
+                champ_exists = await cur.fetchone()
+
+            if not champ_exists:
+                LOGGER.warning(
+                    "Championship %s MISSING for match %s! Looking for alternative championship with S%d D%d playoffs=%d",
+                    match_championship_id,
+                    match_id,
+                    ctx.season,
+                    ctx.division_num,
+                    1 if ctx.is_playoffs else 0,
+                )
+                async with core_conn.cursor() as cur:
+                    await cur.execute(
+                        "SELECT championship_id FROM championships WHERE season = %s AND division_num = %s AND is_playoffs = %s LIMIT 1",
+                        (ctx.season, ctx.division_num, 1 if ctx.is_playoffs else 0),
+                    )
+                    alternative = await cur.fetchone()
+
+                if alternative:
+                    alternative_id = alternative[0]
+                    LOGGER.info("Found alternative championship %s - remapping match %s", alternative_id, match_id)
+                    normalised.match_row["championship_id"] = alternative_id
+                    normalised.match_row["payload_hash"] = _compute_match_payload_hash(normalised)
+                    payload_hash = normalised.match_row.get("payload_hash")
+                else:
+                    LOGGER.error(
+                        "No alternative championship found for S%d D%d playoffs=%d - match %s will fail FK constraint!",
+                        ctx.season,
+                        ctx.division_num,
+                        1 if ctx.is_playoffs else 0,
+                        match_id,
+                    )
+
+            if normalised.team_rows:
+                await upsert_teams_bulk_async(
+                    normalised.team_rows,
+                    conn=core_conn,
+                    label=f"match:{match_id}:teams",
+                )
+                team_champ_rows = [
+                    {
+                        "team_id": row["team_id"],
+                        "championship_id": normalised.match_row["championship_id"],
+                        "team_name": row.get("name"),
+                    }
+                    for row in normalised.team_rows
+                ]
+                await upsert_team_championships_bulk_async(
+                    team_champ_rows,
+                    conn=core_conn,
+                    label=f"match:{match_id}:team_champs",
+                )
+            if normalised.player_rows:
+                await upsert_players_bulk_async(
+                    normalised.player_rows,
+                    conn=core_conn,
+                    label=f"match:{match_id}:players",
+                )
+            if map_catalog_rows:
+                for row in map_catalog_rows:
+                    try:
+                        await upsert_map_catalog_async(core_conn, row, commit=False)
+                    except Exception:
+                        LOGGER.debug("Failed to upsert maps_catalog entry for %s", row.get("map_id"), exc_info=True)
+
+            await upsert_match_async(core_conn, normalised.match_row, commit=False)
+
+            if match_is_played and payload_hash and existing_payload_hash == payload_hash:
+                skip_heavy_persist = True
+            else:
+                if normalised.map_rows:
+                    await upsert_maps_bulk_async(
+                        normalised.match_row["match_id"],
+                        ctx.season,
+                        ctx.division_num,
+                        normalised.map_rows,
+                        conn=core_conn,
+                        label=f"match:{match_id}:maps",
+                    )
+
+                map_lookup = await get_map_id_lookup_async(core_conn, match_id)
+                if normalised.match_row.get("finished_at"):
+                    snapshot_ts = await create_snapshot_ts_async(
+                        core_conn,
+                        ctx.season,
+                        ctx.division_num,
+                        match_id=match_id,
+                        label=f"match:{match_id}:snapshot",
+                    )
+
+        if not skip_heavy_persist:
+            async with connection(label=f"match:{match_id}:stats") as stats_conn:
+                await replace_map_votes_async(
+                    match_id,
+                    ctx.season,
+                    ctx.division_num,
+                    normalised.map_votes,
+                    conn=stats_conn,
+                    label=f"match:{match_id}:votes",
+                )
+
+                await delete_stats_for_match_async(
+                    match_id,
+                    conn=stats_conn,
+                    label=f"match:{match_id}:delete-stats",
+                )
+
+                await upsert_player_stats_bulk_async(
+                    ctx.season,
+                    ctx.division_num,
+                    match_id,
+                    map_lookup,
+                    normalised.player_stats,
+                    forfeit_lookup,
+                    conn=stats_conn,
+                    label=f"match:{match_id}:player-stats",
+                )
+
+                await upsert_team_stats_bulk_async(
+                    ctx.season,
+                    ctx.division_num,
+                    match_id,
+                    map_lookup,
+                    normalised.team_stats,
+                    forfeit_lookup,
+                    conn=stats_conn,
+                    label=f"match:{match_id}:team-stats",
+                )
+
+            affected_team_ids = sorted({str(tid) for tid in normalised.affected_teams if tid})
+            affected_player_ids = sorted({str(pid) for pid in normalised.affected_players if pid})
+            touched_map_names = sorted(
+                {
+                    str(row.get("map_name")).strip()
+                    for row in normalised.map_rows
+                    if row.get("map_name")
+                    and str(row.get("map_name")).strip()
+                    and str(row.get("map_name")).strip().lower() != "forfeit"
+                }
+            )
+
+            if match_is_played:
+                if affected_team_ids:
+                    await upsert_team_season_totals_bulk_async(
+                        ctx.season,
+                        ctx.division_num,
+                        affected_team_ids,
+                        snapshot_ts=snapshot_ts,
+                        label=f"match:{match_id}:team-season-bulk",
+                    )
+                    await upsert_team_map_season_totals_bulk_async(
+                        ctx.season,
+                        ctx.division_num,
+                        affected_team_ids,
+                        map_names=touched_map_names,
+                        snapshot_ts=snapshot_ts,
+                        label=f"match:{match_id}:team-map-bulk",
+                    )
+                if affected_player_ids:
+                    await upsert_player_season_totals_bulk_async(
+                        ctx.season,
+                        ctx.division_num,
+                        affected_player_ids,
+                        snapshot_ts=snapshot_ts,
+                        label=f"match:{match_id}:player-season-bulk",
+                    )
+                    await upsert_player_map_season_totals_bulk_async(
+                        ctx.season,
+                        ctx.division_num,
+                        affected_player_ids,
+                        snapshot_ts=snapshot_ts,
+                        label=f"match:{match_id}:player-map-bulk",
+                    )
+            else:
+                LOGGER.debug(
+                    "Skipping aggregate totals refresh for pending match %s (status=%s)",
+                    match_id,
+                    match_status or "unknown",
+                )
+        else:
+            LOGGER.debug("Skipping stats/votes rewrite for match %s; payload hash unchanged", match_id)
+    finally:
+        if db_semaphore is not None:
+            db_semaphore.release()
 
     if diagnostics:
         diagnostics.mark_progress("match", match_id)
@@ -1098,7 +1226,7 @@ async def sync_match_async(
         },
         prefix=f"match {match_id}",
     )
-    LOGGER.info("Match %s synced in %s", match_id, format_hms(total_elapsed))
+    LOGGER.debug("Match %s synced in %s", match_id, format_hms(total_elapsed))
     return normalised
 
 
@@ -1110,11 +1238,13 @@ async def sync_championship_async(
     overrides: Mapping[str, dict[str, List[dict[str, str]]]] | None = None,
     end_on_error: bool = False,
     db_semaphore: asyncio.Semaphore | None = None,
+    max_match_concurrency: int = 1,
+    validate_avatars: bool = False,
     diagnostics: SyncDiagnostics | None = None,
 ) -> ChampionshipSyncResult:
     start_time = time.perf_counter()
     force_all_matches = full
-    division_info = division or next((d for d in faceit_config.DIVISIONS if d["championship_id"] == championship_id), None)
+    division_info = division or _get_division_by_championship_id(championship_id)
     if not division_info:
         raise ValueError(f"Championship {championship_id} not found in DIVISIONS")
 
@@ -1132,10 +1262,14 @@ async def sync_championship_async(
     slug = division_info.get("slug") or f"div{division_num}-s{season}"
     is_playoffs = bool(division_info.get("is_playoffs"))
 
-    override_source = overrides if overrides is not None else load_division_overrides()
+    override_source = overrides if overrides is not None else _get_default_overrides()
     status_entries = combined_status_teams(championship_id, override_source)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
-    team_payloads = await _build_championship_team_payloads(championship_id, status_entries)
+    team_payloads = await _build_championship_team_payloads(
+        championship_id,
+        status_entries,
+        validate_avatars=validate_avatars,
+    )
 
     # Find parent championship if this is a playoff division
     parent_championship_id = await find_parent_championship_id(slug, season, division_num, is_playoffs)
@@ -1228,7 +1362,12 @@ async def sync_championship_async(
                 label=f"champ:{championship_id}:matchlist-team-champs",
             )
     
-    match_ids = [item.get("match_id") for item in filtered_matches]
+    match_summaries = {
+        str(item.get("match_id")): item
+        for item in filtered_matches
+        if item.get("match_id")
+    }
+    match_ids = list(match_summaries.keys())
     total_matches = len(match_ids)
     if len(matches) > len(filtered_matches):
         LOGGER.info("Filtered out %d matches with 'bye' teams (from %d total)",
@@ -1236,21 +1375,24 @@ async def sync_championship_async(
 
     existing_rows = await fetch_all(
         """
-        SELECT match_id, finished_at, status, last_seen_at
+        SELECT match_id, finished_at, status, last_seen_at, activity_ts
         FROM matches
         WHERE championship_id = %s
         """,
         (championship_id,),
     )
     existing_lookup = {str(row["match_id"]): row for row in existing_rows if row.get("match_id")}
-    LOGGER.info("Found %d existing matches in database", len(existing_lookup))
+    LOGGER.debug("Found %d existing matches in database", len(existing_lookup))
     if existing_lookup:
-        # Log first few for debugging
         sample_keys = list(existing_lookup.keys())[:3]
         for key in sample_keys:
             row = existing_lookup[key]
-            LOGGER.info("Sample existing match: %s, finished_at=%s, status='%s'", 
-                       key, row.get("finished_at"), row.get("status"))
+            LOGGER.debug(
+                "Sample existing match: %s, finished_at=%s, status='%s'",
+                key,
+                row.get("finished_at"),
+                row.get("status"),
+            )
 
     synced: List[str] = []
     skipped_matches = 0
@@ -1262,72 +1404,130 @@ async def sync_championship_async(
         force_all_matches,
         len(existing_lookup),
     )
-    
+
+    matches_to_sync: List[str] = []
     process_start_time = time.perf_counter()
+    now_ts = time.time()
     for match_id in match_ids:
         if not match_id:
             continue
-        LOGGER.info("Processing match %s", match_id)
+        LOGGER.debug("Evaluating match %s", match_id)
         if not force_all_matches:
             existing = existing_lookup.get(str(match_id))
             if existing:
-                existing_finished = existing.get("finished_at")
+                existing_finished = normalize_finished_at(existing.get("finished_at"))
                 existing_status = str(existing.get("status") or "").lower()
-                LOGGER.info("Match %s: existing_finished=%s, existing_status='%s'", 
-                           match_id, existing_finished, existing_status)
+                existing_activity = safe_int(existing.get("activity_ts"), 0) or 0
+                summary = match_summaries.get(str(match_id), {})
+                summary_status = str(summary.get("status") or "").lower()
+                summary_finished = normalize_finished_at(summary.get("finished_at"))
+                summary_activity = _match_list_activity_ts(summary)
+                LOGGER.debug(
+                    "Match %s: existing_finished=%s, existing_status='%s', existing_activity=%s, summary_status='%s', summary_activity=%s",
+                    match_id,
+                    existing_finished,
+                    existing_status,
+                    existing_activity,
+                    summary_status,
+                    summary_activity,
+                )
                 
                 # Only skip if match is fully played/finished
-                if existing_finished or existing_status in {"finished", "closed", "over", "completed", "cancelled"}:
-                    LOGGER.info("Skipping already played match %s (finished_at=%s, status=%s)", 
-                               match_id, existing_finished, existing_status)
+                if _is_played_match_state(existing_status, existing_finished):
+                    LOGGER.debug(
+                        "Skipping already played match %s (finished_at=%s, status=%s)",
+                        match_id,
+                        existing_finished,
+                        existing_status,
+                    )
                     skipped_matches += 1
                     continue
                 else:
                     last_seen_at = safe_int(existing.get("last_seen_at"))
                     if last_seen_at:
-                        age_seconds = time.time() - last_seen_at
-                        if age_seconds < PENDING_REFRESH_INTERVAL_SECONDS:
+                        age_seconds = now_ts - last_seen_at
+                        summary_says_played = _is_played_match_state(summary_status, summary_finished)
+                        pending_unchanged = (
+                            not summary_says_played
+                            and summary_status == existing_status
+                            and summary_activity > 0
+                            and existing_activity > 0
+                            and summary_activity <= existing_activity
+                        )
+                        refresh_interval = (
+                            PENDING_UNCHANGED_REFRESH_INTERVAL_SECONDS
+                            if pending_unchanged
+                            else PENDING_REFRESH_INTERVAL_SECONDS
+                        )
+                        if age_seconds < refresh_interval and age_seconds < PENDING_FORCE_REFRESH_INTERVAL_SECONDS:
                             deferred_pending += 1
                             pending_matches += 1
-                            LOGGER.info(
-                                "Deferring refresh for pending match %s; last seen %s ago (< %s)",
+                            LOGGER.debug(
+                                "Deferring refresh for pending match %s; last seen %s ago (< %s, unchanged=%s)",
                                 match_id,
                                 format_hms(age_seconds),
-                                format_hms(PENDING_REFRESH_INTERVAL_SECONDS),
+                                format_hms(refresh_interval),
+                                pending_unchanged,
                             )
                             continue
 
-                    LOGGER.info("Match %s exists but not finished - will update basic info only", match_id)
+                    LOGGER.debug("Match %s exists but not finished - scheduling refresh", match_id)
                     pending_matches += 1
-            else:
-                LOGGER.info("Match %s: not found in existing_lookup, will sync", match_id)
-        try:
-            if db_semaphore:
-                async with db_semaphore:
-                    await sync_match_async(
-                        championship_id,
-                        season,
-                        division_num,
-                        match_id,
-                        is_playoffs=is_playoffs,
-                        banned_lookup=banned_lookup,
-                        diagnostics=diagnostics,
-                    )
-            else:
-                await sync_match_async(
-                    championship_id,
-                    season,
-                    division_num,
-                    match_id,
-                    is_playoffs=is_playoffs,
-                    banned_lookup=banned_lookup,
-                    diagnostics=diagnostics,
-                )
-            synced.append(match_id)
-        except Exception as exc:  # pragma: no cover - logged for visibility
-            LOGGER.exception("Failed to sync match %s: %s", match_id, exc)
-            if end_on_error:
-                raise
+        matches_to_sync.append(str(match_id))
+
+    match_concurrency = max(1, int(max_match_concurrency))
+    match_sem = asyncio.Semaphore(match_concurrency)
+
+    async def _sync_one(match_id: str) -> str:
+        async with match_sem:
+            await sync_match_async(
+                championship_id,
+                season,
+                division_num,
+                match_id,
+                is_playoffs=is_playoffs,
+                banned_lookup=banned_lookup,
+                db_semaphore=db_semaphore,
+                diagnostics=diagnostics,
+            )
+            return match_id
+
+    if matches_to_sync:
+        worker_count = min(match_concurrency, len(matches_to_sync))
+        next_index = 0
+        first_exc: Exception | None = None
+        index_lock = asyncio.Lock()
+
+        async def _next_match_id() -> str | None:
+            nonlocal next_index
+            async with index_lock:
+                if next_index >= len(matches_to_sync):
+                    return None
+                match_id = matches_to_sync[next_index]
+                next_index += 1
+                return match_id
+
+        async def _worker() -> None:
+            nonlocal first_exc
+            while True:
+                if end_on_error and first_exc is not None:
+                    return
+                next_match = await _next_match_id()
+                if not next_match:
+                    return
+                try:
+                    synced_id = await _sync_one(next_match)
+                    synced.append(synced_id)
+                except Exception as exc:
+                    if end_on_error:
+                        if first_exc is None:
+                            first_exc = exc
+                        return
+                    LOGGER.exception("Failed to sync match %s: %s", next_match, exc)
+
+        await asyncio.gather(*(asyncio.create_task(_worker()) for _ in range(worker_count)))
+        if first_exc is not None:
+            raise first_exc
     
     process_elapsed = time.perf_counter() - process_start_time
     total_elapsed = time.perf_counter() - start_time
@@ -1386,8 +1586,14 @@ async def sync_championship_async(
     )
 
 
-async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics | None = None) -> Optional[str]:
-    division = next((d for d in faceit_config.DIVISIONS if d.get("championship_id") == match_id), None)
+async def update_single_match_async(
+    match_id: str,
+    *,
+    overrides: Mapping[str, dict[str, List[dict[str, str]]]] | None = None,
+    validate_avatars: bool = False,
+    diagnostics: SyncDiagnostics | None = None,
+) -> Optional[str]:
+    division = _get_division_by_championship_id(match_id)
     if division:
         raise ValueError("update_single_match_async expects a match_id, not a championship_id")
 
@@ -1414,7 +1620,7 @@ async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics 
     if not championship_id:
         raise RuntimeError(f"Match {match_id} lacks competition id")
 
-    division = next((d for d in faceit_config.DIVISIONS if d["championship_id"] == championship_id), None)
+    division = _get_division_by_championship_id(str(championship_id))
     if not division:
         raise RuntimeError(f"Championship {championship_id} not configured")
 
@@ -1423,10 +1629,14 @@ async def update_single_match_async(match_id: str, diagnostics: SyncDiagnostics 
     slug = division.get("slug") or f"div{division_num}-s{season}"
     is_playoffs = bool(division.get("is_playoffs"))
 
-    overrides = load_division_overrides()
-    status_entries = combined_status_teams(championship_id, overrides)
+    override_source = overrides if overrides is not None else _get_default_overrides()
+    status_entries = combined_status_teams(championship_id, override_source)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
-    team_payloads = await _build_championship_team_payloads(championship_id, status_entries)
+    team_payloads = await _build_championship_team_payloads(
+        championship_id,
+        status_entries,
+        validate_avatars=validate_avatars,
+    )
 
     # Find parent championship if this is a playoff division
     parent_championship_id = await find_parent_championship_id(slug, season, division_num, is_playoffs)
