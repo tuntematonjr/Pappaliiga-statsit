@@ -43,10 +43,10 @@ window.MapStatsTable = {
                 { key: 'kr', label: 'K/R', sortable: true, numeric: true, align: 'right', decimals: 2, width: '78px' },
                 { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, align: 'right', decimals: 2, width: '94px' },
                 { key: 'enemy_flash', label: 'Enemy/Flash', sortable: true, numeric: true, align: 'right', decimals: 2, width: '108px' },
-                { key: 'k2', label: '2K', sortable: true, numeric: true, align: 'right', width: '68px' },
-                { key: 'k3', label: '3K', sortable: true, numeric: true, align: 'right', width: '68px' },
-                { key: 'k4', label: '4K', sortable: true, numeric: true, align: 'right', width: '68px' },
-                { key: 'ace', label: 'Ace', sortable: true, numeric: true, align: 'right', width: '68px' },
+                { key: 'mk_2k', label: '2K', sortable: true, numeric: true, align: 'right', width: '68px' },
+                { key: 'mk_3k', label: '3K', sortable: true, numeric: true, align: 'right', width: '68px' },
+                { key: 'mk_4k', label: '4K', sortable: true, numeric: true, align: 'right', width: '68px' },
+                { key: 'mk_5k', label: '5K', sortable: true, numeric: true, align: 'right', width: '68px' },
                 { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '104px' },
                 { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '104px' }
             ],
@@ -89,10 +89,10 @@ window.MapStatsTable = {
                 const enemyFlash = Number(curr.enemy_flash ?? curr.enemyFlash ?? 0);
                 const sniperKills = Number(curr.sniper_kills ?? 0);
                 const assists = Number(curr.assists ?? 0);
-                const k2 = Number(curr.k2 ?? curr.two_k ?? 0);
-                const k3 = Number(curr.k3 ?? curr.three_k ?? 0);
-                const k4 = Number(curr.k4 ?? curr.four_k ?? 0);
-                const ace = Number(curr.ace ?? curr.five_k ?? 0);
+                const mk2k = Number(curr.mk_2k ?? 0);
+                const mk3k = Number(curr.mk_3k ?? 0);
+                const mk4k = Number(curr.mk_4k ?? 0);
+                const mk5k = Number(curr.mk_5k ?? 0);
                 const pistolKills = Number(curr.pistol_kills ?? 0);
                 const name = entry.pretty_name || curr.pretty_name || entry.map_name || curr.name || 'Kartta';
                 const mapId = entry.map_name || curr.map_name || entry.mapId || name;
@@ -113,10 +113,10 @@ window.MapStatsTable = {
                     enemy_flash: enemyFlash,
                     sniper_kills: sniperKills,
                     assists,
-                    k2,
-                    k3,
-                    k4,
-                    ace,
+                    mk_2k: mk2k,
+                    mk_3k: mk3k,
+                    mk_4k: mk4k,
+                    mk_5k: mk5k,
                     pistol_kills: pistolKills
                 };
             });

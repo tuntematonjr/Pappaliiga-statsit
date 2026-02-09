@@ -49,6 +49,40 @@
         return String(rawName).replace(/\s+S\d+$/i, '').trim();
     }
 
+    function formatSeasonLabel(value) {
+        if (value === null || value === undefined) return '';
+        const text = String(value).trim();
+        if (!text) return '';
+        if (/^kausi\s+/i.test(text)) return text;
+        if (/^s\d+/i.test(text)) return text.toUpperCase();
+        return `Kausi ${text}`;
+    }
+
+    function normalizeDivisionName({ name, divisionNum }) {
+        const rawName = cleanDivisionName(name);
+        if (rawName && !isLikelyId(rawName)) return rawName;
+        const numericDivision = toNumber(divisionNum, null);
+        if (numericDivision === 0) return 'Mestaruussarja';
+        if (numericDivision != null) return `${numericDivision} Divisioona`;
+        return 'Divisioona';
+    }
+
+    function buildDivisionBreadcrumbMeta(input = {}) {
+        const normalizedName = normalizeDivisionName({
+            name: input.name,
+            divisionNum: input.divisionNum
+        });
+        const seasonLabel = formatSeasonLabel(input.season);
+        let label = seasonLabel ? `${normalizedName} (${seasonLabel})` : normalizedName;
+        if (input.isPlayoffs && !/playoffs?/i.test(label)) {
+            label = `${label} (Playoffs)`;
+        }
+        return {
+            name: normalizedName,
+            label
+        };
+    }
+
     function isLikelyId(value) {
         if (value === null || value === undefined) return false;
         const text = String(value).trim();
@@ -212,7 +246,7 @@
                 playoffs: normalizedPlayoffs,
                 bestPlayer: bestPlayer ? {
                     name: bestPlayer.name,
-                    rating: toNumber(bestPlayer.rating, 0)
+                    kd: toNumber(bestPlayer.kd, 0)
                 } : null,
                 mvpTeam: mvpTeam ? String(mvpTeam) : null,
                 winners: winners,
@@ -227,6 +261,9 @@
         normalizeDivision,
         inferTier,
         cleanDivisionName,
+        formatSeasonLabel,
+        normalizeDivisionName,
+        buildDivisionBreadcrumbMeta,
         slugifyDivisionName,
         getDivisionSlug,
         getDivisionHrefId,

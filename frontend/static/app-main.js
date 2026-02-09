@@ -53,6 +53,14 @@ const router = createRouter({
         }
     ],
     scrollBehavior(to, from, savedPosition) {
+        const navEntry =
+            typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function'
+                ? performance.getEntriesByType('navigation')[0]
+                : null;
+        const isReload = navEntry && navEntry.type === 'reload';
+        if (isReload) {
+            return { left: 0, top: 0 };
+        }
         if (savedPosition) {
             return savedPosition;
         }
@@ -60,7 +68,7 @@ const router = createRouter({
         if (to.path === from.path && to.hash === from.hash) {
             return false;
         }
-        return { top: 0 };
+        return { left: 0, top: 0 };
     }
 });
 

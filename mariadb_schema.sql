@@ -283,7 +283,6 @@ CREATE TABLE IF NOT EXISTS player_season_totals (
     adr FLOAT NOT NULL DEFAULT 0,
     kr FLOAT NOT NULL DEFAULT 0,
     kd FLOAT NOT NULL DEFAULT 0,
-    rating FLOAT NOT NULL DEFAULT 0,
     hs_pct FLOAT NOT NULL DEFAULT 0,
     damage BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -293,56 +292,7 @@ CREATE TABLE IF NOT EXISTS player_season_totals (
     CONSTRAINT fk_player_season_totals_team FOREIGN KEY (team_id) REFERENCES teams (team_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS player_season_totals_prev (
-    season SMALLINT NOT NULL,
-    division_num SMALLINT NOT NULL,
-    player_id VARCHAR(64) NOT NULL,
-    team_id VARCHAR(64) NULL,
-    maps_played INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    rounds_played INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    deaths INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    assists INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mvps INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    headshots INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    sniper_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    pistol_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    knife_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    zeus_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    first_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    utility_damage INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    enemies_flashed INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    flash_count INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    flash_successes INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    utility_count INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    utility_successes INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    utility_enemies INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mk_2k INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mk_3k INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mk_4k INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mk_5k INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    clutch_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    cl_1v1_attempts INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    cl_1v1_wins INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    cl_1v2_attempts INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    cl_1v2_wins INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    entry_count INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    entry_wins INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    adr FLOAT NOT NULL DEFAULT 0,
-    kr FLOAT NOT NULL DEFAULT 0,
-    kd FLOAT NOT NULL DEFAULT 0,
-    rating FLOAT NOT NULL DEFAULT 0,
-    hs_pct FLOAT NOT NULL DEFAULT 0,
-    damage BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
-    snapshot_ts BIGINT(20) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (season, division_num, player_id, snapshot_ts),
-    KEY idx_player_season_totals_prev_team (team_id),
-    KEY idx_player_season_totals_prev_snapshot (snapshot_ts),
-    KEY idx_player_season_totals_prev_player_time (player_id, snapshot_ts),
-    CONSTRAINT fk_player_season_totals_prev_player FOREIGN KEY (player_id) REFERENCES players (player_id),
-    CONSTRAINT fk_player_season_totals_prev_team FOREIGN KEY (team_id) REFERENCES teams (team_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DROP TABLE IF EXISTS player_season_totals_prev;
 
 CREATE TABLE IF NOT EXISTS player_map_season_totals (
     season SMALLINT NOT NULL,
@@ -394,56 +344,7 @@ CREATE TABLE IF NOT EXISTS player_map_season_totals (
     CONSTRAINT fk_player_map_totals_team FOREIGN KEY (team_id) REFERENCES teams (team_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS player_map_season_totals_prev (
-    season SMALLINT NOT NULL,
-    division_num SMALLINT NOT NULL,
-    player_id VARCHAR(64) NOT NULL,
-    team_id VARCHAR(64) NULL,
-    map_name VARCHAR(80) NOT NULL,
-    maps_played INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    rounds_played INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    deaths INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    assists INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    headshots INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    sniper_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    pistol_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    knife_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    zeus_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    first_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    utility_damage INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    enemies_flashed INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    flash_count INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    flash_successes INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    utility_count INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    utility_successes INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    utility_enemies INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mk_2k INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mk_3k INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mk_4k INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    mk_5k INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    entry_count INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    entry_wins INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    clutch_kills INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    cl_1v1_attempts INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    cl_1v1_wins INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    cl_1v2_attempts INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    cl_1v2_wins INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    adr FLOAT NOT NULL DEFAULT 0,
-    kr FLOAT NOT NULL DEFAULT 0,
-    kd FLOAT NOT NULL DEFAULT 0,
-    hs_pct FLOAT NOT NULL DEFAULT 0,
-    mvps INT(10) UNSIGNED NOT NULL DEFAULT 0,
-    damage BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
-    snapshot_ts BIGINT(20) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (season, division_num, player_id, map_name, snapshot_ts),
-    KEY idx_player_map_totals_prev_team (team_id),
-    KEY idx_player_map_totals_prev_snapshot (snapshot_ts),
-    KEY idx_player_map_totals_prev_player_time (player_id, snapshot_ts),
-    CONSTRAINT fk_player_map_totals_prev_player FOREIGN KEY (player_id) REFERENCES players (player_id),
-    CONSTRAINT fk_player_map_totals_prev_team FOREIGN KEY (team_id) REFERENCES teams (team_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DROP TABLE IF EXISTS player_map_season_totals_prev;
 
 CREATE TABLE IF NOT EXISTS team_season_totals (
     season SMALLINT NOT NULL,
@@ -508,38 +409,7 @@ CREATE TABLE IF NOT EXISTS team_map_season_totals (
     CONSTRAINT fk_team_map_totals_team FOREIGN KEY (team_id) REFERENCES teams (team_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS team_map_season_totals_prev (
-    season SMALLINT NOT NULL,
-    division_num SMALLINT NOT NULL,
-    team_id VARCHAR(64) NOT NULL,
-    map_name VARCHAR(80) NOT NULL,
-    played INT NOT NULL DEFAULT 0,
-    picks INT NOT NULL DEFAULT 0,
-    opp_picks INT NOT NULL DEFAULT 0,
-    wins INT NOT NULL DEFAULT 0,
-    games INT NOT NULL DEFAULT 0,
-    ban1 INT NOT NULL DEFAULT 0,
-    ban2 INT NOT NULL DEFAULT 0,
-    opp_ban INT NOT NULL DEFAULT 0,
-    total_own_ban INT NOT NULL DEFAULT 0,
-    decov INT NOT NULL DEFAULT 0,
-    kills INT NOT NULL DEFAULT 0,
-    deaths INT NOT NULL DEFAULT 0,
-    mvps INT NOT NULL DEFAULT 0,
-    rd INT(11) NOT NULL DEFAULT 0,
-    kd FLOAT NOT NULL DEFAULT 0,
-    adr FLOAT NOT NULL DEFAULT 0,
-    damage BIGINT(20) NOT NULL DEFAULT 0,
-    utility_damage BIGINT(20) NOT NULL DEFAULT 0,
-    snapshot_ts BIGINT(20) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (season, division_num, team_id, map_name, snapshot_ts),
-    KEY idx_team_map_totals_prev_team (team_id),
-    KEY idx_team_map_totals_prev_map (map_name),
-    KEY idx_team_map_totals_prev_snapshot (snapshot_ts),
-    KEY idx_team_map_totals_prev_team_time (team_id, snapshot_ts),
-    CONSTRAINT fk_team_map_totals_prev_team FOREIGN KEY (team_id) REFERENCES teams (team_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DROP TABLE IF EXISTS team_map_season_totals_prev;
 
 -- Snapshot tracking for division-level aggregates
 CREATE TABLE IF NOT EXISTS division_snapshots (

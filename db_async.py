@@ -582,7 +582,6 @@ async def create_schema_async(force: bool = False) -> None:
         }
         await _ensure_table_columns_async(conn, "matches", match_columns)
         await _ensure_table_columns_async(conn, "player_season_totals", player_totals_columns)
-        await _ensure_table_columns_async(conn, "player_season_totals_prev", player_totals_columns)
 
         match_indexes = {
             "idx_matches_season_division_team1_finished": "(season, division_num, team1_id, finished_at)",
@@ -1632,6 +1631,14 @@ async def upsert_player_stats_bulk_async(
             return default
         return val
 
+    def _normalize_result(value: Any) -> int:
+        if value is None:
+            return 0
+        text = str(value).strip().lower()
+        if text in {"1", "w", "win", "won", "true"}:
+            return 1
+        return 0
+
     rows: list[dict[str, Any]] = []
     for row in player_rows:
         round_index = int(row.get("round_index") or 0)
@@ -1689,7 +1696,7 @@ async def upsert_player_stats_bulk_async(
                 "kr": _get_stat(stats, "K/R Ratio", 0.0),
                 "adr": _get_stat(stats, "ADR", 0.0),
                 "hs_pct": _get_stat(stats, "Headshots %", 0.0),
-                "result": _get_stat(stats, "Result"),
+                "result": _normalize_result(_get_stat(stats, "Result")),
             }
         )
 
@@ -1861,7 +1868,6 @@ async def upsert_player_season_totals_bulk_async(
     division_num: int,
     player_ids: Sequence[str],
     *,
-    snapshot_ts: int | None = None,
     label: str = "player-season-totals-bulk",
 ) -> None:
     """Upsert aggregated season totals for multiple players in one query."""
@@ -1890,7 +1896,7 @@ async def upsert_player_season_totals_bulk_async(
                     SELECT
                       %s AS season, %s AS division_num, ps.player_id,
                       MAX(ps.team_id) AS team_id,
-                      COUNT(DISTINCT ps.match_id) AS maps_played,
+                      COUNT(*) AS maps_played,
                       SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
                       SUM(ps.kills) AS kills,
                       SUM(ps.deaths) AS deaths,
@@ -1923,7 +1929,7 @@ async def upsert_player_season_totals_bulk_async(
                       COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
                       COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
                       COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                      AVG(ps.hs_pct) AS hs_pct,
+                      COALESCE(SUM(ps.headshots) / NULLIF(SUM(ps.kills),0) * 100, 0) AS hs_pct,
                       SUM(ps.damage) AS damage
                     FROM player_stats ps
                     JOIN matches m ON m.match_id = ps.match_id
@@ -1931,6 +1937,8 @@ async def upsert_player_season_totals_bulk_async(
                     WHERE m.season = %s
                       AND m.division_num = %s
                       AND ps.player_id IN ({placeholders})
+                      AND COALESCE(ps.is_forfeit_map, 0) = 0
+                      AND COALESCE(mp.is_forfeit, 0) = 0
                     GROUP BY ps.player_id
                     ON DUPLICATE KEY UPDATE
                       team_id = VALUES(team_id),
@@ -1978,39 +1986,6 @@ async def upsert_player_season_totals_bulk_async(
                         *player_id_list,
                     ),
                 )
-                if snapshot_ts is not None:
-                    await cur.execute(
-                        f"""
-                        INSERT IGNORE INTO player_season_totals_prev (
-                          season, division_num, player_id, team_id,
-                          maps_played, rounds_played, kills, deaths, assists,
-                          mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                          utility_damage, enemies_flashed, flash_count, flash_successes,
-                          utility_count, utility_successes, utility_enemies,
-                          mk_2k, mk_3k, mk_4k, mk_5k,
-                          clutch_kills, cl_1v1_attempts, cl_1v1_wins,
-                          cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
-                          adr, kr, kd, hs_pct, damage,
-                          snapshot_ts
-                        )
-                        SELECT
-                          season, division_num, player_id, team_id,
-                          maps_played, rounds_played, kills, deaths, assists,
-                          mvps, headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                          utility_damage, enemies_flashed, flash_count, flash_successes,
-                          utility_count, utility_successes, utility_enemies,
-                          mk_2k, mk_3k, mk_4k, mk_5k,
-                          clutch_kills, cl_1v1_attempts, cl_1v1_wins,
-                          cl_1v2_attempts, cl_1v2_wins, entry_count, entry_wins,
-                          adr, kr, kd, hs_pct, damage,
-                          %s AS snapshot_ts
-                        FROM player_season_totals
-                        WHERE season = %s
-                          AND division_num = %s
-                          AND player_id IN ({placeholders})
-                        """,
-                        (snapshot_ts, season, division_num, *player_id_list),
-                    )
             await conn.commit()
 
     await _retry_on_deadlock(_op, label=label)
@@ -2022,7 +1997,6 @@ async def upsert_team_map_season_totals_bulk_async(
     team_ids: Sequence[str],
     *,
     map_names: Sequence[str] | None = None,
-    snapshot_ts: int | None = None,
     label: str = "team-map-season-totals-bulk",
 ) -> None:
     """Upsert aggregated map totals for multiple teams in one query."""
@@ -2105,42 +2079,6 @@ async def upsert_team_map_season_totals_bulk_async(
                         *map_filter_params,
                     ),
                 )
-                if snapshot_ts is not None:
-                    snapshot_map_filter_sql = ""
-                    snapshot_map_filter_params: tuple[Any, ...] = ()
-                    if map_name_list:
-                        snapshot_map_placeholders = ", ".join(["%s"] * len(map_name_list))
-                        snapshot_map_filter_sql = f" AND map_name IN ({snapshot_map_placeholders})"
-                        snapshot_map_filter_params = tuple(map_name_list)
-                    await cur.execute(
-                        f"""
-                        INSERT IGNORE INTO team_map_season_totals_prev (
-                          season, division_num, team_id, map_name,
-                          played, picks, opp_picks, wins, games,
-                          ban1, ban2, opp_ban, total_own_ban, decov,
-                          kills, deaths, mvps, rd, kd, adr, damage, utility_damage,
-                          snapshot_ts
-                        )
-                        SELECT
-                          season, division_num, team_id, map_name,
-                          played, picks, opp_picks, wins, games,
-                          ban1, ban2, opp_ban, total_own_ban, decov,
-                          kills, deaths, mvps, rd, kd, adr, damage, utility_damage,
-                          %s AS snapshot_ts
-                        FROM team_map_season_totals
-                        WHERE season = %s
-                          AND division_num = %s
-                          AND team_id IN ({placeholders})
-                          {snapshot_map_filter_sql}
-                        """,
-                        (
-                            snapshot_ts,
-                            season,
-                            division_num,
-                            *team_id_list,
-                            *snapshot_map_filter_params,
-                        ),
-                    )
             await conn.commit()
 
     await _retry_on_deadlock(_op, label=label)
@@ -2151,7 +2089,6 @@ async def upsert_player_map_season_totals_bulk_async(
     division_num: int,
     player_ids: Sequence[str],
     *,
-    snapshot_ts: int | None = None,
     label: str = "player-map-season-totals-bulk",
 ) -> None:
     """Upsert aggregated map totals for multiple players in one query."""
@@ -2181,7 +2118,7 @@ async def upsert_player_map_season_totals_bulk_async(
                       %s AS season, %s AS division_num, ps.player_id,
                       MAX(ps.team_id) AS team_id,
                       COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
-                      COUNT(DISTINCT ps.match_id) AS maps_played,
+                      COUNT(*) AS maps_played,
                       SUM(COALESCE(mp.score_team1,0) + COALESCE(mp.score_team2,0)) AS rounds_played,
                       SUM(ps.kills) AS kills,
                       SUM(ps.deaths) AS deaths,
@@ -2213,7 +2150,7 @@ async def upsert_player_map_season_totals_bulk_async(
                       COALESCE(SUM(ps.damage) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS adr,
                       COALESCE(SUM(ps.kills) / NULLIF(SUM(COALESCE(mp.score_team1,0)+COALESCE(mp.score_team2,0)),0), 0) AS kr,
                       COALESCE(SUM(ps.kills) / NULLIF(SUM(ps.deaths),0), SUM(ps.kills)) AS kd,
-                      AVG(ps.hs_pct) AS hs_pct,
+                      COALESCE(SUM(ps.headshots) / NULLIF(SUM(ps.kills),0) * 100, 0) AS hs_pct,
                       SUM(ps.mvps) AS mvps,
                       SUM(ps.damage) AS damage
                     FROM player_stats ps
@@ -2222,6 +2159,8 @@ async def upsert_player_map_season_totals_bulk_async(
                     WHERE m.season = %s
                       AND m.division_num = %s
                       AND ps.player_id IN ({placeholders})
+                      AND COALESCE(ps.is_forfeit_map, 0) = 0
+                      AND COALESCE(mp.is_forfeit, 0) = 0
                     GROUP BY ps.player_id, COALESCE(mp.map_name, CONCAT('map_', ps.map_id))
                     ON DUPLICATE KEY UPDATE
                       team_id = VALUES(team_id),
@@ -2269,39 +2208,6 @@ async def upsert_player_map_season_totals_bulk_async(
                         *player_id_list,
                     ),
                 )
-                if snapshot_ts is not None:
-                    await cur.execute(
-                        f"""
-                        INSERT IGNORE INTO player_map_season_totals_prev (
-                          season, division_num, player_id, team_id, map_name,
-                          maps_played, rounds_played, kills, deaths, assists,
-                          headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                          utility_damage, enemies_flashed, flash_count, flash_successes,
-                          utility_count, utility_successes, utility_enemies,
-                          mk_2k, mk_3k, mk_4k, mk_5k,
-                          entry_count, entry_wins, clutch_kills,
-                          cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
-                          adr, kr, kd, hs_pct, mvps, damage,
-                          snapshot_ts
-                        )
-                        SELECT
-                          season, division_num, player_id, team_id, map_name,
-                          maps_played, rounds_played, kills, deaths, assists,
-                          headshots, sniper_kills, pistol_kills, knife_kills, zeus_kills, first_kills,
-                          utility_damage, enemies_flashed, flash_count, flash_successes,
-                          utility_count, utility_successes, utility_enemies,
-                          mk_2k, mk_3k, mk_4k, mk_5k,
-                          entry_count, entry_wins, clutch_kills,
-                          cl_1v1_attempts, cl_1v1_wins, cl_1v2_attempts, cl_1v2_wins,
-                          adr, kr, kd, hs_pct, mvps, damage,
-                          %s AS snapshot_ts
-                        FROM player_map_season_totals
-                        WHERE season = %s
-                          AND division_num = %s
-                          AND player_id IN ({placeholders})
-                        """,
-                        (snapshot_ts, season, division_num, *player_id_list),
-                    )
             await conn.commit()
 
     await _retry_on_deadlock(_op, label=label)
@@ -2690,24 +2596,22 @@ async def compute_player_map_deltas_async(
             COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_label,
             COALESCE(mp.map_name, CONCAT('map_', ps.map_id)) AS map_name,
             COUNT(DISTINCT ps.match_id) AS maps_played,
-            COUNT(*) AS rounds_played,
+            SUM(COALESCE(mp.score_team1, 0) + COALESCE(mp.score_team2, 0)) AS rounds_played,
             SUM(COALESCE(ps.kills, 0)) AS kills,
             SUM(COALESCE(ps.deaths, 0)) AS deaths,
             SUM(COALESCE(ps.assists, 0)) AS assists,
-            AVG(COALESCE(ps.kd, 0)) AS kd_avg,
-            AVG(COALESCE(ps.kr, 0)) AS kr_avg,
-            AVG(COALESCE(ps.adr, 0)) AS adr_avg,
-            AVG(COALESCE(ps.hs_pct, 0)) AS hs_avg,
+            SUM(COALESCE(ps.headshots, 0)) AS headshots,
+            SUM(COALESCE(ps.damage, 0)) AS damage,
             SUM(COALESCE(ps.mvps, 0)) AS mvps,
             SUM(COALESCE(ps.sniper_kills, 0)) AS sniper_kills,
             SUM(COALESCE(ps.utility_damage, 0)) AS utility_damage,
             SUM(COALESCE(ps.enemies_flashed, 0)) AS enemies_flashed,
             SUM(COALESCE(ps.flash_count, 0)) AS flash_count,
             SUM(COALESCE(ps.flash_successes, 0)) AS flash_successes,
-            SUM(COALESCE(ps.mk_2k, 0)) AS mk2,
-            SUM(COALESCE(ps.mk_3k, 0)) AS mk3,
-            SUM(COALESCE(ps.mk_4k, 0)) AS mk4,
-            SUM(COALESCE(ps.mk_5k, 0)) AS mk5,
+            SUM(COALESCE(ps.mk_2k, 0)) AS mk_2k,
+            SUM(COALESCE(ps.mk_3k, 0)) AS mk_3k,
+            SUM(COALESCE(ps.mk_4k, 0)) AS mk_4k,
+            SUM(COALESCE(ps.mk_5k, 0)) AS mk_5k,
             SUM(COALESCE(ps.clutch_kills, 0)) AS clutch_kills,
             SUM(COALESCE(ps.cl_1v1_attempts, 0)) AS c11_att,
             SUM(COALESCE(ps.cl_1v1_wins, 0)) AS c11_win,
@@ -2740,9 +2644,9 @@ async def compute_player_map_deltas_async(
             "deaths": deaths,
             "assists": int(row.get("assists") or 0),
             "kd": (kills / deaths) if deaths else float(kills),
-            "kr": float(row.get("kr_avg") or 0.0),
-            "adr": float(row.get("adr_avg") or 0.0),
-            "hs_pct": float(row.get("hs_avg") or 0.0),
+            "kr": (kills / rounds) if rounds else 0.0,
+            "adr": (float(row.get("damage") or 0.0) / rounds) if rounds else 0.0,
+            "hs_pct": ((float(row.get("headshots") or 0.0) / kills) * 100.0) if kills else 0.0,
             "mvps": int(row.get("mvps") or 0),
             "sniper_kills": int(row.get("sniper_kills") or 0),
             "utility_damage": int(row.get("utility_damage") or 0),
@@ -2756,12 +2660,12 @@ async def compute_player_map_deltas_async(
             "c12_win": int(row.get("c12_win") or 0),
             "entry_count": int(row.get("entry_count") or 0),
             "entry_wins": int(row.get("entry_wins") or 0),
-            "mk2": int(row.get("mk2") or 0),
-            "mk3": int(row.get("mk3") or 0),
-            "mk4": int(row.get("mk4") or 0),
-            "mk5": int(row.get("mk5") or 0),
+            "mk_2k": int(row.get("mk_2k") or 0),
+            "mk_3k": int(row.get("mk_3k") or 0),
+            "mk_4k": int(row.get("mk_4k") or 0),
+            "mk_5k": int(row.get("mk_5k") or 0),
             "pistol_kills": int(row.get("pistol_kills") or 0),
-            "damage": None,
+            "damage": int(row.get("damage") or 0),
         }
         out[map_name] = {"curr": curr, "prev": None, "delta": None}
     return out

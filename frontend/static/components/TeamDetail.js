@@ -516,7 +516,6 @@ function normalizePlayer(player, idx = 0) {
     const mk5k = toNumber(player.mk5k);
     const clutchKills = toNumber(player.clutchKills);
     const kd = toNumber(player.kd || (deaths ? kills / deaths : kills));
-    const rating = kd;
     const adr = toNumber(player.adr);
     const kr = toNumber(player.kr);
     const hsPct = toNumber(player.hsPct);
@@ -526,12 +525,11 @@ function normalizePlayer(player, idx = 0) {
     const flashSuccessPct = flashCount ? (flashSuccesses / flashCount) * 100 : 0;
 
     return {
-        playerId: player.playerId || `player-${idx}`,
+        playerId: player.playerId || player.player_id || `player-${idx}`,
         nickname: player.nickname || 'Pelaaja',
         mapsPlayed,
         roundsPlayed,
         kd,
-        rating,
         adr,
         kr,
         hsPct,
@@ -641,7 +639,6 @@ function normalizeMatch(match, teamId = null) {
     let roundsFor = maps.reduce((sum, m) => sum + m.scoreFor, 0);
     let roundsAgainst = maps.reduce((sum, m) => sum + m.scoreAgainst, 0);
     const played = maps.length || playedFlag;
-    const matchRating = maps.length ? safeDivide(maps.reduce((sum, m) => sum + (m.kd || 0), 0), maps.length) : 0;
     const seriesMaps = Math.max(1, bestOf || 2);
     let teamScore = mapWins;
     let oppScore = mapLosses;
@@ -670,7 +667,6 @@ function normalizeMatch(match, teamId = null) {
         roundsFor,
         roundsAgainst,
         roundDiff,
-        matchRating,
         team1Name: match.team1Name || myName,
         team2Name: match.team2Name || oppName,
         opponentName: oppName,
@@ -1725,7 +1721,7 @@ window.TeamDetail = {
                 showXAxis: idx === charts.length - 1
             }));
         },
-        // Player stats table uses every DB field: maps/rounds/kills/deaths/assists/mvps/sniper_kills/utility_damage/enemies_flashed/flash_count/flash_successes/entry_count/entry_wins/clutch fields/pistol_kills/adr/kr/kd/rating/hs_pct/damage/multi-kills
+        // Player stats table uses every DB field: maps/rounds/kills/deaths/assists/mvps/sniper_kills/utility_damage/enemies_flashed/flash_count/flash_successes/entry_count/entry_wins/clutch fields/pistol_kills/adr/kr/kd/hs_pct/damage/multi-kills
         players() {
             const players = Array.isArray(this.seasonData?.playerStats) ? this.seasonData.playerStats : [];
             return players.map((p, idx) => normalizePlayer(p, idx)).filter(Boolean);
@@ -2440,33 +2436,18 @@ window.TeamDetail = {
             const seasons = Array.isArray(this.pageData?.seasons) ? this.pageData.seasons : [];
             const row = seasons.find(season => String(season.championshipId) === String(championshipId));
             if (!row) return { name: null, season: null };
-
-            let name = row.name || null;
-            if (!name) {
-                const divNum = toNumber(row.divisionNum, null);
-                if (divNum === 0) {
-                    name = 'Mestaruussarja';
-                } else if (divNum != null) {
-                    name = `${divNum} Divisioona`;
-                } else {
-                    name = 'Divisioona';
-                }
-                if (row.isPlayoffs) {
-                    name = `${name} Playoffs`;
-                }
-            }
-
-            if (name) {
-                const normalizer = typeof window !== 'undefined' ? window.divisionNormalizer : null;
-                if (normalizer?.cleanDivisionName) {
-                    name = normalizer.cleanDivisionName(name);
-                } else {
-                    name = String(name).replace(/\s+S\d+$/i, '').trim();
-                }
-            }
+            const normalizer = typeof window !== 'undefined' ? window.divisionNormalizer : null;
+            const meta = normalizer?.buildDivisionBreadcrumbMeta
+                ? normalizer.buildDivisionBreadcrumbMeta({
+                    name: row.name,
+                    divisionNum: row.divisionNum,
+                    season: row.season,
+                    isPlayoffs: Boolean(row.isPlayoffs)
+                })
+                : { name: row.name || null };
 
             return {
-                name: name || null,
+                name: meta?.name || null,
                 season: row.season ?? null
             };
         },
@@ -3781,7 +3762,10 @@ window.TeamDetail = {
                                     <div class="avatar-placeholder">{{ row.nickname ? row.nickname.slice(0, 2).toUpperCase() : 'PL' }}</div>
                                     <div>
                                         <div class="player-name">
-                                            {{ row.nickname }}
+                                            <router-link v-if="row.playerId" class="player-link" :to="{ name: 'player', params: { playerId: row.playerId } }">
+                                                {{ row.nickname }}
+                                            </router-link>
+                                            <span v-else>{{ row.nickname }}</span>
                                             <span
                                                 v-for="badge in getPlayerRoleBadges(row.playerId)"
                                                 :key="badge.label"
@@ -3791,14 +3775,6 @@ window.TeamDetail = {
                                             >{{ badge.label }}</span>
                                         </div>
                                         <div class="player-sub">Maps {{ row.mapsPlayed }} · Rnds {{ row.roundsPlayed }}</div>
-                                    </div>
-                                </div>
-                            </template>
-                            <template #cell-rating="{ row }">
-                                <div class="cell-with-bar">
-                                    <span class="stat-strong">{{ formatNumber(row.rating, 2) }}</span>
-                                    <div class="inline-bar inline-bar--thin">
-                                        <div class="inline-bar__fill inline-bar__fill--accent" :style="{ width: Math.min(100, row.rating / 2 * 100) + '%' }"></div>
                                     </div>
                                 </div>
                             </template>

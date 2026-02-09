@@ -25,7 +25,8 @@
             state[playerId] = {
                 profile: createSegment(),
                 seasons: createSegment(),
-                maps: {}
+                maps: {},
+                progression: {}
             };
         }
         return state[playerId];
@@ -39,6 +40,51 @@
             entry.maps[championshipId] = createSegment();
         }
         return entry.maps[championshipId];
+    }
+
+    function ensureProgressionEntry(entry, championshipId) {
+        if (!entry.progression) {
+            entry.progression = {};
+        }
+        if (!entry.progression[championshipId]) {
+            entry.progression[championshipId] = createSegment();
+        }
+        return entry.progression[championshipId];
+    }
+
+    function applyBundleToEntry(entry, bundle, championshipId = null) {
+        const payload = (bundle && typeof bundle === 'object') ? bundle : {};
+        const profile = payload.player || null;
+        const seasons = Array.isArray(payload.seasons) ? payload.seasons : [];
+        const selectedChampionshipId = String(
+            payload.selected_championship_id
+            || payload.selectedChampionshipId
+            || championshipId
+            || ''
+        );
+        const mapStats = Array.isArray(payload.map_stats || payload.mapStats) ? (payload.map_stats || payload.mapStats) : [];
+        const progression = Array.isArray(payload.progression) ? payload.progression : [];
+
+        if (profile) {
+            entry.profile.data = profile;
+            entry.profile.error = null;
+            entry.profile.fetchedAt = now();
+        }
+        entry.seasons.data = seasons;
+        entry.seasons.error = null;
+        entry.seasons.fetchedAt = now();
+
+        if (selectedChampionshipId) {
+            const mapEntry = ensureMapEntry(entry, selectedChampionshipId);
+            mapEntry.data = mapStats;
+            mapEntry.error = null;
+            mapEntry.fetchedAt = now();
+
+            const progressionEntry = ensureProgressionEntry(entry, selectedChampionshipId);
+            progressionEntry.data = progression;
+            progressionEntry.error = null;
+            progressionEntry.fetchedAt = now();
+        }
     }
 
     window.usePlayerStore = defineStore('player', {
@@ -57,77 +103,82 @@
             ensureEntry(playerId) {
                 return ensurePlayerEntry(this.players, playerId);
             },
-            async fetchProfile(playerId, options = {}) {
+            async fetchBundle(playerId, championshipId = null, options = {}) {
                 if (!playerId) return null;
                 const entry = this.ensureEntry(playerId);
                 const { force = false } = options;
-                if (entry.profile.loading) {
-                    return entry.profile.data;
+                const bundleKey = championshipId ? String(championshipId) : '__default__';
+                entry.bundle = entry.bundle || {};
+                const segment = entry.bundle[bundleKey] || createSegment();
+                entry.bundle[bundleKey] = segment;
+
+                if (segment.loading) {
+                    return segment.data;
                 }
-                if (!force && isFresh(entry.profile)) {
-                    return entry.profile.data;
+                if (!force && isFresh(segment)) {
+                    return segment.data;
                 }
-                entry.profile.loading = true;
-                entry.profile.error = null;
+                segment.loading = true;
+                segment.error = null;
                 try {
-                    const data = await window.apiClient.getPlayerInfo(playerId);
-                    entry.profile.data = data;
-                    entry.profile.fetchedAt = now();
-                    return data;
+                    const data = await window.apiClient.getPlayerBundle(playerId, championshipId);
+                    segment.data = data || {};
+                    segment.fetchedAt = now();
+                    applyBundleToEntry(entry, segment.data, championshipId);
+                    return segment.data;
+                } catch (error) {
+                    segment.error = error?.message || 'Pelaajan tietojen lataus epäonnistui';
+                    throw error;
+                } finally {
+                    segment.loading = false;
+                }
+            },
+            async fetchProfile(playerId, options = {}) {
+                if (!playerId) return null;
+                const entry = this.ensureEntry(playerId);
+                try {
+                    await this.fetchBundle(playerId, null, options);
+                    return entry.profile.data;
                 } catch (error) {
                     entry.profile.error = error?.message || 'Pelaajan tietojen lataus epäonnistui';
                     throw error;
-                } finally {
-                    entry.profile.loading = false;
                 }
             },
             async fetchSeasons(playerId, options = {}) {
                 if (!playerId) return [];
                 const entry = this.ensureEntry(playerId);
-                const { force = false } = options;
-                if (entry.seasons.loading) {
-                    return entry.seasons.data || [];
-                }
-                if (!force && isFresh(entry.seasons)) {
-                    return entry.seasons.data || [];
-                }
-                entry.seasons.loading = true;
-                entry.seasons.error = null;
                 try {
-                    const data = await window.apiClient.getPlayerSeasonStats(playerId);
-                    entry.seasons.data = Array.isArray(data) ? data : [];
-                    entry.seasons.fetchedAt = now();
+                    await this.fetchBundle(playerId, null, options);
                     return entry.seasons.data;
                 } catch (error) {
                     entry.seasons.error = error?.message || 'Pelaajan kausitilastojen lataus epäonnistui';
                     throw error;
-                } finally {
-                    entry.seasons.loading = false;
                 }
             },
             async fetchMapStats(playerId, championshipId, options = {}) {
                 if (!playerId || !championshipId) return [];
-                const entry = this.ensureEntry(playerId);
-                const mapEntry = ensureMapEntry(entry, championshipId);
-                const { force = false } = options;
-                if (mapEntry.loading) {
-                    return mapEntry.data || [];
-                }
-                if (!force && isFresh(mapEntry)) {
-                    return mapEntry.data || [];
-                }
-                mapEntry.loading = true;
-                mapEntry.error = null;
                 try {
-                    const data = await window.apiClient.getPlayerMapStats(playerId, championshipId);
-                    mapEntry.data = Array.isArray(data) ? data : [];
-                    mapEntry.fetchedAt = now();
-                    return mapEntry.data;
+                    await this.fetchBundle(playerId, championshipId, options);
+                    const entry = this.ensureEntry(playerId);
+                    return ensureMapEntry(entry, championshipId).data || [];
                 } catch (error) {
+                    const entry = this.ensureEntry(playerId);
+                    const mapEntry = ensureMapEntry(entry, championshipId);
                     mapEntry.error = error?.message || 'Pelaajan karttatilastojen lataus epäonnistui';
                     throw error;
-                } finally {
-                    mapEntry.loading = false;
+                }
+            },
+            async fetchProgression(playerId, championshipId, season, division, options = {}) {
+                if (!playerId || !championshipId || season == null || division == null) return [];
+                try {
+                    await this.fetchBundle(playerId, championshipId, options);
+                    const entry = this.ensureEntry(playerId);
+                    return ensureProgressionEntry(entry, championshipId).data || [];
+                } catch (error) {
+                    const entry = this.ensureEntry(playerId);
+                    const progressionEntry = ensureProgressionEntry(entry, championshipId);
+                    progressionEntry.error = error?.message || 'Pelaajan kehitystrendin lataus epäonnistui';
+                    throw error;
                 }
             }
         }

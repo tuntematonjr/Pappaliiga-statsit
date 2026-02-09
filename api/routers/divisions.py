@@ -136,6 +136,8 @@ class DivisionPlayerTotals(CamelModel):
     mvps: int
     pistol_kills: int
     sniper_kills: int
+    knife_kills: int
+    zeus_kills: int
     utility_damage: int
     enemies_flashed: int
     flash_count: int

@@ -76,7 +76,7 @@ class DivisionPlayoffsStats(CamelModel):
 
 class MvpPlayer(CamelModel):
     name: str
-    rating: float
+    kd: float
 
 
 class DivisionMeta(CamelModel):

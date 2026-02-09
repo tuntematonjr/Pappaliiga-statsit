@@ -1260,7 +1260,6 @@ async def sync_match_async(
                         ctx.division_num,
                         affected_team_ids,
                         map_names=touched_map_names,
-                        snapshot_ts=snapshot_ts,
                         label=f"match:{match_id}:team-map-bulk",
                     )
                 if affected_player_ids:
@@ -1268,14 +1267,12 @@ async def sync_match_async(
                         ctx.season,
                         ctx.division_num,
                         affected_player_ids,
-                        snapshot_ts=snapshot_ts,
                         label=f"match:{match_id}:player-season-bulk",
                     )
                     await upsert_player_map_season_totals_bulk_async(
                         ctx.season,
                         ctx.division_num,
                         affected_player_ids,
-                        snapshot_ts=snapshot_ts,
                         label=f"match:{match_id}:player-map-bulk",
                     )
             else:

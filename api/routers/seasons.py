@@ -69,7 +69,7 @@ class WinnerInfo(CamelModel):
 
 class BestPlayer(CamelModel):
     name: str
-    rating: float
+    kd: float
 
 
 class DivisionWithStats(CamelModel):

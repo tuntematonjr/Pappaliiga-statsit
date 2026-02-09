@@ -135,6 +135,7 @@ async def receive_faceit_webhook(
     if not kind and not reason:
         reason = "unsupported_or_missing_target"
 
+    queue_snapshot = queue.stats()
     record_path = None
     if _LOG_RAW:
         record = {
@@ -147,6 +148,7 @@ async def receive_faceit_webhook(
             "reason": reason or None,
             "kind": kind,
             "target_id": target_id,
+            "queue": queue_snapshot,
             "headers": _redact_headers(dict(request.headers)),
             "body": event,
         }
@@ -162,7 +164,7 @@ async def receive_faceit_webhook(
             "event_id": event_id,
             "organizer_id": organizer_id or None,
             "expected_organizer_id": _ORGANIZER_ID or None,
-            "queue": queue.stats(),
+            "queue": queue_snapshot,
             "logged_to": record_path,
         }
 
@@ -182,6 +184,6 @@ async def receive_faceit_webhook(
         "event_id": event_id,
         "kind": kind,
         "target_id": target_id,
-        "queue": queue.stats(),
+        "queue": queue_snapshot,
         "logged_to": record_path,
     }

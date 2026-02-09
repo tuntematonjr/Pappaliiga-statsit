@@ -143,22 +143,13 @@
             `/api/teams/${teamId}/season/${seasonId}/map-stats`,
             `/api/v1/teams/${teamId}/season/${seasonId}/map-stats`
         ],
-        playerInfo: playerId => [
-            `/api/players/${playerId}`,
-            `/api/v1/players/${playerId}`
-        ],
-        playerSeasonStats: playerId => [
-            `/api/players/${playerId}/seasons`,
-            `/api/v1/players/${playerId}/seasons`
-        ],
-        playerMapStats: (playerId, championshipId) => [
-            `/api/players/${playerId}/map-stats/${championshipId}`,
-            `/api/v1/players/${playerId}/map-stats/${championshipId}`
-        ],
-        playerSeasonProgression: (playerId, season, division) => [
-            `/api/players/${playerId}/season-progression?season=${season}&division=${division}`,
-            `/api/v1/players/${playerId}/season-progression?season=${season}&division=${division}`
-        ],
+        playerBundle: (playerId, championshipId = null) => {
+            const champParam = championshipId ? `?championship_id=${encodeURIComponent(championshipId)}` : '';
+            return [
+                `/api/players/${playerId}/bundle${champParam}`,
+                `/api/v1/players/${playerId}/bundle${champParam}`
+            ];
+        },
         teamPlayers: (teamId, seasonId) => [
             `/api/teams/${teamId}/players`,
             `/api/v1/teams/${teamId}/players`,
@@ -1614,77 +1605,21 @@
             }
         }
 
-        async getPlayerInfo(playerId, options = {}) {
+        async getPlayerBundle(playerId, championshipId = null, options = {}) {
             if (!playerId) {
                 throw new Error('playerId is required');
             }
             const encPlayerId = encodeURIComponent(playerId);
-            const routes = buildRouteCandidates('playerInfo', encPlayerId);
+            const encChampionshipId = championshipId ? encodeURIComponent(championshipId) : null;
+            const routes = buildRouteCandidates('playerBundle', encPlayerId, encChampionshipId);
             try {
                 const result = await fetchWithFallback(routes, options);
                 return result?.data ?? result ?? {};
             } catch (error) {
                 if (isDev) {
-                    console.warn('[apiClient] playerInfo endpoint failed', error);
+                    console.warn('[apiClient] playerBundle endpoint failed', error);
                 }
                 throw error;
-            }
-        }
-
-        async getPlayerSeasonStats(playerId, options = {}) {
-            if (!playerId) {
-                throw new Error('playerId is required');
-            }
-            const encPlayerId = encodeURIComponent(playerId);
-            const routes = buildRouteCandidates('playerSeasonStats', encPlayerId);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                const payload = result?.data ?? result ?? [];
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] playerSeasonStats endpoint failed', error);
-                }
-                return [];
-            }
-        }
-
-        async getPlayerMapStats(playerId, championshipId, options = {}) {
-            if (!playerId || !championshipId) {
-                throw new Error('playerId and championshipId are required');
-            }
-            const encPlayerId = encodeURIComponent(playerId);
-            const encChampionshipId = encodeURIComponent(championshipId);
-            const routes = buildRouteCandidates('playerMapStats', encPlayerId, encChampionshipId);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                const payload = result?.data ?? result ?? [];
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] playerMapStats endpoint failed', error);
-                }
-                return [];
-            }
-        }
-
-        async getPlayerSeasonProgression(playerId, season, division, options = {}) {
-            if (!playerId || season == null || division == null) {
-                throw new Error('playerId, season, and division are required');
-            }
-            const encPlayerId = encodeURIComponent(playerId);
-            const encSeason = encodeURIComponent(season);
-            const encDivision = encodeURIComponent(division);
-            const routes = buildRouteCandidates('playerSeasonProgression', encPlayerId, encSeason, encDivision);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                const payload = result?.data ?? result ?? [];
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] playerSeasonProgression endpoint failed', error);
-                }
-                return [];
             }
         }
     }

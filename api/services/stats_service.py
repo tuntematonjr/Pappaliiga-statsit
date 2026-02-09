@@ -17,7 +17,7 @@ from api.services.season_aggregates import dedupe_team_total, get_season_summary
 from division_overrides import combined_status_teams
 
 
-def _get_excluded_team_ids(championship_id: int) -> set[str]:
+def _get_excluded_team_ids(championship_id: str) -> set[str]:
     teams = combined_status_teams(str(championship_id))
     return {team["team_id"] for team in teams}
 
@@ -238,7 +238,7 @@ async def _compute_top_players(
     return rows
 
 
-async def get_division_averages(championship_id: int) -> dict[str, float]:
+async def get_division_averages(championship_id: str) -> dict[str, float]:
     revision = await get_championship_revision(str(championship_id))
     cache_key = ("division-averages", championship_id, revision)
     cached_value, _ = await GLOBAL_CACHE.get_or_set(
@@ -248,7 +248,7 @@ async def get_division_averages(championship_id: int) -> dict[str, float]:
     return cached_value
 
 
-async def _compute_division_averages(championship_id: int) -> dict[str, float]:
+async def _compute_division_averages(championship_id: str) -> dict[str, float]:
     champ_rows = await query_async(
         "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
         {"champ_id": championship_id},
@@ -270,27 +270,117 @@ async def _compute_division_averages(championship_id: int) -> dict[str, float]:
 
     rows = await query_async(
         f"""
-        SELECT AVG(pst.kd) AS avg_kd, AVG(pst.adr) AS avg_adr,
-               AVG(pst.hs_pct) AS avg_hs_pct,
-               AVG(pst.kr) AS avg_kr
+        SELECT
+            pst.kd,
+            pst.adr,
+            pst.hs_pct,
+            pst.kr,
+            pst.entry_wins,
+            pst.entry_count,
+            pst.cl_1v1_wins,
+            pst.cl_1v2_wins,
+            pst.cl_1v1_attempts,
+            pst.cl_1v2_attempts,
+            pst.flash_successes,
+            pst.flash_count,
+            pst.utility_successes,
+            pst.utility_count
         FROM player_season_totals pst
         WHERE {where_clause} AND pst.maps_played >= 3
         """,
         params,
     )
+
+    def _safe_number(value: Any) -> float:
+        try:
+            return float(value or 0.0)
+        except Exception:
+            return 0.0
+
+    def _avg(values: list[float]) -> float:
+        return (sum(values) / len(values)) if values else 0.0
+
+    def _median(values: list[float]) -> float:
+        if not values:
+            return 0.0
+        ordered = sorted(values)
+        mid = len(ordered) // 2
+        if len(ordered) % 2:
+            return ordered[mid]
+        return (ordered[mid - 1] + ordered[mid]) / 2
+
     if not rows:
         return {
             "avg_kd": 0.0,
+            "median_kd": 0.0,
             "avg_adr": 0.0,
+            "median_adr": 0.0,
             "avg_hs_pct": 0.0,
+            "median_hs_pct": 0.0,
             "avg_kr": 0.0,
+            "median_kr": 0.0,
+            "avg_entry_pct": 0.0,
+            "median_entry_pct": 0.0,
+            "avg_clutch_pct": 0.0,
+            "median_clutch_pct": 0.0,
+            "avg_flash_success_pct": 0.0,
+            "median_flash_success_pct": 0.0,
+            "avg_utility_success_pct": 0.0,
+            "median_utility_success_pct": 0.0,
         }
-    row = rows[0]
+
+    kd_values: list[float] = []
+    adr_values: list[float] = []
+    hs_values: list[float] = []
+    kr_values: list[float] = []
+    entry_values: list[float] = []
+    clutch_values: list[float] = []
+    flash_success_values: list[float] = []
+    utility_success_values: list[float] = []
+
+    for row in rows:
+        kd_values.append(_safe_number(row.get("kd")))
+        adr_values.append(_safe_number(row.get("adr")))
+        hs_values.append(_safe_number(row.get("hs_pct")))
+        kr_values.append(_safe_number(row.get("kr")))
+
+        entry_wins = _safe_number(row.get("entry_wins"))
+        entry_count = _safe_number(row.get("entry_count"))
+        entry_pct = (entry_wins / entry_count * 100.0) if entry_count > 0 else 0.0
+        entry_values.append(entry_pct)
+
+        clutch_wins = _safe_number(row.get("cl_1v1_wins")) + _safe_number(row.get("cl_1v2_wins"))
+        clutch_attempts = _safe_number(row.get("cl_1v1_attempts")) + _safe_number(row.get("cl_1v2_attempts"))
+        clutch_pct = (clutch_wins / clutch_attempts * 100.0) if clutch_attempts > 0 else 0.0
+        clutch_values.append(clutch_pct)
+
+        flash_successes = _safe_number(row.get("flash_successes"))
+        flash_count = _safe_number(row.get("flash_count"))
+        flash_success_pct = (flash_successes / flash_count * 100.0) if flash_count > 0 else 0.0
+        flash_success_values.append(flash_success_pct)
+
+        utility_successes = _safe_number(row.get("utility_successes"))
+        utility_count = _safe_number(row.get("utility_count"))
+        utility_success_pct = (utility_successes / utility_count * 100.0) if utility_count > 0 else 0.0
+        utility_success_values.append(utility_success_pct)
+
     return {
-        "avg_kd": float(row.get("avg_kd") or 0.0),
-        "avg_adr": float(row.get("avg_adr") or 0.0),
-        "avg_hs_pct": float(row.get("avg_hs_pct") or 0.0),
-        "avg_kr": float(row.get("avg_kr") or 0.0),
+        "avg_kd": _avg(kd_values),
+        "median_kd": _median(kd_values),
+        "avg_adr": _avg(adr_values),
+        "median_adr": _median(adr_values),
+        "avg_hs_pct": _avg(hs_values),
+        "median_hs_pct": _median(hs_values),
+        "avg_kr": _avg(kr_values),
+        "median_kr": _median(kr_values),
+        "avg_entry_pct": _avg(entry_values),
+        "median_entry_pct": _median(entry_values),
+        "avg_clutch_pct": _avg(clutch_values),
+        "median_clutch_pct": _median(clutch_values),
+        "avg_flash_success_pct": _avg(flash_success_values),
+        "median_flash_success_pct": _median(flash_success_values),
+        "avg_utility_success_pct": _avg(utility_success_values),
+        "median_utility_success_pct": _median(utility_success_values),
     }
 
 

@@ -3,7 +3,7 @@
 The sync process moves a lot of data concurrently which makes it hard to see
 at-a-glance progress or notice when workers stall.  This module provides a
 small drop-in helper (`SyncDiagnostics`) that records progress events and
-periodically writes structured snapshots to ``logs/runtime_diagnostics.jsonl``.
+periodically writes structured snapshots to ``logs/diagnostics/runtime_diagnostics.jsonl``.
 
 The snapshots can be tailed in real time while the sync runs to answer
 questions like:
@@ -49,7 +49,9 @@ def _coerce_float(value: Any, default: float) -> float:
         return default
 
 
-_DEFAULT_LOG_DIR = Path(os.environ.get("SYNC_LOG_DIR", Path(__file__).with_name("logs")))
+_DEFAULT_LOG_DIR = Path(
+    os.environ.get("SYNC_DIAGNOSTICS_LOG_DIR", Path(__file__).with_name("logs") / "diagnostics")
+)
 _DEFAULT_OUTPUT = Path(
     os.environ.get("SYNC_DIAGNOSTICS_PATH", _DEFAULT_LOG_DIR / "runtime_diagnostics.jsonl")
 )

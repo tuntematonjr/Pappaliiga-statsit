@@ -33,6 +33,7 @@
             const router = useRouter();
             const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
             const teamStore = typeof window.useTeamStore === 'function' ? window.useTeamStore() : null;
+            const playerStore = typeof window.usePlayerStore === 'function' ? window.usePlayerStore() : null;
             const seasonsStore = typeof window.useSeasonsStore === 'function' ? window.useSeasonsStore() : null;
 
             function beautifyDivisionLabel(value) {
@@ -42,6 +43,14 @@
                 return text.charAt(0).toUpperCase() + text.slice(1);
             }
 
+            function looksLikeRawId(value) {
+                const text = String(value || '').trim();
+                if (!text) return false;
+                // Championship IDs are UUID-like; do not surface them as breadcrumb labels.
+                return /^[0-9a-f]{8}(?:[-\s]?[0-9a-f]{4}){3}[-\s]?[0-9a-f]{12}$/i.test(text)
+                    || /^[0-9a-f-]{24,}$/i.test(text);
+            }
+
             function formatSeasonLabel(value) {
                 if (value === null || value === undefined) return '';
                 const text = String(value).trim();
@@ -49,6 +58,33 @@
                 if (/^kausi\s+/i.test(text)) return text;
                 if (/^s\d+/i.test(text)) return text.toUpperCase();
                 return `Kausi ${text}`;
+            }
+
+            function normalizeIdLike(value) {
+                return String(value || '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+            }
+
+            function looksLikeChampionshipIdLabel(label, championshipId) {
+                const normalizedLabel = normalizeIdLike(label);
+                const normalizedId = normalizeIdLike(championshipId);
+                return Boolean(normalizedLabel) && Boolean(normalizedId) && normalizedLabel === normalizedId;
+            }
+
+            function formatDivisionBreadcrumbLabel(name, seasonValue, isPlayoffs = false, divisionNum = null) {
+                const normalizer = typeof window !== 'undefined' ? window.divisionNormalizer : null;
+                if (normalizer?.buildDivisionBreadcrumbMeta) {
+                    return normalizer.buildDivisionBreadcrumbMeta({
+                        name,
+                        season: seasonValue,
+                        isPlayoffs,
+                        divisionNum
+                    }).label;
+                }
+                const safeName = String(name || '').trim() || 'Divisioona';
+                const seasonLabel = seasonValue ? formatSeasonLabel(seasonValue) : '';
+                const base = seasonLabel ? `${safeName} (${seasonLabel})` : safeName;
+                if (isPlayoffs && !/playoffs?/i.test(base)) return `${base} (Playoffs)`;
+                return base;
             }
 
             function resolveDivisionSeason(params, query) {
@@ -75,6 +111,9 @@
                     if (name) return String(name);
                 }
                 if (lookupKey) {
+                    if (looksLikeRawId(lookupKey)) {
+                        return 'Divisioona';
+                    }
                     return beautifyDivisionLabel(lookupKey);
                 }
                 return 'Divisioona';
@@ -133,6 +172,83 @@
                 return seasonId != null ? `Kausi ${seasonId}` : '';
             }
 
+            function readPlayerContext(playerId) {
+                if (!playerStore || !playerId || typeof playerStore.getPlayerState !== 'function') return null;
+                const entry = playerStore.getPlayerState(playerId);
+                if (!entry) return null;
+                const profile = entry?.profile?.data || null;
+                const seasons = Array.isArray(entry?.seasons?.data) ? entry.seasons.data : [];
+                const defaultBundle = entry?.bundle?.__default__?.data || null;
+                const selectedChampionshipId = String(
+                    defaultBundle?.selected_championship_id
+                    || defaultBundle?.selectedChampionshipId
+                    || ''
+                );
+                const selectedSeason = selectedChampionshipId
+                    ? (seasons.find(season =>
+                        String(
+                            season?.championship_id
+                            || season?.championshipId
+                            || season?.id
+                            || ''
+                        ) === selectedChampionshipId
+                    ) || null)
+                    : (seasons[0] || null);
+                return { profile, selectedSeason, selectedChampionshipId };
+            }
+
+            function resolvePlayerName(params, query) {
+                if (query?.player_name) return String(query.player_name);
+                const playerId = params?.playerId;
+                const context = readPlayerContext(playerId);
+                const nickname =
+                    context?.profile?.nickname
+                    || context?.profile?.name
+                    || context?.profile?.player_name
+                    || null;
+                return nickname ? String(nickname) : `Pelaaja ${playerId}`;
+            }
+
+            function resolvePlayerTeamContext(params, query) {
+                const playerId = params?.playerId;
+                const context = readPlayerContext(playerId);
+                const seasonRow = context?.selectedSeason || null;
+                const championshipId =
+                    query?.championship
+                    || query?.team_championship
+                    || seasonRow?.championship_id
+                    || seasonRow?.championshipId
+                    || seasonRow?.id
+                    || context?.selectedChampionshipId
+                    || null;
+                const teamId =
+                    query?.team_id
+                    || seasonRow?.team_id
+                    || seasonRow?.teamId
+                    || null;
+                const teamName =
+                    query?.team_name
+                    || seasonRow?.team_name
+                    || seasonRow?.teamName
+                    || seasonRow?.team
+                    || null;
+                const season = seasonRow?.season != null ? String(seasonRow.season) : null;
+                const division = seasonRow?.division_num != null ? String(seasonRow.division_num) : null;
+                const isPlayoffs = Boolean(
+                    seasonRow?.is_playoffs
+                    || seasonRow?.isPlayoffs
+                    || seasonRow?.is_playoff
+                );
+                return {
+                    championshipId: championshipId ? String(championshipId) : null,
+                    teamId: teamId ? String(teamId) : null,
+                    teamName: teamName ? String(teamName) : null,
+                    season,
+                    division,
+                    isPlayoffs
+                };
+            }
+
             const breadcrumbs = computed(() => {
                 const crumbs = [];
                 const routeName = route.name;
@@ -163,13 +279,12 @@
                 if (params.championshipId) {
                     const championshipName = resolveDivisionName(params, query);
                     const seasonValue = resolveDivisionSeason(params, query);
-                    const seasonLabel = seasonValue ? formatSeasonLabel(seasonValue) : '';
-                    const fullLabel = seasonLabel ? `${championshipName} (${seasonLabel})` : championshipName;
                     const isPlayoffs = routeName === 'division-playoffs';
+                    const fullLabel = formatDivisionBreadcrumbLabel(championshipName, seasonValue, isPlayoffs);
                     
                     crumbs.push({
                         key: 'division',
-                        label: isPlayoffs ? `${fullLabel} (Playoffs)` : fullLabel,
+                        label: fullLabel,
                         icon: '🏆',
                         to: { 
                             name: isPlayoffs ? 'division-playoffs' : 'division', 
@@ -177,7 +292,8 @@
                             query: {
                                 ...(query.championship ? { championship: query.championship } : {}),
                                 ...(query.championship_name ? { championship_name: query.championship_name } : {}),
-                                ...(query.championship_season ? { championship_season: query.championship_season } : {})
+                                ...(query.championship_season ? { championship_season: query.championship_season } : {}),
+                                ...(isPlayoffs ? { championship_playoffs: '1' } : {})
                             }
                         },
                         disabled: routeName === 'division' || routeName === 'division-playoffs'
@@ -193,8 +309,8 @@
                         const championshipIdFromQuery = query.championship || query.team_championship;
                         const championshipName = resolveDivisionName({ championshipId: championshipIdFromQuery }, query);
                         const seasonValue = resolveDivisionSeason({ championshipId: championshipIdFromQuery }, query);
-                        const seasonLabel = seasonValue ? formatSeasonLabel(seasonValue) : '';
-                        const fullLabel = seasonLabel ? `${championshipName} (${seasonLabel})` : championshipName;
+                        const isPlayoffs = String(query?.championship_playoffs || '') === '1';
+                        const fullLabel = formatDivisionBreadcrumbLabel(championshipName, seasonValue, isPlayoffs);
                         
                         crumbs.push({
                             key: 'division',
@@ -206,7 +322,8 @@
                                 query: {
                                     ...(query.championship ? { championship: query.championship } : {}),
                                     ...(query.championship_name ? { championship_name: query.championship_name } : {}),
-                                    ...(query.championship_season ? { championship_season: query.championship_season } : {})
+                                    ...(query.championship_season ? { championship_season: query.championship_season } : {}),
+                                    ...(isPlayoffs ? { championship_playoffs: '1' } : {})
                                 }
                             },
                             disabled: false
@@ -244,7 +361,71 @@
 
                 // Player context
                 if (params.playerId && routeName === 'player') {
-                    const playerName = query.player_name || `Pelaaja ${params.playerId}`;
+                    const playerName = resolvePlayerName(params, query);
+                    const playerContext = resolvePlayerTeamContext(params, query);
+                    const isPlayoffs = playerContext.isPlayoffs || String(query?.championship_playoffs || '') === '1';
+
+                    if (playerContext.championshipId) {
+                        const championshipName = resolveDivisionName({ championshipId: playerContext.championshipId }, query);
+                        const championshipLooksLikeId = looksLikeChampionshipIdLabel(championshipName, playerContext.championshipId);
+                        const seasonValue = resolveDivisionSeason({ championshipId: playerContext.championshipId }, query) || playerContext.season;
+                        const fullLabel = formatDivisionBreadcrumbLabel(
+                            championshipLooksLikeId ? null : championshipName,
+                            seasonValue,
+                            isPlayoffs,
+                            playerContext.division
+                        );
+                        crumbs.push({
+                            key: 'division',
+                            label: fullLabel,
+                            icon: '🏆',
+                            to: {
+                                name: 'division',
+                                params: { championshipId: playerContext.championshipId },
+                                query: {
+                                    championship: playerContext.championshipId,
+                                    ...(query.championship_name ? { championship_name: query.championship_name } : {}),
+                                    ...(query.championship_season ? { championship_season: query.championship_season } : {}),
+                                    ...(isPlayoffs ? { championship_playoffs: '1' } : {})
+                                }
+                            },
+                            disabled: false
+                        });
+                    }
+
+                    if (playerContext.teamId || playerContext.teamName) {
+                        const teamName = playerContext.teamName || `Joukkue ${playerContext.teamId || ''}`.trim();
+                        const teamTo = playerContext.teamId
+                            ? (playerContext.championshipId
+                                ? {
+                                    name: 'team-detail',
+                                    params: {
+                                        championshipId: playerContext.championshipId,
+                                        teamId: playerContext.teamId
+                                    },
+                                    query: {
+                                        ...(playerContext.championshipId ? { championship: playerContext.championshipId } : {}),
+                                        ...(query.championship_name ? { championship_name: query.championship_name } : {}),
+                                        ...(query.championship_season ? { championship_season: query.championship_season } : {}),
+                                        ...(isPlayoffs ? { championship_playoffs: '1' } : {}),
+                                        ...(teamName ? { team_name: teamName } : {})
+                                    }
+                                }
+                                : {
+                                    name: 'team',
+                                    params: { teamId: playerContext.teamId },
+                                    query: teamName ? { team_name: teamName } : {}
+                                })
+                            : null;
+                        crumbs.push({
+                            key: 'team',
+                            label: teamName,
+                            icon: '👥',
+                            to: teamTo || { name: 'home' },
+                            disabled: !teamTo
+                        });
+                    }
+
                     crumbs.push({
                         key: 'player',
                         label: playerName,
@@ -252,7 +433,13 @@
                         to: { 
                             name: 'player', 
                             params: { playerId: params.playerId },
-                            query: query.player_name ? { player_name: query.player_name } : {}
+                            query: {
+                                ...(query.player_name ? { player_name: query.player_name } : {}),
+                                ...(playerContext.championshipId ? { championship: playerContext.championshipId } : {}),
+                                ...(isPlayoffs ? { championship_playoffs: '1' } : {}),
+                                ...(playerContext.teamId ? { team_id: playerContext.teamId } : {}),
+                                ...(playerContext.teamName ? { team_name: playerContext.teamName } : {})
+                            }
                         },
                         disabled: true
                     });

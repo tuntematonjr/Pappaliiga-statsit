@@ -6,7 +6,6 @@ import argparse
 import asyncio
 import logging
 import os
-from datetime import datetime
 from pathlib import Path
 import sys
 import time
@@ -19,12 +18,18 @@ from faceit_client_async import get_rate_limit_stats, reset_rate_limit_stats, sh
 import faceit_config
 from sync_pipeline import ChampionshipSyncResult, sync_championship_async, update_single_match_async
 from utils import format_hms, log_stage
+from utils.log_files import (
+    DEFAULT_LOG_MAX_AGE_DAYS,
+    DEFAULT_LOG_MAX_TOTAL_BYTES,
+    build_timestamped_log_path,
+    prune_log_files,
+)
 from division_registry import refresh_divisions
 from runtime_diagnostics import SyncDiagnostics
 
 LOGGER = logging.getLogger("pappaliiga.sync")
-LOG_DIR = Path(os.environ.get("SYNC_LOG_DIR", Path(__file__).with_name("logs")))
-DEFAULT_LOG_MAX_FILES = 10
+_DEFAULT_SYNC_LOG_DIR = Path(__file__).with_name("logs") / "sync"
+LOG_DIR = Path(os.environ.get("SYNC_LOG_DIR", _DEFAULT_SYNC_LOG_DIR))
 
 
 def _configure_logging(verbose: bool) -> None:
@@ -34,9 +39,7 @@ def _configure_logging(verbose: bool) -> None:
         root.setLevel(level)
         return
 
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
-    log_path = LOG_DIR / f"sync-{timestamp}.log"
+    log_path = build_timestamped_log_path(LOG_DIR, prefix="sync")
 
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
@@ -44,7 +47,6 @@ def _configure_logging(verbose: bool) -> None:
     console_handler.setFormatter(formatter)
     console_handler.setLevel(level)
 
-    max_files = int(os.environ.get("SYNC_LOG_MAX_FILES", DEFAULT_LOG_MAX_FILES))
     # Use a plain file handler so we don't split the log file by size.
     from logging import FileHandler
     file_handler = FileHandler(log_path, mode="a", encoding="utf-8")
@@ -55,20 +57,21 @@ def _configure_logging(verbose: bool) -> None:
     root.handlers.clear()
     root.addHandler(console_handler)
     root.addHandler(file_handler)
-    # Ensure pruning runs after the new log file exists so the new file counts
+
+    # Ensure pruning runs after the new log file exists so the active file is preserved.
     try:
-        if max_files > 0:
-            # ensure file exists (FileHandler opened in append, but touch to be safe)
-            try:
-                log_path.touch(exist_ok=True)
-            except Exception:
-                pass
-            logs = sorted(LOG_DIR.glob("sync-*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
-            for old in logs[max_files:]:
-                try:
-                    old.unlink()
-                except Exception:
-                    logging.getLogger("pappaliiga.sync").warning("Failed to remove old log file %s", old)
+        try:
+            log_path.touch(exist_ok=True)
+        except Exception:
+            pass
+        prune_log_files(
+            log_dir=LOG_DIR,
+            file_glob="sync-*.log",
+            active_log_path=log_path,
+            max_age_days=int(os.environ.get("SYNC_LOG_MAX_AGE_DAYS", DEFAULT_LOG_MAX_AGE_DAYS)),
+            max_total_bytes=int(os.environ.get("SYNC_LOG_MAX_TOTAL_BYTES", DEFAULT_LOG_MAX_TOTAL_BYTES)),
+            logger=logging.getLogger("pappaliiga.sync"),
+        )
     except Exception:
         logging.getLogger("pappaliiga.sync").exception("Log pruning failed")
     _configure_logging._configured = True

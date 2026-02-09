@@ -377,7 +377,7 @@
             },
             bestPlayer: bestPlayer ? {
                 name: bestPlayer.name || bestPlayer.nickname,
-                rating: Number(bestPlayer.rating || 0).toFixed(2)
+                kd: Number(bestPlayer.kd || 0).toFixed(2)
             } : null,
             mvpTeam: mvpTeam,
             winners: winners,
@@ -644,7 +644,7 @@
                 const hasBestPlayer = Boolean(this.division.bestPlayer);
                 const hasMvpTeam = Boolean(this.division.mvpTeam);
                 if (hasBestPlayer) {
-                    rows.push({ key: 'bestPlayer', label: 'Paras pelaaja', value: `${this.division.bestPlayer.name} (${this.division.bestPlayer.rating})` });
+                    rows.push({ key: 'bestPlayer', label: 'Paras pelaaja', value: `${this.division.bestPlayer.name} (K/D ${this.division.bestPlayer.kd})` });
                 }
                 if (hasMvpTeam) {
                     rows.push({ key: 'mvpTeam', label: 'MVP-joukkue', value: this.division.mvpTeam });

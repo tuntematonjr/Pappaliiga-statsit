@@ -101,7 +101,7 @@ async def get_top_players(
 
 
 @router.get("/division/{championship_id}/averages")
-async def get_division_averages(championship_id: int):
+async def get_division_averages(championship_id: str):
     try:
         averages = await stats_service.get_division_averages(championship_id)
     except NotFoundError as exc:

@@ -88,6 +88,28 @@ const SANKARI_CARD_GROUPS = [
                 metricKey: 'sniperKills',
                 sortDirection: 'desc',
                 maxEntries: 4
+            },
+            {
+                id: 'puukko-junnkkari',
+                title: 'Sain maineen puukko junnkkari',
+                description: 'Hiipii selkään kuin LAN-illan viimeinen yllätys.<br>Eniten puukko tappoja.',
+                metricKey: 'knifeKills',
+                requirePositive: true,
+                showWhenEmpty: true,
+                placeholderNames: ['Bot Allu', 'Bot Bob', 'Bot Pete', 'Bot Tuntematon'],
+                sortDirection: 'desc',
+                maxEntries: 4
+            },
+            {
+                id: 'ukko-ylijumala',
+                title: 'Ukko Ylijumala',
+                description: 'Salama ei aina iske kahdesti, mutta Zeus kyllä.<br>Eniten zeus tappoja.',
+                metricKey: 'zeusKills',
+                requirePositive: true,
+                showWhenEmpty: true,
+                placeholderNames: ['Bot Allu', 'Bot Bob', 'Bot Pete', 'Bot Tuntematon'],
+                sortDirection: 'desc',
+                maxEntries: 4
             }
         ]
     },
@@ -224,6 +246,8 @@ const SANKARI_METRIC_META = {
     totalKills: { decimals: 0 },
     pistolKills: { decimals: 0 },
     sniperKills: { decimals: 0 },
+    knifeKills: { decimals: 0 },
+    zeusKills: { decimals: 0 },
     roundsPlayed: { decimals: 0 },
     totalDamage: { decimals: 0 },
     deaths: { decimals: 0 },
@@ -345,7 +369,6 @@ window.DivisionView = {
         get ErrorMessage() { return window.ErrorMessage; },
         get TeamComparisonBoard() { return window.TeamComparisonBoard; },
         get MapsStats() { return window.MapsStats; },
-        get CopyLink() { return window.CopyLink; },
         get SummaryStatCard() { return window.SummaryStatCard; },
         get SankariCard() { return window.SankariCard; },
         get UpcomingMatchesList() { return window.UpcomingMatchesList; }
@@ -366,7 +389,8 @@ window.DivisionView = {
                 { id: 'maps', label: 'Karttatilastot' },
                 { id: 'heroes', label: 'Sankarit' }
             ],
-            activeTeamChipId: null
+            activeTeamChipId: null,
+            sankariPlaceholderOrderCache: {}
         };
     },
     computed: {
@@ -499,19 +523,20 @@ window.DivisionView = {
                 .filter(Boolean);
         },
         sankariGroups() {
-            if (!this.sankariPlayers.length) return [];
             return SANKARI_CARD_GROUPS.map(group => {
                 const cards = group.cards
                     .map(card => {
                         const thresholds = this.sankariThreshold(card, this.sankariPlayers);
+                        const entries = this.buildSankariEntries(this.sankariPlayers, card, thresholds);
+                        const resolvedEntries = this.mergeSankariEntriesWithPlaceholders(card, entries);
                         return {
                             ...card,
                             thresholds,
-                            entries: this.buildSankariEntries(this.sankariPlayers, card, thresholds),
+                            entries: resolvedEntries,
                             tooltip: this.cardThresholdTooltip(card, thresholds)
                         };
                     })
-                    .filter(card => card.entries.length);
+                    .filter(card => card.showWhenEmpty === true || card.entries.length);
                 if (!cards.length) return null;
                 return {
                     ...group,
@@ -1080,6 +1105,8 @@ window.DivisionView = {
                 mvps: safe(row.mvps),
                 pistolKills: safe(row.pistol_kills ?? row.pistolKills),
                 sniperKills: safe(row.sniper_kills ?? row.sniperKills),
+                knifeKills: safe(row.knife_kills ?? row.knifeKills),
+                zeusKills: safe(row.zeus_kills ?? row.zeusKills),
                 utilityDamage: safe(row.utility_damage ?? row.utilityDamage),
                 enemiesFlashed: safe(row.enemies_flashed ?? row.enemiesFlashed),
                 flashCount: safe(row.flash_count ?? row.flashCount),
@@ -1135,6 +1162,9 @@ window.DivisionView = {
                     if (value === null || value === undefined || Number.isNaN(value)) {
                         return null;
                     }
+                    if (card.requirePositive === true && value <= 0) {
+                        return null;
+                    }
                     return {
                         id: player.id || player.playerId,
                         nickname: player.nickname || 'Tuntematon',
@@ -1154,6 +1184,55 @@ window.DivisionView = {
             const limit = Number(card.maxEntries) || 4;
             return sorted.slice(0, limit);
         },
+        buildSankariPlaceholderEntries(card) {
+            if (!card || !Array.isArray(card.placeholderNames) || !card.placeholderNames.length) {
+                return [];
+            }
+            const limit = Number(card.maxEntries) || 4;
+            const names = this.getPlaceholderNames(card).slice(0, limit);
+            return names.map((name, idx) => ({
+                id: `${card.id || 'sankari'}-placeholder-${idx}`,
+                nickname: name || 'Bot Tuntematon',
+                teamName: 'Pappaliiga Botit',
+                avatar: DIVISION_DEFAULT_TEAM_LOGO,
+                logo: DIVISION_DEFAULT_TEAM_LOGO,
+                maps: '–',
+                rounds: '–',
+                rawValue: null,
+                displayValue: '–'
+            }));
+        },
+        mergeSankariEntriesWithPlaceholders(card, entries) {
+            const baseEntries = Array.isArray(entries) ? entries : [];
+            const limit = Number(card?.maxEntries) || 4;
+            if (!card || !Array.isArray(card.placeholderNames) || !card.placeholderNames.length) {
+                return baseEntries.slice(0, limit);
+            }
+            if (baseEntries.length >= limit) {
+                return baseEntries.slice(0, limit);
+            }
+            const missing = limit - baseEntries.length;
+            if (missing <= 0) return baseEntries.slice(0, limit);
+            const placeholders = this.buildSankariPlaceholderEntries(card).slice(0, missing);
+            return [...baseEntries, ...placeholders].slice(0, limit);
+        },
+        getPlaceholderNames(card) {
+            if (!card || !card.id || !Array.isArray(card.placeholderNames)) {
+                return [];
+            }
+            const key = String(card.id);
+            const cached = this.sankariPlaceholderOrderCache?.[key];
+            if (Array.isArray(cached) && cached.length) {
+                return cached;
+            }
+            const shuffled = [...card.placeholderNames];
+            for (let i = shuffled.length - 1; i > 0; i -= 1) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            this.sankariPlaceholderOrderCache[key] = shuffled;
+            return shuffled;
+        },
         sankariMetricValue(player, metricKey) {
             if (!player) return null;
             switch (metricKey) {
@@ -1170,6 +1249,10 @@ window.DivisionView = {
                     return player.pistolKills;
                 case 'sniperKills':
                     return player.sniperKills;
+                case 'knifeKills':
+                    return player.knifeKills;
+                case 'zeusKills':
+                    return player.zeusKills;
                 case 'roundsPlayed':
                     return player.rounds;
                 case 'totalDamage':

@@ -471,7 +471,7 @@ async def _fetch_best_players_map(season: int) -> Dict[tuple[int, int], Dict[str
         key = (int(row["season"]), int(row["division_num"]))
         result[key] = {
             "name": row["nickname"],
-            "rating": float(row["kd"]),
+            "kd": float(row["kd"]),
         }
     
     return result
