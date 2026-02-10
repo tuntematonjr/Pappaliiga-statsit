@@ -202,6 +202,38 @@ a{ color:var(--accent); text-decoration:none; }
         box-shadow: var(--shadow);
 }
 
+/* Beta popup styles */
+.beta-badge{
+	right:18px; bottom:80px; padding:10px 12px; border-radius:10px; font-weight:700; position:fixed;
+}
+.beta-overlay{
+	position:fixed;
+	top:0; left:0; right:0; bottom:0;
+	background:rgba(0,0,0,0.6);
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	z-index:10002;
+	padding:20px; /* ensure small-screen spacing */
+}
+.beta-modal{
+	background: linear-gradient(180deg, rgba(18,25,50,0.98), rgba(12,18,36,0.98));
+	border:1px solid rgba(255,255,255,0.06);
+	padding:18px; border-radius:12px; max-width:420px; width:100%; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+	margin: 0 auto; /* center within available space */
+	transform: translateZ(0);
+	max-height: 80vh; overflow: auto;
+}
+.beta-modal-head{ font-size:1.05rem; font-weight:700; margin-bottom:8px; }
+.beta-modal-body{ color:var(--muted); margin-bottom:12px; }
+.beta-modal-actions{ display:flex; gap:10px; justify-content:flex-end; }
+
+/* Seedaus modal overlay */
+.seedaus-overlay{
+	position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:9998;
+}
+.seedaus-modal{ max-width:420px; }
+
 .info-banner {
         margin: 24px 0;
         padding: 18px 22px;
@@ -398,6 +430,44 @@ a{ color:var(--accent); text-decoration:none; }
 	padding: 32px;
 	background: linear-gradient(135deg, rgba(15,25,45,0.6), rgba(8,15,30,0.8));
 	border: 1px solid rgba(255,255,255,0.08);
+
+/* Small floating seedaus button + modal */
+.seedaus-btn{
+	width:48px; height:48px; border-radius:12px; font-weight:700; font-size:16px; display:inline-flex; align-items:center; justify-content:center;
+	position:fixed; left:18px; top:18px; z-index:80;
+}
+.seedaus-modal-overlay{
+	position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(2,6,23,0.6); z-index:120;
+}
+.seedaus-modal{
+	width:320px; max-width:92%; background:linear-gradient(180deg, var(--card), #0e1730); border:1px solid rgba(255,255,255,0.05); padding:18px; border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,0.6); color:var(--fg);
+}
+.seedaus-modal-head{ font-size:18px; font-weight:700; margin-bottom:8px; }
+.seedaus-modal-body{ color:var(--muted); margin-bottom:14px; }
+.seedaus-modal-actions{ display:flex; gap:10px; justify-content:flex-end; }
+
+@media (max-width:768px){
+	.seedaus-modal{ width:92%; }
+	.seedaus-btn{ left:12px; top:12px; }
+}
+
+/* Explicitly override global floating rule for this specific button */
+.btn-floating.seedaus-btn {
+	right: auto !important;
+	bottom: auto !important;
+	left: 18px !important;
+	top: 18px !important;
+}
+
+/* Strong ID-based override to guarantee position */
+#seedaus-btn {
+	position: fixed !important;
+	left: 18px !important;
+	top: 18px !important;
+	right: auto !important;
+	bottom: auto !important;
+	z-index: 9999 !important;
+}
 	border-radius: 20px;
 	backdrop-filter: blur(10px);
 }
