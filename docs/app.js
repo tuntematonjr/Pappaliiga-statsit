@@ -1,4 +1,40 @@
 // Extracted from html_gen.py UNIFIED_HEAD <script>
+
+// Default Pappaliiga logo for broken images
+const DEFAULT_LOGO_URL = 'https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png';
+
+/**
+ * Handle image load errors by replacing with default logo
+ * Attaches to all images with class 'logo' 
+ */
+function setupImageFallbacks() {
+	const images = document.querySelectorAll('img.logo');
+	images.forEach(img => {
+		// Add error handler if not already present
+		if (!img.hasAttribute('data-fallback-set')) {
+			img.addEventListener('error', function() {
+				this.src = DEFAULT_LOGO_URL;
+
+				this.title = 'Default logo (image not available)';
+			}, { once: true });
+			img.setAttribute('data-fallback-set', 'true');
+		}
+	});
+}
+
+// Setup fallbacks when DOM is ready
+document.addEventListener('DOMContentLoaded', setupImageFallbacks);
+
+// Also watch for dynamically added images
+const imageObserver = new MutationObserver(() => {
+	setupImageFallbacks();
+});
+
+imageObserver.observe(document.body, {
+	childList: true,
+	subtree: true
+});
+
 function sortTable(tableId,n,numeric){
 	const table=document.getElementById(tableId);
 	const dirAttr=table.getAttribute('data-sort-dir')||'asc';
@@ -236,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	initTeamLinks();
 	initSmoothAnimations();
 	initSeasonSelector();
+	initSeedausButton();
 });
 
 function initTabs() {
@@ -692,4 +729,182 @@ function switchTab(containerId, tabName) {
 	const targetPanel = container.querySelector(`.tab-panel[data-tab="${tabName}"]`);
 	if (targetPanel) targetPanel.classList.add('active');
 
+}
+
+// Small floating button + modal asking the seedaus question
+function initSeedausButton() {
+	// Avoid adding multiple times
+	if (document.getElementById('seedaus-btn')) return;
+
+	// Floating button
+	const btn = document.createElement('button');
+	btn.id = 'seedaus-btn';
+	btn.className = 'btn btn-ghost btn-floating seedaus-btn';
+	btn.type = 'button';
+	btn.title = 'Pieni kysymys';
+	btn.textContent = '✓?';
+    // Explicit inline positioning to avoid conflicts with other floating rules
+    btn.style.position = 'fixed';
+    btn.style.left = '18px';
+    btn.style.top = '18px';
+    btn.style.right = 'auto';
+    btn.style.bottom = 'auto';
+    btn.style.zIndex = '9999';
+	// Create overlay and ensure it sits just below the button
+	const overlay = document.createElement('div');
+	overlay.className = 'seedaus-overlay';
+	overlay.style.display = 'none';
+	overlay.style.zIndex = '9998';
+	// Modal box
+	const modal = document.createElement('div');
+	modal.className = 'seedaus-modal';
+	modal.innerHTML = `
+		<div class="seedaus-modal-head">Oliko seedaus paska?</div>
+		<div class="seedaus-modal-body">Valitse jatka nähdäksesi vastauksen.</div>
+		<div class="seedaus-modal-actions">
+			<button class="btn btn-primary" id="seedaus-continue">Jatka</button>
+			<button class="btn btn-ghost" id="seedaus-cancel">Peru</button>
+		</div>
+	`;
+
+	overlay.appendChild(modal);
+	document.body.appendChild(overlay);
+	document.body.appendChild(btn);
+
+	function closeOverlay() {
+		overlay.style.display = 'none';
+	}
+
+	function openOverlay() {
+		// Reset modal to initial state
+		modal.querySelector('.seedaus-modal-head').textContent = 'Oliko seedaus paska?';
+		modal.querySelector('.seedaus-modal-body').textContent = 'Valitse jatka nähdäksesi vastauksen.';
+		const actions = modal.querySelector('.seedaus-modal-actions');
+		actions.innerHTML = '<button class="btn btn-primary" id="seedaus-continue">Jatka</button> <button class="btn btn-ghost" id="seedaus-cancel">Peru</button>';
+		overlay.style.display = 'flex';
+        // Ensure centering even if other CSS interferes
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        modal.style.margin = 'auto';
+		// Bind continue/cancel
+		overlay.querySelector('#seedaus-cancel').addEventListener('click', closeOverlay);
+		overlay.querySelector('#seedaus-continue').addEventListener('click', () => {
+			// 90% Kyllä, otherwise Ei
+			const ok = Math.random() < 0.9;
+			const head = modal.querySelector('.seedaus-modal-head');
+			const body = modal.querySelector('.seedaus-modal-body');
+			if (ok) {
+				head.textContent = 'Kyllä';
+				body.textContent = 'Kyllä se oli paska.';
+			} else {
+				head.textContent = 'Ei (oli oikeesti)';
+				body.textContent = 'No, oikeesti se ei ollut niin paha.';
+			}
+			// Replace actions with single close button
+			const actions2 = modal.querySelector('.seedaus-modal-actions');
+			actions2.innerHTML = '<button class="btn btn-primary" id="seedaus-close">OK</button>';
+			actions2.querySelector('#seedaus-close').addEventListener('click', closeOverlay);
+		}, { once: true });
+	}
+
+	// Open on button click
+	btn.addEventListener('click', (e) => { e.preventDefault(); openOverlay(); });
+
+	// Close when clicking outside modal
+	overlay.addEventListener('click', (e) => {
+		if (e.target === overlay) closeOverlay();
+	});
+}
+
+// Ensure the seedaus button exists even if DOMContentLoaded didn't run or scripts were loaded late
+if (typeof initSeedausButton === 'function') {
+    if (document.readyState !== 'loading') {
+        initSeedausButton();
+    } else {
+        document.addEventListener('DOMContentLoaded', initSeedausButton);
+    }
+}
+
+// Beta notice: show a small badge and modal when a beta page is available.
+function initBetaNotice() {
+	// Determine beta link and version from body data attributes or global variables
+	// If already created, don't run twice
+	if (document.getElementById('beta-overlay')) return;
+	const betaLink = document.body.dataset.betaLink || (window.BETA_LINK || null);
+	const betaVersion = document.body.dataset.betaVersion || (window.BETA_VERSION || '1');
+	if (!betaLink) return; // no beta configured
+
+	const storageKey = `beta_seen_${betaVersion}`;
+	const storedVal = localStorage.getItem(storageKey);
+	if (storedVal) {
+		if (storedVal === 'permanent') return; // permanently dismissed (opened)
+		const ts = parseInt(storedVal, 10);
+		if (!isNaN(ts) && ts > Date.now()) return; // still within suppression window
+		// expired or invalid -> remove and continue
+		localStorage.removeItem(storageKey);
+	}
+
+	// Overlay + modal (open automatically)
+	const overlay = document.createElement('div');
+	overlay.id = 'beta-overlay';
+	overlay.className = 'beta-overlay';
+	overlay.style.display = 'none';
+
+	const modal = document.createElement('div');
+	modal.className = 'beta-modal';
+	modal.innerHTML = `
+		<div class="beta-modal-head">Uusi beta-sivu</div>
+		<div class="beta-modal-body">Uusi beta-sivu on julkaistu. Haluatko avata sen nyt?</div>
+		<div class="beta-modal-actions">
+			<a class="btn btn-primary" id="beta-open" href="${betaLink}" target="_blank" rel="noopener">Avaa beta</a>
+			<button class="btn btn-ghost" id="beta-close">Sulje</button>
+		</div>
+	`;
+
+	overlay.appendChild(modal);
+	document.body.appendChild(overlay);
+
+	function openOverlay() {
+		overlay.style.display = 'flex';
+		overlay.style.alignItems = 'center';
+		overlay.style.justifyContent = 'center';
+	}
+	function closeOverlay() {
+		overlay.style.display = 'none';
+	}
+
+	// Close when clicking outside modal
+	overlay.addEventListener('click', (e) => {
+		if (e.target === overlay) closeOverlay();
+	});
+
+	// Close button suppresses reminder for 1 day
+	overlay.querySelector('#beta-close').addEventListener('click', (e) => {
+		e.preventDefault();
+		const oneDay = 24 * 60 * 60 * 1000;
+		const expiry = Date.now() + oneDay;
+		try { localStorage.setItem(storageKey, expiry.toString()); } catch (err) { /* ignore */ }
+		closeOverlay();
+	});
+
+	// Mark seen permanently when user opens the beta link
+	overlay.querySelector('#beta-open').addEventListener('click', () => {
+		try { localStorage.setItem(storageKey, 'permanent'); } catch (err) { /* ignore */ }
+	});
+
+	// Open automatically shortly after load
+	setTimeout(() => { openOverlay(); }, 250);
+}
+
+// Default beta link provided by user (only set if not present)
+if (!window.BETA_LINK) window.BETA_LINK = 'https://pappa.aukko.net';
+if (!window.BETA_VERSION) window.BETA_VERSION = '20260210';
+
+// Ensure beta notice runs even if DOMContentLoaded already fired
+if (typeof initBetaNotice === 'function') {
+	if (document.readyState !== 'loading') {
+		initBetaNotice();
+	} else {
+		document.addEventListener('DOMContentLoaded', initBetaNotice);
+	}
 }
