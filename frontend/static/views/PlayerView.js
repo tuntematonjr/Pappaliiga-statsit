@@ -1092,12 +1092,21 @@ window.PlayerView = {
                 this.selectedSeasonId = null;
                 return;
             }
-            if (!this.selectedSeasonId || !newOptions.some(option => option.value === this.selectedSeasonId)) {
-                this.selectedSeasonId = newOptions[0].value;
+            const preferred = this.resolvePreferredSeasonId(newOptions);
+            if (preferred && String(preferred) !== String(this.selectedSeasonId || '')) {
+                this.selectedSeasonId = preferred;
             }
             if (this.trendScope === 'all') {
                 this.loadAllProgressions();
             }
+        },
+        '$route.query.championship'(newVal) {
+            if (!Array.isArray(this.seasonOptions) || !this.seasonOptions.length) return;
+            const requested = newVal == null ? null : String(newVal).trim();
+            if (!requested) return;
+            if (!this.seasonOptions.some(option => String(option.value) === requested)) return;
+            if (String(this.selectedSeasonId || '') === requested) return;
+            this.selectedSeasonId = requested;
         },
         selectedSeasonId(newVal, oldVal) {
             if (newVal && newVal !== oldVal) {
@@ -1131,6 +1140,23 @@ window.PlayerView = {
         }
     },
     methods: {
+        requestedChampionshipId() {
+            const raw = this.$route?.query?.championship;
+            if (raw === null || raw === undefined) return null;
+            const value = String(raw).trim();
+            return value || null;
+        },
+        resolvePreferredSeasonId(options = []) {
+            if (!Array.isArray(options) || !options.length) return null;
+            const requested = this.requestedChampionshipId();
+            if (requested && options.some(option => String(option.value) === requested)) {
+                return requested;
+            }
+            if (this.selectedSeasonId && options.some(option => String(option.value) === String(this.selectedSeasonId))) {
+                return this.selectedSeasonId;
+            }
+            return options[0].value;
+        },
         async bootstrap() {
             if (!this.playerStore || !this.playerId) return;
             this.compareVisible = false;
@@ -1139,8 +1165,9 @@ window.PlayerView = {
             try {
                 await this.playerStore.fetchBundle(this.playerId, null, { force: true });
                 const defaults = this.seasonOptions;
-                if (defaults.length && !this.selectedSeasonId) {
-                    this.selectedSeasonId = defaults[0].value;
+                const preferred = this.resolvePreferredSeasonId(defaults);
+                if (preferred && String(preferred) !== String(this.selectedSeasonId || '')) {
+                    this.selectedSeasonId = preferred;
                 }
                 if (this.selectedSeasonId) {
                     await this.playerStore.fetchBundle(this.playerId, this.selectedSeasonId, { force: true });
@@ -1152,6 +1179,7 @@ window.PlayerView = {
         },
         syncRouteBreadcrumbContext() {
             if (!this.$router || !this.$route || !this.playerId) return;
+            if (!this.selectedSeasonId) return;
             const currentSeason = this.currentSeasonOption || null;
             const currentSeasonStats = this.selectedSeasonStats || null;
             const teamName = this.heroTeam || null;
