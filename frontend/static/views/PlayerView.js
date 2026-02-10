@@ -4,7 +4,7 @@ const PLAYER_KPI_SCHEMA = [
     { key: 'adr', label: 'ADR', decimals: 1, max: 130 },
     { key: 'hs_pct', label: 'HS%', decimals: 1, max: 100, percent: true },
     { key: 'entry_pct', label: 'Entry %', decimals: 1, max: 100, percent: true },
-    { key: 'clutch_pct', label: 'Clutch %', decimals: 1, max: 100, percent: true },
+    { key: 'first_kills', label: 'First Kills', decimals: 0, max: 220 },
     { key: 'flash_success_pct', label: 'Flash Suc %', decimals: 1, max: 100, percent: true },
     { key: 'utility_success_pct', label: 'Utility Suc %', decimals: 1, max: 100, percent: true }
 ];
@@ -79,7 +79,6 @@ const TOTALS_SECTION_SCHEMA = [
             { label: 'ADR', key: 'adr', fmt: 'float', decimals: 1 },
             { label: 'HS%', key: 'hs_pct', fmt: 'pct', decimals: 1 },
             { label: 'Entry %', key: 'entry_pct', fmt: 'pct', decimals: 1 },
-            { label: 'Clutch %', key: 'clutch_pct', fmt: 'pct', decimals: 1 },
             { label: 'Flash %', key: 'flash_pct', fmt: 'pct', decimals: 1 },
             { label: 'Util / R', key: 'utility_per_round', fmt: 'float', decimals: 2 }
         ]
@@ -132,7 +131,6 @@ const TREND_METRIC_OPTIONS = [
     { key: 'adr', label: 'ADR', decimals: 1, color: '#fbbf24' },
     { key: 'hs_pct', label: 'HS%', decimals: 1, percent: true, color: '#a78bfa' },
     { key: 'entry_pct', label: 'Entry %', decimals: 1, percent: true, color: '#22d3ee' },
-    { key: 'clutch_pct', label: 'Clutch %', decimals: 1, percent: true, color: '#2dd4bf' },
     { key: 'flash_pct', label: 'Flash %', decimals: 1, percent: true, color: '#10b981' },
     { key: 'utility_per_round', label: 'Util / Round', decimals: 2, color: '#0ea5e9' }
 ];
@@ -148,7 +146,7 @@ const TREND_METRIC_GROUPS = [
     { key: 'clutch_1v2', title: '1v2 Duel', members: ['cl_1v2_attempts', 'cl_1v2_wins'] },
     { key: 'entry_duel', title: 'Entry Duel', members: ['entry_count', 'entry_wins'] },
     { key: 'flash_duel', title: 'Flash Impact', members: ['enemies_flashed', 'flash_count', 'flash_successes'] },
-    { key: 'percentage_stats', title: 'Percentages', members: ['entry_pct', 'clutch_pct', 'hs_pct', 'flash_pct'] },
+    { key: 'percentage_stats', title: 'Percentages', members: ['entry_pct', 'hs_pct', 'flash_pct'] },
     { key: 'gun_game', title: 'Weapon Kills', members: ['sniper_kills', 'pistol_kills', 'knife_kills', 'zeus_kills'] }
 ];
 
@@ -238,9 +236,6 @@ function aggregateSeasons(seasons) {
     totals.hs_pct = safeDivide(totals.headshots, totals.kills) * 100;
     totals.entry_pct = safeDivide(totals.entry_wins, totals.entry_count) * 100;
     totals.flash_pct = safeDivide(totals.flash_successes, totals.flash_count) * 100;
-    const clutch_attempts = totals.cl_1v1_attempts + totals.cl_1v2_attempts;
-    const clutch_wins = totals.cl_1v1_wins + totals.cl_1v2_wins;
-    totals.clutch_pct = safeDivide(clutch_wins, clutch_attempts) * 100;
     totals.utility_per_round = safeDivide(totals.utility_damage, totals.rounds_played);
     totals.entry_per_round = safeDivide(totals.entry_count, totals.rounds_played);
     totals.first_kills_per_round = safeDivide(totals.first_kills, totals.rounds_played);
@@ -265,11 +260,6 @@ function buildKpis(stats) {
     }
     if (!Number.isFinite(Number(computed.entry_pct))) {
         computed.entry_pct = safeDivide(toNumber(computed.entry_wins), Math.max(1, toNumber(computed.entry_count))) * 100;
-    }
-    if (!Number.isFinite(Number(computed.clutch_pct))) {
-        const attempts = toNumber(computed.cl_1v1_attempts) + toNumber(computed.cl_1v2_attempts);
-        const wins = toNumber(computed.cl_1v1_wins) + toNumber(computed.cl_1v2_wins);
-        computed.clutch_pct = safeDivide(wins, Math.max(1, attempts)) * 100;
     }
     if (!Number.isFinite(Number(computed.utility_per_round))) {
         computed.utility_per_round = safeDivide(
@@ -388,11 +378,6 @@ function buildSummaryCards(totals) {
 function trendMetricValue(row, metricKey) {
     if (!row) return 0;
     if (metricKey === 'entry_pct') return safeDivide(toNumber(row.entry_wins), Math.max(1, toNumber(row.entry_count))) * 100;
-    if (metricKey === 'clutch_pct') {
-        const attempts = toNumber(row.cl_1v1_attempts) + toNumber(row.cl_1v2_attempts);
-        const wins = toNumber(row.cl_1v1_wins) + toNumber(row.cl_1v2_wins);
-        return safeDivide(wins, Math.max(1, attempts)) * 100;
-    }
     if (metricKey === 'flash_pct') return safeDivide(toNumber(row.flash_successes), Math.max(1, toNumber(row.flash_count))) * 100;
     if (metricKey === 'utility_per_round') return safeDivide(toNumber(row.utility_damage), Math.max(1, toNumber(row.rounds_played)));
     return toNumber(row[metricKey]);
@@ -443,9 +428,6 @@ function withDerivedMetrics(row) {
     base.adr = safeDivide(toNumber(base.damage), Math.max(1, toNumber(base.rounds_played)));
     base.hs_pct = safeDivide(toNumber(base.headshots), Math.max(1, toNumber(base.kills))) * 100;
     base.entry_pct = safeDivide(toNumber(base.entry_wins), Math.max(1, toNumber(base.entry_count))) * 100;
-    const clutchAttempts = toNumber(base.cl_1v1_attempts) + toNumber(base.cl_1v2_attempts);
-    const clutchWins = toNumber(base.cl_1v1_wins) + toNumber(base.cl_1v2_wins);
-    base.clutch_pct = safeDivide(clutchWins, Math.max(1, clutchAttempts)) * 100;
     base.flash_pct = safeDivide(toNumber(base.flash_successes), Math.max(1, toNumber(base.flash_count))) * 100;
     base.utility_per_round = safeDivide(toNumber(base.utility_damage), Math.max(1, toNumber(base.rounds_played)));
     return base;
@@ -991,6 +973,19 @@ window.PlayerView = {
             const metrics = this.radarMetrics || [];
             const metricKeys = metrics.map(metric => String(metric.key || ''));
             if (!metricKeys.length) return [];
+            const aggregates = averages.aggregates && typeof averages.aggregates === 'object'
+                ? averages.aggregates
+                : null;
+            const medianKeyByMetric = {
+                kd: 'median_kd',
+                adr: 'median_adr',
+                kr: 'median_kr',
+                hs_pct: 'median_hs_pct',
+                entry_pct: 'median_entry_pct',
+                first_kills: 'median_first_kills',
+                flash_success_pct: 'median_flash_success_pct',
+                utility_success_pct: 'median_utility_success_pct'
+            };
 
             return [
                 {
@@ -998,7 +993,10 @@ window.PlayerView = {
                     label: 'Division median',
                     color: '#f59e0b',
                     values: metricKeys.reduce((acc, key) => {
-                        acc[key] = toNumber(averages[`median_${key}`], 0);
+                        const medianKey = medianKeyByMetric[key] || `median_${key}`;
+                        const direct = averages[medianKey];
+                        const nested = aggregates ? aggregates[medianKey] : null;
+                        acc[key] = toNumber(direct ?? nested, 0);
                         return acc;
                     }, {})
                 }
@@ -1009,6 +1007,27 @@ window.PlayerView = {
         },
         heroTeam() {
             return this.selectedSeasonStats?.team_name || this.selectedSeasonStats?.team || null;
+        },
+        heroTeamRoute() {
+            const teamId = this.selectedSeasonStats?.team_id || this.selectedSeasonStats?.teamId || null;
+            if (!teamId) return null;
+            const championshipId = this.selectedSeasonId || this.selectedSeasonStats?.championship_id || this.selectedSeasonStats?.championshipId || null;
+            const teamName = this.heroTeam || null;
+            if (championshipId) {
+                return {
+                    name: 'team-detail',
+                    params: { championshipId: String(championshipId), teamId: String(teamId) },
+                    query: {
+                        championship: String(championshipId),
+                        ...(teamName ? { team_name: String(teamName) } : {})
+                    }
+                };
+            }
+            return {
+                name: 'team',
+                params: { teamId: String(teamId) },
+                query: teamName ? { team_name: String(teamName) } : {}
+            };
         },
         heroTeamAvatar() {
             return this.selectedSeasonStats?.team_avatar || null;
@@ -1464,7 +1483,14 @@ window.PlayerView = {
                     <div v-if="heroTeam" class="player-hero__team-side">
                         <div class="player-hero__team-meta">
                             <div class="player-hero__team-label">Joukkue</div>
-                            <h2 class="player-hero__team-name title-accent titleUnderlinePage">{{ heroTeam }}</h2>
+                            <h2 class="player-hero__team-name title-accent titleUnderlinePage">
+                                <router-link
+                                    v-if="heroTeamRoute"
+                                    class="player-hero__team-link"
+                                    :to="heroTeamRoute"
+                                >{{ heroTeam }}</router-link>
+                                <span v-else>{{ heroTeam }}</span>
+                            </h2>
                         </div>
                         <div class="player-hero__team-logo">
                             <img v-if="heroTeamAvatar" :src="heroTeamAvatar" :alt="heroTeam" loading="lazy" />
@@ -1494,7 +1520,7 @@ window.PlayerView = {
 
                 <section class="player-kpis">
                     <article class="glass-card player-kpi-card">
-                        <h3 class="title-accent titleUnderlineCard">Valitun filtterin KPI:t</h3>
+                        <h3 class="title-accent titleUnderlineCard">Valitun divarin statsi</h3>
                         <stat-panel :items="kpiMetrics.map(kpi => ({ key: kpi.key, label: kpi.label, value: kpi.display }))" :columns="4"></stat-panel>
                     </article>
                     <article class="glass-card player-kpi-card player-kpi-card--radar">
@@ -1507,7 +1533,7 @@ window.PlayerView = {
                         <p v-else class="player-empty">Ei riittavia mittareita.</p>
                     </article>
                     <article class="glass-card player-kpi-card">
-                        <h3 class="title-accent titleUnderlineCard">All-time KPI:t</h3>
+                        <h3 class="title-accent titleUnderlineCard">Kaikkie kausien statsi</h3>
                         <stat-panel :items="allTimeKpiMetrics.map(kpi => ({ key: 'all-' + kpi.key, label: kpi.label, value: kpi.display }))" :columns="4"></stat-panel>
                     </article>
                 </section>

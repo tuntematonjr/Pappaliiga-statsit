@@ -275,6 +275,7 @@ async def _compute_division_averages(championship_id: str) -> dict[str, float]:
             pst.adr,
             pst.hs_pct,
             pst.kr,
+            pst.first_kills,
             pst.entry_wins,
             pst.entry_count,
             pst.cl_1v1_wins,
@@ -319,6 +320,8 @@ async def _compute_division_averages(championship_id: str) -> dict[str, float]:
             "median_hs_pct": 0.0,
             "avg_kr": 0.0,
             "median_kr": 0.0,
+            "avg_first_kills": 0.0,
+            "median_first_kills": 0.0,
             "avg_entry_pct": 0.0,
             "median_entry_pct": 0.0,
             "avg_clutch_pct": 0.0,
@@ -333,6 +336,7 @@ async def _compute_division_averages(championship_id: str) -> dict[str, float]:
     adr_values: list[float] = []
     hs_values: list[float] = []
     kr_values: list[float] = []
+    first_kills_values: list[float] = []
     entry_values: list[float] = []
     clutch_values: list[float] = []
     flash_success_values: list[float] = []
@@ -343,6 +347,7 @@ async def _compute_division_averages(championship_id: str) -> dict[str, float]:
         adr_values.append(_safe_number(row.get("adr")))
         hs_values.append(_safe_number(row.get("hs_pct")))
         kr_values.append(_safe_number(row.get("kr")))
+        first_kills_values.append(_safe_number(row.get("first_kills")))
 
         entry_wins = _safe_number(row.get("entry_wins"))
         entry_count = _safe_number(row.get("entry_count"))
@@ -373,6 +378,8 @@ async def _compute_division_averages(championship_id: str) -> dict[str, float]:
         "median_hs_pct": _median(hs_values),
         "avg_kr": _avg(kr_values),
         "median_kr": _median(kr_values),
+        "avg_first_kills": _avg(first_kills_values),
+        "median_first_kills": _median(first_kills_values),
         "avg_entry_pct": _avg(entry_values),
         "median_entry_pct": _median(entry_values),
         "avg_clutch_pct": _avg(clutch_values),
