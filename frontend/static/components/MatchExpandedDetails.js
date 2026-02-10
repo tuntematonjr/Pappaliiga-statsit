@@ -90,11 +90,7 @@ window.MatchExpandedDetails = {
             if (!championshipId || !teamId) return null;
             return {
                 name: 'team-detail',
-                params: { championshipId: String(championshipId), teamId: String(teamId) },
-                query: {
-                    championship: String(championshipId),
-                    ...(teamName ? { team_name: teamName } : {})
-                }
+                params: { championshipId: String(championshipId), teamId: String(teamId) }
             };
         },
         mapKey(name) {

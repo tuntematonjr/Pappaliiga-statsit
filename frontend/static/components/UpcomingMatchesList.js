@@ -293,12 +293,7 @@
                 if (!item?.championshipId) return null;
                 return {
                     name: item.isPlayoffs ? 'division-playoffs' : 'division',
-                    params: { championshipId: item.championshipId },
-                    query: {
-                        championship: item.championshipId,
-                        ...(item.divisionName ? { championship_name: item.divisionName } : {}),
-                        ...(item.season != null ? { championship_season: item.season } : {})
-                    }
+                    params: { championshipId: item.championshipId }
                 };
             },
             divisionGroupRoute(divisionGroup) {
@@ -309,13 +304,7 @@
                 if (!item?.championshipId || !team?.id) return null;
                 return {
                     name: 'team-detail',
-                    params: { championshipId: item.championshipId, teamId: team.id },
-                    query: {
-                        championship: item.championshipId,
-                        ...(item.divisionName ? { championship_name: item.divisionName } : {}),
-                        ...(item.season != null ? { championship_season: item.season } : {}),
-                        ...(team.name ? { team_name: team.name } : {})
-                    }
+                    params: { championshipId: item.championshipId, teamId: team.id }
                 };
             }
         },

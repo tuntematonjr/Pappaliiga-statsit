@@ -165,14 +165,10 @@ window.TeamComparisonBoard = {
             return TEAM_BOARD_INT_FORMATTER.format(numeric);
         },
         getTeamUrl(teamId, teamName) {
-            const base = '/team/' + teamId;
-            const params = new URLSearchParams();
-            if (this.championshipId) params.set('championship', this.championshipId);
-            if (this.championshipName) params.set('championship_name', this.championshipName);
-            if (this.championshipSeason != null) params.set('championship_season', this.championshipSeason);
-            if (teamName) params.set('team_name', teamName);
-            const query = params.toString();
-            return query ? base + '?' + query : base;
+            if (this.championshipId) {
+                return `/team/${this.championshipId}/${teamId}`;
+            }
+            return `/team/${teamId}`;
         },
         scrollToTeam(teamId, options = {}) {
             const resolvedId = this.resolveTeamId(teamId);

@@ -1012,21 +1012,15 @@ window.PlayerView = {
             const teamId = this.selectedSeasonStats?.team_id || this.selectedSeasonStats?.teamId || null;
             if (!teamId) return null;
             const championshipId = this.selectedSeasonId || this.selectedSeasonStats?.championship_id || this.selectedSeasonStats?.championshipId || null;
-            const teamName = this.heroTeam || null;
             if (championshipId) {
                 return {
                     name: 'team-detail',
-                    params: { championshipId: String(championshipId), teamId: String(teamId) },
-                    query: {
-                        championship: String(championshipId),
-                        ...(teamName ? { team_name: String(teamName) } : {})
-                    }
+                    params: { championshipId: String(championshipId), teamId: String(teamId) }
                 };
             }
             return {
                 name: 'team',
-                params: { teamId: String(teamId) },
-                query: teamName ? { team_name: String(teamName) } : {}
+                params: { teamId: String(teamId) }
             };
         },
         heroTeamAvatar() {
@@ -1180,33 +1174,7 @@ window.PlayerView = {
         syncRouteBreadcrumbContext() {
             if (!this.$router || !this.$route || !this.playerId) return;
             if (!this.selectedSeasonId) return;
-            const currentSeason = this.currentSeasonOption || null;
-            const currentSeasonStats = this.selectedSeasonStats || null;
-            const teamName = this.heroTeam || null;
-            const playerName = this.profile?.nickname || null;
-
-            const nextQuery = { ...(this.$route.query || {}) };
-            if (this.selectedSeasonId) nextQuery.championship = String(this.selectedSeasonId);
-            else delete nextQuery.championship;
-
-            if (currentSeason?.season != null) nextQuery.championship_season = String(currentSeason.season);
-            else delete nextQuery.championship_season;
-
-            const divisionName = this.resolveBreadcrumbDivisionName(currentSeason);
-            if (divisionName) nextQuery.championship_name = divisionName;
-            else delete nextQuery.championship_name;
-
-            if (currentSeason?.isPlayoffs) nextQuery.championship_playoffs = '1';
-            else delete nextQuery.championship_playoffs;
-
-            if (currentSeasonStats?.team_id != null) nextQuery.team_id = String(currentSeasonStats.team_id);
-            else delete nextQuery.team_id;
-
-            if (teamName) nextQuery.team_name = String(teamName);
-            else delete nextQuery.team_name;
-
-            if (playerName) nextQuery.player_name = String(playerName);
-            else delete nextQuery.player_name;
+            const nextQuery = { championship: String(this.selectedSeasonId) };
 
             const normalizeQuery = obj => Object.keys(obj)
                 .sort()
@@ -1219,22 +1187,6 @@ window.PlayerView = {
                 params: { ...(this.$route.params || {}), playerId: this.playerId },
                 query: nextQuery
             }).catch(() => {});
-        },
-        resolveBreadcrumbDivisionName(seasonOption) {
-            if (!seasonOption) return null;
-            const normalizer = typeof window !== 'undefined' ? window.divisionNormalizer : null;
-            if (normalizer?.buildDivisionBreadcrumbMeta) {
-                return normalizer.buildDivisionBreadcrumbMeta({
-                    name: null,
-                    divisionNum: seasonOption.division,
-                    season: seasonOption.season,
-                    isPlayoffs: Boolean(seasonOption.isPlayoffs)
-                }).name;
-            }
-            const divisionNum = toNumber(seasonOption.division, null);
-            if (divisionNum === 0) return 'Mestaruussarja';
-            if (divisionNum != null) return `${divisionNum} Divisioona`;
-            return null;
         },
         async loadMapStats() {
             if (!this.playerStore || !this.playerId || !this.selectedSeasonId) return;

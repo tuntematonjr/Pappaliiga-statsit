@@ -882,6 +882,8 @@ window.DivisionView = {
             immediate: true,
             async handler(id) {
                 if (!id) return;
+                const routeUpdated = this.syncCompactRoute(id);
+                if (routeUpdated) return;
                 await this.loadDivision(id);
                 this.loadUpcoming(id);
             }
@@ -894,6 +896,23 @@ window.DivisionView = {
         }
     },
     methods: {
+        syncCompactRoute(championshipId) {
+            if (!this.$router || !this.$route || !championshipId) return false;
+            const targetName = this.$route?.name === 'division-playoffs' ? 'division-playoffs' : 'division';
+            const targetParams = { championshipId: String(championshipId) };
+            const targetQuery = {};
+            const currentParam = String(this.$route?.params?.championshipId || '');
+            const hasQuery = Object.keys(this.$route?.query || {}).length > 0;
+            if (currentParam === targetParams.championshipId && !hasQuery && String(this.$route?.name || '') === targetName) {
+                return false;
+            }
+            this.$router.replace({
+                name: targetName,
+                params: targetParams,
+                query: targetQuery
+            }).catch(() => {});
+            return true;
+        },
         async loadDivision(id, options = {}) {
             if (!id || !this.divisionStore) return;
             const requests = [
@@ -942,34 +961,15 @@ window.DivisionView = {
         teamRoute(team) {
             if (!team || !team.team_id) return null;
             if (this.championshipId) {
-                const divisionName = this.divisionDetails?.name || this.divisionTitle || null;
-                const divisionSeason = this.divisionDetails?.season || null;
-                const teamName = team.name || team.display_name || team.team_name || team.teamName || null;
-                const divisionParam = this.championshipParam || this.championshipId;
+                const divisionParam = this.championshipId || this.championshipParam;
                 return {
                     name: 'team-detail',
-                    params: { championshipId: divisionParam, teamId: team.team_id },
-                    query: {
-                        championship: this.championshipId,
-                        ...(divisionName ? { championship_name: divisionName } : {}),
-                        ...(divisionSeason != null ? { championship_season: divisionSeason } : {}),
-                        ...(teamName ? { team_name: teamName } : {})
-                    }
+                    params: { championshipId: divisionParam, teamId: team.team_id }
                 };
             }
-            // Fallback without championshipId in params, but include championship in query
-            const divisionName = this.divisionDetails?.name || this.divisionTitle || null;
-            const divisionSeason = this.divisionDetails?.season || null;
-            const teamName = team.name || team.display_name || team.team_name || team.teamName || null;
             return { 
                 name: 'team', 
-                params: { teamId: team.team_id }, 
-                query: {
-                    ...(this.championshipId ? { championship: this.championshipId } : {}),
-                    ...(divisionName ? { championship_name: divisionName } : {}),
-                    ...(divisionSeason != null ? { championship_season: divisionSeason } : {}),
-                    ...(teamName ? { team_name: teamName } : {})
-                }
+                params: { teamId: team.team_id }
             };
         },
         highlightTeamRoute(highlight) {

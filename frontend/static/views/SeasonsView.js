@@ -159,23 +159,11 @@ window.SeasonsView = {
         buildDivisionRoute(division, options = {}) {
             const divisionId = division?.divisionId || division?.division_id || division?.id;
             const slug = this.resolveDivisionSlug(division) || divisionId;
-            if (!slug) return '/division';
-            const name = this.getDivisionTitle(division);
-            const seasonValue = division?.season ?? division?.seasonNumber ?? division?.season_number ?? division?.season_id ?? null;
-            const query = {};
-            if (divisionId != null) {
-                query.championship = String(divisionId);
-            }
-            if (name) {
-                query.championship_name = String(name);
-            }
-            if (seasonValue != null) {
-                query.championship_season = String(seasonValue);
-            }
+            const routeId = divisionId != null ? String(divisionId) : (slug != null ? String(slug) : '');
+            if (!routeId) return '/division';
             return {
                 name: options.playoffs ? 'division-playoffs' : 'division',
-                params: { championshipId: String(slug) },
-                query
+                params: { championshipId: routeId }
             };
         },
         getDivisionHref(division) {
@@ -188,20 +176,9 @@ window.SeasonsView = {
                     : null) ||
                 null;
             if (!hrefId) return '/division';
-            const name = this.getDivisionTitle(division);
-            const query = {};
-            query.championship = String(hrefId);
-            if (name) {
-                query.championship_name = String(name);
-            }
-            const seasonValue = division?.season ?? division?.seasonNumber ?? division?.season_number ?? division?.season_id ?? null;
-            if (seasonValue != null) {
-                query.championship_season = String(seasonValue);
-            }
             return {
                 name: 'division-playoffs',
-                params: { championshipId: String(hrefId) },
-                query
+                params: { championshipId: String(hrefId) }
             };
         }
     }

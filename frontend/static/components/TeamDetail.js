@@ -2424,61 +2424,34 @@ window.TeamDetail = {
             if (!championshipId || !opponentId) return null;
             return {
                 name: 'team-detail',
-                params: { championshipId, teamId: String(opponentId) },
-                query: {
-                    championship: championshipId,
-                    ...(match?.opponentName ? { team_name: match.opponentName } : {})
-                }
-            };
-        },
-        resolveChampionshipMeta(championshipId) {
-            if (!championshipId) return { name: null, season: null };
-            const seasons = Array.isArray(this.pageData?.seasons) ? this.pageData.seasons : [];
-            const row = seasons.find(season => String(season.championshipId) === String(championshipId));
-            if (!row) return { name: null, season: null };
-            const normalizer = typeof window !== 'undefined' ? window.divisionNormalizer : null;
-            const meta = normalizer?.buildDivisionBreadcrumbMeta
-                ? normalizer.buildDivisionBreadcrumbMeta({
-                    name: row.name,
-                    divisionNum: row.divisionNum,
-                    season: row.season,
-                    isPlayoffs: Boolean(row.isPlayoffs)
-                })
-                : { name: row.name || null };
-
-            return {
-                name: meta?.name || null,
-                season: row.season ?? null
+                params: { championshipId, teamId: String(opponentId) }
             };
         },
         updateRoute(championshipId, tab) {
             if (!this.$router || !this.$route) return;
-            const params = { ...(this.$route.params || {}), teamId: this.teamId };
-            const query = { ...(this.$route.query || {}) };
-            if (championshipId) {
-                query.championship = championshipId;
-            } else {
-                delete query.championship;
-            }
-            const meta = this.resolveChampionshipMeta(championshipId);
-            if (meta.name) {
-                query.championship_name = meta.name;
-            } else {
-                delete query.championship_name;
-            }
-            if (meta.season != null) {
-                query.championship_season = String(meta.season);
-            } else {
-                delete query.championship_season;
-            }
+            const params = championshipId
+                ? { championshipId: String(championshipId), teamId: this.teamId }
+                : { teamId: this.teamId };
+            const query = {};
             const normalizedTab = tab || this.activeTab;
             if (normalizedTab && normalizedTab !== 'overview') {
                 query.tab = normalizedTab;
-            } else {
-                delete query.tab;
             }
+            const nextRouteName = championshipId ? 'team-detail' : 'team';
+
+            const normalizeQuery = obj => Object.keys(obj)
+                .sort()
+                .map(key => `${key}:${String(obj[key])}`)
+                .join('|');
+            const sameRoute =
+                String(this.$route.name || '') === String(nextRouteName)
+                && normalizeQuery(this.$route.query || {}) === normalizeQuery(query)
+                && String(this.$route.params?.teamId || '') === String(params.teamId || '')
+                && String(this.$route.params?.championshipId || '') === String(params.championshipId || '');
+            if (sameRoute) return;
+
             this.$router.replace({
-                name: this.$route.name || 'team',
+                name: nextRouteName,
                 params,
                 query
             }).catch(() => {});
@@ -3762,7 +3735,15 @@ window.TeamDetail = {
                                     <div class="avatar-placeholder">{{ row.nickname ? row.nickname.slice(0, 2).toUpperCase() : 'PL' }}</div>
                                     <div>
                                         <div class="player-name">
-                                            <router-link v-if="row.playerId" class="player-link" :to="{ name: 'player', params: { playerId: row.playerId } }">
+                                            <router-link
+                                                v-if="row.playerId"
+                                                class="player-link"
+                                                :to="{
+                                                    name: 'player',
+                                                    params: { playerId: row.playerId },
+                                                    query: currentChampionshipId ? { championship: String(currentChampionshipId) } : {}
+                                                }"
+                                            >
                                                 {{ row.nickname }}
                                             </router-link>
                                             <span v-else>{{ row.nickname }}</span>

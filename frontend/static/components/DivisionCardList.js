@@ -247,21 +247,9 @@
     }
 
     function buildDivisionHref(slug, divisionId, name, season, isPlayoffs) {
-        const base = slug || (divisionId != null ? String(divisionId) : '');
+        const base = divisionId != null ? String(divisionId) : (slug || '');
         if (!base) return '/division';
-        const path = isPlayoffs ? `/division/${base}/playoffs` : `/division/${base}`;
-        const params = new URLSearchParams();
-        if (divisionId != null) {
-            params.set('championship', String(divisionId));
-        }
-        if (name) {
-            params.set('championship_name', String(name));
-        }
-        if (season != null) {
-            params.set('championship_season', String(season));
-        }
-        const query = params.toString();
-        return query ? `${path}?${query}` : path;
+        return isPlayoffs ? `/division/${base}/playoffs` : `/division/${base}`;
     }
 
     function buildCardModel(division) {
