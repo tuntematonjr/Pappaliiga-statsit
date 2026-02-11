@@ -264,6 +264,7 @@
                 const crumbs = [];
                 const routeName = route.name;
                 const params = route.params;
+                const isPlayerRoute = routeName === 'player' || routeName === 'player-detail';
 
                 // Always add home first
                 crumbs.push({
@@ -286,7 +287,7 @@
                 }
 
                 // Division/Championship context
-                if (params.championshipId) {
+                if (params.championshipId && !isPlayerRoute) {
                     const teamContext = readTeamContext(params);
                     const teamSeason = teamContext?.seasonRow || null;
                     const championshipName = resolveDivisionName(params);
@@ -358,7 +359,7 @@
                 }
 
                 // Player context
-                if (params.playerId && (routeName === 'player' || routeName === 'player-detail')) {
+                if (params.playerId && isPlayerRoute) {
                     const playerName = resolvePlayerName(params);
                     const playerContext = resolvePlayerTeamContext(params);
                     const isPlayoffs = playerContext.isPlayoffs;

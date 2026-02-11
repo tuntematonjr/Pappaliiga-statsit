@@ -350,7 +350,14 @@ function normalizeSeasonData(pageData) {
 function normalizeMap(entry) {
     if (!entry) return null;
     const rawMapId = entry.mapId || entry.map_id || entry.map || entry.mapName || null;
-    const rawName = entry.mapName || entry.mapNameRaw || rawMapId || entry.map_name || entry.map || 'Kartta';
+    const rawName = entry.prettyName
+        || entry.pretty_name
+        || entry.mapName
+        || entry.mapNameRaw
+        || rawMapId
+        || entry.map_name
+        || entry.map
+        || 'Kartta';
     const lowerRaw = String(rawName || '').toLowerCase();
     if (lowerRaw === 'forfeit') {
         return null; // never include forfeit entries as maps
@@ -426,7 +433,7 @@ function normalizeMap(entry) {
     return {
         id: identifier,
         mapId: rawMapId || null,
-        map_name: entry.map_name || rawMapId || rawName || null,
+        map_name: beautified || rawName || null,
         mapName: beautified,
         mapNameRaw: rawName,
         image_sm: entry.image_sm || entry.imageSm || null,
