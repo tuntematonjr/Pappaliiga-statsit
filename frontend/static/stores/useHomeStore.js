@@ -419,33 +419,15 @@
                 this.summaryError = null;
 
                 try {
-                    let summaryResponse = await window.apiClient.fetchLifetimeSummary();
-                    let summary = summaryResponse?.data ?? summaryResponse;
-                    if (!summary || typeof summary !== 'object') {
-                        const fallbackResponse = await window.apiClient.getStatsOverview();
-                        summary = fallbackResponse?.data ?? fallbackResponse;
-                    }
+                    const summaryResponse = await window.apiClient.fetchLifetimeSummary();
+                    const summary = summaryResponse?.data ?? summaryResponse;
                     this.lifetimeSummary = normalizeSummary(summary);
                     this.summaryFetchedAt = Date.now();
                     return this.lifetimeSummary;
                 } catch (error) {
-                    if (error && error.status === 404) {
-                        try {
-                            const fallback = await window.apiClient.getStatsOverview();
-                            const payload = fallback?.data ?? fallback;
-                            this.lifetimeSummary = normalizeSummary(payload);
-                            this.summaryFetchedAt = Date.now();
-                            return this.lifetimeSummary;
-                        } catch (fallbackError) {
-                            this.summaryError =
-                                fallbackError?.message || 'Yleistilastojen lataus epäonnistui';
-                            throw fallbackError;
-                        }
-                    } else {
-                        this.summaryError =
-                            error?.message || 'Yleistilastojen lataus epäonnistui';
-                        throw error;
-                    }
+                    this.summaryError =
+                        error?.message || 'Yleistilastojen lataus epäonnistui';
+                    throw error;
                 } finally {
                     this.summaryLoading = false;
                 }
@@ -487,10 +469,6 @@
                 };
 
                 try {
-                    if (DEV_MODE) {
-                        console.info('[homeStore] fetchSeason start', { key, identifier, force });
-                    }
-                    const EndpointMissingError = typeof window !== 'undefined' ? window.ApiEndpointNotFound : null;
                     const [healthResult, summaryResult, divisionsResult] = await Promise.allSettled([
                         window.apiClient.healthCheck(identifier).catch(() => ({ ok: false })),
                         window.apiClient.getSeasonSummary(identifier),
@@ -506,22 +484,15 @@
                         summaryData = summaryResult.value.data || summaryResult.value;
                         summaryMeta = summaryResult.value.meta || {};
                     } else {
-                        summaryData = await window.apiClient
-                            .getSeasonStats(identifier)
-                            .then(res => res.data || res)
-                            .catch(() => ({}));
+                        summaryData = {};
                     }
                     const normalizedSummary = normalizeSummary(summaryData);
                     const normalizedStats = normalizedSummary.aggregates || {};
                     const normalizedRaw = normalizedSummary.raw;
-                    if (typeof console !== 'undefined' && console.log) {
-                        console.log('seasonSummary', identifier, normalizedRaw);
-                    }
 
                     let divisionsData = [];
                     let divisionsMeta = null;
                     let apiValidationWarnings = [];
-                    let missingRoutes = false;
                     if (divisionsResult.status === 'fulfilled') {
                         divisionsData = Array.isArray(divisionsResult.value.data)
                             ? divisionsResult.value.data
@@ -533,17 +504,7 @@
                             error => error?.message || 'Division validation error'
                         );
                     } else {
-                        const reason = divisionsResult.reason;
-                        const isRouteError = EndpointMissingError && reason instanceof EndpointMissingError;
-                        if (isRouteError) {
-                            missingRoutes = true;
-                        } else {
-                            const fallback = await window.apiClient
-                                .getDivisionsBySeason(identifier)
-                                .then(res => (Array.isArray(res?.data) ? res.data : res))
-                                .catch(() => []);
-                            divisionsData = Array.isArray(fallback) ? fallback : [];
-                        }
+                        divisionsData = [];
                     }
 
                     if (divisionsData.length === 0 && DEV_MODE) {
@@ -566,40 +527,11 @@
                     let cacheTimestamp = summaryMeta?.cacheTimestamp || divisionsMeta?.cacheTimestamp || null;
                     let resolvedPathLabel = divisionsMeta?.resolvedPath || 'unresolved';
 
-                    if (missingRoutes) {
-                        if (existing && Array.isArray(existing.divisions) && existing.divisions.length) {
-                            finalDivisions = existing.divisions.slice();
-                            finalRawDivisions = Array.isArray(existing.rawDivisions)
-                                ? existing.rawDivisions.slice()
-                                : [];
-                            bannerMessage = formatCacheBanner(existing.cacheTimestamp || existing.fetchedAt);
-                            cacheTimestamp = existing.cacheTimestamp || existing.fetchedAt || cacheTimestamp;
-                            usingCache = true;
-                            resolvedPathLabel = 'cache';
-                        } else if (DEV_MOCK_DATA && Array.isArray(DEV_MOCK_DATA.divisions) && DEV_MOCK_DATA.divisions.length) {
-                            const devResult = normalizeDivisionCollection(DEV_MOCK_DATA.divisions);
-                            finalDivisions = devResult.divisions;
-                            finalRawDivisions = DEV_MOCK_DATA.divisions;
-                            normalizationWarnings.push(...devResult.warnings, 'Using developer mock dataset.');
-                            bannerMessage = 'Backend routes not found; showing developer mock data.';
-                            dataBadge = 'DEV DATA';
-                            cacheTimestamp = DEV_MOCK_DATA.timestamp || cacheTimestamp || Date.now();
-                            usingCache = true;
-                            resolvedPathLabel = 'dev-mock';
-                        } else {
-                            throw divisionsResult.reason || new Error('Division routes unavailable');
-                        }
-                    }
-
                     const finalCount = finalDivisions.length;
                     const stats = normalizedStats;
                     const progress = computeProgress(stats, finalDivisions);
                     const offline = !healthOk || usingCache || Boolean(bannerMessage);
                     divisionsMeta = { ...(divisionsMeta || {}), resolvedPath: resolvedPathLabel };
-
-                    if (typeof console !== 'undefined' && console.info) {
-                        console.info('[homeStore] divisions raw %s → normalized %s → filtered %s (used=%s)', rawCount, normalizedCount, finalCount, resolvedPathLabel);
-                    }
 
                     const payload = {
                         loading: false,
@@ -623,17 +555,6 @@
                     };
 
                     this.seasonCache[key] = payload;
-                    if (DEV_MODE) {
-                        console.info('[homeStore] fetchSeason success', {
-                            key,
-                            divisions: finalDivisions.length,
-                            offline,
-                            cacheTimestamp,
-                            resolvedPath: resolvedPathLabel,
-                            banner: bannerMessage || null,
-                            badge: dataBadge || null
-                        });
-                    }
                     return payload;
                 } catch (error) {
                     this.seasonCache[key] = {

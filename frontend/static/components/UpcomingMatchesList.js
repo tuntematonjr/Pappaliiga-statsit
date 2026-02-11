@@ -292,7 +292,7 @@
             divisionRoute(item) {
                 if (!item?.championshipId) return null;
                 return {
-                    name: item.isPlayoffs ? 'division-playoffs' : 'division',
+                    name: 'division',
                     params: { championshipId: item.championshipId }
                 };
             },

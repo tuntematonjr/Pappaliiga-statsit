@@ -12,12 +12,6 @@ window.TeamDetailView = {
             return this.$route.query?.championship || this.$route.params?.championshipId || null;
         }
     },
-    watch: {
-        '$route.fullPath'() {
-            // Trigger prop update on nested component by forcing re-render
-            this.$forceUpdate();
-        }
-    },
     template: `
         <div class="team-detail-view">
             <team-detail

@@ -162,7 +162,7 @@ window.SeasonsView = {
             const routeId = divisionId != null ? String(divisionId) : (slug != null ? String(slug) : '');
             if (!routeId) return '/division';
             return {
-                name: options.playoffs ? 'division-playoffs' : 'division',
+                name: 'division',
                 params: { championshipId: routeId }
             };
         },
@@ -177,7 +177,7 @@ window.SeasonsView = {
                 null;
             if (!hrefId) return '/division';
             return {
-                name: 'division-playoffs',
+                name: 'division',
                 params: { championshipId: String(hrefId) }
             };
         }

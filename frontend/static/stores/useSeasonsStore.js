@@ -168,9 +168,6 @@
                 this.error = null;
 
                 try {
-                    if (typeof window !== 'undefined' && window.console) {
-                        console.info('[seasonsStore] fetchSeasons start', { force });
-                    }
                     const payload = await window.apiClient.getSeasons();
                     const normalized = Array.isArray(payload)
                         ? payload.map((season, index) => normalizeSeason(season, index)).filter(Boolean)
@@ -200,13 +197,6 @@
                         if (!found && normalized.length) {
                             this.selectedSeasonKey = normalized[0].key;
                         }
-                    }
-
-                    if (typeof window !== 'undefined' && window.console) {
-                        console.info('[seasonsStore] fetchSeasons success', {
-                            count: normalized.length,
-                            selectedSeasonKey: this.selectedSeasonKey
-                        });
                     }
                     return this.seasons;
                 } catch (error) {

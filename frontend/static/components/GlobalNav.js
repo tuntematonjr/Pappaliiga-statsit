@@ -86,7 +86,7 @@
                 return base;
             }
 
-            function readTeamContext(params, query) {
+            function readTeamContext(params) {
                 const teamId = params?.teamId;
                 if (!teamStore || !teamId || typeof teamStore.getTeamState !== 'function') return null;
                 const entry = teamStore.getTeamState(teamId);
@@ -95,7 +95,6 @@
                 const seasons = Array.isArray(page?.seasons) ? page.seasons : [];
                 const selectedChampionshipId =
                     params?.championshipId
-                    || query?.championship
                     || entry?.selectedChampionship
                     || page?.currentChampionshipId
                     || null;
@@ -109,34 +108,28 @@
                 };
             }
 
-            function resolveDivisionSeason(params, query) {
-                if (query?.championship_season) {
-                    return String(query.championship_season);
-                }
-                const lookupKey = query?.championship || params?.championshipId;
+            function resolveDivisionSeason(params) {
+                const lookupKey = params?.championshipId;
                 if (divisionStore && lookupKey && typeof divisionStore.getDivisionState === 'function') {
                     const entry = divisionStore.getDivisionState(lookupKey);
                     const season = entry?.details?.data?.season;
                     if (season != null) return String(season);
                 }
-                const teamContext = readTeamContext(params, query);
+                const teamContext = readTeamContext(params);
                 if (teamContext?.seasonRow?.season != null) {
                     return String(teamContext.seasonRow.season);
                 }
                 return '';
             }
 
-            function resolveDivisionName(params, query) {
-                if (query?.championship_name) {
-                    return String(query.championship_name);
-                }
-                const lookupKey = query?.championship || params?.championshipId;
+            function resolveDivisionName(params) {
+                const lookupKey = params?.championshipId;
                 if (divisionStore && lookupKey && typeof divisionStore.getDivisionState === 'function') {
                     const entry = divisionStore.getDivisionState(lookupKey);
                     const name = entry?.details?.data?.name;
                     if (name) return String(name);
                 }
-                const teamContext = readTeamContext(params, query);
+                const teamContext = readTeamContext(params);
                 if (teamContext?.seasonRow) {
                     const row = teamContext.seasonRow;
                     if (row?.name) return String(row.name);
@@ -163,10 +156,7 @@
                 return 'Divisioona';
             }
 
-            function resolveTeamName(params, query) {
-                if (query?.team_name) {
-                    return String(query.team_name);
-                }
+            function resolveTeamName(params) {
                 const teamId = params?.teamId;
                 if (teamStore && teamId && typeof teamStore.getTeamState === 'function') {
                     const entry = teamStore.getTeamState(teamId);
@@ -222,10 +212,9 @@
                 return { profile, selectedSeason, selectedChampionshipId };
             }
 
-            function resolvePlayerName(params, query) {
-                if (query?.player_name) return String(query.player_name);
+            function resolvePlayerName(params) {
                 const playerId = params?.playerId;
-                const context = readPlayerContext(playerId, query?.championship || null);
+                const context = readPlayerContext(playerId, params?.championshipId || null);
                 const nickname =
                     context?.profile?.nickname
                     || context?.profile?.name
@@ -234,26 +223,23 @@
                 return nickname ? String(nickname) : `Pelaaja ${playerId}`;
             }
 
-            function resolvePlayerTeamContext(params, query) {
+            function resolvePlayerTeamContext(params) {
                 const playerId = params?.playerId;
-                const context = readPlayerContext(playerId, query?.championship || null);
+                const context = readPlayerContext(playerId, params?.championshipId || null);
                 const seasonRow = context?.selectedSeason || null;
                 const championshipId =
-                    query?.championship
-                    || query?.team_championship
+                    params?.championshipId
                     || seasonRow?.championship_id
                     || seasonRow?.championshipId
                     || seasonRow?.id
                     || context?.selectedChampionshipId
                     || null;
                 const teamId =
-                    query?.team_id
-                    || seasonRow?.team_id
+                    seasonRow?.team_id
                     || seasonRow?.teamId
                     || null;
                 const teamName =
-                    query?.team_name
-                    || seasonRow?.team_name
+                    seasonRow?.team_name
                     || seasonRow?.teamName
                     || seasonRow?.team
                     || null;
@@ -278,7 +264,6 @@
                 const crumbs = [];
                 const routeName = route.name;
                 const params = route.params;
-                const query = route.query;
 
                 // Always add home first
                 crumbs.push({
@@ -302,14 +287,11 @@
 
                 // Division/Championship context
                 if (params.championshipId) {
-                    const teamContext = readTeamContext(params, query);
+                    const teamContext = readTeamContext(params);
                     const teamSeason = teamContext?.seasonRow || null;
-                    const championshipName = resolveDivisionName(params, query);
-                    const seasonValue = resolveDivisionSeason(params, query);
-                    const isPlayoffs =
-                        routeName === 'division-playoffs'
-                        || String(query?.championship_playoffs || '') === '1'
-                        || Boolean(teamSeason?.isPlayoffs);
+                    const championshipName = resolveDivisionName(params);
+                    const seasonValue = resolveDivisionSeason(params);
+                    const isPlayoffs = Boolean(teamSeason?.isPlayoffs);
                     const fullLabel = formatDivisionBreadcrumbLabel(
                         championshipName,
                         seasonValue,
@@ -322,23 +304,24 @@
                         label: fullLabel,
                         icon: '🏆',
                         to: { 
-                            name: isPlayoffs ? 'division-playoffs' : 'division', 
+                            name: 'division', 
                             params: { championshipId: params.championshipId }
                         },
-                        disabled: routeName === 'division' || routeName === 'division-playoffs'
+                        disabled: routeName === 'division'
                     });
                 }
 
                 // Team context
                 if (params.teamId) {
-                    const teamName = resolveTeamName(params, query);
+                    const teamName = resolveTeamName(params);
                     
-                    // If championship isn't in params but we have it in query or store, add division breadcrumb
-                    if (!params.championshipId && (query?.championship || query?.team_championship)) {
-                        const championshipIdFromQuery = query.championship || query.team_championship;
-                        const championshipName = resolveDivisionName({ championshipId: championshipIdFromQuery }, query);
-                        const seasonValue = resolveDivisionSeason({ championshipId: championshipIdFromQuery }, query);
-                        const isPlayoffs = String(query?.championship_playoffs || '') === '1';
+                    // If championship isn't in params, derive it from current team context.
+                    const teamContext = readTeamContext(params);
+                    if (!params.championshipId && teamContext?.selectedChampionshipId) {
+                        const championshipIdFromQuery = teamContext.selectedChampionshipId;
+                        const championshipName = resolveDivisionName({ championshipId: championshipIdFromQuery });
+                        const seasonValue = resolveDivisionSeason({ championshipId: championshipIdFromQuery });
+                        const isPlayoffs = Boolean(teamContext?.seasonRow?.isPlayoffs);
                         const fullLabel = formatDivisionBreadcrumbLabel(championshipName, seasonValue, isPlayoffs);
                         
                         crumbs.push({
@@ -346,7 +329,7 @@
                             label: fullLabel,
                             icon: '🏆',
                             to: { 
-                                name: isPlayoffs ? 'division-playoffs' : 'division', 
+                                name: 'division', 
                                 params: { championshipId: championshipIdFromQuery }
                             },
                             disabled: false
@@ -375,15 +358,15 @@
                 }
 
                 // Player context
-                if (params.playerId && routeName === 'player') {
-                    const playerName = resolvePlayerName(params, query);
-                    const playerContext = resolvePlayerTeamContext(params, query);
-                    const isPlayoffs = playerContext.isPlayoffs || String(query?.championship_playoffs || '') === '1';
+                if (params.playerId && (routeName === 'player' || routeName === 'player-detail')) {
+                    const playerName = resolvePlayerName(params);
+                    const playerContext = resolvePlayerTeamContext(params);
+                    const isPlayoffs = playerContext.isPlayoffs;
 
                     if (playerContext.championshipId) {
-                        const championshipName = resolveDivisionName({ championshipId: playerContext.championshipId }, query);
+                        const championshipName = resolveDivisionName({ championshipId: playerContext.championshipId });
                         const championshipLooksLikeId = looksLikeChampionshipIdLabel(championshipName, playerContext.championshipId);
-                        const seasonValue = resolveDivisionSeason({ championshipId: playerContext.championshipId }, query) || playerContext.season;
+                        const seasonValue = resolveDivisionSeason({ championshipId: playerContext.championshipId }) || playerContext.season;
                         const fullLabel = formatDivisionBreadcrumbLabel(
                             championshipLooksLikeId ? null : championshipName,
                             seasonValue,
@@ -395,7 +378,7 @@
                             label: fullLabel,
                             icon: '🏆',
                             to: {
-                                name: isPlayoffs ? 'division-playoffs' : 'division',
+                                name: 'division',
                                 params: { championshipId: playerContext.championshipId }
                             },
                             disabled: false
@@ -431,13 +414,18 @@
                         key: 'player',
                         label: playerName,
                         icon: '🎮',
-                        to: { 
-                            name: 'player', 
-                            params: { playerId: params.playerId },
-                            query: playerContext.championshipId
-                                ? { championship: playerContext.championshipId }
-                                : {}
-                        },
+                        to: playerContext.championshipId
+                            ? {
+                                name: 'player-detail',
+                                params: {
+                                    championshipId: playerContext.championshipId,
+                                    playerId: params.playerId
+                                }
+                            }
+                            : { 
+                                name: 'player', 
+                                params: { playerId: params.playerId }
+                            },
                         disabled: true
                     });
                 }

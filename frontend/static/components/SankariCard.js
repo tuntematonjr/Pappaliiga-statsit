@@ -16,6 +16,19 @@ window.SankariCard = {
         }
     },
     methods: {
+        championshipId() {
+            return this.$route?.params?.championshipId || this.$route?.query?.championship || null;
+        },
+        playerRoute(entry) {
+            const playerId = entry?.playerId || entry?.player_id || null;
+            if (!playerId) return null;
+            const championshipId = this.championshipId();
+            return {
+                name: 'player',
+                params: { playerId: String(playerId) },
+                query: championshipId ? { championship: String(championshipId) } : {}
+            };
+        },
         avatarUrl(src) {
             const fallback = window.PAPPALIIGA_DEFAULT_LOGO;
             if (!src) return fallback;
@@ -73,7 +86,12 @@ window.SankariCard = {
                                     loading="lazy"
                                 />
                                 <div>
-                                    <div class="sankari-card__name">{{ entry?.nickname || entry?.name || 'Tuntematon' }}</div>
+                                    <router-link
+                                        v-if="playerRoute(entry)"
+                                        :to="playerRoute(entry)"
+                                        class="sankari-card__name player-link"
+                                    >{{ entry?.nickname || entry?.name || 'Tuntematon' }}</router-link>
+                                    <div v-else class="sankari-card__name">{{ entry?.nickname || entry?.name || 'Tuntematon' }}</div>
                                     <div class="sankari-card__team muted">{{ entry?.teamName || entry?.team || '' }}</div>
                                 </div>
                             </div>

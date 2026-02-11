@@ -375,11 +375,9 @@ window.DivisionView = {
     },
     data() {
         const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
-        const seasonsStore = typeof window.useSeasonsStore === 'function' ? window.useSeasonsStore() : null;
         const upcomingStore = typeof window.useUpcomingStore === 'function' ? window.useUpcomingStore() : null;
         return {
             divisionStore,
-            seasonsStore,
             upcomingStore,
             mapColumns: DIVISION_MAP_COLUMNS,
             quickLinks: [
@@ -394,9 +392,6 @@ window.DivisionView = {
         };
     },
     computed: {
-        championshipParam() {
-            return this.$route.params?.championshipId || null;
-        },
         championshipId() {
             return this.$route.query?.championship || this.$route.query?.division_id || this.$route.params?.championshipId || null;
         },
@@ -405,15 +400,13 @@ window.DivisionView = {
                 return {
                     details: defaultSegment(),
                     standings: defaultSegment(),
-                    maps: defaultSegment(),
-                    highlights: defaultSegment()
+                    maps: defaultSegment()
                 };
             }
             return this.divisionStore.getDivisionState(this.championshipId) || {
                 details: defaultSegment(),
                 standings: defaultSegment(),
-                maps: defaultSegment(),
-                highlights: defaultSegment()
+                maps: defaultSegment()
             };
         },
         divisionDetails() {
@@ -550,30 +543,9 @@ window.DivisionView = {
         sankariLoading() {
             return this.divisionLoading;
         },
-        highlightsState() {
-            return this.divisionState.highlights;
-        },
-        highlights() {
-            return Array.isArray(this.highlightsState.data) ? this.highlightsState.data : [];
-        },
-        highlightsLoading() {
-            return this.highlightsState.loading;
-        },
-        highlightsError() {
-            return this.highlightsState.error;
-        },
         divisionTitle() {
             if (!this.divisionDetails) return 'Divisioona';
             return this.divisionDetails.name || `Divisioona ${this.divisionDetails.division_num}`;
-        },
-        divisionSeasonLabel() {
-            if (this.breadcrumbSeason?.label) {
-                return this.breadcrumbSeason.label;
-            }
-            if (this.divisionDetails?.season) {
-                return `Kausi ${this.divisionDetails.season}`;
-            }
-            return null;
         },
         statMetrics() {
             if (!this.divisionDetails) {
@@ -715,33 +687,6 @@ window.DivisionView = {
 
             return aggregates;
         },
-        divisionBadgeLabel() {
-            if (!this.divisionDetails) return 'Divisioona';
-            if (this.divisionDetails.division_num != null) {
-                return `${this.divisionDetails.division_num} Divisioona`;
-            }
-            return this.divisionDetails.name || this.divisionTitle;
-        },
-        divisionHeaderStats() {
-            if (!this.statMetrics.length) return [];
-            const lookup = this.statMetrics.reduce((acc, metric) => {
-                acc[metric.key] = metric;
-                return acc;
-            }, {});
-            const priority = ['teams', 'matches', 'maps'];
-            return priority.map(key => lookup[key]).filter(Boolean);
-        },
-        divisionStatusLabel() {
-            return this.divisionDetails?.status_fi || this.divisionDetails?.status_label || this.divisionDetails?.status || null;
-        },
-        divisionStatusTone() {
-            const label = String(this.divisionStatusLabel || '').toLowerCase();
-            if (!label) return 'idle';
-            if (label.includes('loppu') || label.includes('valmis')) return 'finished';
-            if (label.includes('playoff')) return 'playoff';
-            if (label.includes('käynn') || label.includes('kaynn')) return 'active';
-            return 'idle';
-        },
         matchProgressMetric() {
             const aggregates = this.derivedAggregates || {};
             const playedRaw =
@@ -791,9 +736,6 @@ window.DivisionView = {
         teams() {
             return Array.isArray(this.divisionDetails?.teams) ? this.divisionDetails.teams : [];
         },
-        hasTeams() {
-            return this.teams.length > 0;
-        },
         teamChipItems() {
             const source = this.standings.length ? this.standings : this.teams;
             if (!Array.isArray(source)) {
@@ -822,60 +764,6 @@ window.DivisionView = {
                 };
             });
         },
-        heroCards() {
-            if (!Array.isArray(this.highlights) || !this.highlights.length) {
-                return [];
-            }
-            return this.highlights
-                .map((highlight, idx) => {
-                    const entries = this.normalizeHighlightEntries(highlight);
-                    if (!entries.length) {
-                        return null;
-                    }
-                    return {
-                        id: highlight.id || `highlight-${idx}`,
-                        title: highlight.title || 'Sankari',
-                        metric: highlight.metric || '',
-                        entries
-                    };
-                })
-                .filter(Boolean);
-        },
-        hasHeroCards() {
-            return this.heroCards.length > 0;
-        },
-        breadcrumbSeason() {
-            if (!this.divisionDetails || !this.seasonsStore) {
-                return null;
-            }
-            const target = this.seasonsStore.sortedSeasons?.find(season => {
-                const seasonNumber = season?.seasonNumber ?? Number(season?.raw?.season);
-                return seasonNumber && Number(this.divisionDetails.season) === Number(seasonNumber);
-            });
-            if (!target) {
-                return {
-                    label: `Kausi ${this.divisionDetails.season}`,
-                    key: this.divisionDetails.season
-                };
-            }
-            return target;
-        },
-        shareUrl() {
-            try {
-                const resolved = this.$router?.resolve({
-                    name: this.$route?.name,
-                    params: this.$route?.params,
-                    query: this.$route?.query
-                }) || {};
-                const href = resolved.href || this.$route?.fullPath || window.location.pathname;
-                if (href.startsWith('http')) {
-                    return href;
-                }
-                return `${window.location.origin}${href}`;
-            } catch (error) {
-                return window.location.href;
-            }
-        }
     },
     watch: {
         championshipId: {
@@ -898,7 +786,7 @@ window.DivisionView = {
     methods: {
         syncCompactRoute(championshipId) {
             if (!this.$router || !this.$route || !championshipId) return false;
-            const targetName = this.$route?.name === 'division-playoffs' ? 'division-playoffs' : 'division';
+            const targetName = 'division';
             const targetParams = { championshipId: String(championshipId) };
             const targetQuery = {};
             const currentParam = String(this.$route?.params?.championshipId || '');
@@ -918,8 +806,7 @@ window.DivisionView = {
             const requests = [
                 this.divisionStore.fetchDivisionDetails(id, { force: options.force === true }),
                 this.divisionStore.fetchDivisionStandings(id, { force: options.force === true }),
-                this.divisionStore.fetchDivisionMaps(id, { force: options.force === true }),
-                this.divisionStore.fetchDivisionHighlights(id, { force: options.force === true })
+                this.divisionStore.fetchDivisionMaps(id, { force: options.force === true })
             ];
             await Promise.allSettled(requests);
         },
@@ -954,37 +841,6 @@ window.DivisionView = {
                 window.location.hash = `#${id}`;
                 window.scrollTo(0, el.offsetTop || 0);
             }
-        },
-        sectionLinkTarget(link) {
-            return `#${link.id}`;
-        },
-        teamRoute(team) {
-            if (!team || !team.team_id) return null;
-            if (this.championshipId) {
-                const divisionParam = this.championshipId || this.championshipParam;
-                return {
-                    name: 'team-detail',
-                    params: { championshipId: divisionParam, teamId: team.team_id }
-                };
-            }
-            return { 
-                name: 'team', 
-                params: { teamId: team.team_id }
-            };
-        },
-        highlightTeamRoute(highlight) {
-            if (!highlight?.team) return null;
-            return this.teamRoute(highlight.team);
-        },
-        highlightAvatar(highlight) {
-            if (!highlight?.team) return null;
-            return this.teamLogo(highlight.team);
-        },
-        retryHighlights() {
-            if (!this.divisionStore || !this.championshipId) return;
-            this.divisionStore.fetchDivisionHighlights(this.championshipId, { force: true }).catch(err => {
-                console.error('Highlight refresh failed', err);
-            });
         },
         resolveAvatar(src) {
             if (!src) return DIVISION_DEFAULT_TEAM_LOGO;
@@ -1167,6 +1023,7 @@ window.DivisionView = {
                     }
                     return {
                         id: player.id || player.playerId,
+                        playerId: player.playerId || player.id || null,
                         nickname: player.nickname || 'Tuntematon',
                         teamName: player.teamName || '',
                         avatar: player.logo || DIVISION_DEFAULT_TEAM_LOGO,
@@ -1344,25 +1201,6 @@ window.DivisionView = {
             }
             this.activeTeamChipId = String(items[0].id);
         },
-        handleTeamChipSelect(teamId) {
-            if (teamId == null) return;
-            const normalized = String(teamId);
-            this.activeTeamChipId = normalized;
-            this.$nextTick(() => this.scrollTeamRow(normalized, { instant: true }));
-        },
-        scrollTeamRow(teamId, options = {}) {
-            if (teamId == null) return;
-            const normalized = String(teamId);
-            this.scrollTeamTable(normalized, options);
-        },
-        scrollTeamTable(teamId, options = {}) {
-            const board = this.$refs.teamBoard;
-            if (board && typeof board.scrollToTeam === 'function') {
-                board.scrollToTeam(teamId, options);
-                return true;
-            }
-            return false;
-        },
         getMetricIcon(key) {
             const icons = {
                 teams: '👥',
@@ -1382,50 +1220,6 @@ window.DivisionView = {
             };
             return icons[key] || '📊';
         },
-        normalizeHighlightEntries(highlight) {
-            if (!highlight) return [];
-            const entries = [];
-            if (Array.isArray(highlight.players) && highlight.players.length) {
-                entries.push(
-                    ...highlight.players.slice(0, 3).map(player => this.buildHeroEntry({
-                        id: player.id || player.player_id,
-                        name: player.nickname || player.name,
-                        team: player.team || player.team_name,
-                        avatar: player.avatar,
-                        value: player.value ?? player.metric ?? player.stat
-                    }, highlight.description))
-                );
-            } else if (Array.isArray(highlight.entries) && highlight.entries.length) {
-                entries.push(
-                    ...highlight.entries.slice(0, 3).map(entry => this.buildHeroEntry(entry, highlight.description))
-                );
-            } else if (highlight.team) {
-                const teamSource = highlight.team.logo || highlight.team.avatar || highlight.team.raw?.avatar;
-                entries.push(this.buildHeroEntry({
-                    id: highlight.team.team_id,
-                    name: highlight.team.name,
-                    team: highlight.team.name,
-                    avatar: teamSource,
-                    value: highlight.metric
-                }, highlight.description));
-            }
-            return entries.filter(Boolean);
-        },
-        buildHeroEntry(entry, fallbackLabel = '') {
-            if (!entry) return null;
-            const name = entry.name || entry.nickname || fallbackLabel || 'Nimetön';
-            const team = entry.team || entry.team_name || fallbackLabel || '';
-            const avatarSource = entry.avatar || entry.logo || entry.image || null;
-            const value = entry.value ?? entry.metric ?? entry.stat ?? '';
-            const id = entry.id || entry.player_id || entry.team_id || `${name}-${team}`;
-            return {
-                id,
-                name,
-                team,
-                value,
-                avatar: this.resolveAvatar(avatarSource)
-            };
-        }
     },
     template: `
         <div class="division-view">
@@ -1442,7 +1236,7 @@ window.DivisionView = {
                         v-for="link in quickLinksVisible"
                         :key="link.id"
                         class="division-hero__nav-link"
-                        :href="sectionLinkTarget(link)"
+                        :href="'#' + link.id"
                         @click.prevent="scrollToSection(link.id)"
                     >
                         {{ link.label }}
@@ -1495,7 +1289,6 @@ window.DivisionView = {
                     <div class="division-team-module">
                         <div class="division-team-panels">
                             <team-comparison-board
-                                ref="teamBoard"
                                 class="division-team-panel division-team-panel--table"
                                 :teams="teams"
                                 :loading="standingsLoading"

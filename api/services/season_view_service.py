@@ -3,11 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-import db_async as db
 from api.services import seasons_service
 from api.services.cache_helpers import get_season_revision, select_season_cache
-from db_async import get_pool
-from division_naming import build_division_name
 
 
 def _as_int(value: Any, default: int = 0) -> int:
@@ -97,60 +94,41 @@ async def get_divisions(season_id: int) -> List[Dict[str, Any]]:
 
 
 async def _compute_divisions(season_id: int) -> List[Dict[str, Any]]:
-    pool = await get_pool()
-    async with pool.acquire() as conn:
-        divisions = await db.get_all_base_divisions_for_season(conn, season_id)
+    # Reuse the canonical season division aggregator to avoid duplicate SQL and drift.
+    divisions = await seasons_service.get_season_divisions(season_id)
 
-        result = []
-        for div in divisions:
-            stats = await db.get_division_stats_for_v3(conn, div["division_id"])
+    result: list[dict[str, Any]] = []
+    for row in divisions:
+        season_stats = row.get("season") or {}
+        playoff_stats = row.get("playoffs") or {}
+        winners = row.get("winners") or []
+        winner_team = playoff_stats.get("winner") or (
+            winners[0].get("team_name") if winners and isinstance(winners[0], dict) else None
+        )
 
-            season_stats = stats.get("season", {})
-            playoff_stats = stats.get("playoffs", {})
-
-            def get_status(matches_played, matches_total, db_status):
-                if matches_played == 0:
-                    return "waiting"
-                if matches_played >= matches_total and matches_total > 0:
-                    return "finished"
-                if db_status == "finished":  # last match finished
-                    return "finished"
-                return "active"
-
-            season_status = get_status(
-                season_stats.get("matches_played", 0),
-                season_stats.get("matches_total", 0),
-                season_stats.get("division_status"),
-            )
-
-            playoff_matches_played = playoff_stats.get("matches_played", 0)
-            playoff_matches_total = 7  # Hardcoded as per spec for now
-
-            playoff_status = get_status(playoff_matches_played, playoff_matches_total, None)
-
-            result.append(
-                {
-                    "division_id": div["division_id"],
-                    "tier": div["tier"],
-                    "name": build_division_name(season_id, div.get("tier"), False),
-                    "status": season_status,
-                    "season": {
-                        "teams": season_stats.get("teams", 0),
-                        "matches_played": season_stats.get("matches_played", 0),
-                        "matches_total": season_stats.get("matches_total", 0),
-                    },
-                    "playoffs": {
-                        "status": playoff_status,
-                        "teams": 8,
-                        "matches_played": playoff_matches_played,
-                        "matches_total": playoff_matches_total,
-                        "winner_team": playoff_stats.get("winner_team"),
-                        "playoff_championship_id": playoff_stats.get("playoff_championship_id"),
-                    },
-                    "meta": {
-                        "winner_team": None,  # Placeholder
-                        "mvp_player": None,
-                    },
-                }
-            )
-        return result
+        result.append(
+            {
+                "division_id": str(row.get("division_id") or ""),
+                "tier": _as_int(row.get("tier") or row.get("division_num")),
+                "name": str(row.get("name") or ""),
+                "status": str(row.get("status") or "waiting"),
+                "season": {
+                    "teams": _as_int(season_stats.get("teams")),
+                    "matches_played": _as_int(season_stats.get("matches_played")),
+                    "matches_total": _as_int(season_stats.get("matches_total")),
+                },
+                "playoffs": {
+                    "status": str(playoff_stats.get("status") or "waiting"),
+                    "teams": _as_int(playoff_stats.get("teams"), 8),
+                    "matches_played": _as_int(playoff_stats.get("matches_played")),
+                    "matches_total": _as_int(playoff_stats.get("matches_total"), 7),
+                    "winner_team": winner_team,
+                    "playoff_championship_id": playoff_stats.get("playoff_championship_id"),
+                },
+                "meta": {
+                    "winner_team": winner_team,
+                    "mvp_player": row.get("best_player"),
+                },
+            }
+        )
+    return result

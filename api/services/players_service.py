@@ -135,15 +135,15 @@ async def fetch_player_season_stats(player_id: str) -> list[dict[str, Any]]:
 async def fetch_player_map_stats(championship_id: str, player_id: str) -> list[dict[str, Any]]:
     revision = await get_championship_revision(championship_id)
     cache_key = ("fetch_player_map_stats", championship_id, player_id, revision)
+    champ_rows = await query_async(
+        "SELECT season FROM championships WHERE championship_id = :champ_id",
+        {"champ_id": championship_id},
+    )
+    if not champ_rows:
+        raise NotFoundError(f"Championship {championship_id} not found")
+    season = int(champ_rows[0]["season"])
 
     async def _compute():
-        champ_rows = await query_async(
-            "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
-            {"champ_id": championship_id},
-        )
-        if not champ_rows:
-            raise NotFoundError(f"Championship {championship_id} not found")
-
         map_deltas = await compute_player_map_deltas_async(championship_id, player_id)
         if not map_deltas:
             raise NotFoundError(
@@ -164,13 +164,8 @@ async def fetch_player_map_stats(championship_id: str, player_id: str) -> list[d
         return result
 
     # Use season-aware cache
-    champ_rows = await query_async(
-        "SELECT season FROM championships WHERE championship_id = :champ_id",
-        {"champ_id": championship_id},
-    )
-    if champ_rows:
-        season = int(champ_rows[0]["season"])
-        cache, ttl_seconds = select_season_cache(season)
+    cache, ttl_seconds = select_season_cache(season)
+    if cache is not None:
         cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
     else:
         cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)

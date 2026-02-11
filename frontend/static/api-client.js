@@ -59,135 +59,43 @@
 
     const ROUTE_MAP = Object.freeze({
         seasons: () => [
-            `/api/seasons`,
-            `/api/v1/seasons`
-        ],
-        seasonSummary: seasonId => [
-            `/api/season-view/summary/${seasonId}`,
-            `/api/seasons/${seasonId}/summary`,
-            `/api/v1/seasons/${seasonId}/summary`,
-            `/api/seasons/${seasonId}/stats/summary`
-        ],
-        seasonDivisions: seasonId => [
-            `/api/season-view/divisions/${seasonId}`,
-            `/api/seasons/${seasonId}/divisions`,
-            `/api/v1/seasons/${seasonId}/divisions`,
-            `/api/divisions/season/${seasonId}`,
-            `/api/v1/divisions/season/${seasonId}`,
-            `/api/divisions?season=${seasonId}`,
-            `/api/v1/divisions?season=${seasonId}`
-        ],
-        divisionStats: (seasonId, divisionId) => [
-            `/api/seasons/${seasonId}/divisions/${divisionId}/stats`,
-            `/api/v1/seasons/${seasonId}/divisions/${divisionId}/stats`,
-            `/api/divisions/${divisionId}/stats`
+            `/api/seasons`
         ],
         divisionDetails: divisionId => [
-            `/api/divisions/by-slug/${divisionId}`,
-            `/api/divisions/${divisionId}`,
-            `/api/divisions/${divisionId}/details`,
-            `/api/championships/${divisionId}`,
-            `/api/championships/${divisionId}/details`
+            `/api/divisions/${divisionId}`
         ],
         divisionMatches: divisionId => [
-            `/api/matches/division/${divisionId}`,
-            `/api/v1/matches/division/${divisionId}`
+            `/api/matches/division/${divisionId}`
         ],
         divisionAverages: championshipId => [
-            `/api/stats/division/${championshipId}/averages`,
-            `/api/v1/stats/division/${championshipId}/averages`
-        ],
-        teamInfo: teamId => [
-            `/api/teams/${teamId}`,
-            `/api/teams/${teamId}/info`,
-            `/api/v1/teams/${teamId}`,
-            `/api/v1/teams/${teamId}/info`
+            `/api/stats/division/${championshipId}/averages`
         ],
         teamPage: (teamId, seasonId) => {
             const seasonQuery = seasonId ? `?championship_id=${seasonId}` : '';
-            const routes = [
-                `/api/teams/${teamId}/page${seasonQuery}`,
-                `/api/v1/teams/${teamId}/page${seasonQuery}`
-            ];
-            if (seasonId) {
-                routes.push(`/api/teams/${teamId}/season/${seasonId}/page`);
-                routes.push(`/api/v1/teams/${teamId}/season/${seasonId}/page`);
-            }
-            return routes;
+            return [`/api/teams/${teamId}/page${seasonQuery}`];
         },
-        teamSeasons: teamId => [
-            `/api/teams/${teamId}/seasons`,
-            `/api/v1/teams/${teamId}/seasons`,
-            `/api/teams/${teamId}/season-list`,
-            `/api/v1/teams/${teamId}/season-list`
-        ],
-        teamDetails: (teamId, championshipId) => [
-            `/api/teams/${teamId}/season/${championshipId}`,
-            `/api/v1/teams/${teamId}/season/${championshipId}`,
-            `/api/teams/${teamId}/championship/${championshipId}`,
-            `/api/v1/teams/${teamId}/championship/${championshipId}`
-        ],
-        teamMatches: (teamId, seasonId) => [
-            `/api/teams/${teamId}/matches`,
-            `/api/v1/teams/${teamId}/matches`,
-            `/api/teams/${teamId}/season/${seasonId}/matches`,
-            `/api/v1/teams/${teamId}/season/${seasonId}/matches`
-        ],
-        teamSeasonProgression: (teamId, season, division) => [
-            `/api/teams/${teamId}/season-progression?season=${season}&division=${division}`,
-            `/api/v1/teams/${teamId}/season-progression?season=${season}&division=${division}`
-        ],
-        teamMapStats: (teamId, seasonId) => [
-            `/api/teams/${teamId}/map-stats`,
-            `/api/v1/teams/${teamId}/map-stats`,
-            `/api/teams/${teamId}/season/${seasonId}/map-stats`,
-            `/api/v1/teams/${teamId}/season/${seasonId}/map-stats`
-        ],
         playerBundle: (playerId, championshipId = null) => {
             const champParam = championshipId ? `?championship_id=${encodeURIComponent(championshipId)}` : '';
             return [
-                `/api/players/${playerId}/bundle${champParam}`,
-                `/api/v1/players/${playerId}/bundle${champParam}`
+                `/api/players/${playerId}/bundle${champParam}`
             ];
         },
-        teamPlayers: (teamId, seasonId) => [
-            `/api/teams/${teamId}/players`,
-            `/api/v1/teams/${teamId}/players`,
-            `/api/teams/${teamId}/season/${seasonId}/players`,
-            `/api/v1/teams/${teamId}/season/${seasonId}/players`
-        ],
         teamMatchPlayerStats: (teamId, championshipId) => [
-            `/api/teams/${teamId}/match-player-stats/${championshipId}`,
-            `/api/v1/teams/${teamId}/match-player-stats/${championshipId}`
+            `/api/teams/${teamId}/match-player-stats/${championshipId}`
         ],
-        // Legacy compatibility
         divisions: seasonId => [
-            `/api/season-view/divisions/${seasonId}`,
-            `/api/divisions/season/${seasonId}`,
-            `/api/seasons/${seasonId}/divisions`,
-            `/api/v1/divisions/season/${seasonId}`,
-            `/api/v1/seasons/${seasonId}/divisions`,
-            `/api/divisions?season=${seasonId}`,
-            `/api/v1/divisions?season=${seasonId}`
+            `/api/season-view/divisions/${seasonId}`
         ],
         summary: seasonId => [
-            `/api/stats/summary/season/${seasonId}`,
-            `/api/season-view/summary/${seasonId}`,
-            `/api/seasons/${seasonId}/summary`,
-            `/api/v1/seasons/${seasonId}/summary`,
-            `/api/seasons/${seasonId}/stats/summary`
+            `/api/stats/summary/season/${seasonId}`
         ],
-        health: () => [`/api/health`, `/api/v1/health`, `/healthz`],
+        health: () => [`/api/health`],
         mapsCatalog: () => [
             `/api/maps`,
-            `/api/maps/`,
-            `/api/maps_catalog`,
-            `/api/maps-catalog`,
-            `/api/maps/catalog`
+            `/api/maps/`
         ],
         upcomingMatches: query => [
-            `/api/matches/upcoming${query}`,
-            `/api/v1/matches/upcoming${query}`
+            `/api/matches/upcoming${query}`
         ]
     });
 
@@ -510,100 +418,6 @@
         return null;
     }
 
-    function clampNumber(value, min, max) {
-        const num = Number(value);
-        if (!Number.isFinite(num)) return min;
-        return Math.min(max, Math.max(min, num));
-    }
-
-    class ApiValidationError extends Error {
-        constructor(message, path, value) {
-            super(message);
-            this.name = 'ApiValidationError';
-            this.path = path;
-            this.value = value;
-        }
-    }
-
-    function validateSeasonSummary(payload) {
-        if (!payload || typeof payload !== 'object') {
-            throw new ApiValidationError('Season summary must be an object', 'root', payload);
-        }
-        return payload;
-    }
-
-    function validateDivisionRecord(record, index) {
-        if (!record || typeof record !== 'object') {
-            throw new ApiValidationError('Division entry must be object', `divisions[${index}]`, record);
-        }
-        if (!record.division_id && record.division_id !== 0) {
-            throw new ApiValidationError('division_id missing', `divisions[${index}].division_id`, record);
-        }
-        const normalized = {
-            id: String(record.division_id),
-            name: String(record.name || `Division ${record.division_id}`),
-            tier: Number(record.tier || 0),
-            season: normalizeSeason(record.season, index),
-            playoffs: normalizePlayoffs(record.playoffs, index)
-        };
-        return normalized;
-    }
-
-    function normalizeSeason(season, index) {
-        if (!season || typeof season !== 'object') {
-            throw new ApiValidationError('season missing', `divisions[${index}].season`, season);
-        }
-        const teams = Number(season.teams);
-        if (!Number.isFinite(teams) || teams < 0) {
-            throw new ApiValidationError('season.teams invalid', `divisions[${index}].season.teams`, season.teams);
-        }
-        const matchesTotal = Number(season.matches_total);
-        const matchesPlayed = clampNumber(season.matches_played, 0, Number.isFinite(matchesTotal) ? matchesTotal : 100);
-        const status = String(season.status || '').toLowerCase();
-        if (!['waiting', 'active', 'finished'].includes(status)) {
-            throw new ApiValidationError('season.status invalid', `divisions[${index}].season.status`, season.status);
-        }
-        return {
-            teams,
-            matches_played: matchesPlayed,
-            matches_total: Number.isFinite(matchesTotal) ? matchesTotal : 0,
-            status,
-            winner: season.winner ? String(season.winner) : null
-        };
-    }
-
-    function normalizePlayoffs(playoffs, index) {
-        const fallback = {
-            teams: 0,
-            matches_played: 0,
-            matches_total: 0,
-            status: 'waiting',
-            winner: null
-        };
-        if (!playoffs || typeof playoffs !== 'object') {
-            return fallback;
-        }
-        const status = String(playoffs.status || 'waiting').toLowerCase();
-        if (!['waiting', 'active', 'finished'].includes(status)) {
-            throw new ApiValidationError('playoffs.status invalid', `divisions[${index}].playoffs.status`, playoffs.status);
-        }
-        const rawTotal = Number(playoffs.matches_total);
-        const matchesTotal = Number.isFinite(rawTotal) && rawTotal >= 0 ? rawTotal : 0;
-        const rawPlayed = Number(playoffs.matches_played);
-        const matchesPlayed =
-            Number.isFinite(rawPlayed) && rawPlayed >= 0
-                ? (matchesTotal > 0 ? Math.min(rawPlayed, matchesTotal) : rawPlayed)
-                : 0;
-        const teamCount = Number(playoffs.teams);
-        return {
-            teams: Number.isFinite(teamCount) && teamCount >= 0 ? teamCount : 0,
-            matches_played: matchesPlayed,
-            matches_total: matchesTotal,
-            status,
-            winner: playoffs.winner ? String(playoffs.winner) : null
-        };
-    }
-
     function extractDivisionArray(raw) {
         const metaHints = {};
         if (!raw || typeof raw !== 'object') {
@@ -633,20 +447,6 @@
             };
         }
         return { list: [], meta: raw.meta || metaHints };
-    }
-
-    let validationCounts = {};
-
-    function recordValidationError(error) {
-        const key = error.path || 'unknown';
-        validationCounts[key] = (validationCounts[key] || 0) + 1;
-        if (isDev) {
-            console.warn(`[apiClient] Validation error at ${key}`, error.value);
-        }
-    }
-
-    function resetValidationCounts() {
-        validationCounts = {};
     }
 
     async function fetchJson(path, options = {}) {
@@ -953,21 +753,9 @@
         async getSeasonSummary(seasonId) {
             const identifier = encodeSeasonId(seasonId);
             const routes = buildRouteCandidates('summary', identifier);
-            try {
-                const result = await fetchWithFallback(routes);
-                const payload = result?.data ?? result;
-                return { data: payload || {}, meta: result?.meta || {} };
-            } catch (error) {
-                if (error instanceof ApiEndpointNotFound) {
-                    if (isDev) {
-                        console.warn('[apiClient] summary routes missing, falling back to stats summary');
-                    }
-                    const fallback = await this.getSeasonStats(seasonId).catch(() => ({}));
-                    const payload = fallback?.data ?? fallback ?? {};
-                    return { data: payload, meta: { fallback: 'stats', error: 'summary-routes-missing' } };
-                }
-                throw error;
-            }
+            const result = await fetchWithFallback(routes);
+            const payload = result?.data ?? result;
+            return { data: payload || {}, meta: result?.meta || {} };
         }
 
         async getDivisions(seasonId) {
@@ -983,59 +771,15 @@
             return { data: list, meta, errors: [], validationCounts: {} };
         }
 
-        async getNormalizedDivisions(seasonId, options = {}) {
-            const { includePlayoffs = false } = options;
-            try {
-                const response = await this.getDivisions(seasonId);
-                const list = response?.data ?? response ?? [];
-                const filtered = Array.isArray(list)
-                    ? list.filter(item => includePlayoffs || (!item.is_playoff && !item.isPlayoff))
-                    : [];
-                const normalized = filtered.map(item => ({
-                    id: item.division_id || item.divisionId || item.id,
-                    name: item.name || `Division ${item.tier || item.division || '?'}`,
-                    tier: item.tier || item.division || 0,
-                    status: item.status,
-                    isPlayoff: item.is_playoff || item.isPlayoff || false
-                })).sort((a, b) => (a.tier || 0) - (b.tier || 0));
-                return normalized;
-            } catch (err) {
-                if (isDev) {
-                    console.warn(`[apiClient] Failed to fetch normalized divisions for season ${seasonId}:`, err);
-                }
-                return [];
-            }
-        }
-
         async fetchLifetimeSummary() {
-            try {
-                return await fetchJson('/stats/summary/all');
-            } catch (error) {
-                if (error?.status === 404) {
-                    return fetchJson('/home');
-                }
-                throw error;
-            }
-        }
-
-        async getStatsOverview() {
-            return fetchJson('/stats/overview');
+            return await fetchJson('/stats/summary/all');
         }
 
         async getSeasons() {
             const routes = buildRouteCandidates('seasons');
-            try {
-                const result = await fetchWithFallback(routes);
-                const payload = result?.data ?? result;
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] seasons endpoint failed, falling back to legacy', error);
-                }
-                // Fallback to legacy endpoint
-                const legacyResult = await fetchJson('/divisions/seasons').catch(() => []);
-                return legacyResult?.data ?? legacyResult ?? [];
-            }
+            const result = await fetchWithFallback(routes);
+            const payload = result?.data ?? result;
+            return Array.isArray(payload) ? payload : [];
         }
 
         async getMapsCatalog(options = {}) {
@@ -1051,29 +795,6 @@
             const data = Array.isArray(normalized) ? normalized : [];
             this._mapCatalogCache = { data, timestamp: now() };
             return data;
-        }
-
-        async getSeasonStats(seasonId) {
-            return fetchJson(`/seasons/${encodeURIComponent(seasonId)}/stats`);
-        }
-
-        async getDivisionsBySeason(seasonId) {
-            return fetchJson(`/divisions/season/${encodeURIComponent(seasonId)}`);
-        }
-
-        async getDivisionDetailedStats(seasonId, divisionId) {
-            const encodedSeason = encodeURIComponent(seasonId);
-            const encodedDivision = encodeURIComponent(divisionId);
-            const routes = buildRouteCandidates('divisionStats', encodedSeason, encodedDivision);
-            try {
-                const result = await fetchWithFallback(routes);
-                return result?.data ?? result;
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] divisionStats endpoint failed', error);
-                }
-                throw error;
-            }
         }
 
         async getDivisionById(championshipId, options = {}) {
@@ -1431,41 +1152,6 @@
             };
         }
 
-        async getTeamInfo(teamId, options = {}) {
-            if (!teamId) {
-                throw new Error('teamId is required');
-            }
-            const encodedId = encodeURIComponent(teamId);
-            const routes = buildRouteCandidates('teamInfo', encodedId);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                return result?.data ?? result ?? {};
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] teamInfo endpoint failed', error);
-                }
-                throw error;
-            }
-        }
-
-        async getTeamSeasons(teamId, options = {}) {
-            if (!teamId) {
-                throw new Error('teamId is required');
-            }
-            const encodedId = encodeURIComponent(teamId);
-            const routes = buildRouteCandidates('teamSeasons', encodedId);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                const payload = result?.data ?? result ?? [];
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] teamSeasons endpoint failed', error);
-                }
-                return [];
-            }
-        }
-
         async getTeamPage(teamId, seasonId, options = {}) {
             if (!teamId) {
                 throw new Error('teamId is required');
@@ -1484,86 +1170,6 @@
             }
         }
 
-        async getTeamDetails(teamId, championshipId, options = {}) {
-            if (!teamId || !championshipId) {
-                throw new Error('teamId and championshipId are required');
-            }
-            const encTeamId = encodeURIComponent(teamId);
-            const encChampId = encodeURIComponent(championshipId);
-            const routes = buildRouteCandidates('teamDetails', encTeamId, encChampId);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                return result?.data ?? result ?? {};
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] teamDetails endpoint failed', error);
-                }
-                throw error;
-            }
-        }
-
-        async getTeamMatches(teamId, seasonId, options = {}) {
-            if (!teamId) {
-                throw new Error('teamId is required');
-            }
-            const encTeamId = encodeURIComponent(teamId);
-            const encSeasonId = seasonId ? encodeURIComponent(seasonId) : null;
-            const routes = encSeasonId 
-                ? buildRouteCandidates('teamMatches', encTeamId, encSeasonId)
-                : buildRouteCandidates('teamMatches', encTeamId);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                const payload = result?.data ?? result ?? [];
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] teamMatches endpoint failed', error);
-                }
-                return [];
-            }
-        }
-
-        async getTeamMapStats(teamId, seasonId, options = {}) {
-            if (!teamId) {
-                throw new Error('teamId is required');
-            }
-            const encTeamId = encodeURIComponent(teamId);
-            const encSeasonId = seasonId ? encodeURIComponent(seasonId) : null;
-            const routes = encSeasonId
-                ? buildRouteCandidates('teamMapStats', encTeamId, encSeasonId)
-                : buildRouteCandidates('teamMapStats', encTeamId);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                const payload = result?.data ?? result ?? [];
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] teamMapStats endpoint failed', error);
-                }
-                return [];
-            }
-        }
-
-        async getTeamSeasonProgression(teamId, season, division, options = {}) {
-            if (!teamId || season == null || division == null) {
-                throw new Error('teamId, season, and division are required');
-            }
-            const encTeamId = encodeURIComponent(teamId);
-            const encSeason = encodeURIComponent(season);
-            const encDivision = encodeURIComponent(division);
-            const routes = buildRouteCandidates('teamSeasonProgression', encTeamId, encSeason, encDivision);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                const payload = result?.data ?? result ?? [];
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] teamSeasonProgression endpoint failed', error);
-                }
-                return [];
-            }
-        }
-
         async getTeamMatchPlayerStats(teamId, championshipId, options = {}) {
             if (!teamId || !championshipId) {
                 throw new Error('teamId and championshipId are required');
@@ -1579,27 +1185,6 @@
             } catch (error) {
                 if (isDev) {
                     console.warn('[apiClient] teamMatchPlayerStats endpoint failed', error);
-                }
-                return [];
-            }
-        }
-
-        async getTeamPlayers(teamId, seasonId, options = {}) {
-            if (!teamId) {
-                throw new Error('teamId is required');
-            }
-            const encTeamId = encodeURIComponent(teamId);
-            const encSeasonId = seasonId ? encodeURIComponent(seasonId) : null;
-            const routes = encSeasonId
-                ? buildRouteCandidates('teamPlayers', encTeamId, encSeasonId)
-                : buildRouteCandidates('teamPlayers', encTeamId);
-            try {
-                const result = await fetchWithFallback(routes, options);
-                const payload = result?.data ?? result ?? [];
-                return Array.isArray(payload) ? payload : [];
-            } catch (error) {
-                if (isDev) {
-                    console.warn('[apiClient] teamPlayers endpoint failed', error);
                 }
                 return [];
             }
@@ -1624,7 +1209,5 @@
         }
     }
 
-    window.ApiValidationError = ApiValidationError;
-    window.ApiEndpointNotFound = ApiEndpointNotFound;
     window.apiClient = new ApiClient();
 })();

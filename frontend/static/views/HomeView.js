@@ -263,6 +263,45 @@ function emptySeasonState() {
     };
 }
 
+const HOME_PARTNER_CALLOUTS = Object.freeze([
+    {
+        id: 'armafi',
+        name: 'Armafinland',
+        description: 'Yhteisö on avoin kaikille pelaajille ja ryhmille, jotka haluavat kokeilla taktista pelaamista myös Arma-sarjan peleissä. Pelaamme Arma 3 ja Arma Reforger, sekä järjestämme kansainvälisiä TvT-tehtäviä, joissa painotetaan realismia, joukkuepeliä ja yhteistoimintaa. Pelien ulkopuolella meno on rentoa ja mutkatonta, mutta pelissä otetaan tehtävät tosissaan. ',
+        primaryLabel: 'Liity AFI Discord',
+        primaryHref: 'https://www.armafinland.fi/discord',
+        secondaryLabel: 'Lue lisää',
+        secondaryHref: 'https://armafinland.fi',
+        logo: 'https://armafinland.fi/logot/images/armafin-logo-400px.png'
+    },
+    {
+        id: 'sosso-bot',
+        name: 'Sössö The PappaCS bot',
+        description: 'Sössö on Discord-botti, joka tuo Pappaliiga-statistiikkaa suoraan Discord-palvelimillesi. Saat reaaliaikaisia tilastoja, ottelutuloksia ja pelaajatietoja kätevästi chatissa.',
+        primaryLabel: 'Lue lisää ja kutsu Sössö bot palvelimellesi',
+        primaryHref: 'https://cultti.github.io/Sosso-Bot/',
+        logo: '/static/sosso-bot-logo.png'
+    },
+    {
+        id: 'mobbi-cs',
+        name: 'Mobbi CS',
+        description: 'Pappaliigan tilastot: menneet ja tulevat kaudet, joukkueiden ja pelaajien kausikohtaiset statistiikat yhdessä paikassa. Puhdasta raakaa dataa ilman clutteria. Helposti filtteröitävissä olevat pelaaja statsit.',
+        primaryLabel: 'Katso dataa Mobbi CS:ssä',
+        primaryHref: 'https://cs.mobbi.dev/',
+        logo: 'https://cs.mobbi.dev/assets/img/og_image.png'
+    },
+    {
+        id: 'pappaliiga',
+        name: 'Pappaliiga',
+        description: 'Pappaliigan tarkoituksena on tarjota varttuneemmalle väelle mahdollisuus kilpapelaamiseen; tosissaan ja `ei niin tosissaan`. ',
+        primaryLabel: 'Liity Pappaliiga Discord',
+        primaryHref: 'https://discord.gg/pappaliiga',
+        secondaryLabel: 'Lue lisää',
+        secondaryHref: 'https://pappaliiga.fi',
+        logo: 'https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png'
+    }
+]);
+
 window.HomeView = {
     name: 'HomeView',
     components: {
@@ -304,7 +343,8 @@ window.HomeView = {
             divisionSearch: '',
             seasonTeamCount: null,
             seasonTeamCountKey: null,
-            globalTeamCount: null
+            globalTeamCount: null,
+            seasonLoadPromises: {}
         };
     },
     computed: {
@@ -312,50 +352,7 @@ window.HomeView = {
             return 'AFI - Unofficial Pappaliiga CS Statsit';
         },
         partnerCallouts() {
-            return [
-                {
-                    id: 'armafi',
-                    // eyebrow: 'Epävirallisen statsisivuston ylläpitäjä',
-                    name: 'Armafinland',
-                    description: 'Yhteisö on avoin kaikille pelaajille ja ryhmille, jotka haluavat kokeilla taktista pelaamista myös Arma-sarjan peleissä. Pelaamme Arma 3 ja Arma Reforger, sekä järjestämme kansainvälisiä TvT-tehtäviä, joissa painotetaan realismia, joukkuepeliä ja yhteistoimintaa. Pelien ulkopuolella meno on rentoa ja mutkatonta, mutta pelissä otetaan tehtävät tosissaan. ',
-                    primaryLabel: 'Liity AFI Discord',
-                    primaryHref: 'https://www.armafinland.fi/discord',
-                    secondaryLabel: 'Lue lisää',
-                    secondaryHref: 'https://armafinland.fi',
-                    logo: 'https://armafinland.fi/logot/images/armafin-logo-400px.png'
-                },
-                {
-                    id: 'sosso-bot',
-                    name: 'Sössö The PappaCS bot',
-                    description: 'Sössö on Discord-botti, joka tuo Pappaliiga-statistiikkaa suoraan Discord-palvelimillesi. Saat reaaliaikaisia tilastoja, ottelutuloksia ja pelaajatietoja kätevästi chatissa.',
-                    primaryLabel: 'Lue lisää ja kutsu Sössö bot palvelimellesi',
-                    primaryHref: 'https://cultti.github.io/Sosso-Bot/',
-                    // secondaryLabel: 'Komennot ja ohjeet',
-                    // secondaryHref: 'https://cultti.github.io/Sosso-Bot/',
-                    logo: '/static/sosso-bot-logo.png'
-                },
-                {
-                    id: 'mobbi-cs',
-                    name: 'Mobbi CS',
-                    description: 'Pappaliigan tilastot: menneet ja tulevat kaudet, joukkueiden ja pelaajien kausikohtaiset statistiikat yhdessä paikassa. Puhdasta raakaa dataa ilman clutteria. Helposti filtteröitävissä olevat pelaaja statsit.',
-                    primaryLabel: 'Katso dataa Mobbi CS:ssä',
-                    primaryHref: 'https://cs.mobbi.dev/',
-                    // secondaryLabel: 'Komennot ja ohjeet',
-                    // secondaryHref: 'https://cultti.github.io/Sosso-Bot/',
-                    logo: 'https://cs.mobbi.dev/assets/img/og_image.png'
-                },
-                {
-                    id: 'pappaliiga',
-                    // eyebrow: 'Liiga',
-                    name: 'Pappaliiga',
-                    description: 'Pappaliigan tarkoituksena on tarjota varttuneemmalle väelle mahdollisuus kilpapelaamiseen; tosissaan ja `ei niin tosissaan`. ',
-                    primaryLabel: 'Liity Pappaliiga Discord',
-                    primaryHref: 'https://discord.gg/pappaliiga',
-                    secondaryLabel: 'Lue lisää',
-                    secondaryHref: 'https://pappaliiga.fi',
-                    logo: 'https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png'
-                }
-            ];
+            return HOME_PARTNER_CALLOUTS;
         },
         summaryLoading() {
             return this.homeStore?.summaryLoading ?? false;
@@ -451,16 +448,7 @@ window.HomeView = {
             return metrics;
         },
         seasonDivisions() {
-            const list = Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
-            if (typeof window !== 'undefined' && window.console && window.console.info) {
-                console.info('[HomeView] seasonDivisions resolved', {
-                    count: list.length,
-                    hasSelectedSeason: Boolean(this.selectedSeasonKey),
-                    loading: this.seasonState.loading,
-                    cached: this.seasonState.usingCache
-                });
-            }
-            return list;
+            return Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
         },
         seasonTitle() {
             const season = this.selectedSeason;
@@ -560,17 +548,6 @@ window.HomeView = {
                 };
             });
 
-            if (typeof console !== 'undefined' && console.log) {
-                console.log('[HomeView] circularProgressData resolved', {
-                    payload,
-                    progressSources: {
-                        regular: progress?.regular?.source || 'unknown',
-                        playoffs: progress?.playoffs?.source || 'unknown',
-                        overall: progress?.overall?.source || 'unknown'
-                    }
-                });
-            }
-
             return payload;
         },
         hasCircularProgressData() {
@@ -662,25 +639,17 @@ window.HomeView = {
         await this.bootstrap();
     },
     watch: {
-        '$route.query.season': {
+        '$route.params.seasonId': {
             handler(newValue, oldValue) {
-                if (newValue === oldValue) {
-                    return;
-                }
-                if (newValue == null) {
-                    if (this.selectedSeasonKey) {
-                        this.syncRouteWithSelectedSeason({ replace: true });
-                    } else {
-                        this.initializeSeasonSelection({ ensureRoute: true });
+                if (newValue === oldValue) return;
+                if (!this.sortedSeasons.length || !this.seasonsStore) return;
+                const season = this.syncSeasonFromRouteParam(newValue, { fallbackToNewest: true, replaceRoute: true });
+                if (season) {
+                    if (season.key !== this.selectedSeasonKey) {
+                        this.seasonsStore.selectSeason(season.key);
                     }
-                    return;
+                    this.loadSeason(season.key, { apiParam: season.apiParam });
                 }
-                this.syncSeasonFromRoute(newValue, {
-                    fallbackToNewest: true,
-                    scroll: false,
-                    replaceRoute: true
-                });
-                this.syncRouteWithSelectedSeason({ replace: true });
             }
         }
     },
@@ -701,8 +670,7 @@ window.HomeView = {
                     this.seasonsStore
                         .fetchSeasons()
                         .then(() => {
-                            const season = this.initializeSeasonSelection({ ensureRoute: true });
-                            // Load initial season data
+                            const season = this.initializeSeasonSelection();
                             if (season) {
                                 this.loadSeason(season.key, { apiParam: season.apiParam });
                             }
@@ -714,7 +682,7 @@ window.HomeView = {
             }
             await Promise.allSettled(tasks);
             if (!this.selectedSeasonKey && this.sortedSeasons.length) {
-                const season = this.initializeSeasonSelection({ ensureRoute: true });
+                const season = this.initializeSeasonSelection();
                 if (season) {
                     this.loadSeason(season.key, { apiParam: season.apiParam });
                 }
@@ -725,37 +693,34 @@ window.HomeView = {
                 this.loadSeasonTeamCount(season?.apiParam ?? season?.id ?? this.selectedSeasonKey, this.seasonDivisions);
             }
         },
-        initializeSeasonSelection(options = {}) {
+        initializeSeasonSelection() {
             if (!this.sortedSeasons.length || !this.seasonsStore) {
                 return null;
             }
-            const routeSeason = this.$route?.query?.season;
+            const routeSeason = this.$route?.params?.seasonId;
             if (routeSeason != null) {
-                const resolved = this.syncSeasonFromRoute(routeSeason, {
+                const resolved = this.syncSeasonFromRouteParam(routeSeason, {
                     fallbackToNewest: true,
-                    scroll: false,
                     replaceRoute: true
                 });
-                if (resolved && options.ensureRoute) {
-                    this.syncRouteWithSelectedSeason({ replace: true });
+                if (resolved) {
+                    if (resolved.key !== this.selectedSeasonKey) {
+                        this.seasonsStore.selectSeason(resolved.key);
+                    }
+                    return resolved;
                 }
-                return resolved;
             }
 
             const existing = this.findSeasonRecord(this.selectedSeasonKey);
             if (existing) {
-                if (options.ensureRoute) {
-                    this.syncRouteWithSelectedSeason({ replace: true });
-                }
+                this.syncRouteWithSelectedSeason({ replace: true });
                 return existing;
             }
 
             const fallback = this.sortedSeasons[0];
             if (fallback) {
                 this.seasonsStore.selectSeason(fallback.key);
-                if (options.ensureRoute) {
-                    this.syncRouteWithSelectedSeason({ replace: true });
-                }
+                this.syncRouteWithSelectedSeason({ replace: true });
                 return fallback;
             }
             return null;
@@ -785,23 +750,11 @@ window.HomeView = {
             }
             return this.matchSeasonByParam(identifier);
         },
-        syncSeasonFromRoute(param, options = {}) {
-            if (!this.sortedSeasons.length || !this.seasonsStore) {
-                return null;
-            }
+        syncSeasonFromRouteParam(param, options = {}) {
             const matched = this.matchSeasonByParam(param);
             let targetSeason = matched;
             if (!targetSeason && options.fallbackToNewest) {
                 targetSeason = this.sortedSeasons[0] || null;
-            }
-            if (targetSeason && targetSeason.key !== this.selectedSeasonKey) {
-                this.seasonsStore.selectSeason(targetSeason.key);
-                // Load season data when syncing from route
-                this.loadSeason(targetSeason.key, { apiParam: targetSeason.apiParam });
-                // Only scroll if explicitly requested (not on initial load)
-                if (options.scroll) {
-                    this.scrollToSeasonSummary();
-                }
             }
             if (!matched && targetSeason && options.replaceRoute) {
                 this.syncRouteWithSelectedSeason({ replace: true });
@@ -809,27 +762,17 @@ window.HomeView = {
             return targetSeason;
         },
         syncRouteWithSelectedSeason(options = {}) {
-            if (!this.$router || !this.selectedSeason) {
-                return;
-            }
+            if (!this.$router || !this.selectedSeason) return;
             const season = this.selectedSeason;
             const targetId = season.id ?? season.seasonNumber ?? season.key;
             const normalized = targetId != null ? String(targetId) : null;
-            const current = this.$route?.query?.season ?? null;
-            if (normalized === (current != null ? String(current) : null)) {
-                return;
-            }
-            const nextQuery = { ...(this.$route?.query || {}) };
-            if (normalized) {
-                nextQuery.season = normalized;
-            } else {
-                delete nextQuery.season;
-            }
+            const current = this.$route?.params?.seasonId ?? null;
+            if (normalized === (current != null ? String(current) : null)) return;
             const method = options.replace ? 'replace' : 'push';
-            this.$router[method]({
-                query: nextQuery,
-                hash: this.$route?.hash || undefined
-            }).catch(() => {});
+            const nextRoute = normalized
+                ? { name: 'home-season', params: { seasonId: normalized }, hash: this.$route?.hash || undefined }
+                : { name: 'home', hash: this.$route?.hash || undefined };
+            this.$router[method](nextRoute).catch(() => {});
         },
         handleSeasonSelect(value) {
             const season = this.findSeasonRecord(value);
@@ -843,15 +786,11 @@ window.HomeView = {
                 return;
             }
 
-            console.info('[HomeView] handleSeasonSelect', { selected: season.key });
-
             // Update store selection (this triggers data load in bootstrap if needed)
             this.seasonsStore?.selectSeason(season.key);
 
             // Load season data immediately without waiting for watchers
             this.loadSeason(season.key, { apiParam: season?.apiParam });
-
-            // Update route silently (for sharing/refresh) without triggering navigation
             this.syncRouteWithSelectedSeason({ replace: true });
 
             // Scroll to season summary section
@@ -861,27 +800,40 @@ window.HomeView = {
             if (!key || !this.homeStore) {
                 return;
             }
+            const loadKey = String(key);
+            const inFlight = this.seasonLoadPromises?.[loadKey];
+            if (inFlight) {
+                return inFlight;
+            }
+
             this.seasonTeamCount = null;
             this.seasonTeamCountKey = null;
             const season = this.seasonsStore?.getSeasonByKey(key);
             const apiParam = options.apiParam ?? season?.apiParam ?? key;
-            try {
-                const payload = await this.homeStore.fetchSeason(key, {
-                    apiParam,
-                    force: options.force === true
-                });
-                if (typeof window !== 'undefined' && window.console) {
-                    console.info('[HomeView] Season loaded', {
-                        seasonKey: key,
-                        divisions: payload?.divisions?.length ?? 0,
-                        offline: payload?.offline,
-                        cacheTimestamp: payload?.cacheTimestamp
+            const request = (async () => {
+                try {
+                    const payload = await this.homeStore.fetchSeason(key, {
+                        apiParam,
+                        force: options.force === true
                     });
+                    this.loadSeasonTeamCount(apiParam, payload?.divisions);
+                    return payload;
+                } catch (error) {
+                    console.error('Season fetch failed', error);
+                    return null;
+                } finally {
+                    const current = this.seasonLoadPromises?.[loadKey];
+                    if (current === request) {
+                        delete this.seasonLoadPromises[loadKey];
+                    }
                 }
-                this.loadSeasonTeamCount(apiParam, payload?.divisions);
-            } catch (error) {
-                console.error('Season fetch failed', error);
-            }
+            })();
+
+            this.seasonLoadPromises = {
+                ...(this.seasonLoadPromises || {}),
+                [loadKey]: request
+            };
+            return request;
         },
         async loadSeasonTeamCount(seasonId, divisions) {
             if (!seasonId || typeof window === 'undefined' || !window.apiClient?.getSeasonTeamCount) {
@@ -924,7 +876,7 @@ window.HomeView = {
             this.seasonsStore
                 .fetchSeasons({ force: true })
                 .then(() => {
-                    this.initializeSeasonSelection({ ensureRoute: true });
+                    this.initializeSeasonSelection();
                 })
                 .catch(error => {
                     console.error('Season list refresh failed', error);
@@ -941,16 +893,6 @@ window.HomeView = {
         retrySeason() {
             if (!this.selectedSeasonKey) return;
             const season = this.selectedSeason;
-            if (season) {
-                console.info('[HomeView] retrySeason triggered', {
-                    key: this.selectedSeasonKey,
-                    apiParam: season?.apiParam
-                });
-            } else {
-                console.info('[HomeView] retrySeason triggered without selectedSeason', {
-                    key: this.selectedSeasonKey
-                });
-            }
             this.loadSeason(this.selectedSeasonKey, {
                 apiParam: season?.apiParam,
                 force: true
@@ -986,10 +928,7 @@ window.HomeView = {
                     const visibleThreshold = vh * 0.3;
                     const isWellPositioned = rect.top >= 0 && rect.top <= visibleThreshold;
 
-                    if (isWellPositioned) {
-                        console.info('[HomeView] scrollToSeasonSummary: already visible, skipping scroll');
-                        return;
-                    }
+                    if (isWellPositioned) return;
 
                     // Scroll to position target near top of viewport with some padding
                     const targetY = scrollY + rect.top - 80; // 80px padding from top
@@ -1003,11 +942,9 @@ window.HomeView = {
             });
         },
         setDivisionFilter(filter) {
-            console.info('[HomeView] setDivisionFilter', filter);
             this.divisionFilter = filter;
         },
         resetDivisionFilters() {
-            console.info('[HomeView] resetDivisionFilters');
             this.divisionFilter = 'all';
             this.divisionSearch = '';
         }

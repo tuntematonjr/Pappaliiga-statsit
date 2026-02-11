@@ -27,13 +27,13 @@ const router = createRouter({
             component: window.UpcomingMatchesView
         },
         {
-            path: '/division/:championshipId',
-            name: 'division',
-            component: window.DivisionView
+            path: '/:seasonId',
+            name: 'home-season',
+            component: window.HomeView
         },
         {
-            path: '/division/:championshipId/playoffs',
-            name: 'division-playoffs',
+            path: '/division/:championshipId',
+            name: 'division',
             component: window.DivisionView
         },
         {
@@ -49,6 +49,11 @@ const router = createRouter({
         {
             path: '/player/:playerId',
             name: 'player',
+            component: window.PlayerView
+        },
+        {
+            path: '/player/:championshipId/:playerId',
+            name: 'player-detail',
             component: window.PlayerView
         }
     ],
@@ -98,5 +103,3 @@ app.use(router);
 
 // Mount app
 app.mount('#app');
-
-console.log('✓ Pappaliiga Stats App initialized');

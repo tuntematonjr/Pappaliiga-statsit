@@ -97,19 +97,16 @@ window.SortableTable = {
 
         const runSortPipeline = (rows) => {
             if (!Array.isArray(rows)) {
-                console.debug('[SortableTable] runSortPipeline: rows not array, resetting');
                 sortedData.value = [];
                 return;
             }
 
             if (!rows.length) {
-                console.debug('[SortableTable] runSortPipeline: rows empty, waiting for data');
                 sortedData.value = [];
                 return;
             }
 
             if (!hasAppliedDefault.value && props.defaultSort && hasDefaultColumn.value) {
-                console.debug('[SortableTable] runSortPipeline: applying default sort', props.defaultSort);
                 sortedData.value = applyDefaultSort(
                     [...rows],
                     props.defaultSort.column,
@@ -121,37 +118,26 @@ window.SortableTable = {
             }
 
             if (hasAppliedDefault.value || (currentSort.value && currentSort.value.column)) {
-                console.debug('[SortableTable] runSortPipeline: reapplying existing sort', currentSort.value);
                 sortedData.value = sortData([...rows]);
                 return;
             }
 
-            console.debug('[SortableTable] runSortPipeline: no sort applied, using incoming order');
             sortedData.value = [...rows];
         };
 
         Vue.watch(dataSource, (newVal) => {
-            console.debug('[SortableTable] dataSource change', {
-                rows: Array.isArray(newVal) ? newVal.length : null,
-                defaultSort: props.defaultSort,
-                hasAppliedDefault: hasAppliedDefault.value,
-                currentSort: currentSort.value
-            });
             if (!Array.isArray(newVal)) {
-                console.debug('[SortableTable] value is not array; resetting');
                 hasAppliedDefault.value = false;
                 sortedData.value = [];
                 return;
             }
 
             if (!newVal.length) {
-                console.debug('[SortableTable] array empty; waiting for data');
                 sortedData.value = [];
                 return;
             }
 
             if (!props.sortReady) {
-                console.debug('[SortableTable] sortReady false; skipping sorting pass');
                 sortedData.value = [...newVal];
                 return;
             }
@@ -160,7 +146,6 @@ window.SortableTable = {
         }, { immediate: true, deep: true });
 
         Vue.watch(() => props.sortReady, (ready) => {
-            console.debug('[SortableTable] sortReady change detected', { ready, hasAppliedDefault: hasAppliedDefault.value });
             if (!ready) return;
 
             const currentRows = Array.isArray(props.data) ? props.data : [];
@@ -229,7 +214,6 @@ window.SortableTable = {
         },
         handleSort(column) {
             if (column.sortable !== false) {
-                console.debug('[SortableTable] manual column sort', { column: column.key, numeric: column.numeric });
                 // Call sortData with current props data to avoid stale internal references
                 this.sortData([...this.data], column.key, column.numeric);
                 this.hasAppliedDefault = true;

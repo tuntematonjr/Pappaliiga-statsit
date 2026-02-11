@@ -85,6 +85,16 @@ window.MatchExpandedDetails = {
         championshipId() {
             return this.$route?.params?.championshipId || this.$route?.query?.championship || null;
         },
+        playerRoute(player) {
+            const playerId = player?.playerId || player?.player_id || null;
+            if (!playerId) return null;
+            const championshipId = this.championshipId();
+            return {
+                name: 'player',
+                params: { playerId: String(playerId) },
+                query: championshipId ? { championship: String(championshipId) } : {}
+            };
+        },
         teamRoute(teamId, teamName = '') {
             const championshipId = this.championshipId();
             if (!championshipId || !teamId) return null;
@@ -269,7 +279,14 @@ window.MatchExpandedDetails = {
                                         <span v-else>{{ teamName }}</span>
                                     </div>
                                     <div class="map-players__list">
-                                        <span v-for="player in playersForTeam(mapRoundIndex(map), teamId)" :key="player.playerId || player.player_id" class="map-player-pill">{{ player.nickname || player.playerId || player.player_id }}</span>
+                                        <template v-for="player in playersForTeam(mapRoundIndex(map), teamId)" :key="player.playerId || player.player_id || player.nickname">
+                                            <router-link
+                                                v-if="playerRoute(player)"
+                                                :to="playerRoute(player)"
+                                                class="map-player-pill player-link"
+                                            >{{ player.nickname || player.playerId || player.player_id }}</router-link>
+                                            <span v-else class="map-player-pill">{{ player.nickname || player.playerId || player.player_id }}</span>
+                                        </template>
                                     </div>
                                 </div>
                                 <div class="map-players__team">
@@ -278,7 +295,14 @@ window.MatchExpandedDetails = {
                                         <span v-else>{{ opponentName }}</span>
                                     </div>
                                     <div class="map-players__list">
-                                        <span v-for="player in playersForTeam(mapRoundIndex(map), opponentId)" :key="player.playerId || player.player_id" class="map-player-pill">{{ player.nickname || player.playerId || player.player_id }}</span>
+                                        <template v-for="player in playersForTeam(mapRoundIndex(map), opponentId)" :key="player.playerId || player.player_id || player.nickname">
+                                            <router-link
+                                                v-if="playerRoute(player)"
+                                                :to="playerRoute(player)"
+                                                class="map-player-pill player-link"
+                                            >{{ player.nickname || player.playerId || player.player_id }}</router-link>
+                                            <span v-else class="map-player-pill">{{ player.nickname || player.playerId || player.player_id }}</span>
+                                        </template>
                                     </div>
                                 </div>
                             </div>

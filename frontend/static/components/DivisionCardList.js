@@ -249,7 +249,7 @@
     function buildDivisionHref(slug, divisionId, name, season, isPlayoffs) {
         const base = divisionId != null ? String(divisionId) : (slug || '');
         if (!base) return '/division';
-        return isPlayoffs ? `/division/${base}/playoffs` : `/division/${base}`;
+        return `/division/${base}`;
     }
 
     function buildCardModel(division) {

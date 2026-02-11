@@ -126,11 +126,6 @@ function createSegment() {
     return { data: null, loading: false, error: null, fetchedAt: null };
 }
 
-function safeDivide(num, den) {
-    if (!den) return 0;
-    return num / den;
-}
-
 function toNumber(value, fallback = 0) {
     if (value === null || value === undefined) return fallback;
     const numeric = Number(value);
@@ -228,6 +223,15 @@ function formatSignedNumber(value, decimals = 0) {
 
 function clampValue(value, min, max) {
     return Math.min(max, Math.max(min, value));
+}
+
+function buildHeatStyle(percent) {
+    const clamped = clampValue(toNumber(percent), 0, 100);
+    const hue = (clamped / 100) * 120;
+    const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
+    return {
+        background: `linear-gradient(90deg, ${color}, transparent)`
+    };
 }
 
 function computeMedian(values = []) {
@@ -741,6 +745,19 @@ function getMatchResult(match) {
     return 'draw';
 }
 
+function computePerformanceBadge(teamValue, divAvg, metricKey) {
+    if (!divAvg || teamValue == null) return null;
+    // Skip badges for zero-sum metrics where avg is always ~50%
+    if (metricKey === 'winrate' || metricKey === 'mapWinRate') return null;
+    const diff = teamValue - divAvg;
+    if (Math.abs(diff) < 0.5) return null;
+    const pct = ((Math.abs(diff) / divAvg) * 100).toFixed(0);
+    return {
+        type: diff > 0 ? 'positive' : 'negative',
+        label: `${diff > 0 ? '+' : ''}${pct}%`
+    };
+}
+
 function resolveTabFromQuery(route) {
     const tab = route?.query?.tab;
     if (tab === 'veto') return 'matches';
@@ -786,11 +803,6 @@ window.TeamDetail = {
             performanceTrendMode: 'map',
             trendChartWidth: 640,
             trendChartHeight: 140,
-            matchesTrendHover: {
-                index: null,
-                x: 0,
-                y: 0
-            },
             matchesHoverMatchId: null,
             matchesHoverSource: null,
             matchesChartWidth: 640,
@@ -801,7 +813,15 @@ window.TeamDetail = {
             mapCatalogLoading: false,
             mapCatalogLoaded: false,
             playerBaselineMode: 'avg',
-            divisionPlayerBaselinesState: {}
+            divisionPlayerBaselinesState: {},
+            inFlightLoads: {
+                bootstrap: {},
+                season: {},
+                upcoming: {},
+                divisionBaselines: {},
+                matchPlayerStats: {},
+                mapCatalog: {}
+            }
         };
     },
     computed: {
@@ -1038,7 +1058,6 @@ window.TeamDetail = {
             const divAvgs = this.divisionAverages || {};
             const mapWinRate = mapsPlayed ? (mapWins / mapsPlayed) * 100 : 0;
 
-            const hasWinRate = matches > 0;
             const missingTip = 'Ei dataa valitulle kaudelle.';
             return {
                 primary: [
@@ -1048,13 +1067,13 @@ window.TeamDetail = {
                         value: mapsPlayed > 0 ? formatPercent(mapWinRate, 1) : '—',
                         sub: '',
                         tone: 'stat-primary',
-                        missing: mapsPlayed === 0,
                         tooltip: mapsPlayed > 0
                             ? 'Voitetut kartat / pelatut kartat. Luovutukset mukana.'
                             : missingTip,
                         trendValue: mapsPlayed > 0 ? mapWinRate : null,
                         divAvg: divAvgs.avgMapWinRate || null,
-                        trendTooltip: mapsPlayed > 0 ? `Verrattuna divisioonan kauden keskiarvoon · ${formatPercent(divAvgs.avgMapWinRate || 0, 1)}` : ''
+                        trendTooltip: mapsPlayed > 0 ? `Verrattuna divisioonan kauden keskiarvoon · ${formatPercent(divAvgs.avgMapWinRate || 0, 1)}` : '',
+                        performanceBadge: computePerformanceBadge(mapsPlayed > 0 ? mapWinRate : null, divAvgs.avgMapWinRate || null, 'mapWinRate')
                     },
                     {
                         key: 'rounds',
@@ -1065,7 +1084,8 @@ window.TeamDetail = {
                         tooltip: 'Voitetut erät − hävityt erät. Luovutukset mukana (13–0/0–13).',
                         trendValue: roundsDiff,
                         divAvg: divAvgs.avgRoundDiff || null,
-                        trendTooltip: `Verrattuna divisioonan kauden keskiarvoon · ${formatNumber(divAvgs.avgRoundDiff || 0, 1)}`
+                        trendTooltip: `Verrattuna divisioonan kauden keskiarvoon · ${formatNumber(divAvgs.avgRoundDiff || 0, 1)}`,
+                        performanceBadge: computePerformanceBadge(roundsDiff, divAvgs.avgRoundDiff || null, 'rounds')
                     },
                     {
                         key: 'matches',
@@ -1075,7 +1095,8 @@ window.TeamDetail = {
                         tone: 'stat-primary',
                         tooltip: `Pelatut ottelut. Voitot–tappiot: ${formatNumber(matchWins)}–${formatNumber(matchLosses)}.`,
                         trendValue: null,
-                        divAvg: null
+                        divAvg: null,
+                        performanceBadge: null
                     }
                 ],
                 secondary: [
@@ -1856,9 +1877,6 @@ window.TeamDetail = {
         matchPlayerStatsLoading() {
             return !!this.matchPlayerStatsCurrent.loading;
         },
-        matchPlayerStatsError() {
-            return this.matchPlayerStatsCurrent.error || null;
-        },
         // Phase 1: Division averages for comparison
         divisionAverages() {
             return this.seasonData?.divisionAverages || {};
@@ -1978,6 +1996,31 @@ window.TeamDetail = {
         this.teardownMatchesChartObserver();
     },
     methods: {
+        runInFlightLoad(group, key, taskFactory) {
+            if (!group || !key || typeof taskFactory !== 'function') {
+                return Promise.resolve(null);
+            }
+            const bucket = this.inFlightLoads?.[group];
+            if (!bucket) {
+                return Promise.resolve(taskFactory());
+            }
+            if (bucket[key]) {
+                return bucket[key];
+            }
+
+            const task = (async () => {
+                try {
+                    return await taskFactory();
+                } finally {
+                    if (this.inFlightLoads?.[group]?.[key] === task) {
+                        delete this.inFlightLoads[group][key];
+                    }
+                }
+            })();
+
+            this.inFlightLoads[group][key] = task;
+            return task;
+        },
         formatDate(ts) {
             return formatMatchDate(ts);
         },
@@ -2012,14 +2055,11 @@ window.TeamDetail = {
             window.removeEventListener('resize', update);
             this._mapScrollHandler = null;
         },
-        formatSubMetric(perRound, perMap, decimals = 3) {
+        subMetricValue(perRound, perMap, decimals = 3) {
             if (this.mapSubMetricMode === 'perMap') {
                 return formatPerRound(perMap, decimals);
             }
             return formatPerRound(perRound, decimals);
-        },
-        subMetricValue(perRound, perMap, decimals = 3) {
-            return this.formatSubMetric(perRound, perMap, decimals);
         },
         shouldShowSubMetric(perRound, perMap) {
             const value = this.mapSubMetricMode === 'perMap'
@@ -2140,43 +2180,43 @@ window.TeamDetail = {
             const hasAvg = !!Object.keys(existing?.avg || {}).length;
             const hasMedian = !!Object.keys(existing?.median || {}).length;
             if ((hasAvg || hasMedian) && !existing?.error) return;
-            if (existing?.loading) return;
-
-            this.divisionPlayerBaselinesState = {
-                ...this.divisionPlayerBaselinesState,
-                [key]: {
-                    loading: true,
-                    error: null,
-                    avg: existing?.avg || {},
-                    median: existing?.median || {}
-                }
-            };
-            try {
-                const [divisionAverages, divisionDetails] = await Promise.all([
-                    window.apiClient.getDivisionAverages(key).catch(() => ({})),
-                    window.apiClient.getDivisionById(key).catch(() => ({}))
-                ]);
-                const baselines = this.buildDivisionPlayerBaselines(divisionAverages, divisionDetails);
+            return this.runInFlightLoad('divisionBaselines', key, async () => {
                 this.divisionPlayerBaselinesState = {
                     ...this.divisionPlayerBaselinesState,
                     [key]: {
-                        loading: false,
+                        loading: true,
                         error: null,
-                        avg: baselines.avg || {},
-                        median: baselines.median || {}
+                        avg: existing?.avg || {},
+                        median: existing?.median || {}
                     }
                 };
-            } catch (error) {
-                this.divisionPlayerBaselinesState = {
-                    ...this.divisionPlayerBaselinesState,
-                    [key]: {
-                        loading: false,
-                        error: 'Divisioonan vertailuarvojen lataus epäonnistui.',
-                        avg: {},
-                        median: {}
-                    }
-                };
-            }
+                try {
+                    const [divisionAverages, divisionDetails] = await Promise.all([
+                        window.apiClient.getDivisionAverages(key).catch(() => ({})),
+                        window.apiClient.getDivisionById(key).catch(() => ({}))
+                    ]);
+                    const baselines = this.buildDivisionPlayerBaselines(divisionAverages, divisionDetails);
+                    this.divisionPlayerBaselinesState = {
+                        ...this.divisionPlayerBaselinesState,
+                        [key]: {
+                            loading: false,
+                            error: null,
+                            avg: baselines.avg || {},
+                            median: baselines.median || {}
+                        }
+                    };
+                } catch (error) {
+                    this.divisionPlayerBaselinesState = {
+                        ...this.divisionPlayerBaselinesState,
+                        [key]: {
+                            loading: false,
+                            error: 'Divisioonan vertailuarvojen lataus epäonnistui.',
+                            avg: {},
+                            median: {}
+                        }
+                    };
+                }
+            });
         },
         updateTrendChartWidth() {
             const panel = this.$refs.performanceTrendPanel;
@@ -2248,29 +2288,6 @@ window.TeamDetail = {
         clearTrendHover() {
             this.performanceTrendHover = { key: null, index: null, x: 0, y: 0 };
         },
-        handleMatchesTrendHover(event) {
-            const chart = this.matchesWinLossChart;
-            if (!chart || !chart.basePoints?.length) return;
-            const rect = event.currentTarget.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const scale = rect.width ? chart.width / rect.width : 1;
-            const xView = x * scale;
-            const ratio = clampValue((xView - chart.padding.left) / chart.plotWidth, 0, 1);
-            const index = Math.round(ratio * (chart.basePoints.length - 1));
-            const refSeries = chart.series?.[0];
-            const point = (refSeries?.points?.[index]) || chart.basePoints[index];
-            if (!point) return;
-            this.matchesTrendHover = { index, x: point.x, y: point.y };
-            this.matchesHoverMatchId = point.matchId;
-            this.matchesHoverSource = 'chart';
-        },
-        clearMatchesTrendHover() {
-            this.matchesTrendHover = { index: null, x: 0, y: 0 };
-            if (this.matchesHoverSource === 'chart') {
-                this.matchesHoverMatchId = null;
-                this.matchesHoverSource = null;
-            }
-        },
         setMatchesHover(matchId) {
             this.matchesHoverMatchId = matchId;
             this.matchesHoverSource = 'table';
@@ -2292,19 +2309,6 @@ window.TeamDetail = {
                 this.ensureMatchPlayerStats(this.currentChampionshipId);
                 this.ensureMapCatalog();
             }
-        },
-        matchTooltipStyle(chart, point) {
-            if (!chart || !point) return {};
-            const left = (point.x / chart.width) * 100;
-            const top = (point.y / chart.height) * 100;
-            return {
-                left: `${left}%`,
-                top: `${top}%`
-            };
-        },
-        matchMetricLabel(metric, value) {
-            if (!metric) return formatNumber(value, 1);
-            return metric.format ? metric.format(value) : formatNumber(value, metric.decimals || 0);
         },
         trendTooltipStyle(chart, point) {
             if (!chart || !point) return {};
@@ -2380,35 +2384,44 @@ window.TeamDetail = {
         },
         async bootstrap() {
             if (!this.teamStore || !this.teamId) return;
-            try {
-                const data = await this.teamStore.fetchTeamPage(this.teamId, this.selectedChampionship);
-                if (data?.currentChampionshipId) {
-                    this.selectedChampionship = String(data.currentChampionshipId);
-                    this.updateRoute(this.selectedChampionship, this.activeTab);
+            const key = `${this.teamId}::${this.selectedChampionship || 'auto'}`;
+            return this.runInFlightLoad('bootstrap', key, async () => {
+                try {
+                    const data = await this.teamStore.fetchTeamPage(this.teamId, this.selectedChampionship);
+                    if (data?.currentChampionshipId) {
+                        this.selectedChampionship = String(data.currentChampionshipId);
+                        this.updateRoute(this.selectedChampionship, this.activeTab);
+                    }
+                    this.loadUpcoming();
+                } catch (err) {
+                    console.error('TeamDetail bootstrap failed', err);
                 }
-                this.loadUpcoming();
-            } catch (err) {
-                console.error('TeamDetail bootstrap failed', err);
-            }
+            });
         },
         async fetchSeason(championshipId, options = {}) {
             if (!this.teamStore || !this.teamId || !championshipId) return;
-            try {
-                await this.teamStore.fetchTeamPage(this.teamId, championshipId, options);
-            } catch (err) {
-                console.error('TeamDetail season fetch failed', err);
-            }
+            const key = `${this.teamId}::${championshipId}::${options.force === true ? 'force' : 'cached'}`;
+            return this.runInFlightLoad('season', key, async () => {
+                try {
+                    await this.teamStore.fetchTeamPage(this.teamId, championshipId, options);
+                } catch (err) {
+                    console.error('TeamDetail season fetch failed', err);
+                }
+            });
         },
         async loadUpcoming(options = {}) {
             if (!this.upcomingStore || !this.teamId || !this.currentChampionshipId) return;
-            try {
-                await this.upcomingStore.fetchUpcomingMatches(
-                    this.upcomingParams,
-                    { force: options.force === true }
-                );
-            } catch (error) {
-                console.error('[TeamDetail] upcoming schedule fetch failed', error);
-            }
+            const key = `${this.teamId}::${this.currentChampionshipId}::${options.force === true ? 'force' : 'cached'}`;
+            return this.runInFlightLoad('upcoming', key, async () => {
+                try {
+                    await this.upcomingStore.fetchUpcomingMatches(
+                        this.upcomingParams,
+                        { force: options.force === true }
+                    );
+                } catch (error) {
+                    console.error('[TeamDetail] upcoming schedule fetch failed', error);
+                }
+            });
         },
         selectChampionship(championshipId) {
             if (!championshipId || championshipId === this.currentChampionshipId) return;
@@ -2465,44 +2478,48 @@ window.TeamDetail = {
             const key = String(championshipId);
             const existing = this.matchPlayerStatsState[key];
             if (existing?.items?.length && !existing?.loading) return;
-            if (existing?.loading) return;
-            this.matchPlayerStatsState = {
-                ...this.matchPlayerStatsState,
-                [key]: { items: existing?.items || [], byMatch: existing?.byMatch || {}, loading: true, error: null }
-            };
-            try {
-                const items = await window.apiClient.getTeamMatchPlayerStats(this.teamId, championshipId);
-                const byMatch = {};
-                items.forEach(row => {
-                    const matchId = row?.matchId || row?.match_id;
-                    if (!matchId) return;
-                    if (!byMatch[matchId]) byMatch[matchId] = [];
-                    byMatch[matchId].push(row);
-                });
+            const loadKey = `${this.teamId}::${key}`;
+            return this.runInFlightLoad('matchPlayerStats', loadKey, async () => {
                 this.matchPlayerStatsState = {
                     ...this.matchPlayerStatsState,
-                    [key]: { items, byMatch, loading: false, error: null }
+                    [key]: { items: existing?.items || [], byMatch: existing?.byMatch || {}, loading: true, error: null }
                 };
-            } catch (error) {
-                this.matchPlayerStatsState = {
-                    ...this.matchPlayerStatsState,
-                    [key]: { items: existing?.items || [], byMatch: existing?.byMatch || {}, loading: false, error: error?.message || 'Failed to load player stats' }
-                };
-            }
+                try {
+                    const items = await window.apiClient.getTeamMatchPlayerStats(this.teamId, championshipId);
+                    const byMatch = {};
+                    items.forEach(row => {
+                        const matchId = row?.matchId || row?.match_id;
+                        if (!matchId) return;
+                        if (!byMatch[matchId]) byMatch[matchId] = [];
+                        byMatch[matchId].push(row);
+                    });
+                    this.matchPlayerStatsState = {
+                        ...this.matchPlayerStatsState,
+                        [key]: { items, byMatch, loading: false, error: null }
+                    };
+                } catch (error) {
+                    this.matchPlayerStatsState = {
+                        ...this.matchPlayerStatsState,
+                        [key]: { items: existing?.items || [], byMatch: existing?.byMatch || {}, loading: false, error: error?.message || 'Failed to load player stats' }
+                    };
+                }
+            });
         },
         async ensureMapCatalog() {
             if (this.mapCatalogLoaded || this.mapCatalogLoading || !window.apiClient) return;
-            this.mapCatalogLoading = true;
-            try {
-                const catalog = await window.apiClient.getMapsCatalog();
-                this.mapCatalog = Array.isArray(catalog) ? catalog : [];
-                this.mapCatalogLoaded = true;
-            } catch (error) {
-                console.warn('[TeamDetail] map catalog fetch failed', error);
-                this.mapCatalogLoaded = true;
-            } finally {
-                this.mapCatalogLoading = false;
-            }
+            return this.runInFlightLoad('mapCatalog', 'global', async () => {
+                this.mapCatalogLoading = true;
+                try {
+                    const catalog = await window.apiClient.getMapsCatalog();
+                    this.mapCatalog = Array.isArray(catalog) ? catalog : [];
+                    this.mapCatalogLoaded = true;
+                } catch (error) {
+                    console.warn('[TeamDetail] map catalog fetch failed', error);
+                    this.mapCatalogLoaded = true;
+                } finally {
+                    this.mapCatalogLoading = false;
+                }
+            });
         },
         resetMapSort() {
             this.scoutTableKey += 1;
@@ -2512,40 +2529,19 @@ window.TeamDetail = {
             return `${formatNumber(wins)}–${formatNumber(losses)}`;
         },
         winHeatStyle(value) {
-            const pct = Math.min(100, Math.max(0, normalizePercent(value)));
-            const hue = (pct / 100) * 120;
-            const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
-            return {
-                background: `linear-gradient(90deg, ${color}, transparent)`
-            };
+            return buildHeatStyle(normalizePercent(value));
         },
         kdHeatStyle(value) {
-            const kd = toNumber(value);
-            const pct = Math.min(100, Math.max(0, (kd / 2) * 100));
-            const hue = (pct / 100) * 120;
-            const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
-            return {
-                background: `linear-gradient(90deg, ${color}, transparent)`
-            };
+            return buildHeatStyle((toNumber(value) / 2) * 100);
         },
         adrHeatStyle(value) {
-            const adr = toNumber(value);
-            const pct = Math.min(100, Math.max(0, (adr / 120) * 100));
-            const hue = (pct / 100) * 120;
-            const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
-            return {
-                background: `linear-gradient(90deg, ${color}, transparent)`
-            };
+            return buildHeatStyle((toNumber(value) / 120) * 100);
         },
         rdHeatStyle(value) {
             const rd = toNumber(value);
             const maxAbs = this.mapMaxRoundDiff || 1;
-            const pct = Math.min(1, Math.max(0, (rd + maxAbs) / (maxAbs * 2)));
-            const hue = pct * 120;
-            const color = `hsla(${hue.toFixed(1)}, 60%, 45%, 0.22)`;
-            return {
-                background: `linear-gradient(90deg, ${color}, transparent)`
-            };
+            const pct = clampValue((rd + maxAbs) / (maxAbs * 2), 0, 1);
+            return buildHeatStyle(pct * 100);
         },
         detectSeriesFormat(bestOf, steps = []) {
             if (Number(bestOf) === 2) return 'bo2';
@@ -2688,18 +2684,6 @@ window.TeamDetail = {
             if (!statChunks.length) return `${prefix}${base}`;
             return `${prefix}${base} (${statChunks.join(' · ')})`;
         },
-        getPerformanceBadge(teamValue, divAvg, metricKey) {
-            if (!divAvg || teamValue == null) return null;
-            // Skip badges for zero-sum metrics where avg is always ~50%
-            if (metricKey === 'winrate' || metricKey === 'mapWinRate') return null;
-            const diff = teamValue - divAvg;
-            if (Math.abs(diff) < 0.5) return null;
-            const pct = ((Math.abs(diff) / divAvg) * 100).toFixed(0);
-            return {
-                type: diff > 0 ? 'positive' : 'negative',
-                label: `${diff > 0 ? '+' : ''}${pct}%`
-            };
-        },
     },
     template: `
         <div class="team-detail">
@@ -2763,11 +2747,11 @@ window.TeamDetail = {
                                 <div class="snapshot-label">
                                     {{ stat.label }}
                                     <span
-                                        v-if="getPerformanceBadge(stat.trendValue, stat.divAvg, stat.key)"
+                                        v-if="stat.performanceBadge"
                                         class="performance-badge"
-                                        :class="'performance-badge--' + getPerformanceBadge(stat.trendValue, stat.divAvg, stat.key).type"
+                                        :class="'performance-badge--' + stat.performanceBadge.type"
                                         :title="'Ero divisioonan keskiarvoon'"
-                                    >{{ getPerformanceBadge(stat.trendValue, stat.divAvg, stat.key).label }}</span>
+                                    >{{ stat.performanceBadge.label }}</span>
                                 </div>
                                 <div class="snapshot-value mono-num" :class="stat.tone" :title="stat.tooltip || ''">{{ stat.value }}</div>
                                 <div class="snapshot-sub">{{ stat.sub }}</div>
@@ -3739,9 +3723,10 @@ window.TeamDetail = {
                                                 v-if="row.playerId"
                                                 class="player-link"
                                                 :to="{
-                                                    name: 'player',
-                                                    params: { playerId: row.playerId },
-                                                    query: currentChampionshipId ? { championship: String(currentChampionshipId) } : {}
+                                                    name: currentChampionshipId ? 'player-detail' : 'player',
+                                                    params: currentChampionshipId
+                                                        ? { championshipId: String(currentChampionshipId), playerId: row.playerId }
+                                                        : { playerId: row.playerId }
                                                 }"
                                             >
                                                 {{ row.nickname }}

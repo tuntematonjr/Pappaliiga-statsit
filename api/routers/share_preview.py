@@ -117,9 +117,7 @@ def _absolute_url(request: Request, maybe_relative: str) -> str:
     return urljoin(f"{base}/", maybe_relative.lstrip("/"))
 
 
-def _build_description(payload: dict) -> str:
-    season_data = payload.get("season_data") or {}
-    stats = season_data.get("stats") or {}
+def _build_team_description(stats: Optional[dict]) -> str:
     if not stats:
         return f"Joukkueen tilastot, kartat, pelaajat ja otteluhistoria. {UNOFFICIAL_NOTE}"
 
@@ -128,7 +126,8 @@ def _build_description(payload: dict) -> str:
     matches_played = int(stats.get("matches_played") or 0)
     wins = int(stats.get("wins") or 0)
     losses = int(stats.get("losses") or 0)
-    win_rate = float(stats.get("win_rate") or 0.0) * 100.0
+    win_rate_raw = float(stats.get("win_rate") or 0.0)
+    win_rate = win_rate_raw * 100.0 if win_rate_raw <= 1.0 else win_rate_raw
     return (
         f"Kausi {season}, divisioona {division_num}. "
         f"Ottelut {matches_played}, voitot {wins}, tappiot {losses}, voittoprosentti {win_rate:.1f}%. "
@@ -178,12 +177,27 @@ async def build_preview_for_spa_path(request: Request, full_path: str) -> HTMLRe
         team_id = parts[-1]
         championship_id = parts[1] if len(parts) >= 3 else request.query_params.get("championship")
         try:
-            payload = await teams_service.fetch_team_page(team_id, championship_id)
-            team = payload.get("team") or {}
+            team = await teams_service.fetch_team(team_id)
             team_name = team.get("display_name") or team.get("team_name") or f"Team {team_id}"
             title = f"{team_name} - Pappaliiga Stats"
-            description = _build_description(payload)
             image_url = _absolute_url(request, team.get("avatar") or DEFAULT_IMAGE)
+
+            try:
+                seasons = await teams_service.fetch_team_season_stats(team_id)
+            except NotFoundError:
+                seasons = []
+
+            selected_stats = None
+            if seasons:
+                if championship_id:
+                    selected_stats = next(
+                        (row for row in seasons if str(row.get("championship_id")) == str(championship_id)),
+                        None,
+                    )
+                if selected_stats is None:
+                    selected_stats = seasons[0]
+
+            description = _build_team_description(selected_stats)
         except NotFoundError:
             title = f"Team {team_id} - Pappaliiga Stats"
             description = f"Joukkueen tilastosivu. {UNOFFICIAL_NOTE}"

@@ -603,6 +603,13 @@ window.PlayerView = {
             playerStore,
             selectedSeasonId: null,
             divisionAveragesByChampionship: {},
+            inFlightLoads: {
+                bootstrap: {},
+                mapStats: {},
+                progression: {},
+                divisionAverages: {},
+                allProgressions: {}
+            },
             trendScope: 'all',
             trendMode: 'avg',
             trendMetricKeys: ['kills', 'deaths', 'assists', 'adr', 'kd', 'kr'],
@@ -1094,7 +1101,7 @@ window.PlayerView = {
                 this.loadAllProgressions();
             }
         },
-        '$route.query.championship'(newVal) {
+        '$route.params.championshipId'(newVal) {
             if (!Array.isArray(this.seasonOptions) || !this.seasonOptions.length) return;
             const requested = newVal == null ? null : String(newVal).trim();
             if (!requested) return;
@@ -1134,8 +1141,33 @@ window.PlayerView = {
         }
     },
     methods: {
+        runInFlightLoad(group, key, taskFactory) {
+            if (!group || !key || typeof taskFactory !== 'function') {
+                return Promise.resolve(null);
+            }
+            const bucket = this.inFlightLoads?.[group];
+            if (!bucket) {
+                return Promise.resolve(taskFactory());
+            }
+            if (bucket[key]) {
+                return bucket[key];
+            }
+
+            const task = (async () => {
+                try {
+                    return await taskFactory();
+                } finally {
+                    if (this.inFlightLoads?.[group]?.[key] === task) {
+                        delete this.inFlightLoads[group][key];
+                    }
+                }
+            })();
+
+            this.inFlightLoads[group][key] = task;
+            return task;
+        },
         requestedChampionshipId() {
-            const raw = this.$route?.query?.championship;
+            const raw = this.$route?.params?.championshipId;
             if (raw === null || raw === undefined) return null;
             const value = String(raw).trim();
             return value || null;
@@ -1153,96 +1185,121 @@ window.PlayerView = {
         },
         async bootstrap() {
             if (!this.playerStore || !this.playerId) return;
-            this.compareVisible = false;
-            this.compareMetrics = [];
-            this.comparePlayer = null;
-            try {
-                await this.playerStore.fetchBundle(this.playerId, null, { force: true });
-                const defaults = this.seasonOptions;
-                const preferred = this.resolvePreferredSeasonId(defaults);
-                if (preferred && String(preferred) !== String(this.selectedSeasonId || '')) {
-                    this.selectedSeasonId = preferred;
+            const key = String(this.playerId);
+            return this.runInFlightLoad('bootstrap', key, async () => {
+                this.compareVisible = false;
+                this.compareMetrics = [];
+                this.comparePlayer = null;
+                try {
+                    await this.playerStore.fetchBundle(this.playerId, null, { force: true });
+                    const defaults = this.seasonOptions;
+                    const preferred = this.resolvePreferredSeasonId(defaults);
+                    if (preferred && String(preferred) !== String(this.selectedSeasonId || '')) {
+                        this.selectedSeasonId = preferred;
+                    }
+                    if (this.selectedSeasonId) {
+                        await this.playerStore.fetchBundle(this.playerId, this.selectedSeasonId, { force: true });
+                    }
+                    this.syncRouteBreadcrumbContext();
+                } catch (error) {
+                    console.error('Player bootstrap failed', error);
                 }
-                if (this.selectedSeasonId) {
-                    await this.playerStore.fetchBundle(this.playerId, this.selectedSeasonId, { force: true });
-                }
-                this.syncRouteBreadcrumbContext();
-            } catch (error) {
-                console.error('Player bootstrap failed', error);
-            }
+            });
         },
         syncRouteBreadcrumbContext() {
             if (!this.$router || !this.$route || !this.playerId) return;
             if (!this.selectedSeasonId) return;
-            const nextQuery = { championship: String(this.selectedSeasonId) };
+            const nextName = 'player-detail';
+            const nextParams = {
+                championshipId: String(this.selectedSeasonId),
+                playerId: this.playerId
+            };
+            const nextQuery = {};
 
             const normalizeQuery = obj => Object.keys(obj)
                 .sort()
                 .map(key => `${key}:${String(obj[key])}`)
                 .join('|');
-            if (normalizeQuery(nextQuery) === normalizeQuery(this.$route.query || {})) return;
+            const sameRoute =
+                String(this.$route?.name || '') === nextName
+                && String(this.$route?.params?.playerId || '') === String(nextParams.playerId)
+                && String(this.$route?.params?.championshipId || '') === String(nextParams.championshipId)
+                && normalizeQuery(this.$route.query || {}) === normalizeQuery(nextQuery);
+            if (sameRoute) return;
 
             this.$router.replace({
-                name: this.$route.name || 'player',
-                params: { ...(this.$route.params || {}), playerId: this.playerId },
+                name: nextName,
+                params: nextParams,
                 query: nextQuery
             }).catch(() => {});
         },
         async loadMapStats() {
             if (!this.playerStore || !this.playerId || !this.selectedSeasonId) return;
-            try {
-                await this.playerStore.fetchMapStats(this.playerId, this.selectedSeasonId, { force: true });
-            } catch (error) {
-                console.error('Player map stats failed', error);
-            }
+            const key = `${this.playerId}::${this.selectedSeasonId}`;
+            return this.runInFlightLoad('mapStats', key, async () => {
+                try {
+                    await this.playerStore.fetchMapStats(this.playerId, this.selectedSeasonId, { force: true });
+                } catch (error) {
+                    console.error('Player map stats failed', error);
+                }
+            });
         },
         async loadSelectedProgression() {
             if (!this.playerStore || !this.playerId || !this.currentSeasonOption) return;
-            try {
-                await this.playerStore.fetchProgression(
-                    this.playerId,
-                    this.currentSeasonOption.value,
-                    this.currentSeasonOption.season,
-                    this.currentSeasonOption.division,
-                    { force: false }
-                );
-            } catch (error) {
-                console.error('Player progression failed', error);
-            }
+            const key = `${this.playerId}::${this.currentSeasonOption.value}::${this.currentSeasonOption.season}::${this.currentSeasonOption.division}`;
+            return this.runInFlightLoad('progression', key, async () => {
+                try {
+                    await this.playerStore.fetchProgression(
+                        this.playerId,
+                        this.currentSeasonOption.value,
+                        this.currentSeasonOption.season,
+                        this.currentSeasonOption.division,
+                        { force: false }
+                    );
+                } catch (error) {
+                    console.error('Player progression failed', error);
+                }
+            });
         },
         async loadDivisionAverages() {
             if (!this.selectedSeasonId || !window.apiClient?.getDivisionAverages) return;
             const championshipId = String(this.selectedSeasonId);
             if (this.divisionAveragesByChampionship?.[championshipId]) return;
-            try {
-                const data = await window.apiClient.getDivisionAverages(championshipId);
-                this.divisionAveragesByChampionship = {
-                    ...(this.divisionAveragesByChampionship || {}),
-                    [championshipId]: data && typeof data === 'object' ? data : {}
-                };
-            } catch (error) {
-                console.error('Division averages failed', error);
-                this.divisionAveragesByChampionship = {
-                    ...(this.divisionAveragesByChampionship || {}),
-                    [championshipId]: {}
-                };
-            }
+            return this.runInFlightLoad('divisionAverages', championshipId, async () => {
+                try {
+                    const data = await window.apiClient.getDivisionAverages(championshipId);
+                    this.divisionAveragesByChampionship = {
+                        ...(this.divisionAveragesByChampionship || {}),
+                        [championshipId]: data && typeof data === 'object' ? data : {}
+                    };
+                } catch (error) {
+                    console.error('Division averages failed', error);
+                    this.divisionAveragesByChampionship = {
+                        ...(this.divisionAveragesByChampionship || {}),
+                        [championshipId]: {}
+                    };
+                }
+            });
         },
         async loadAllProgressions() {
             if (!this.playerStore || !this.playerId) return;
             if (!Array.isArray(this.seasonOptions) || !this.seasonOptions.length) return;
-            const tasks = this.seasonOptions.map(option => this.playerStore.fetchProgression(
-                this.playerId,
-                option.value,
-                option.season,
-                option.division,
-                { force: false }
-            ));
-            try {
-                await Promise.allSettled(tasks);
-            } catch (error) {
-                console.error('Player all progression failed', error);
-            }
+            const optionsKey = this.seasonOptions.map(option => String(option.value)).join(',');
+            const key = `${this.playerId}::${optionsKey}`;
+            return this.runInFlightLoad('allProgressions', key, async () => {
+                const tasks = this.seasonOptions.map(option => this.playerStore.fetchProgression(
+                    this.playerId,
+                    option.value,
+                    option.season,
+                    option.division,
+                    { force: false }
+                ));
+                try {
+                    await Promise.allSettled(tasks);
+                } catch (error) {
+                    console.error('Player all progression failed', error);
+                }
+            });
         },
         handleCompareOpen() {
             this.compareVisible = true;

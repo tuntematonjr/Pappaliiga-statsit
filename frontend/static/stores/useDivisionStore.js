@@ -309,21 +309,9 @@
                 entry.highlights.loading = true;
                 entry.highlights.error = null;
                 try {
-                    let highlights = null;
-                    try {
-                        if (typeof window.apiClient.getDivisionHighlights === 'function') {
-                            highlights = await window.apiClient.getDivisionHighlights(id);
-                        }
-                    } catch (error) {
-                        if (!error || error.status !== 404) {
-                            console.warn('Division highlights endpoint failed, using fallback', error);
-                        }
-                    }
-                    if (!Array.isArray(highlights) || !highlights.length) {
-                        const details = entry.details.data || (await this.fetchDivisionDetails(id));
-                        const standings = entry.standings.data || [];
-                        highlights = deriveHighlights(details, standings);
-                    }
+                    const details = entry.details.data || (await this.fetchDivisionDetails(id));
+                    const standings = entry.standings.data || [];
+                    const highlights = deriveHighlights(details, standings);
                     entry.highlights.data = highlights;
                     entry.highlights.fetchedAt = now();
                     return highlights;
