@@ -3,8 +3,16 @@
  * Exposed globally as window.apiClient.
  */
 (function () {
+    const BROWSER_ORIGIN =
+        typeof window !== 'undefined' && /^https?:\/\//i.test(window.location.origin || '')
+            ? window.location.origin
+            : '';
+
     const DEFAULTS = Object.freeze({
-        baseUrl: (typeof window !== 'undefined' && window.PL_API_URL) || (typeof window !== 'undefined' && window.__API_BASE__) || (typeof window !== 'undefined' ? `${window.location.origin}/api` : '/api'),
+        baseUrl:
+            (typeof window !== 'undefined' && window.PL_API_URL) ||
+            (typeof window !== 'undefined' && window.__API_BASE__) ||
+            (BROWSER_ORIGIN ? `${BROWSER_ORIGIN}/api` : '/api'),
         timeoutMs: Number((typeof window !== 'undefined' && window.PL_API_TIMEOUT_MS) || 8000),
         retries: Number((typeof window !== 'undefined' && window.PL_API_RETRY) || 2),
         cacheTtlMs: Number((typeof window !== 'undefined' && window.PL_API_CACHE_TTL_MS) || 300000)
@@ -37,13 +45,17 @@
         }
         try {
             const parsed = new URL(DEFAULTS.baseUrl, window.location.origin);
+            const origin = `${parsed.protocol}//${parsed.host}`;
+            if (!/^https?:\/\//i.test(origin)) {
+                return { origin: '', path: parsed.pathname.replace(/\/$/, '') || '' };
+            }
             return {
-                origin: `${parsed.protocol}//${parsed.host}`,
+                origin,
                 path: parsed.pathname.replace(/\/$/, '') || ''
             };
         } catch (error) {
             return {
-                origin: window.location.origin,
+                origin: BROWSER_ORIGIN,
                 path: ''
             };
         }
@@ -114,10 +126,10 @@
             };
         }
         const normalized = raw.startsWith('/') ? raw : `/${raw}`;
-        const origin = API_ROOT.origin || (typeof window !== 'undefined' && window.location ? window.location.origin : '');
-        if (!origin) {
+        const origin = API_ROOT.origin || BROWSER_ORIGIN;
+        if (!origin || !/^https?:\/\//i.test(origin)) {
             return {
-                absoluteUrl: `${DEFAULTS.baseUrl}${normalized}`,
+                absoluteUrl: normalized,
                 displayPath: normalized
             };
         }
@@ -567,7 +579,13 @@
                 clearTimeout(timeoutId);
                 lastError = error;
                 if (isDev) {
-                    console.warn(`[apiClient] request error ${target.displayPath}`, { requestId, attempt, error });
+                    console.warn(`[apiClient] request error ${target.displayPath}`, {
+                        requestId,
+                        attempt,
+                        requestUrl: target.url,
+                        error,
+                        message: error?.message || String(error || '')
+                    });
                 }
                 if (attempt < retries && shouldRetry(error.status, error)) {
                     await sleep(Math.pow(2, attempt) * 150);

@@ -10,7 +10,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import asyncio
 import logging
-import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,26 +18,16 @@ from fastapi.staticfiles import StaticFiles
 
 from db_async import close_pool, get_pool
 
-from .routers import championships, divisions, matches, players, stats, teams, seasons, debug
+from .routers import divisions, matches, players, stats, teams, seasons
 from .routers import maps_catalog, image_proxy, season_view
 from .routers import share_preview
-from .routers import faceit_webhooks
-from .routers import sync_events
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.cache_reheat import reheat_main_page
-from api.services.sync_event_queue import get_sync_event_queue
 
 # Track app start time for uptime calculation
 import time
 _app_start_time = time.time()
 logger = logging.getLogger(__name__)
-
-
-def _env_bool(name: str, default: bool = False) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 # Load environment variables from .env file if present
@@ -59,9 +48,6 @@ except ImportError:
         # best-effort only; if this fails the environment should be provided externally
         pass
 
-_sync_event_routes_enabled = _env_bool("ENABLE_SYNC_EVENT_ROUTES", default=False)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize and cleanup database pool."""
@@ -74,12 +60,9 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         print(f"[warn] Cache reheat failed to start: {exc}")
 
-    await get_sync_event_queue().start()
-    
     yield
     
     # Shutdown: close pool
-    await get_sync_event_queue().stop()
     await close_pool()
     print("[info] Database pool closed")
 
@@ -109,13 +92,7 @@ if (frontend_dir / "static").exists():
 
 # Include routers
 app.include_router(seasons.router, prefix="/api/seasons", tags=["seasons"])
-if _env_bool("ENABLE_DEBUG_ROUTES", default=False):
-    if (os.getenv("DEBUG_API_TOKEN") or "").strip():
-        app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
-    else:
-        logger.warning("ENABLE_DEBUG_ROUTES is true but DEBUG_API_TOKEN is missing; debug routes disabled")
 app.include_router(divisions.router, prefix="/api/divisions", tags=["divisions"])
-app.include_router(championships.router, prefix="/api/championships", tags=["championships"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(players.router, prefix="/api/players", tags=["players"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
@@ -123,13 +100,6 @@ app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
 app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 app.include_router(season_view.router, prefix="/api", tags=["season-view"])
-app.include_router(share_preview.router, tags=["share-preview"])
-app.include_router(faceit_webhooks.router, tags=["faceit-webhooks"])
-if _sync_event_routes_enabled:
-    if (os.getenv("SYNC_EVENT_TOKEN") or "").strip():
-        app.include_router(sync_events.router, tags=["sync-events"])
-    else:
-        logger.warning("ENABLE_SYNC_EVENT_ROUTES is true but SYNC_EVENT_TOKEN is missing; sync events routes disabled")
 
 
 @app.get("/")
@@ -152,18 +122,7 @@ async def root(request: Request):
         }
 
 
-@app.get("/api")
-async def api_root():
-    """API root endpoint."""
-    return {
-        "message": "Pappaliiga Stats API",
-        "version": "1.0.0",
-        "docs": "/docs",
-    }
-
-
-@app.get("/health")
-async def health_check():
+async def _health_check_payload():
     """Health check endpoint for monitoring."""
     try:
         pool = await get_pool()
@@ -186,7 +145,7 @@ async def health_check():
 
 @app.get("/api/health")
 async def api_health():
-    return await health_check()
+    return await _health_check_payload()
 
 
 # SPA fallback - must be last route!

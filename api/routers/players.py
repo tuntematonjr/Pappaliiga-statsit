@@ -192,19 +192,3 @@ async def get_player_bundle(
         map_stats=map_stats,
         progression=progression,
     )
-
-
-@router.get("/", response_model=List[PlayerInfo], response_model_by_alias=False)
-async def list_players(
-    season: Optional[int] = Query(None, description="Filter by season"),
-    division: Optional[int] = Query(None, description="Filter by division"),
-    team_id: Optional[str] = Query(None, description="Filter by team"),
-    limit: int = Query(100, ge=1, le=500),
-):
-    rows = await players_service.list_players(
-        season=season,
-        division=division,
-        team_id=team_id,
-        limit=limit,
-    )
-    return [PlayerInfo(**row) for row in rows]

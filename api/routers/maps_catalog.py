@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from db_async import query_async
@@ -41,32 +41,3 @@ async def list_maps():
         for r in rows
     ]
 
-
-@router.get("/{map_id}", response_model=MapInfo)
-async def get_map_info(map_id: str):
-    """Get map information by map ID.
-    
-    Args:
-        map_id: Map identifier (e.g., 'de_dust2', 'de_mirage')
-    
-    Returns:
-        Map display information including pretty name and image URLs.
-    
-    Raises:
-        HTTPException: 404 if map not found in catalog.
-    """
-    rows = await query_async(
-        "SELECT map_id, pretty_name, image_sm, image_lg FROM maps_catalog WHERE map_id = :map_id",
-        {"map_id": map_id}
-    )
-    
-    if not rows:
-        raise HTTPException(status_code=404, detail=f"Map '{map_id}' not found in catalog")
-    
-    r = rows[0]
-    return {
-        "map_id": r["map_id"],
-        "pretty_name": r["pretty_name"],
-        "image_sm": r.get("image_sm"),
-        "image_lg": r.get("image_lg"),
-    }

@@ -37,19 +37,6 @@ class TeamSeasonStats(CamelModel):
     rounds_diff: Optional[int] = None
 
 
-class TeamSeasonProgressPoint(CamelModel):
-    snapshot_ts: int
-    snapshot_time: Optional[str] = None
-    matches_played: int
-    matches_won: int
-    losses: int
-    win_rate: float
-    maps_played: int
-    maps_won: int
-    rounds_won: int
-    rounds_lost: int
-
-
 class MapVeto(CamelModel):
     match_id: str
     map_name: str
@@ -88,7 +75,6 @@ class TeamMapStats(CamelModel):
     total_rounds_played: Optional[int] = None
     rounds_won: Optional[int] = None
     rounds_lost: Optional[int] = None
-    # Player stats aggregated by map
     assists: Optional[int] = None
     kr: Optional[float] = None
     hs_pct: Optional[float] = None
@@ -102,7 +88,6 @@ class TeamMapStats(CamelModel):
     enemies_flashed: Optional[int] = None
     flash_count: Optional[int] = None
     flash_successes: Optional[int] = None
-    # Map catalog images
     image_sm: Optional[str] = None
     image_lg: Optional[str] = None
 
@@ -217,7 +202,6 @@ class ComprehensiveTeamSeasonData(CamelModel):
     player_stats: List[PlayerStats] = []
     veto_history: List[MapVeto] = []
     veto_aggregates: List[VetoBanAggregate] = []
-    # Phase 1 enhancements
     division_averages: Optional[DivisionAverages] = None
     player_roles: Optional[List[PlayerWithRole]] = None
 
@@ -231,27 +215,8 @@ class TeamPageResponse(CamelModel):
     season_data: Optional[ComprehensiveTeamSeasonData] = None
 
 
-@router.get("/{team_id}", response_model=TeamInfo)
-async def get_team_info(team_id: str):
-    try:
-        team = await teams_service.fetch_team(team_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return TeamInfo(**team)
-
-
-@router.get("/{team_id}/seasons", response_model=List[TeamSeasonStats])
-async def get_team_season_stats(team_id: str):
-    try:
-        rows = await teams_service.fetch_team_season_stats(team_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return [TeamSeasonStats(**row) for row in rows]
-
-
 async def _build_team_page_payload(team_id: str, championship_id: Optional[str]) -> dict[str, Any]:
     """Assemble team page response payload shared by multiple routes."""
-    # Get basic team info and seasons
     team = await teams_service.fetch_team(team_id)
 
     try:
@@ -259,20 +224,15 @@ async def _build_team_page_payload(team_id: str, championship_id: Optional[str])
     except NotFoundError:
         seasons = []
 
-    # Determine which championship to load
     available_champs = {row.get("championship_id") for row in seasons if row.get("championship_id")}
     selected_champ = championship_id or None
 
     if selected_champ:
-        # If requested championship not available, silently ignore it (don't throw error)
-        # This allows the team page to still load with basic info even if that specific season isn't available
         if selected_champ not in available_champs:
             selected_champ = None
     elif available_champs:
-        # Default to most recent championship
         selected_champ = seasons[0]["championship_id"]
 
-    # Fetch comprehensive season data if championship available
     season_data = None
     if selected_champ:
         try:
@@ -310,15 +270,6 @@ async def get_team_page(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.get("/{team_id}/season/{championship_id}/page", response_model=TeamPageResponse)
-async def get_team_page_for_season(team_id: str, championship_id: str):
-    """Legacy/compat route for team page by season path segment."""
-    try:
-        return await _build_team_page_payload(team_id, championship_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
 @router.get("/{team_id}/match-player-stats/{championship_id}", response_model=List[MatchPlayerStats])
 async def get_team_match_player_stats(team_id: str, championship_id: str):
     """Get player map stats for every match the team played in a championship."""
@@ -327,93 +278,3 @@ async def get_team_match_player_stats(team_id: str, championship_id: str):
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return [MatchPlayerStats(**row) for row in rows]
-
-
-@router.get("/{team_id}/season/{championship_id}", response_model=ComprehensiveTeamSeasonData)
-async def get_team_season_comprehensive(team_id: str, championship_id: str):
-    """Get comprehensive team season data including stats, maps, matches, players, and veto history."""
-    try:
-        data = await teams_service.fetch_comprehensive_team_season(team_id, championship_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return ComprehensiveTeamSeasonData(**data)
-
-
-@router.get("/{team_id}/matches", response_model=List[MatchFull])
-async def get_team_matches(
-    team_id: str,
-    championship_id: Optional[str] = Query(None, description="Championship ID")
-):
-    """Get team's matches. If championship_id not provided, uses latest."""
-    try:
-        rows = await teams_service.fetch_team_matches(team_id, championship_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return [MatchFull(**row) for row in rows]
-
-
-@router.get("/{team_id}/players", response_model=List[PlayerStats])
-async def get_team_players(
-    team_id: str,
-    championship_id: Optional[str] = Query(None, description="Championship ID")
-):
-    """Get team's players with complete stats. If championship_id not provided, uses latest."""
-    try:
-        rows = await teams_service.fetch_team_players_comprehensive(team_id, championship_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return [PlayerStats(**row) for row in rows]
-
-
-
-@router.get("/{team_id}/map-stats/{championship_id}", response_model=List[TeamMapStats])
-async def get_team_map_stats(team_id: str, championship_id: str):
-    """Get detailed team map statistics for a specific championship."""
-    try:
-        rows = await teams_service.fetch_team_map_stats_comprehensive(championship_id, team_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return [TeamMapStats(**row) for row in rows]
-
-
-@router.get("/{team_id}/season-progression", response_model=List[TeamSeasonProgressPoint])
-async def get_team_season_progression(
-    team_id: str,
-    season: int = Query(..., description="Season number"),
-    division: int = Query(..., description="Division number"),
-):
-    try:
-        rows = await teams_service.fetch_team_season_progression(team_id, season, division)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return [TeamSeasonProgressPoint(**row) for row in rows]
-
-
-@router.get("/{team_id}/veto-history/{championship_id}", response_model=List[MapVeto])
-async def get_team_veto_history(team_id: str, championship_id: str):
-    """Get team's map veto/pick history for a championship."""
-    try:
-        rows = await teams_service.fetch_team_veto_history(team_id, championship_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return [MapVeto(**row) for row in rows]
-
-
-@router.get("/{team_id}/veto-aggregates/{championship_id}", response_model=List[VetoBanAggregate])
-async def get_team_veto_aggregates(team_id: str, championship_id: str):
-    """Get aggregated veto/ban statistics for a team in a championship."""
-    try:
-        rows = await teams_service.fetch_team_veto_aggregates(team_id, championship_id)
-    except NotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return [VetoBanAggregate(**row) for row in rows]
-
-
-@router.get("/", response_model=List[TeamInfo])
-async def list_teams(
-    season: Optional[int] = Query(None, description="Filter by season"),
-    division: Optional[int] = Query(None, description="Filter by division"),
-    limit: int = Query(100, ge=1, le=500),
-):
-    rows = await teams_service.list_teams(season=season, division=division, limit=limit)
-    return [TeamInfo(**row) for row in rows]
