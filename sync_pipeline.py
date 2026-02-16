@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import random
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -1237,14 +1238,14 @@ async def sync_match_async(
                         label=f"match:{match_id}:team-stats",
                     )
 
-            max_stats_attempts = 3
+            max_stats_attempts = 5
             for attempt in range(1, max_stats_attempts + 1):
                 try:
                     await _run_stats_persist()
                     break
                 except Exception as exc:
                     if attempt < max_stats_attempts and _is_retryable_db_error(exc):
-                        delay = 0.1 * (2 ** (attempt - 1))
+                        delay = 0.1 * (2 ** (attempt - 1)) + random.uniform(0, 0.2)
                         LOGGER.warning(
                             "Retrying stats persist for match %s after %s (attempt %d/%d, sleep %.2fs)",
                             match_id,
@@ -1601,18 +1602,35 @@ async def sync_championship_async(
     match_sem = asyncio.Semaphore(match_concurrency)
 
     async def _sync_one(match_id: str) -> str:
-        async with match_sem:
-            await sync_match_async(
-                championship_id,
-                season,
-                division_num,
-                match_id,
-                is_playoffs=is_playoffs,
-                banned_lookup=banned_lookup,
-                db_semaphore=db_semaphore,
-                diagnostics=diagnostics,
-            )
-            return match_id
+        max_match_attempts = 5
+        for attempt in range(1, max_match_attempts + 1):
+            try:
+                async with match_sem:
+                    await sync_match_async(
+                        championship_id,
+                        season,
+                        division_num,
+                        match_id,
+                        is_playoffs=is_playoffs,
+                        banned_lookup=banned_lookup,
+                        db_semaphore=db_semaphore,
+                        diagnostics=diagnostics,
+                    )
+                return match_id
+            except Exception as exc:
+                if attempt < max_match_attempts and _is_retryable_db_error(exc):
+                    delay = 0.25 * (2 ** (attempt - 1)) + random.uniform(0, 0.25)
+                    LOGGER.warning(
+                        "Retrying match sync for %s after %s (attempt %d/%d, sleep %.2fs)",
+                        match_id,
+                        getattr(exc, "args", exc),
+                        attempt,
+                        max_match_attempts,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise
 
     if matches_to_sync:
         worker_count = min(match_concurrency, len(matches_to_sync))
