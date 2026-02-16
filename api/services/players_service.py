@@ -26,7 +26,7 @@ async def fetch_player(player_id: str) -> dict[str, Any]:
         try:
             rows = await query_async(
                 """
-                SELECT player_id, nickname, country, avatar, faceit_url
+                SELECT player_id, nickname, avatar, faceit_url
                 FROM players
                 WHERE player_id = :player_id
                 """,
@@ -45,7 +45,6 @@ async def fetch_player(player_id: str) -> dict[str, Any]:
         if not rows:
             raise NotFoundError(f"Player '{player_id}' not found")
         player = dict(rows[0])
-        player.setdefault("country", None)
         player.setdefault("avatar", DEFAULT_AVATAR)
         player.setdefault("faceit_url", None)
         if not player.get("nickname"):
@@ -430,30 +429,80 @@ async def list_players(
     team_id: Optional[str] = None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    if season is not None and division is not None:
+    if season is not None:
+        filters = ["pst.season = :season"]
         query = """
-            SELECT DISTINCT p.player_id, p.nickname, p.country, p.avatar, p.faceit_url
+            SELECT DISTINCT
+                p.player_id,
+                COALESCE(pc.player_name, p.nickname) AS nickname,
+                p.avatar,
+                p.faceit_url
             FROM players p
             JOIN player_season_totals pst ON pst.player_id = p.player_id
-            WHERE pst.season = :season AND pst.division_num = :division
+            LEFT JOIN championships c
+                ON c.season = pst.season
+               AND c.division_num = pst.division_num
+               AND COALESCE(c.is_playoffs, 0) = 0
+            LEFT JOIN player_championships pc
+                ON pc.player_id = p.player_id
+               AND pc.championship_id = c.championship_id
+            WHERE {where_clause}
         """
-        params: Dict[str, Any] = {"season": season, "division": division, "limit": limit}
+        params: Dict[str, Any] = {"season": season, "limit": limit}
+        if division is not None:
+            filters.append("pst.division_num = :division")
+            params["division"] = division
         if team_id:
-            query += " AND pst.team_id = :team_id"
+            filters.append("pst.team_id = :team_id")
             params["team_id"] = team_id
-        query += " ORDER BY p.nickname LIMIT :limit"
-        rows = await query_async(query, params)
-    else:
-        rows = await query_async(
+        query = query.format(where_clause=" AND ".join(filters))
+        query += " ORDER BY nickname LIMIT :limit"
+        try:
+            rows = await query_async(query, params)
+        except Exception:
+            fallback_query = """
+                SELECT DISTINCT
+                    p.player_id,
+                    COALESCE(pc.player_name, p.nickname) AS nickname
+                FROM players p
+                JOIN player_season_totals pst ON pst.player_id = p.player_id
+                LEFT JOIN championships c
+                    ON c.season = pst.season
+                   AND c.division_num = pst.division_num
+                   AND COALESCE(c.is_playoffs, 0) = 0
+                LEFT JOIN player_championships pc
+                    ON pc.player_id = p.player_id
+                   AND pc.championship_id = c.championship_id
+                WHERE {where_clause}
             """
-            SELECT player_id, nickname, country, avatar, faceit_url
-            FROM players
-            ORDER BY nickname
-            LIMIT :limit
-            """,
-            {"limit": limit},
-        )
+            fallback_query = fallback_query.format(where_clause=" AND ".join(filters))
+            fallback_query += " ORDER BY nickname LIMIT :limit"
+            rows = await query_async(fallback_query, params)
+    else:
+        try:
+            rows = await query_async(
+                """
+                SELECT player_id, nickname, avatar, faceit_url
+                FROM players
+                ORDER BY nickname
+                LIMIT :limit
+                """,
+                {"limit": limit},
+            )
+        except Exception:
+            rows = await query_async(
+                """
+                SELECT player_id, nickname
+                FROM players
+                ORDER BY nickname
+                LIMIT :limit
+                """,
+                {"limit": limit},
+            )
 
     for row in rows:
         row.setdefault("avatar", DEFAULT_AVATAR)
+        row.setdefault("faceit_url", None)
+        if not row.get("nickname"):
+            row["nickname"] = str(row.get("player_id") or "")
     return rows

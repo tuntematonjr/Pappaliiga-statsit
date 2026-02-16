@@ -498,7 +498,78 @@ async def _ensure_table_columns_async(
     table: str,
     columns: dict[str, str],
 ) -> None:
+    async def _kill_metadata_lock_blockers() -> int:
+        killed = 0
+        current_id = conn.thread_id() if hasattr(conn, "thread_id") else None
+        def _field(proc: Any, idx: int, key: str, default: Any = None) -> Any:
+            if isinstance(proc, Mapping):
+                return proc.get(key, default)
+            try:
+                return proc[idx]
+            except Exception:
+                return default
+
+        async with conn.cursor() as kill_cur:
+            await kill_cur.execute("SELECT DATABASE()")
+            dbname = (await kill_cur.fetchone() or ("",))[0]
+            await kill_cur.execute("SHOW FULL PROCESSLIST")
+            processes = await kill_cur.fetchall()
+            candidates: list[tuple[Any, str, str, str, str, str]] = []
+            for proc in processes:
+                proc_id = _field(proc, 0, "Id")
+                user = str(_field(proc, 1, "User", "") or "")
+                db = _field(proc, 3, "db")
+                command = str(_field(proc, 4, "Command", "") or "")
+                state = str(_field(proc, 6, "State", "") or "").lower()
+                info = str(_field(proc, 7, "Info", "") or "").lower()
+                if current_id is not None and proc_id == current_id:
+                    continue
+                if dbname and db != dbname:
+                    continue
+                if command in {"Binlog Dump", "Daemon"}:
+                    continue
+                if user.lower() in {"system user", "event_scheduler"}:
+                    continue
+                looks_like_blocker = (
+                    "metadata lock" in state
+                    or (f"`{table}`".lower() in info)
+                    or (f" {table} " in f" {info} ")
+                )
+                candidates.append((proc_id, user, str(db), command, state, info))
+                if looks_like_blocker:
+                    try:
+                        await kill_cur.execute(f"KILL {int(proc_id)}")
+                        killed += 1
+                        LOGGER.warning("Killed blocking process %s while migrating %s", proc_id, table)
+                    except Exception as kill_exc:
+                        LOGGER.warning("Failed to kill blocking process %s: %s", proc_id, kill_exc)
+            # If we still did not kill anything, fall back to aggressive mode:
+            # terminate all non-system sessions in this DB and retry ALTER.
+            if killed == 0 and candidates:
+                LOGGER.warning(
+                    "No explicit metadata-lock blocker found for %s; killing %d candidate session(s) in db %s",
+                    table,
+                    len(candidates),
+                    dbname,
+                )
+                for proc_id, _user, _db, _cmd, _state, _info in candidates:
+                    try:
+                        await kill_cur.execute(f"KILL {int(proc_id)}")
+                        killed += 1
+                        LOGGER.warning("Killed candidate process %s while migrating %s", proc_id, table)
+                    except Exception as kill_exc:
+                        LOGGER.warning("Failed to kill candidate process %s: %s", proc_id, kill_exc)
+        if killed:
+            await conn.commit()
+        return killed
+
     async with conn.cursor() as cur:
+        # Fail fast instead of hanging on metadata locks during ALTER TABLE.
+        try:
+            await cur.execute("SET SESSION lock_wait_timeout = 5")
+            await cur.execute("SET SESSION innodb_lock_wait_timeout = 5")
+        except Exception:
+            pass
         await cur.execute(
             """
             SELECT column_name
@@ -512,7 +583,48 @@ async def _ensure_table_columns_async(
         missing = [(name, ddl) for name, ddl in columns.items() if name not in existing]
         for name, ddl in missing:
             LOGGER.info("Adding missing column %s.%s", table, name)
-            await cur.execute(f"ALTER TABLE `{table}` ADD COLUMN `{name}` {ddl}")
+            started = time.perf_counter()
+            try:
+                await cur.execute(f"ALTER TABLE `{table}` ADD COLUMN `{name}` {ddl}")
+            except Exception as exc:
+                message = str(exc).lower()
+                is_lock = ("lock wait timeout" in message) or ("metadata lock" in message)
+                if is_lock:
+                    LOGGER.warning(
+                        "Metadata lock while adding %s.%s; attempting to kill blockers and retry once",
+                        table,
+                        name,
+                    )
+                    killed = await _kill_metadata_lock_blockers()
+                    if killed > 0:
+                        try:
+                            await cur.execute(f"ALTER TABLE `{table}` ADD COLUMN `{name}` {ddl}")
+                        except Exception as retry_exc:
+                            elapsed = time.perf_counter() - started
+                            LOGGER.error(
+                                "Retry failed adding column %s.%s after %.2fs: %s",
+                                table,
+                                name,
+                                elapsed,
+                                retry_exc,
+                            )
+                            raise
+                        else:
+                            elapsed = time.perf_counter() - started
+                            LOGGER.info("Added column %s.%s in %.2fs after killing blockers", table, name, elapsed)
+                            continue
+                elapsed = time.perf_counter() - started
+                LOGGER.error(
+                    "Failed adding column %s.%s after %.2fs (likely metadata lock or insufficient privileges): %s",
+                    table,
+                    name,
+                    elapsed,
+                    exc,
+                )
+                raise
+            else:
+                elapsed = time.perf_counter() - started
+                LOGGER.info("Added column %s.%s in %.2fs", table, name, elapsed)
     if missing:
         await conn.commit()
 
@@ -522,7 +634,75 @@ async def _ensure_table_indexes_async(
     table: str,
     indexes: dict[str, str],
 ) -> None:
+    async def _kill_metadata_lock_blockers() -> int:
+        killed = 0
+        current_id = conn.thread_id() if hasattr(conn, "thread_id") else None
+        def _field(proc: Any, idx: int, key: str, default: Any = None) -> Any:
+            if isinstance(proc, Mapping):
+                return proc.get(key, default)
+            try:
+                return proc[idx]
+            except Exception:
+                return default
+
+        async with conn.cursor() as kill_cur:
+            await kill_cur.execute("SELECT DATABASE()")
+            dbname = (await kill_cur.fetchone() or ("",))[0]
+            await kill_cur.execute("SHOW FULL PROCESSLIST")
+            processes = await kill_cur.fetchall()
+            candidates: list[tuple[Any, str, str, str, str, str]] = []
+            for proc in processes:
+                proc_id = _field(proc, 0, "Id")
+                user = str(_field(proc, 1, "User", "") or "")
+                db = _field(proc, 3, "db")
+                command = str(_field(proc, 4, "Command", "") or "")
+                state = str(_field(proc, 6, "State", "") or "").lower()
+                info = str(_field(proc, 7, "Info", "") or "").lower()
+                if current_id is not None and proc_id == current_id:
+                    continue
+                if dbname and db != dbname:
+                    continue
+                if command in {"Binlog Dump", "Daemon"}:
+                    continue
+                if user.lower() in {"system user", "event_scheduler"}:
+                    continue
+                looks_like_blocker = (
+                    "metadata lock" in state
+                    or (f"`{table}`".lower() in info)
+                    or (f" {table} " in f" {info} ")
+                )
+                candidates.append((proc_id, user, str(db), command, state, info))
+                if looks_like_blocker:
+                    try:
+                        await kill_cur.execute(f"KILL {int(proc_id)}")
+                        killed += 1
+                        LOGGER.warning("Killed blocking process %s while indexing %s", proc_id, table)
+                    except Exception as kill_exc:
+                        LOGGER.warning("Failed to kill blocking process %s: %s", proc_id, kill_exc)
+            if killed == 0 and candidates:
+                LOGGER.warning(
+                    "No explicit metadata-lock blocker found for %s indexes; killing %d candidate session(s) in db %s",
+                    table,
+                    len(candidates),
+                    dbname,
+                )
+                for proc_id, _user, _db, _cmd, _state, _info in candidates:
+                    try:
+                        await kill_cur.execute(f"KILL {int(proc_id)}")
+                        killed += 1
+                        LOGGER.warning("Killed candidate process %s while indexing %s", proc_id, table)
+                    except Exception as kill_exc:
+                        LOGGER.warning("Failed to kill candidate process %s: %s", proc_id, kill_exc)
+        if killed:
+            await conn.commit()
+        return killed
+
     async with conn.cursor() as cur:
+        try:
+            await cur.execute("SET SESSION lock_wait_timeout = 5")
+            await cur.execute("SET SESSION innodb_lock_wait_timeout = 5")
+        except Exception:
+            pass
         await cur.execute(
             """
             SELECT DISTINCT index_name
@@ -536,7 +716,48 @@ async def _ensure_table_indexes_async(
         missing = [(name, ddl) for name, ddl in indexes.items() if name not in existing]
         for name, ddl in missing:
             LOGGER.info("Adding missing index %s.%s", table, name)
-            await cur.execute(f"ALTER TABLE `{table}` ADD INDEX `{name}` {ddl}")
+            started = time.perf_counter()
+            try:
+                await cur.execute(f"ALTER TABLE `{table}` ADD INDEX `{name}` {ddl}")
+            except Exception as exc:
+                message = str(exc).lower()
+                is_lock = ("lock wait timeout" in message) or ("metadata lock" in message)
+                if is_lock:
+                    LOGGER.warning(
+                        "Metadata lock while adding index %s.%s; attempting to kill blockers and retry once",
+                        table,
+                        name,
+                    )
+                    killed = await _kill_metadata_lock_blockers()
+                    if killed > 0:
+                        try:
+                            await cur.execute(f"ALTER TABLE `{table}` ADD INDEX `{name}` {ddl}")
+                        except Exception as retry_exc:
+                            elapsed = time.perf_counter() - started
+                            LOGGER.error(
+                                "Retry failed adding index %s.%s after %.2fs: %s",
+                                table,
+                                name,
+                                elapsed,
+                                retry_exc,
+                            )
+                            raise
+                        else:
+                            elapsed = time.perf_counter() - started
+                            LOGGER.info("Added index %s.%s in %.2fs after killing blockers", table, name, elapsed)
+                            continue
+                elapsed = time.perf_counter() - started
+                LOGGER.error(
+                    "Failed adding index %s.%s after %.2fs (likely metadata lock): %s",
+                    table,
+                    name,
+                    elapsed,
+                    exc,
+                )
+                raise
+            else:
+                elapsed = time.perf_counter() - started
+                LOGGER.info("Added index %s.%s in %.2fs", table, name, elapsed)
     if missing:
         await conn.commit()
 
@@ -568,6 +789,28 @@ async def create_schema_async(force: bool = False) -> None:
             sql = SCHEMA_PATH.read_text(encoding="utf-8")
             await _run_script(conn, sql)
 
+        # New tables may be added after the initial bootstrap; ensure they exist
+        # even when the base schema creation is skipped.
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS player_championships (
+                    player_id VARCHAR(64) NOT NULL,
+                    championship_id VARCHAR(64) NOT NULL,
+                    player_name VARCHAR(255) NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (player_id, championship_id),
+                    KEY idx_player_championships_championship (championship_id),
+                    CONSTRAINT fk_player_championships_player FOREIGN KEY (player_id)
+                        REFERENCES players (player_id) ON DELETE CASCADE ON UPDATE CASCADE,
+                    CONSTRAINT fk_player_championships_championship FOREIGN KEY (championship_id)
+                        REFERENCES championships (championship_id) ON DELETE CASCADE ON UPDATE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """
+            )
+        await conn.commit()
+
         player_totals_columns = {
             "headshots": "INT(10) UNSIGNED NOT NULL DEFAULT 0",
             "utility_count": "INT(10) UNSIGNED NOT NULL DEFAULT 0",
@@ -577,10 +820,24 @@ async def create_schema_async(force: bool = False) -> None:
             "zeus_kills": "INT(10) UNSIGNED NOT NULL DEFAULT 0",
             "first_kills": "INT(10) UNSIGNED NOT NULL DEFAULT 0",
         }
+        player_columns = {
+            "avatar": "VARCHAR(512) NULL",
+            "faceit_url": "VARCHAR(512) NULL",
+        }
         match_columns = {
             "payload_hash": "CHAR(64) NULL",
         }
         await _ensure_table_columns_async(conn, "matches", match_columns)
+        try:
+            await _ensure_table_columns_async(conn, "players", player_columns)
+        except asyncmy_errors.OperationalError as exc:
+            code = exc.args[0] if exc.args else 0
+            if code == 1205:
+                LOGGER.warning(
+                    "Skipping players column migration due to lock timeout. Sync can continue with fallback SQL."
+                )
+            else:
+                raise
         await _ensure_table_columns_async(conn, "player_season_totals", player_totals_columns)
 
         match_indexes = {
@@ -1399,7 +1656,25 @@ async def upsert_players_bulk_async(
     if not rows:
         return
 
-    sql = """
+    full_sql = """
+    INSERT INTO players (player_id, nickname, avatar, faceit_url)
+    VALUES (%s, %s, %s, %s)
+    ON DUPLICATE KEY UPDATE
+      nickname = CASE
+        WHEN COALESCE(players.nickname, '') = '' THEN VALUES(nickname)
+        WHEN players.nickname LIKE 'deleted-user-%' THEN VALUES(nickname)
+        ELSE players.nickname
+      END,
+      avatar = CASE
+        WHEN COALESCE(VALUES(avatar), '') <> '' THEN VALUES(avatar)
+        ELSE players.avatar
+      END,
+      faceit_url = CASE
+        WHEN COALESCE(VALUES(faceit_url), '') <> '' THEN VALUES(faceit_url)
+        ELSE players.faceit_url
+      END
+    """
+    fallback_sql = """
     INSERT INTO players (player_id, nickname)
     VALUES (%s, %s)
     ON DUPLICATE KEY UPDATE
@@ -1409,23 +1684,68 @@ async def upsert_players_bulk_async(
         ELSE players.nickname
       END
     """
-    params = [
+    full_params = [
         (
             row.get("player_id"),
             row.get("nickname") or row.get("name") or "",
+            row.get("avatar"),
+            row.get("faceit_url"),
         )
         for row in rows
         if row.get("player_id")
     ]
-    if not params:
+    fallback_params = [
+        (player_id, nickname)
+        for player_id, nickname, *_ in full_params
+    ]
+    if not full_params:
         return
 
     async def _op(target_conn: asyncmy.Connection):
         async with target_conn.cursor() as cur:
-            await cur.executemany(sql, params)
+            try:
+                await cur.executemany(full_sql, full_params)
+            except Exception:
+                await cur.executemany(fallback_sql, fallback_params)
 
     if conn is not None:
         await _retry_on_deadlock(lambda: _op(conn), label=f"upsert-{label}")
+        return
+
+    async def _owned_op():
+        async with connection(label=f"upsert-{label}") as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=f"upsert-{label}")
+
+
+async def upsert_player_championships_bulk_async(
+    rows: Sequence[Row],
+    *,
+    conn: asyncmy.Connection | None = None,
+    label: str = "player_championships",
+) -> None:
+    """Upsert player-championship associations with historical player names."""
+    if not rows:
+        return
+
+    sql = """
+    INSERT INTO player_championships (player_id, championship_id, player_name)
+    VALUES (%(player_id)s, %(championship_id)s, %(player_name)s)
+    ON DUPLICATE KEY UPDATE
+      player_name = CASE
+        WHEN VALUES(player_name) <> '' THEN VALUES(player_name)
+        ELSE player_championships.player_name
+      END
+    """
+
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.executemany(sql, rows)
+
+    if conn is not None:
+        await _op(conn)
         return
 
     async def _owned_op():

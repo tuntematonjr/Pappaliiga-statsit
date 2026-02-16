@@ -449,10 +449,17 @@ async def _fetch_best_players_map(season: int) -> Dict[tuple[int, int], Dict[str
             pst.season,
             pst.division_num,
             pst.player_id,
-            p.nickname,
+            COALESCE(pc.player_name, p.nickname) AS nickname,
             pst.kd
         FROM player_season_totals pst
         JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN championships c
+            ON c.season = pst.season
+           AND c.division_num = pst.division_num
+           AND COALESCE(c.is_playoffs, 0) = 0
+        LEFT JOIN player_championships pc
+            ON pc.player_id = pst.player_id
+           AND pc.championship_id = c.championship_id
         WHERE pst.season = :season
         AND pst.maps_played >= 3
         AND pst.kd = (
@@ -568,7 +575,7 @@ async def _compute_division_detailed_stats(season: int, division_id: str) -> Dic
     
     # Build exclusion clause
     exclusion_clause = ""
-    params: Dict[str, Any] = {"season": season, "division_num": division_num}
+    params: Dict[str, Any] = {"season": season, "division_num": division_num, "division_id": division_id}
     
     if excluded_teams:
         placeholders = ", ".join(f":ex{i}" for i in range(len(excluded_teams)))
@@ -648,10 +655,11 @@ async def _compute_division_detailed_stats(season: int, division_id: str) -> Dic
         f"""
         SELECT 
             'top_frags' AS category,
-            p.nickname AS player,
+            COALESCE(pc.player_name, p.nickname) AS player,
             pst.kills AS value
         FROM player_season_totals pst
         JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :division_id
         WHERE pst.season = :season 
         AND pst.division_num = :division_num
         {exclusion_clause.replace("tst.", "pst.")}
@@ -665,10 +673,11 @@ async def _compute_division_detailed_stats(season: int, division_id: str) -> Dic
         f"""
         SELECT 
             'best_kd' AS category,
-            p.nickname AS player,
+            COALESCE(pc.player_name, p.nickname) AS player,
             pst.kd AS value
         FROM player_season_totals pst
         JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :division_id
         WHERE pst.season = :season 
         AND pst.division_num = :division_num
         AND pst.maps_played >= 3
@@ -683,10 +692,11 @@ async def _compute_division_detailed_stats(season: int, division_id: str) -> Dic
         f"""
         SELECT 
             'most_mvps' AS category,
-            p.nickname AS player,
+            COALESCE(pc.player_name, p.nickname) AS player,
             pst.mvps AS value
         FROM player_season_totals pst
         JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :division_id
         WHERE pst.season = :season 
         AND pst.division_num = :division_num
         {exclusion_clause.replace("tst.", "pst.")}

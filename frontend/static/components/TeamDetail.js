@@ -2647,8 +2647,20 @@ window.TeamDetail = {
         formatPercent,
         formatNumber,
         getMatchResult,
+        resolveAvatar(src) {
+            const fallback = window.PAPPALIIGA_DEFAULT_LOGO || '';
+            const url = src || fallback;
+            try {
+                if (window.apiClient && typeof window.apiClient.proxyAvatar === 'function') {
+                    return window.apiClient.proxyAvatar(url) || fallback;
+                }
+                return url;
+            } catch (error) {
+                return url;
+            }
+        },
         teamLogo() {
-            return this.teamInfo?.avatar || '';
+            return this.resolveAvatar(this.teamInfo?.avatar || '');
         },
         getPlayerRoleBadges(playerId) {
             const roleData = this.playerRoles[playerId];

@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS teams (
 CREATE TABLE IF NOT EXISTS players (
     player_id VARCHAR(64) NOT NULL,
     nickname VARCHAR(255) NOT NULL,
+    avatar VARCHAR(512) NULL,
+    faceit_url VARCHAR(512) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (player_id)
@@ -49,6 +51,21 @@ CREATE TABLE IF NOT EXISTS team_championships (
     CONSTRAINT fk_team_championships_team FOREIGN KEY (team_id)
         REFERENCES teams (team_id) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_team_championships_championship FOREIGN KEY (championship_id)
+        REFERENCES championships (championship_id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Player championship history: stores player nickname as they appeared in each championship
+CREATE TABLE IF NOT EXISTS player_championships (
+    player_id VARCHAR(64) NOT NULL,
+    championship_id VARCHAR(64) NOT NULL,
+    player_name VARCHAR(255) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (player_id, championship_id),
+    KEY idx_player_championships_championship (championship_id),
+    CONSTRAINT fk_player_championships_player FOREIGN KEY (player_id)
+        REFERENCES players (player_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_player_championships_championship FOREIGN KEY (championship_id)
         REFERENCES championships (championship_id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from db_async import close_pool, get_pool
 
-from .routers import divisions, matches, players, stats, teams, seasons
+from .routers import debug, divisions, matches, players, stats, teams, seasons
 from .routers import maps_catalog, image_proxy, season_view
 from .routers import share_preview
 from api.exceptions import BadRequestError, NotFoundError
@@ -97,6 +97,7 @@ app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(players.router, prefix="/api/players", tags=["players"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
+app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 app.include_router(season_view.router, prefix="/api", tags=["season-view"])

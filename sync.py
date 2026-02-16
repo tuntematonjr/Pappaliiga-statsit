@@ -300,10 +300,9 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
             await shutdown_clients()
             return 0
 
-    if args.create_schema:
-        await create_schema_async(force=True)
-    else:
-        await create_schema_async(force=False)
+    # Always use non-force schema ensure in normal sync flow. The migration helper
+    # still creates missing tables/columns/indexes without re-running the whole SQL script.
+    await create_schema_async(force=False)
 
     overrides = load_division_overrides()
     max_concurrency = max(1, args.max_concurrency)

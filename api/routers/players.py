@@ -16,7 +16,6 @@ router = APIRouter()
 class PlayerInfo(CamelModel):
     player_id: str
     nickname: str
-    country: Optional[str]
     avatar: Optional[str]
     faceit_url: Optional[str]
 
@@ -135,6 +134,20 @@ class PlayerBundleResponse(CamelModel):
     selected_season: Optional[PlayerSeasonStats] = None
     map_stats: List[PlayerMapStatsWithDelta] = []
     progression: List[PlayerSeasonProgressPoint] = []
+
+
+@router.get("", response_model=List[PlayerInfo])
+async def list_players(
+    season: Optional[int] = Query(None, description="Season filter"),
+    division: Optional[int] = Query(None, description="Division filter"),
+    limit: int = Query(2000, ge=1, le=10000, description="Maximum number of players"),
+):
+    """List players with optional season/division filters."""
+    try:
+        rows = await players_service.list_players(season=season, division=division, limit=limit)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [PlayerInfo(**row) for row in rows]
 
 
 @router.get("/{player_id}/bundle", response_model=PlayerBundleResponse, response_model_by_alias=False)

@@ -1141,6 +1141,34 @@ window.PlayerView = {
         }
     },
     methods: {
+        getDefaultLogo() {
+            return window.PAPPALIIGA_DEFAULT_LOGO || 'https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png';
+        },
+        proxyAvatar(url) {
+            const fallback = this.getDefaultLogo();
+            const src = url || fallback;
+            try {
+                if (window.apiClient && typeof window.apiClient.proxyAvatar === 'function') {
+                    return window.apiClient.proxyAvatar(src) || fallback;
+                }
+                return src;
+            } catch (error) {
+                return src;
+            }
+        },
+        profileAvatarSrc() {
+            return this.proxyAvatar(this.profile?.avatar);
+        },
+        heroTeamAvatarSrc() {
+            return this.proxyAvatar(this.heroTeamAvatar);
+        },
+        handleAvatarFallback(event) {
+            const fallback = this.getDefaultLogo();
+            if (!event?.target || !fallback) return;
+            if (event.target.src !== fallback) {
+                event.target.src = fallback;
+            }
+        },
         runInFlightLoad(group, key, taskFactory) {
             if (!group || !key || typeof taskFactory !== 'function') {
                 return Promise.resolve(null);
@@ -1504,8 +1532,7 @@ window.PlayerView = {
                 <header class="player-hero glass-card">
                     <div class="player-hero__identity">
                         <div class="player-hero__avatar">
-                            <img v-if="profile?.avatar" :src="profile.avatar" :alt="profile.nickname" loading="lazy" />
-                            <span v-else>{{ (profile?.nickname || '?').charAt(0).toUpperCase() }}</span>
+                            <img :src="profileAvatarSrc()" :alt="profile?.nickname || 'Pelaaja'" loading="lazy" @error="handleAvatarFallback" />
                         </div>
                         <div class="player-hero__meta">
                             <div class="player-hero__player-label">Pelaaja</div>
@@ -1530,8 +1557,7 @@ window.PlayerView = {
                             </h2>
                         </div>
                         <div class="player-hero__team-logo">
-                            <img v-if="heroTeamAvatar" :src="heroTeamAvatar" :alt="heroTeam" loading="lazy" />
-                            <span v-else>{{ String(heroTeam || '?').charAt(0).toUpperCase() }}</span>
+                            <img :src="heroTeamAvatarSrc()" :alt="heroTeam" loading="lazy" @error="handleAvatarFallback" />
                         </div>
                     </div>
                 </header>

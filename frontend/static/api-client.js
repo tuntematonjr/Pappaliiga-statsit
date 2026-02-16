@@ -82,10 +82,16 @@
         divisionAverages: championshipId => [
             `/api/stats/division/${championshipId}/averages`
         ],
+        teamsList: query => [
+            `/api/teams${query}`
+        ],
         teamPage: (teamId, seasonId) => {
             const seasonQuery = seasonId ? `?championship_id=${seasonId}` : '';
             return [`/api/teams/${teamId}/page${seasonQuery}`];
         },
+        playersList: query => [
+            `/api/players${query}`
+        ],
         playerBundle: (playerId, championshipId = null) => {
             const champParam = championshipId ? `?championship_id=${encodeURIComponent(championshipId)}` : '';
             return [
@@ -102,6 +108,7 @@
             `/api/stats/summary/season/${seasonId}`
         ],
         health: () => [`/api/health`],
+        debugStatus: () => [`/api/debug/status`],
         mapsCatalog: () => [
             `/api/maps`,
             `/api/maps/`
@@ -800,6 +807,16 @@
             return Array.isArray(payload) ? payload : [];
         }
 
+        async getDebugStatus(options = {}) {
+            const routes = buildRouteCandidates('debugStatus');
+            const result = await fetchWithFallback(routes, {
+                persistCache: false,
+                ...options
+            });
+            const payload = result?.data ?? result;
+            return payload || {};
+        }
+
         async getMapsCatalog(options = {}) {
             const { force = false, cacheTtlMs = 5 * 60 * 1000, ...requestOptions } = options || {};
             const cached = this._mapCatalogCache;
@@ -1168,6 +1185,34 @@
                 items,
                 meta: payload?.meta || result?.meta || null
             };
+        }
+
+        async getTeams(params = {}, options = {}) {
+            const queryParams = {
+                season: params.season ?? params.seasonId ?? params.season_id ?? null,
+                division: params.division ?? params.divisionNum ?? params.division_num ?? null,
+                limit: params.limit ?? null
+            };
+            const query = buildQueryString(queryParams);
+            const routes = buildRouteCandidates('teamsList', query);
+            const result = await fetchWithFallback(routes, options);
+            const payload = result?.data ?? result ?? [];
+            const normalized = ensureSnakeCaseDeep(payload);
+            return Array.isArray(normalized) ? normalized : [];
+        }
+
+        async getPlayers(params = {}, options = {}) {
+            const queryParams = {
+                season: params.season ?? params.seasonId ?? params.season_id ?? null,
+                division: params.division ?? params.divisionNum ?? params.division_num ?? null,
+                limit: params.limit ?? null
+            };
+            const query = buildQueryString(queryParams);
+            const routes = buildRouteCandidates('playersList', query);
+            const result = await fetchWithFallback(routes, options);
+            const payload = result?.data ?? result ?? [];
+            const normalized = ensureSnakeCaseDeep(payload);
+            return Array.isArray(normalized) ? normalized : [];
         }
 
         async getTeamPage(teamId, seasonId, options = {}) {

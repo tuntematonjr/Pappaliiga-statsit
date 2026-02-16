@@ -156,17 +156,65 @@ async def list_teams(
     division: Optional[int] = None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    if season is not None and division is not None:
+    if season is not None:
+        season_filter = ["c.season = :season"]
+        season_name_filter = ["c2.season = :season"]
+        params: dict[str, Any] = {"season": season, "limit": limit}
+
+        if division is not None:
+            season_filter.append("c.division_num = :division")
+            season_name_filter.append("c2.division_num = :division")
+            params["division"] = division
+
+        season_where = " AND ".join(season_filter)
+        season_name_where = " AND ".join(season_name_filter)
         rows = await query_async(
-            """
-            SELECT DISTINCT t.team_id, t.name AS team_name, t.name AS display_name, t.avatar
+            f"""
+            SELECT
+                t.team_id,
+                COALESCE(
+                    NULLIF((
+                        SELECT tc2.team_name
+                        FROM team_championships tc2
+                        JOIN championships c2 ON c2.championship_id = tc2.championship_id
+                        WHERE tc2.team_id = t.team_id
+                          AND {season_name_where}
+                          AND NULLIF(TRIM(tc2.team_name), '') IS NOT NULL
+                        ORDER BY tc2.updated_at DESC, tc2.created_at DESC
+                        LIMIT 1
+                    ), ''),
+                    t.name
+                ) AS team_name,
+                COALESCE(
+                    NULLIF((
+                        SELECT tc2.team_name
+                        FROM team_championships tc2
+                        JOIN championships c2 ON c2.championship_id = tc2.championship_id
+                        WHERE tc2.team_id = t.team_id
+                          AND {season_name_where}
+                          AND NULLIF(TRIM(tc2.team_name), '') IS NOT NULL
+                        ORDER BY tc2.updated_at DESC, tc2.created_at DESC
+                        LIMIT 1
+                    ), ''),
+                    t.name
+                ) AS display_name,
+                t.avatar
             FROM teams t
-            JOIN team_season_totals tst ON tst.team_id = t.team_id
-            WHERE tst.season = :season AND tst.division_num = :division
-            ORDER BY t.name, t.team_id
+            JOIN (
+                SELECT DISTINCT tc.team_id
+                FROM team_championships tc
+                JOIN championships c ON c.championship_id = tc.championship_id
+                WHERE {season_where}
+                UNION
+                SELECT DISTINCT tst.team_id
+                FROM team_season_totals tst
+                WHERE tst.season = :season
+                  {"AND tst.division_num = :division" if division is not None else ""}
+            ) season_teams ON season_teams.team_id = t.team_id
+            ORDER BY display_name, t.team_id
             LIMIT :limit
             """,
-            {"season": season, "division": division, "limit": limit},
+            params,
         )
     else:
         rows = await query_async(
@@ -282,7 +330,7 @@ async def fetch_team_match_player_stats(team_id: str, championship_id: str) -> l
             mc.image_sm,
             mc.image_lg,
             ps.player_id,
-            p.nickname,
+            COALESCE(pc.player_name, p.nickname) AS nickname,
             ps.team_id,
             ps.opponent_team_id,
             ps.is_forfeit_map,
@@ -297,6 +345,7 @@ async def fetch_team_match_player_stats(team_id: str, championship_id: str) -> l
         FROM player_stats ps
         JOIN matches m ON m.match_id = ps.match_id
         LEFT JOIN players p ON p.player_id = ps.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = ps.player_id AND pc.championship_id = :champ_id
         LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
         LEFT JOIN maps_catalog mc ON LOWER(mc.map_id) = LOWER(mp.map_name)
         WHERE m.championship_id = :champ_id
@@ -631,13 +680,14 @@ async def fetch_team_players_comprehensive(team_id: str, championship_id: Option
             pst.kd,
             pst.hs_pct,
             pst.damage,
-            p.nickname
+            COALESCE(pc.player_name, p.nickname) AS nickname
         FROM player_season_totals pst
         LEFT JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :champ_id
         WHERE pst.season = :season AND pst.division_num = :div AND pst.team_id = :team_id
         ORDER BY pst.maps_played DESC
         """,
-        {"season": season, "div": division_num, "team_id": team_id}
+        {"season": season, "div": division_num, "team_id": team_id, "champ_id": championship_id}
     )
     
     if not rows:
@@ -834,7 +884,7 @@ async def detect_player_roles(championship_id: str, team_id: str) -> list[dict[s
         """
         SELECT
             pst.player_id,
-            p.nickname,
+            COALESCE(pc.player_name, p.nickname) AS nickname,
             pst.maps_played,
             pst.sniper_kills,
             pst.entry_count,
@@ -853,10 +903,11 @@ async def detect_player_roles(championship_id: str, team_id: str) -> list[dict[s
             CASE WHEN pst.cl_1v1_attempts > 0 THEN pst.cl_1v1_wins / pst.cl_1v1_attempts ELSE 0 END AS clutch_success
         FROM player_season_totals pst
         LEFT JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :champ_id
         WHERE pst.season = :season AND pst.division_num = :div AND pst.team_id = :team_id
         ORDER BY pst.maps_played DESC
         """,
-        {"season": season, "div": division_num, "team_id": team_id}
+        {"season": season, "div": division_num, "team_id": team_id, "champ_id": championship_id}
     )
     
     if not rows:

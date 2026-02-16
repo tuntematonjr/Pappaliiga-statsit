@@ -1,6 +1,7 @@
 """Expose all API router modules for convenience imports."""
 
 from . import (
+    debug,
     divisions,
     image_proxy,
     maps_catalog,
@@ -15,6 +16,7 @@ from . import (
 
 __all__ = [
     "divisions",
+    "debug",
     "image_proxy",
     "maps_catalog",
     "matches",

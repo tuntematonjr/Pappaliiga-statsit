@@ -442,6 +442,26 @@
                     });
                 }
 
+                if (routeName === 'teams') {
+                    crumbs.push({
+                        key: 'teams',
+                        label: 'Joukkueet',
+                        icon: '👥',
+                        to: { name: 'teams' },
+                        disabled: true
+                    });
+                }
+
+                if (routeName === 'players') {
+                    crumbs.push({
+                        key: 'players',
+                        label: 'Pelaajat',
+                        icon: '🎮',
+                        to: { name: 'players' },
+                        disabled: true
+                    });
+                }
+
                 return crumbs;
             });
 

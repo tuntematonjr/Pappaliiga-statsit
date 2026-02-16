@@ -27,6 +27,21 @@ const router = createRouter({
             component: window.UpcomingMatchesView
         },
         {
+            path: '/teams',
+            name: 'teams',
+            component: window.TeamsView
+        },
+        {
+            path: '/players',
+            name: 'players',
+            component: window.PlayersView
+        },
+        {
+            path: '/debug',
+            name: 'debug',
+            component: window.DebugView
+        },
+        {
             path: '/:seasonId',
             name: 'home-season',
             component: window.HomeView

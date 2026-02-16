@@ -129,3 +129,22 @@ async def get_global_revision() -> Optional[str]:
     cache_key = ("global-revision",)
     revision, _ = await _REVISION_CACHE.get_or_set(cache_key, _fetch)
     return revision
+
+
+async def clear_api_response_caches(*, clear_revision_cache: bool = True) -> dict[str, int]:
+    """Clear all in-process API caches used by service-layer endpoints."""
+    caches = [
+        ("active", ACTIVE_CACHE),
+        ("recent", RECENT_CACHE),
+        ("old", OLD_CACHE),
+        ("global", GLOBAL_CACHE),
+    ]
+    if clear_revision_cache:
+        caches.append(("revision", _REVISION_CACHE))
+
+    cleared: dict[str, int] = {}
+    for cache_name, cache in caches:
+        removed = await cache.size()
+        await cache.clear()
+        cleared[cache_name] = removed
+    return cleared

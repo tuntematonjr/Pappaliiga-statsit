@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import json
 import logging
 import os
@@ -10,18 +11,35 @@ from typing import Any
 import aiofiles
 from fastapi import FastAPI, Header, HTTPException, Request
 
+from api.services.sync_event_queue import get_sync_event_queue
+
 logger = logging.getLogger("faceit.webhook")
 logging.basicConfig(level=os.getenv("WEBHOOK_LOG_LEVEL", "INFO"))
 
 WEBHOOK_TOKEN = (os.getenv("FACEIT_WEBHOOK_TOKEN") or "").strip()
 LOG_DIR = Path(os.getenv("FACEIT_WEBHOOK_LOG_DIR", "logs/faceit_webhooks")).expanduser()
 MAX_BODY_BYTES = int(os.getenv("FACEIT_WEBHOOK_MAX_BODY_BYTES", str(2 * 1024 * 1024)))
+SYNC_ENABLED = (os.getenv("FACEIT_WEBHOOK_SYNC_ENABLED", "1").strip().lower() in {"1", "true", "yes", "on"})
 REDACTED_HEADERS = {"authorization", "x-api-key", "x-faceit-api-key"}
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    queue = get_sync_event_queue()
+    await queue.start()
+    logger.info("Webhook sync worker started")
+    try:
+        yield
+    finally:
+        await queue.stop()
+        logger.info("Webhook sync worker stopped")
+
 
 app = FastAPI(
     title="FACEIT Webhook Listener",
     version="1.0.0",
     description="Self-hosted endpoint for capturing and inspecting FACEIT webhook payloads.",
+    lifespan=lifespan,
 )
 
 
@@ -48,6 +66,32 @@ def _json_or_text(body: bytes, content_type: str | None) -> tuple[Any | None, st
             return None, text
 
     return None, text
+
+
+def _extract_match_id(payload: Any) -> str | None:
+    if isinstance(payload, dict):
+        direct = payload.get("match_id") or payload.get("matchId")
+        if isinstance(direct, str) and direct.strip():
+            return direct.strip()
+
+        nested_payload = payload.get("payload")
+        if nested_payload is not None:
+            nested = _extract_match_id(nested_payload)
+            if nested:
+                return nested
+
+        for value in payload.values():
+            nested = _extract_match_id(value)
+            if nested:
+                return nested
+
+    if isinstance(payload, list):
+        for item in payload:
+            nested = _extract_match_id(item)
+            if nested:
+                return nested
+
+    return None
 
 
 async def _append_event(record: dict[str, Any]) -> str:
@@ -95,12 +139,31 @@ async def faceit_webhook(
         "body_text": body_text,
     }
     stored_at = await _append_event(record)
+    match_id: str | None = None
+    sync_queued = False
+    sync_reason: str | None = None
+
+    if SYNC_ENABLED and request.method.upper() == "POST" and body_json is not None:
+        match_id = _extract_match_id(body_json)
+        if match_id:
+            try:
+                sync_queued = await get_sync_event_queue().enqueue_match(match_id)
+                if not sync_queued:
+                    sync_reason = "deduped_or_already_processing"
+            except Exception as exc:
+                sync_reason = f"enqueue_failed:{type(exc).__name__}"
+                logger.exception("Failed to enqueue match sync for %s", match_id)
+        else:
+            sync_reason = "no_match_id_in_payload"
 
     logger.info(
-        "Webhook captured method=%s bytes=%d file=%s",
+        "Webhook captured method=%s bytes=%d file=%s match_id=%s queued=%s reason=%s",
         request.method,
         len(body),
         stored_at,
+        match_id,
+        sync_queued,
+        sync_reason,
     )
 
     return {
@@ -108,6 +171,9 @@ async def faceit_webhook(
         "stored_at": stored_at,
         "received_at": record["received_at"],
         "body_bytes": record["body_bytes"],
+        "match_id": match_id,
+        "sync_queued": sync_queued,
+        "sync_reason": sync_reason,
     }
 
 

@@ -9,6 +9,8 @@ import time
 from typing import Literal
 
 import faceit_config
+from api.services.cache_helpers import clear_api_response_caches
+from api.services.cache_reheat import reheat_main_page
 from division_overrides import load_division_overrides
 from sync_pipeline import sync_championship_async, update_single_match_async
 from utils.log_files import (
@@ -76,6 +78,7 @@ class SyncEventJob:
     kind: Literal["match", "championship"]
     target_id: str
     full: bool = False
+    attempt: int = 0
     enqueued_at: float = field(default_factory=time.time)
 
     @property
@@ -93,6 +96,15 @@ class SyncEventQueue:
         self._processing_keys: set[str] = set()
         self._recent_keys: dict[str, float] = {}
         self._dedupe_ttl_seconds = max(1, int(os.environ.get("SYNC_EVENT_DEDUPE_TTL", "120")))
+        self._retry_interval_seconds = max(1, int(os.environ.get("SYNC_EVENT_RETRY_INTERVAL_SECONDS", "60")))
+        self._retry_max_window_seconds = max(
+            self._retry_interval_seconds,
+            int(os.environ.get("SYNC_EVENT_RETRY_MAX_WINDOW_SECONDS", "900")),
+        )
+        default_max_attempts = max(2, (self._retry_max_window_seconds // self._retry_interval_seconds) + 1)
+        self._retry_max_attempts = max(1, int(os.environ.get("SYNC_EVENT_RETRY_MAX_ATTEMPTS", str(default_max_attempts))))
+        self._clear_cache_on_success = _env_bool("SYNC_EVENT_CLEAR_CACHE_ON_SUCCESS", default=True)
+        self._reheat_on_success = _env_bool("SYNC_EVENT_REHEAT_ON_SUCCESS", default=True)
         self._validate_avatars = _env_bool("SYNC_EVENT_VALIDATE_AVATARS", default=False)
         self._max_match_concurrency = max(
             1,
@@ -223,20 +235,24 @@ class SyncEventQueue:
                 self._last_job_duration_ms = None
 
             LOGGER.info(
-                "Processing sync event key=%s kind=%s target=%s queue_wait_ms=%d",
+                "Processing sync event key=%s kind=%s target=%s attempt=%d queue_wait_ms=%d",
                 key,
                 job.kind,
                 job.target_id,
+                job.attempt + 1,
                 queue_wait_ms,
             )
 
+            retry_job: SyncEventJob | None = None
             try:
                 if job.kind == "match":
-                    await update_single_match_async(
+                    championship_id = await update_single_match_async(
                         job.target_id,
                         overrides=self._overrides,
                         validate_avatars=self._validate_avatars,
                     )
+                    if not championship_id:
+                        raise RuntimeError("match_sync_not_ready")
                 else:
                     await sync_championship_async(
                         job.target_id,
@@ -247,16 +263,41 @@ class SyncEventQueue:
                         max_match_concurrency=self._max_match_concurrency,
                         validate_avatars=self._validate_avatars,
                     )
+                await self._refresh_caches_after_sync(key)
             except Exception as exc:
-                job_status = "failed"
                 job_error = f"{type(exc).__name__}: {exc}"
-                LOGGER.exception("Sync event processing failed for %s", key)
+                if self._should_retry(job):
+                    job_status = "retrying"
+                    retry_job = SyncEventJob(
+                        kind=job.kind,
+                        target_id=job.target_id,
+                        full=job.full,
+                        attempt=job.attempt + 1,
+                    )
+                    LOGGER.warning(
+                        "Sync event failed for %s (%s) - scheduling retry %d/%d in %ss",
+                        key,
+                        job_error,
+                        retry_job.attempt + 1,
+                        self._retry_max_attempts,
+                        self._retry_interval_seconds,
+                    )
+                else:
+                    job_status = "failed"
+                    LOGGER.error(
+                        "Sync event %s exhausted retries after %d attempt(s); last error=%s",
+                        key,
+                        job.attempt + 1,
+                        job_error,
+                    )
+                    LOGGER.exception("Sync event processing failed for %s", key)
             finally:
                 duration_ms = int((time.monotonic() - started_monotonic) * 1000)
                 now = time.monotonic()
                 async with self._lock:
                     self._processing_keys.discard(key)
-                    self._recent_keys[key] = now + self._dedupe_ttl_seconds
+                    if retry_job is None:
+                        self._recent_keys[key] = now + self._dedupe_ttl_seconds
                     self._last_job_finished_at = time.time()
                     self._last_job_status = job_status
                     self._last_job_error = job_error
@@ -269,6 +310,53 @@ class SyncEventQueue:
                     self._queue.qsize(),
                 )
                 self._queue.task_done()
+            if retry_job is not None:
+                asyncio.create_task(
+                    self._requeue_retry(retry_job),
+                    name=f"sync-event-retry:{retry_job.dedupe_key}:{retry_job.attempt}",
+                )
+
+    async def _refresh_caches_after_sync(self, key: str) -> None:
+        if self._clear_cache_on_success:
+            cleared = await clear_api_response_caches(clear_revision_cache=True)
+            LOGGER.info("Cleared API caches after sync key=%s cleared=%s", key, cleared)
+        if self._reheat_on_success:
+            await reheat_main_page()
+
+    def _should_retry(self, job: SyncEventJob) -> bool:
+        return (job.attempt + 1) < self._retry_max_attempts
+
+    async def _requeue_retry(self, job: SyncEventJob) -> None:
+        key = job.dedupe_key
+        delay_seconds = self._retry_interval_seconds
+        try:
+            LOGGER.info(
+                "Requeueing sync event key=%s attempt=%d in %ss",
+                key,
+                job.attempt + 1,
+                delay_seconds,
+            )
+            await asyncio.sleep(delay_seconds)
+            async with self._lock:
+                if key in self._queued_keys or key in self._processing_keys:
+                    LOGGER.info("Skipped retry enqueue for %s because key is already queued/processing", key)
+                    return
+                if not self._worker or self._worker.done():
+                    self._worker = asyncio.create_task(self._run_worker(), name="sync-event-worker")
+                    self._worker_started_at = time.time()
+                    LOGGER.warning("Sync event queue worker restarted by retry enqueue")
+                self._queued_keys.add(key)
+                self._queue.put_nowait(job)
+                LOGGER.info(
+                    "Queued retry sync event key=%s kind=%s target=%s attempt=%d queue_size=%d",
+                    key,
+                    job.kind,
+                    job.target_id,
+                    job.attempt + 1,
+                    self._queue.qsize(),
+                )
+        except Exception:
+            LOGGER.exception("Failed to requeue retry for sync event %s", key)
 
 
 _QUEUE: SyncEventQueue | None = None

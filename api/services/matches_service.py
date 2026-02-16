@@ -196,7 +196,7 @@ async def get_match_player_stats(match_id: str) -> list[dict[str, Any]]:
             ps.map_id,
             mp.map_name,
             ps.player_id,
-            p.nickname,
+            COALESCE(pc.player_name, p.nickname) AS nickname,
             ps.team_id,
             ps.opponent_team_id,
             ps.is_forfeit_map,
@@ -209,7 +209,9 @@ async def get_match_player_stats(match_id: str) -> list[dict[str, Any]]:
             ps.entry_count, ps.entry_wins,
             ps.kd, ps.kr, ps.adr, ps.hs_pct, ps.result
         FROM player_stats ps
+        JOIN matches m ON m.match_id = ps.match_id
         LEFT JOIN players p ON p.player_id = ps.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = ps.player_id AND pc.championship_id = m.championship_id
         LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
         WHERE ps.match_id = :match_id
         ORDER BY ps.round_index, ps.player_id

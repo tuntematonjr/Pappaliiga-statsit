@@ -366,15 +366,16 @@ async def _compute_division_details(championship_id: str, season: int, division_
             SUM(COALESCE(dm.rounds_played, 0)) AS rounds_played,
             SUM(ps.kills) AS kills,
             SUM(ps.deaths) AS deaths,
-            p.nickname
+            COALESCE(pc.player_name, p.nickname) AS nickname
         FROM player_stats ps
         JOIN matches m ON m.match_id = ps.match_id
         LEFT JOIN division_maps dm ON dm.match_id = ps.match_id AND dm.round_index = ps.round_index
         JOIN players p ON p.player_id = ps.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = ps.player_id AND pc.championship_id = :champ_id
         WHERE m.championship_id = :champ_id
           AND COALESCE(ps.is_forfeit_map, 0) = 0
           AND ps.team_id IS NOT NULL
-        GROUP BY ps.team_id, ps.player_id, p.nickname
+        GROUP BY ps.team_id, ps.player_id, COALESCE(pc.player_name, p.nickname)
         """,
         {"champ_id": championship_id},
     )
@@ -439,16 +440,17 @@ async def _compute_division_details(championship_id: str, season: int, division_
             pst.kd,
             pst.hs_pct,
             pst.damage,
-            p.nickname,
+            COALESCE(pc.player_name, p.nickname) AS nickname,
             t.name AS team_name
         FROM player_season_totals pst
         LEFT JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :champ_id
         LEFT JOIN teams t ON t.team_id = pst.team_id
         WHERE pst.season = :season
           AND pst.division_num = :division
           {exclusion_clause}
         """,
-        player_totals_params,
+        {**player_totals_params, "champ_id": championship_id},
     )
 
     player_totals: list[dict[str, Any]] = []
@@ -850,16 +852,17 @@ async def _get_division_leaders(
                 pst.kd,
                 pst.mvps,
                 pst.utility_damage,
-                p.nickname,
+                COALESCE(pc.player_name, p.nickname) AS nickname,
                 t.name AS team_name
             FROM player_season_totals pst
             LEFT JOIN players p ON p.player_id = pst.player_id
+            LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :champ_id
             LEFT JOIN teams t ON t.team_id = pst.team_id
             WHERE pst.season = :season AND pst.division_num = :division
             ORDER BY pst.kills DESC, pst.adr DESC
             LIMIT 10
             """,
-            {"season": season, "division": division_num},
+            {"season": season, "division": division_num, "champ_id": championship_id},
         )
         leaders = []
         for row in rows:
@@ -909,10 +912,11 @@ async def _get_division_leaders(
             pt.kd,
             pt.mvps,
             pt.utility_damage,
-            p.nickname,
+            COALESCE(pc.player_name, p.nickname) AS nickname,
             t.name AS team_name
         FROM player_totals pt
         LEFT JOIN players p ON p.player_id = pt.player_id
+        LEFT JOIN player_championships pc ON pc.player_id = pt.player_id AND pc.championship_id = :champ_id
         LEFT JOIN teams t ON t.team_id = pt.team_id
         ORDER BY pt.kills DESC, pt.adr DESC
         LIMIT 10

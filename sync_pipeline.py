@@ -41,6 +41,7 @@ from db_async import (
     upsert_maps_bulk_async,
     upsert_match_async,
     upsert_player_map_season_totals_bulk_async,
+    upsert_player_championships_bulk_async,
     upsert_player_season_totals_bulk_async,
     upsert_player_stats_bulk_async,
     upsert_players_bulk_async,
@@ -550,7 +551,14 @@ def _collect_roster_players(details: Dict[str, Any]) -> List[Dict[str, Any]]:
             if not pid:
                 continue
             nickname = player.get("nickname") or player.get("name") or ""
-            players.append({"player_id": pid, "nickname": nickname})
+            players.append(
+                {
+                    "player_id": pid,
+                    "nickname": nickname,
+                    "avatar": player.get("avatar") or player.get("avatar_url") or player.get("picture"),
+                    "faceit_url": player.get("faceit_url") or player.get("url"),
+                }
+            )
     return players
 
 
@@ -1122,6 +1130,21 @@ async def sync_match_async(
                         conn=core_conn,
                         label=f"match:{match_id}:players",
                     )
+                    player_champ_rows = [
+                        {
+                            "player_id": row["player_id"],
+                            "championship_id": normalised.match_row["championship_id"],
+                            "player_name": row.get("nickname") or row.get("name"),
+                        }
+                        for row in normalised.player_rows
+                        if row.get("player_id")
+                    ]
+                    if player_champ_rows:
+                        await upsert_player_championships_bulk_async(
+                            player_champ_rows,
+                            conn=core_conn,
+                            label=f"match:{match_id}:player_champs",
+                        )
                 if map_catalog_rows:
                     for row in map_catalog_rows:
                         try:

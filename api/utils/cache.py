@@ -126,6 +126,10 @@ class AsyncTTLCache:
         async with self._lock:
             self._entries.clear()
 
+    async def size(self) -> int:
+        async with self._lock:
+            return len(self._entries)
+
     def get_stats(self) -> dict:
         """Return cache statistics."""
         total_requests = self._hits + self._misses

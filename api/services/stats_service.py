@@ -223,11 +223,18 @@ async def _compute_top_players(
 
     rows = await query_async(
         f"""
-        SELECT pst.player_id, p.nickname, t.name AS team_name,
+        SELECT pst.player_id, COALESCE(pc.player_name, p.nickname) AS nickname, t.name AS team_name,
                pst.{column} AS stat_value, pst.maps_played,
                pst.season, pst.division_num
         FROM player_season_totals pst
         JOIN players p ON p.player_id = pst.player_id
+        LEFT JOIN championships c
+            ON c.season = pst.season
+           AND c.division_num = pst.division_num
+           AND COALESCE(c.is_playoffs, 0) = 0
+        LEFT JOIN player_championships pc
+            ON pc.player_id = pst.player_id
+           AND pc.championship_id = c.championship_id
         LEFT JOIN teams t ON t.team_id = pst.team_id
         WHERE {where_clause}
         ORDER BY pst.{column} DESC

@@ -215,6 +215,20 @@ class TeamPageResponse(CamelModel):
     season_data: Optional[ComprehensiveTeamSeasonData] = None
 
 
+@router.get("", response_model=List[TeamInfo])
+async def list_teams(
+    season: Optional[int] = Query(None, description="Season filter"),
+    division: Optional[int] = Query(None, description="Division filter"),
+    limit: int = Query(2000, ge=1, le=10000, description="Maximum number of teams"),
+):
+    """List teams with optional season/division filters."""
+    try:
+        rows = await teams_service.list_teams(season=season, division=division, limit=limit)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [TeamInfo(**row) for row in rows]
+
+
 async def _build_team_page_payload(team_id: str, championship_id: Optional[str]) -> dict[str, Any]:
     """Assemble team page response payload shared by multiple routes."""
     team = await teams_service.fetch_team(team_id)
