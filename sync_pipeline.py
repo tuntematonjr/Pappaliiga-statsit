@@ -419,6 +419,11 @@ def _extract_map_rows_from_details(
     team2_id: Optional[str],
 ) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
+    status = str((details or {}).get("status") or "").lower()
+    finished_at = normalize_finished_at((details or {}).get("finished_at"))
+    if not _is_played_match_state(status, finished_at):
+        return rows
+
     det = (details or {}).get("detailed_results")
     if isinstance(det, list) and det:
         for idx, item in enumerate(det, start=1):
@@ -1167,6 +1172,10 @@ async def sync_match_async(
                             conn=core_conn,
                             label=f"match:{match_id}:maps",
                         )
+                    elif not match_is_played:
+                        # Keep unplayed/live matches mapless; clears stale synthetic rows.
+                        async with core_conn.cursor() as cur:
+                            await cur.execute("DELETE FROM maps WHERE match_id = %s", (match_id,))
 
                     map_lookup = await get_map_id_lookup_async(core_conn, match_id)
                     if normalised.match_row.get("finished_at"):
