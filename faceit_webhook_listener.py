@@ -16,8 +16,24 @@ from api.services.sync_event_queue import get_sync_event_queue
 logger = logging.getLogger("faceit.webhook")
 logging.basicConfig(level=os.getenv("WEBHOOK_LOG_LEVEL", "INFO"))
 
+ENV_PATH = Path(__file__).with_name(".env")
+try:
+    from dotenv import load_dotenv
+
+    if ENV_PATH.exists():
+        load_dotenv(ENV_PATH)
+except ImportError:
+    try:
+        import env_loader
+
+        if ENV_PATH.exists():
+            env_loader.load_env(ENV_PATH)
+    except Exception:
+        pass
+
 WEBHOOK_TOKEN = (os.getenv("FACEIT_WEBHOOK_TOKEN") or "").strip()
-LOG_DIR = Path(os.getenv("FACEIT_WEBHOOK_LOG_DIR", "logs/faceit_webhooks")).expanduser()
+DEFAULT_LOG_DIR = Path(__file__).resolve().with_name("logs") / "faceit_webhooks"
+LOG_DIR = Path(os.getenv("FACEIT_WEBHOOK_LOG_DIR") or DEFAULT_LOG_DIR).expanduser()
 MAX_BODY_BYTES = int(os.getenv("FACEIT_WEBHOOK_MAX_BODY_BYTES", str(2 * 1024 * 1024)))
 SYNC_ENABLED = (os.getenv("FACEIT_WEBHOOK_SYNC_ENABLED", "1").strip().lower() in {"1", "true", "yes", "on"})
 REDACTED_HEADERS = {"authorization", "x-api-key", "x-faceit-api-key"}
@@ -27,6 +43,13 @@ REDACTED_HEADERS = {"authorization", "x-api-key", "x-faceit-api-key"}
 async def lifespan(app: FastAPI):
     queue = get_sync_event_queue()
     await queue.start()
+    logger.info(
+        "Webhook listener ready log_dir=%s sync_enabled=%s token_required=%s max_body_bytes=%d",
+        LOG_DIR,
+        SYNC_ENABLED,
+        bool(WEBHOOK_TOKEN),
+        MAX_BODY_BYTES,
+    )
     logger.info("Webhook sync worker started")
     try:
         yield
@@ -117,6 +140,12 @@ async def faceit_webhook(
     if WEBHOOK_TOKEN:
         provided = (x_webhook_token or "").strip()
         if provided != WEBHOOK_TOKEN:
+            logger.warning(
+                "Rejected webhook request due to token mismatch method=%s path=%s remote=%s",
+                request.method,
+                request.url.path,
+                request.client.host if request.client else None,
+            )
             raise HTTPException(status_code=403, detail="Forbidden")
 
     body = await request.body()
@@ -138,7 +167,12 @@ async def faceit_webhook(
         "body_json": body_json,
         "body_text": body_text,
     }
-    stored_at = await _append_event(record)
+    try:
+        stored_at = await _append_event(record)
+    except Exception:
+        logger.exception("Failed to persist webhook event in %s", LOG_DIR)
+        raise HTTPException(status_code=500, detail="Failed to persist webhook event")
+
     match_id: str | None = None
     sync_queued = False
     sync_reason: str | None = None
