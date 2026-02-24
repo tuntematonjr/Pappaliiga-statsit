@@ -1267,18 +1267,32 @@ window.TeamDetail = {
             this.vetoByMatch.forEach(entry => {
                 const actions = {};
                 let teamBanCount = 0;
+                let opponentBanCount = 0;
+                let teamPickCount = 0;
+                let opponentPickCount = 0;
                 entry.steps.forEach(step => {
                     if (!step.mapName) return;
                     const key = mapKey(step.mapName);
                     const bucket = actions[key] || { pick: null, ban: null };
                     if (step.action === 'pick') {
-                        bucket.pick = { actor: step.actor, teamName: step.teamName };
+                        let order = null;
+                        if (step.actor === 'team') {
+                            teamPickCount += 1;
+                            order = teamPickCount;
+                        } else if (step.actor === 'opponent') {
+                            opponentPickCount += 1;
+                            order = opponentPickCount;
+                        }
+                        bucket.pick = { actor: step.actor, teamName: step.teamName, order };
                     }
                     if (step.action === 'ban') {
                         let order = null;
                         if (step.actor === 'team') {
                             teamBanCount += 1;
                             order = teamBanCount;
+                        } else if (step.actor === 'opponent') {
+                            opponentBanCount += 1;
+                            order = opponentBanCount;
                         }
                         bucket.ban = { actor: step.actor, teamName: step.teamName, order };
                     }
@@ -1300,54 +1314,70 @@ window.TeamDetail = {
                     const resultLabel = resultKey === 'win' ? 'W' : resultKey === 'loss' ? 'L' : resultKey === 'draw' ? 'D' : 'Kesken';
                     const scoreLabel = (match.teamScore != null && match.oppScore != null) ? `${match.teamScore}-${match.oppScore}` : '';
                     const meta = this.vetoMatchMeta[match.matchId] || {};
+
+                    // Find map winner if this map was played
+                    let mapWinnerLabel = '';
+                    const matchMaps = Array.isArray(match.maps) ? match.maps : [];
+                    const playedMap = matchMaps.find(m => mapKey(beautifyMapName(m.map || m.mapName)) === key);
+                    if (playedMap) {
+                        const mapWinnerId = playedMap.winner_team_id || playedMap.winnerTeamId;
+                        if (mapWinnerId) {
+                            if (String(mapWinnerId) === String(this.teamId)) {
+                                mapWinnerLabel = '✓ Voitto';
+                            } else {
+                                mapWinnerLabel = '✗ Tappio';
+                            }
+                        }
+                    }
+
                     let className = 'veto-heatmap__cell--none';
                     let actionLabel = 'Ei vetoa';
+                    let actionCode = '';
                     let byLabel = '';
 
                     if (actionPick) {
                         if (actionPick.actor === 'team') {
                             className = 'veto-heatmap__cell--team-pick';
                             actionLabel = 'Oma pick';
+                            actionCode = actionPick.order ? `P${actionPick.order}` : 'P';
                             byLabel = this.teamInfo?.teamName || 'Oma joukkue';
                         } else if (actionPick.actor === 'opponent') {
                             className = 'veto-heatmap__cell--opp-pick';
                             actionLabel = 'Vastustajan pick';
+                            actionCode = actionPick.order ? `VP${actionPick.order}` : 'VP';
                             byLabel = opponent;
                         }
                     } else if (actionBan) {
                         if (actionBan.actor === 'team') {
-                            if (actionBan.order === 1) {
-                                className = 'veto-heatmap__cell--team-ban1';
-                                actionLabel = 'Oma banni (1.)';
-                            } else if (actionBan.order === 2) {
-                                className = 'veto-heatmap__cell--team-ban2';
-                                actionLabel = 'Oma banni (2.)';
-                            } else {
-                                className = 'veto-heatmap__cell--team-ban2';
-                                actionLabel = 'Oma banni';
-                            }
+                            className = 'veto-heatmap__cell--team-ban';
+                            actionLabel = 'Oma banni';
+                            actionCode = actionBan.order ? `B${actionBan.order}` : 'B';
                             byLabel = this.teamInfo?.teamName || 'Oma joukkue';
                         } else if (actionBan.actor === 'opponent') {
                             className = 'veto-heatmap__cell--opp-ban';
                             actionLabel = 'Vastustajan banni';
+                            actionCode = actionBan.order ? `VB${actionBan.order}` : 'VB';
                             byLabel = opponent;
                         }
                     }
 
+                    const actionText = actionLabel
+                        ? `${actionLabel}${actionCode ? ` (${actionCode})` : ''}`
+                        : '';
+                    const showMapWinner = mapWinnerLabel && (actionPick || meta.decider === map.mapName || meta.overflow === map.mapName);
                     const title = [
                         map.mapName,
-                        `Ottelu ${match.matchId}`,
-                        dateLabel,
+                        actionText,
+                        showMapWinner ? mapWinnerLabel : '',
                         opponent ? `vs ${opponent}` : '',
                         scoreLabel ? `Tulos ${scoreLabel} (${resultLabel})` : `Tulos ${resultLabel}`,
+                        dateLabel,
                         meta.seriesType ? meta.seriesType : '',
-                        actionLabel,
-                        byLabel ? `Tekijä ${byLabel}` : '',
-                        meta.decider ? `Ratkaisukartta: ${meta.decider}` : '',
-                        meta.overflow ? `Overflow: ${meta.overflow}` : ''
-                    ].filter(Boolean).join(' · ');
+                        (meta.decider === map.mapName) ? 'Ratkaisukartta' : '',
+                        (meta.overflow === map.mapName) ? 'Overflow' : ''
+                    ].filter(Boolean).join('\n');
 
-                    return { className, title, hasAction: !!actionInfo };
+                    return { className, title, hasAction: !!actionInfo, actionCode };
                 });
 
                 return {
@@ -1358,15 +1388,13 @@ window.TeamDetail = {
             });
         },
         vetoLegendEntries() {
-            const buildCell = (className, label) => ({ className, label });
+            const buildCell = (className, label, code = '') => ({ className, label, code });
             return [
-                buildCell('veto-heatmap__cell--team-pick', 'Oma pick'),
-                buildCell('veto-heatmap__cell--opp-pick', 'Vastustajan pick'),
-                buildCell('veto-heatmap__cell--decider', 'Ratkaisukartta'),
-                buildCell('veto-heatmap__cell--overflow', 'Overflow'),
-                buildCell('veto-heatmap__cell--team-ban1', 'Oma banni (1.)'),
-                buildCell('veto-heatmap__cell--team-ban2', 'Oma banni (2.)'),
-                buildCell('veto-heatmap__cell--opp-ban', 'Vastustajan banni'),
+                buildCell('veto-heatmap__cell--team-pick', 'Oma pick', 'P1/P2'),
+                buildCell('veto-heatmap__cell--opp-pick', 'Vastustajan pick', 'VP1/VP2'),
+                buildCell('veto-heatmap__cell--decider', 'Ratkaisukartta / Overflow'),
+                buildCell('veto-heatmap__cell--team-ban', 'Oma banni', 'B1/B2'),
+                buildCell('veto-heatmap__cell--opp-ban', 'Vastustajan banni', 'VB1/VB2'),
                 buildCell('veto-heatmap__cell--none', 'Ei vetoa')
             ];
         },
@@ -2819,6 +2847,7 @@ window.TeamDetail = {
                                         :class="[cell.className, ((idx + 1) % 4 === 0) ? 'veto-heatmap__cell--divider' : '']"
                                         :title="cell.title"
                                     >
+                                        <span v-if="cell.actionCode" class="veto-heatmap__code">{{ cell.actionCode }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -2827,7 +2856,9 @@ window.TeamDetail = {
                             <div class="veto-legend-title">Selite</div>
                             <div class="veto-legend-grid">
                                 <div v-for="entry in vetoLegendEntries" :key="entry.label" class="veto-legend-item">
-                                    <div class="veto-heatmap__cell veto-legend-cell" :class="entry.className"></div>
+                                    <div class="veto-heatmap__cell veto-legend-cell" :class="entry.className">
+                                        <span v-if="entry.code" class="veto-heatmap__code">{{ entry.code }}</span>
+                                    </div>
                                     <span class="veto-legend-label">{{ entry.label }}</span>
                                 </div>
                             </div>
