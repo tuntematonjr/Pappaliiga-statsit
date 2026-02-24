@@ -807,7 +807,7 @@ window.TeamDetail = {
                 x: 0,
                 y: 0
             },
-            performanceTrendMode: 'map',
+            performanceTrendMode: 'cumulative',
             trendChartWidth: 640,
             trendChartHeight: 140,
             matchesHoverMatchId: null,
