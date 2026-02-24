@@ -197,7 +197,7 @@ const SANKARI_CARD_GROUPS = [
             },
             {
                 id: 'utility',
-                title: 'Kranaatit syö tyhjäksi',
+                title: 'Kranaatit vyö tyhjäksi',
                 description: 'Polttaa enemmän kuin 2000-luvun LANit.<br>Eniten utility damage.',
                 metricKey: 'utilityDamage',
                 sortDirection: 'desc',
