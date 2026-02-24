@@ -25,7 +25,7 @@ const PLAYER_COLUMNS = [
     { key: 'mk3k', label: '3K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 3 tappoa.' },
     { key: 'mk4k', label: '4K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 4 tappoa.' },
     { key: 'mk5k', label: 'Ace', sortable: true, numeric: true, group: 'multis', tooltip: 'Ace: kierrokset, joissa pelaaja tappoi koko vastustajajoukkueen (5K).' },
-    { key: 'sniperKills', label: 'AWP', sortable: true, numeric: true, group: 'weapons', tooltip: 'Sniper/AWP-tappojen määrä.' },
+    { key: 'sniperKills', label: 'Sniper', sortable: true, numeric: true, group: 'weapons', tooltip: 'Sniper-tappojen määrä.' },
     { key: 'pistolKills', label: 'Pistol', sortable: true, numeric: true, group: 'weapons', tooltip: 'Pistoolitappojen määrä.' }
 ];
 
