@@ -17,10 +17,12 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from db_async import close_pool, get_pool
+from api.services.sync_event_queue import get_sync_event_queue
 
 from .routers import debug, divisions, matches, players, stats, teams, seasons
 from .routers import maps_catalog, image_proxy, season_view
 from .routers import share_preview
+from .routers import webhook
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.cache_reheat import reheat_main_page
 
@@ -54,6 +56,9 @@ async def lifespan(app: FastAPI):
     # Startup: ensure pool is ready
     await get_pool()
     print("[info] Database pool initialized")
+    sync_queue = get_sync_event_queue()
+    await sync_queue.start()
+    logger.info("Sync event queue worker started from api.main lifespan")
 
     try:
         asyncio.create_task(reheat_main_page())
@@ -63,6 +68,8 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown: close pool
+    await sync_queue.stop()
+    logger.info("Sync event queue worker stopped from api.main lifespan")
     await close_pool()
     print("[info] Database pool closed")
 
@@ -101,6 +108,8 @@ app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 app.include_router(season_view.router, prefix="/api", tags=["season-view"])
+app.include_router(webhook.router, tags=["webhook"])
+app.include_router(webhook.router, prefix="/api", tags=["webhook"])
 
 
 @app.get("/")

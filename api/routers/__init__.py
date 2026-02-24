@@ -12,6 +12,7 @@ from . import (
     season_view,
     stats,
     teams,
+    webhook,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "season_view",
     "stats",
     "teams",
+    "webhook",
 ]
