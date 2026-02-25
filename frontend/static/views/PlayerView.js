@@ -375,6 +375,99 @@ function buildSummaryCards(totals) {
     });
 }
 
+function buildSideBySideSections(baseTotals, compareTotals) {
+    const baseSections = buildTotalsSections(baseTotals);
+    const compareSections = buildTotalsSections(compareTotals);
+    const compareMap = new Map(compareSections.map(section => [section.key, section]));
+    return baseSections.map(section => {
+        const compareSection = compareMap.get(section.key);
+        const compareRowsMap = new Map((compareSection?.rows || []).map(row => [row.label, row.value]));
+        return {
+            key: section.key,
+            title: section.title,
+            rows: (section.rows || []).map(row => ({
+                label: row.label,
+                base: row.value,
+                compare: compareRowsMap.get(row.label) ?? '-'
+            }))
+        };
+    });
+}
+
+function mapNameFromStat(entry) {
+    const curr = entry?.curr || entry || {};
+    return (
+        entry?.pretty_name || curr?.pretty_name ||
+        entry?.map_name || curr?.map_name ||
+        entry?.mapName || curr?.mapName ||
+        entry?.name || curr?.name ||
+        'Kartta'
+    );
+}
+
+function normalizeMapStatForCompare(entry) {
+    const curr = entry?.curr || entry || {};
+    const kills = toNumber(curr.kills);
+    const deaths = toNumber(curr.deaths);
+    const rounds = toNumber(curr.rounds_played ?? curr.rounds);
+    const headshots = toNumber(curr.headshots);
+    const flashSuccesses = toNumber(curr.flash_successes);
+    const flashCount = toNumber(curr.flash_count);
+    const utilitySuccesses = toNumber(curr.utility_successes);
+    const utilityCount = toNumber(curr.utility_count);
+    const hsPct = kills > 0 ? (headshots / kills) * 100 : 0;
+    const mapName = mapNameFromStat(entry);
+    return {
+        map_name: mapName,
+        map_key: canonicalMapKey(mapName),
+        raw: entry,
+        maps_played: toNumber(curr.maps_played),
+        rounds_played: rounds,
+        kills,
+        deaths,
+        assists: toNumber(curr.assists),
+        kd: Number.isFinite(Number(curr.kd)) ? toNumber(curr.kd) : safeDivide(kills, Math.max(1, deaths)),
+        kr: Number.isFinite(Number(curr.kr)) ? toNumber(curr.kr) : safeDivide(kills, Math.max(1, rounds)),
+        adr: toNumber(curr.adr),
+        hs_pct: Number.isFinite(Number(curr.hs_pct)) ? toNumber(curr.hs_pct) : hsPct,
+        flash_success_pct: safeDivide(flashSuccesses, Math.max(1, flashCount)) * 100,
+        utility_success_pct: safeDivide(utilitySuccesses, Math.max(1, utilityCount)) * 100
+    };
+}
+
+function buildMapCompareRows(baseRows, compareRows) {
+    const baseMap = new Map((baseRows || []).map(row => [row.map_key, row]));
+    const compareMap = new Map((compareRows || []).map(row => [row.map_key, row]));
+    const keys = new Set([...baseMap.keys(), ...compareMap.keys()]);
+    const rows = [];
+    keys.forEach(key => {
+        const base = baseMap.get(key) || null;
+        const compare = compareMap.get(key) || null;
+        const rawName = base?.map_name || compare?.map_name || 'Kartta';
+        rows.push({
+            key,
+            map_name: beautifyMapName(rawName),
+            base,
+            compare,
+            maps_played_base: toNumber(base?.maps_played),
+            maps_played_compare: toNumber(compare?.maps_played),
+            kd_base: toNumber(base?.kd),
+            kd_compare: toNumber(compare?.kd),
+            kr_base: toNumber(base?.kr),
+            kr_compare: toNumber(compare?.kr),
+            adr_base: toNumber(base?.adr),
+            adr_compare: toNumber(compare?.adr),
+            hs_pct_base: toNumber(base?.hs_pct),
+            hs_pct_compare: toNumber(compare?.hs_pct)
+        });
+    });
+    return rows.sort((a, b) => {
+        const mapsCmp = (b.maps_played_base + b.maps_played_compare) - (a.maps_played_base + a.maps_played_compare);
+        if (mapsCmp !== 0) return mapsCmp;
+        return String(a.map_name || '').localeCompare(String(b.map_name || ''), 'fi');
+    });
+}
+
 function trendMetricValue(row, metricKey) {
     if (!row) return 0;
     if (metricKey === 'entry_pct') return safeDivide(toNumber(row.entry_wins), Math.max(1, toNumber(row.entry_count))) * 100;
@@ -446,12 +539,35 @@ function parseCsvList(value) {
     return String(value).split('||').map(item => item.trim()).filter(Boolean);
 }
 
+function canonicalMapKey(...values) {
+    // Normalize map identifier by stripping prefixes and special chars
+    // so "de_ancient", "ancient", "ds_ancient", "cs2_ancient" all match
+    const combined = values.filter(Boolean).join(' ').trim();
+    if (!combined) return '';
+    let normalized = combined.toLowerCase();
+    // Strip known CS map prefixes
+    normalized = normalized.replace(/^(de_|ds_|cs2_|map_)/i, '');
+    // Remove special characters and extra spaces
+    normalized = normalized.replace(/[^a-z0-9]/g, '');
+    return normalized;
+}
+
 function beautifyMapName(raw) {
     if (!raw) return 'Kartta';
     const value = String(raw).trim();
     const lower = value.toLowerCase();
     if (lower === 'forfeit') return 'Forfeit';
-    const core = lower.startsWith('de_') ? lower.slice(3) : lower;
+    // Handle ds_ prefix (danger zone maps)
+    let core = lower;
+    if (lower.startsWith('de_')) {
+        core = lower.slice(3);
+    } else if (lower.startsWith('ds_')) {
+        core = lower.slice(3);
+    } else if (lower.startsWith('cs2_')) {
+        core = lower.slice(4);
+    } else if (lower.startsWith('map_')) {
+        core = lower.slice(4);
+    }
     const parts = core.split(/[_-]/).filter(Boolean);
     if (!parts.length) return value;
     return parts.map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
@@ -624,7 +740,14 @@ window.PlayerView = {
             compareVisible: false,
             compareLoading: false,
             compareError: null,
+            compareScope: 'selected',
             comparePlayer: null,
+            compareSeasonsRaw: [],
+            compareSelectedSeasonRaw: null,
+            compareMapStatsRaw: [],
+            compareMapImageLookup: {},
+            compareMapCatalogLoaded: false,
+            compareMapCatalogLoading: false,
             compareMetrics: []
         };
     },
@@ -691,6 +814,82 @@ window.PlayerView = {
         },
         allTimeKpiMetrics() {
             return buildKpis(this.allTimeTotals);
+        },
+        compareSelectedTotals() {
+            if (!this.compareSelectedSeasonRaw) return null;
+            return aggregateSeasons([this.compareSelectedSeasonRaw]);
+        },
+        compareAllTimeTotals() {
+            if (!Array.isArray(this.compareSeasonsRaw) || !this.compareSeasonsRaw.length) return null;
+            return aggregateSeasons(this.compareSeasonsRaw);
+        },
+        compareBaseTotals() {
+            return this.compareScope === 'all' ? this.allTimeTotals : this.selectedDivisionTotals;
+        },
+        compareOpponentTotals() {
+            if (this.compareScope === 'all') return this.compareAllTimeTotals;
+            return this.compareSelectedTotals;
+        },
+        compareBaseKpis() {
+            return buildKpis(this.compareBaseTotals);
+        },
+        compareOpponentKpis() {
+            return buildKpis(this.compareOpponentTotals);
+        },
+        comparePanelRows() {
+            return buildCompareMetrics(this.compareBaseKpis, this.compareOpponentKpis);
+        },
+        compareRadarMetrics() {
+            return buildRadarMetrics(this.compareBaseKpis);
+        },
+        compareRadarComparisons() {
+            if (!this.comparePlayer || !this.compareOpponentKpis.length) return [];
+            const values = this.compareOpponentKpis.reduce((acc, metric) => {
+                acc[metric.key] = metric.value;
+                return acc;
+            }, {});
+            return [{
+                key: 'compare_player',
+                label: this.comparePlayer?.nickname || 'Vertailupelaaja',
+                color: '#22d3ee',
+                values
+            }];
+        },
+        compareSelectedTotalsSections() {
+            if (!this.compareSelectedTotals) return [];
+            return buildSideBySideSections(this.selectedDivisionTotals, this.compareSelectedTotals);
+        },
+        compareAllTimeTotalsSections() {
+            if (!this.compareAllTimeTotals) return [];
+            return buildSideBySideSections(this.allTimeTotals, this.compareAllTimeTotals);
+        },
+        compareMapRows() {
+            const baseRows = (this.mapStats || []).map(normalizeMapStatForCompare);
+            const compareRows = (this.compareMapStatsRaw || []).map(normalizeMapStatForCompare);
+            return buildMapCompareRows(baseRows, compareRows).map(row => {
+                const sourceEntry = row.base?.raw || row.compare?.raw || null;
+                const logo = this.resolveCompareMapImage(sourceEntry);
+                return {
+                    ...row,
+                    logo
+                };
+            });
+        },
+        activeCompareTotalsTitle() {
+            return this.compareScope === 'all'
+                ? 'All-time · kaikki statsit'
+                : 'Valittu kausi · kaikki statsit';
+        },
+        activeCompareTotalsSections() {
+            return this.compareScope === 'all'
+                ? this.compareAllTimeTotalsSections
+                : this.compareSelectedTotalsSections;
+        },
+        activeCompareTotalsEmptyMessage() {
+            if (this.compareScope === 'all') {
+                return 'Vertailupelaajalla ei all-time dataa.';
+            }
+            return 'Vertailupelaajalla ei dataa valitulle kaudelle/divisioonalle.';
         },
         trendMetricOptions() {
             return TREND_METRIC_OPTIONS;
@@ -1116,6 +1315,9 @@ window.PlayerView = {
                 this.loadDivisionAverages();
                 this.syncRouteBreadcrumbContext();
                 this.comparePlayer = null;
+                this.compareSeasonsRaw = [];
+                this.compareSelectedSeasonRaw = null;
+                this.compareMapStatsRaw = [];
                 this.compareMetrics = [];
             }
         },
@@ -1138,6 +1340,28 @@ window.PlayerView = {
                 this.setupTrendChartObserver();
                 this.updateTrendChartWidth();
             });
+        },
+        mapStats: {
+            immediate: true,
+            deep: true,
+            handler(newStats) {
+                const rows = Array.isArray(newStats) ? newStats : [];
+                this.compareMapImageLookup = this.buildCompareMapImageLookup(rows, this.compareMapImageLookup);
+                if (this.shouldFetchCompareMapCatalog(rows)) {
+                    this.ensureCompareMapCatalog();
+                }
+            }
+        },
+        compareMapStatsRaw: {
+            immediate: true,
+            deep: true,
+            handler(newStats) {
+                const rows = Array.isArray(newStats) ? newStats : [];
+                this.compareMapImageLookup = this.buildCompareMapImageLookup(rows, this.compareMapImageLookup);
+                if (this.shouldFetchCompareMapCatalog(rows)) {
+                    this.ensureCompareMapCatalog();
+                }
+            }
         }
     },
     methods: {
@@ -1159,6 +1383,9 @@ window.PlayerView = {
         profileAvatarSrc() {
             return this.proxyAvatar(this.profile?.avatar);
         },
+        compareAvatarSrc() {
+            return this.proxyAvatar(this.comparePlayer?.avatar);
+        },
         heroTeamAvatarSrc() {
             return this.proxyAvatar(this.heroTeamAvatar);
         },
@@ -1168,6 +1395,50 @@ window.PlayerView = {
             if (event.target.src !== fallback) {
                 event.target.src = fallback;
             }
+        },
+        mapKey(name) {
+            return window.MapImageUtils ? window.MapImageUtils.mapKey(name) : null;
+        },
+        buildCompareMapImageLookup(stats, existing = {}) {
+            return window.MapImageUtils
+                ? window.MapImageUtils.buildMapImageLookup(stats, existing)
+                : { ...(existing || {}) };
+        },
+        shouldFetchCompareMapCatalog(stats) {
+            if (this.compareMapCatalogLoaded || this.compareMapCatalogLoading) return false;
+            return window.MapImageUtils ? window.MapImageUtils.shouldFetchCatalog(stats) : false;
+        },
+        async ensureCompareMapCatalog() {
+            if (this.compareMapCatalogLoaded || this.compareMapCatalogLoading) return;
+            if (!window.apiClient || typeof window.apiClient.getMapsCatalog !== 'function') return;
+            this.compareMapCatalogLoading = true;
+            try {
+                const catalog = await window.apiClient.getMapsCatalog();
+                if (Array.isArray(catalog) && catalog.length) {
+                    const lookup = { ...(this.compareMapImageLookup || {}) };
+                    catalog.forEach(item => {
+                        const key = this.mapKey(item?.map_id || item?.pretty_name || item?.map_name || item?.name);
+                        const img = item?.image_sm || item?.image_lg || item?.image;
+                        if (key && img && !lookup[key]) {
+                            lookup[key] = img;
+                        }
+                    });
+                    this.compareMapImageLookup = lookup;
+                }
+                this.compareMapCatalogLoaded = true;
+            } catch (error) {
+                console.warn('Compare map catalog fetch failed', error);
+                this.compareMapCatalogLoaded = true;
+            } finally {
+                this.compareMapCatalogLoading = false;
+            }
+        },
+        resolveCompareMapImage(entry) {
+            if (!entry || !window.MapImageUtils) return null;
+            return window.MapImageUtils.resolveMapImage(entry, {
+                mapImageLookup: this.compareMapImageLookup,
+                apiClient: window.apiClient
+            });
         },
         runInFlightLoad(group, key, taskFactory) {
             if (!group || !key || typeof taskFactory !== 'function') {
@@ -1218,6 +1489,9 @@ window.PlayerView = {
                 this.compareVisible = false;
                 this.compareMetrics = [];
                 this.comparePlayer = null;
+                this.compareSeasonsRaw = [];
+                this.compareSelectedSeasonRaw = null;
+                this.compareMapStatsRaw = [];
                 try {
                     await this.playerStore.fetchBundle(this.playerId, null, { force: true });
                     const defaults = this.seasonOptions;
@@ -1332,11 +1606,21 @@ window.PlayerView = {
         handleCompareOpen() {
             this.compareVisible = true;
             this.compareError = null;
-            this.comparePlayer = null;
-            this.compareMetrics = [];
+            if (!this.comparePlayer) {
+                this.compareMetrics = [];
+            }
         },
         handleCompareClose() {
             this.compareVisible = false;
+        },
+        clearCompare() {
+            this.compareVisible = false;
+            this.compareError = null;
+            this.comparePlayer = null;
+            this.compareSeasonsRaw = [];
+            this.compareSelectedSeasonRaw = null;
+            this.compareMapStatsRaw = [];
+            this.compareMetrics = [];
         },
         async handleCompareSubmit(candidateId) {
             if (!candidateId || !this.playerStore) return;
@@ -1345,21 +1629,106 @@ window.PlayerView = {
             this.comparePlayer = null;
             this.compareMetrics = [];
             try {
-                const bundle = await this.playerStore.fetchBundle(candidateId, this.selectedSeasonId || null, { force: true });
+                const bundle = await this.playerStore.fetchBundle(candidateId, null, { force: true });
                 const profile = bundle?.player || null;
                 const seasons = Array.isArray(bundle?.seasons) ? bundle.seasons : [];
                 const seasonMatch = (seasons || []).find(
                     item => String(item?.championship_id || item?.championshipId || '') === String(this.selectedSeasonId || '')
-                ) || seasons?.[0];
-                const compareKpis = buildKpis(seasonMatch ? aggregateSeasons([normalizeSeasonRow(seasonMatch)]) : null);
+                );
+                const normalizedSeasons = (seasons || []).map(normalizeSeasonRow);
+                const selectedSeasonNum = toNumber(this.currentSeasonOption?.season ?? this.selectedSeasonStats?.season, null);
+                const selectedPhaseFlag = Boolean(this.currentSeasonOption?.isPlayoffs ?? this.selectedSeasonStats?.is_playoffs ?? false);
+                const seasonRowsSameSeason = Number.isFinite(selectedSeasonNum)
+                    ? normalizedSeasons.filter(item => toNumber(item?.season, null) === selectedSeasonNum)
+                    : [];
+                const seasonRowsSamePhase = seasonRowsSameSeason.filter(item => Boolean(item?.is_playoffs) === selectedPhaseFlag);
+                const exactSeasonRow = seasonMatch ? normalizeSeasonRow(seasonMatch) : null;
+                const selectedScopeRows = exactSeasonRow
+                    ? [exactSeasonRow]
+                    : (seasonRowsSamePhase.length ? seasonRowsSamePhase : seasonRowsSameSeason);
+                const selectedScope = this.compareScope === 'selected';
+                const baseStats = selectedScope
+                    ? (this.selectedSeasonStats ? aggregateSeasons([normalizeSeasonRow(this.selectedSeasonStats)]) : null)
+                    : this.allTimeTotals;
+                const compareStats = selectedScope
+                    ? (selectedScopeRows.length ? aggregateSeasons(selectedScopeRows) : null)
+                    : aggregateSeasons(normalizedSeasons);
+                if (selectedScope && !compareStats) {
+                    throw new Error('Pelaajalla ei dataa valitulle kaudelle');
+                }
+                const baseKpis = buildKpis(baseStats);
+                const compareKpis = buildKpis(compareStats);
                 this.comparePlayer = profile;
-                this.compareMetrics = buildCompareMetrics(this.kpiMetrics, compareKpis);
+                this.compareSeasonsRaw = normalizedSeasons;
+                this.compareSelectedSeasonRaw = selectedScopeRows.length ? aggregateSeasons(selectedScopeRows) : null;
+
+                let compareMapStats = Array.isArray(bundle?.map_stats) ? bundle.map_stats : [];
+                const fallbackChampionshipId = (
+                    selectedScopeRows[0]?.championship_id
+                    || selectedScopeRows[0]?.championshipId
+                    || null
+                );
+                if (selectedScope && !seasonMatch && fallbackChampionshipId) {
+                    try {
+                        const seasonBundle = await this.playerStore.fetchBundle(candidateId, String(fallbackChampionshipId), { force: true });
+                        compareMapStats = Array.isArray(seasonBundle?.map_stats) ? seasonBundle.map_stats : compareMapStats;
+                    } catch (_) {
+                        // Keep existing map stats if season-specific fetch fails.
+                    }
+                }
+                this.compareMapStatsRaw = compareMapStats;
+                this.compareMetrics = buildCompareMetrics(baseKpis, compareKpis);
+                this.compareMapImageLookup = this.buildCompareMapImageLookup(
+                    [...(this.mapStats || []), ...(this.compareMapStatsRaw || [])],
+                    this.compareMapImageLookup
+                );
+                if (this.shouldFetchCompareMapCatalog([...(this.mapStats || []), ...(this.compareMapStatsRaw || [])])) {
+                    this.ensureCompareMapCatalog();
+                }
+                this.compareVisible = false;
             } catch (error) {
                 console.error('Compare player failed', error);
-                this.compareError = error?.message || 'Vertailtavaa pelaajaa ei loytynyt';
+                let message = error?.message || 'Vertailtavaa pelaajaa ei loytynyt';
+                if (typeof message === 'string' && message.trim().startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(message);
+                        if (parsed?.detail) {
+                            message = String(parsed.detail);
+                        }
+                    } catch (_) {
+                        // Keep original message when parsing fails.
+                    }
+                }
+                this.compareError = message;
             } finally {
                 this.compareLoading = false;
             }
+        },
+        handleCompareScopeChange(scope) {
+            if (scope !== 'selected' && scope !== 'all') return;
+            if (this.compareScope === scope) return;
+            this.compareScope = scope;
+            if (this.comparePlayer?.player_id || this.comparePlayer?.playerId) {
+                const currentId = this.comparePlayer?.player_id || this.comparePlayer?.playerId;
+                this.handleCompareSubmit(String(currentId));
+            }
+        },
+        formatCompareMapValue(value, decimals = 1, percent = false) {
+            const numeric = toNumber(value);
+            if (percent) return `${numeric.toFixed(decimals)} %`;
+            return numeric.toFixed(decimals);
+        },
+        mapCompareDeltaClass(base, compare) {
+            const b = toNumber(base);
+            const c = toNumber(compare);
+            if (c > b) return 'is-pos';
+            if (c < b) return 'is-neg';
+            return 'is-neutral';
+        },
+        mapComparePair(base, compare, decimals = 1, percent = false) {
+            const b = this.formatCompareMapValue(base, decimals, percent);
+            const c = this.formatCompareMapValue(compare, decimals, percent);
+            return `${b} / ${c}`;
         },
         toggleTrendMetric(metricKey) {
             const current = new Set(this.trendMetricKeys);
@@ -1576,9 +1945,147 @@ window.PlayerView = {
                                 </option>
                             </select>
                         </label>
-                        <button type="button" class="btn-link player-controls__compare" @click="handleCompareOpen">Vertaa pelaajaa</button>
+                        <button type="button" class="btn-primary" @click="handleCompareOpen">
+                            {{ comparePlayer ? 'Vaihda vertailupelaaja' : 'Vertaa pelaajaa' }}
+                        </button>
+                        <button
+                            v-if="String(playerId || '') === '5a278777-ed6d-45e9-983f-3d5a71f6a6c0'"
+                            type="button"
+                            class="btn-secondary"
+                        >
+                            Avaa 2D demot
+                        </button>
+                        <button
+                            v-if="comparePlayer"
+                            type="button"
+                            class="btn-secondary"
+                            @click="clearCompare"
+                        >
+                            Tyhjennä vertailu
+                        </button>
                     </div>
                     <p v-if="!seasonOptions.length" class="player-empty">Ei kausia saatavilla.</p>
+                </section>
+
+                <section v-if="comparePlayer" class="player-compare-workspace glass-card">
+                    <header class="player-compare-workspace__header">
+                        <div class="player-compare-workspace__identity">
+                            <img :src="compareAvatarSrc()" :alt="comparePlayer?.nickname || 'Vertailupelaaja'" loading="lazy" @error="handleAvatarFallback" />
+                            <div>
+                                <p class="player-compare-workspace__eyebrow">Vertailupelaaja</p>
+                                <h3 class="title-accent titleUnderlineCard">{{ comparePlayer?.nickname || 'Vertailupelaaja' }}</h3>
+                            </div>
+                        </div>
+                        <div class="player-compare-workspace__scope" role="group" aria-label="Vertailun aikajakso">
+                            <button
+                                type="button"
+                                class="player-compare-workspace__scope-toggle"
+                                :class="{ 'player-compare-workspace__scope-toggle--active': compareScope === 'selected' }"
+                                :aria-pressed="compareScope === 'selected' ? 'true' : 'false'"
+                                @click="handleCompareScopeChange('selected')"
+                            >Valittu kausi</button>
+                            <button
+                                type="button"
+                                class="player-compare-workspace__scope-toggle"
+                                :class="{ 'player-compare-workspace__scope-toggle--active': compareScope === 'all' }"
+                                :aria-pressed="compareScope === 'all' ? 'true' : 'false'"
+                                @click="handleCompareScopeChange('all')"
+                            >All-time</button>
+                        </div>
+                    </header>
+
+                    <div class="player-compare-kpi-grid">
+                        <article class="player-compare-kpi-card">
+                            <h4 class="title-accent titleUnderlineCard">KPI-vertailu</h4>
+                            <div class="player-compare-kpi-table">
+                                <div class="player-compare-kpi-row player-compare-kpi-row--head">
+                                    <span>Mittari</span>
+                                    <span>{{ profile?.nickname || 'Pelaaja' }}</span>
+                                    <span>{{ comparePlayer?.nickname || 'Vertailu' }}</span>
+                                    <span>Erotus</span>
+                                </div>
+                                <div v-for="metric in comparePanelRows" :key="'panel-' + metric.key" class="player-compare-kpi-row">
+                                    <span>{{ metric.label }}</span>
+                                    <strong>{{ metric.format(metric.base) }}</strong>
+                                    <strong>{{ metric.compare == null ? '–' : metric.format(metric.compare) }}</strong>
+                                    <strong
+                                        :class="metric.compare == null ? 'is-neutral' : (metric.compare > metric.base ? 'is-pos' : metric.compare < metric.base ? 'is-neg' : 'is-neutral')"
+                                    >
+                                        {{ metric.compare == null ? '–' : (metric.compare > metric.base ? '+' : metric.compare < metric.base ? '-' : '±') + metric.format(Math.abs(metric.compare - metric.base)) }}
+                                    </strong>
+                                </div>
+                            </div>
+                        </article>
+                        <article class="player-compare-kpi-card player-compare-kpi-card--radar">
+                            <h4 class="title-accent titleUnderlineCard">Pelityylin profiili</h4>
+                            <radar-chart
+                                v-if="compareRadarMetrics.length"
+                                :metrics="compareRadarMetrics"
+                                :comparisons="compareRadarComparisons"
+                            ></radar-chart>
+                            <p v-else class="player-empty">Ei riittavia mittareita.</p>
+                        </article>
+                    </div>
+
+                    <div class="player-compare-totals-grid">
+                        <article class="player-compare-totals-card">
+                            <h4 class="player-compare-totals-title title-accent titleUnderlineCard">{{ activeCompareTotalsTitle }}</h4>
+                            <p v-if="!activeCompareTotalsSections.length" class="player-empty">{{ activeCompareTotalsEmptyMessage }}</p>
+                            <div v-else class="player-totals-sections-grid">
+                                <div class="player-totals-section-card" v-for="section in activeCompareTotalsSections" :key="'cmp-active-' + section.key">
+                                    <h4>{{ section.title }}</h4>
+                                    <div class="player-totals-compare-table__head">
+                                        <span>Tilasto</span>
+                                        <span>{{ profile?.nickname || 'Pelaaja' }}</span>
+                                        <span>{{ comparePlayer?.nickname || 'Vertailu' }}</span>
+                                    </div>
+                                    <div class="player-totals-rows">
+                                        <div class="player-totals-row player-totals-row--compare" v-for="row in section.rows" :key="'cmp-active-' + section.key + '-' + row.label">
+                                            <span>{{ row.label }}</span>
+                                            <strong>{{ row.base }}</strong>
+                                            <strong>{{ row.compare }}</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="player-compare-totals-card player-compare-maps-card">
+                            <h4 class="player-compare-totals-title title-accent titleUnderlineCard">Karttakohtainen vertailu</h4>
+                            <p v-if="!compareMapRows.length" class="player-empty">Karttakohtaista vertailudataa ei saatavilla valitulle kaudelle.</p>
+                            <div v-else class="player-compare-maps-table">
+                                <div class="player-compare-maps-row player-compare-maps-row--head">
+                                    <span class="align-left">Kartta</span>
+                                    <span class="align-right">Maps</span>
+                                    <span class="align-right">K/D</span>
+                                    <span class="align-right">ADR</span>
+                                    <span class="align-right">K/R</span>
+                                    <span class="align-right">HS%</span>
+                                </div>
+                                <div v-for="row in compareMapRows" :key="'cmp-map-' + row.key" class="player-compare-maps-row player-compare-maps-row--data">
+                                    <div class="player-compare-maps-name">
+                                        <img v-if="row.logo" :src="row.logo" :alt="row.map_name" loading="lazy" />
+                                        <span>{{ row.map_name }}</span>
+                                    </div>
+                                    <div class="player-compare-maps-stat" :class="mapCompareDeltaClass(row.maps_played_base, row.maps_played_compare)">
+                                        {{ mapComparePair(row.maps_played_base, row.maps_played_compare, 0, false) }}
+                                    </div>
+                                    <div class="player-compare-maps-stat" :class="mapCompareDeltaClass(row.kd_base, row.kd_compare)">
+                                        {{ mapComparePair(row.kd_base, row.kd_compare, 2, false) }}
+                                    </div>
+                                    <div class="player-compare-maps-stat" :class="mapCompareDeltaClass(row.adr_base, row.adr_compare)">
+                                        {{ mapComparePair(row.adr_base, row.adr_compare, 1, false) }}
+                                    </div>
+                                    <div class="player-compare-maps-stat" :class="mapCompareDeltaClass(row.kr_base, row.kr_compare)">
+                                        {{ mapComparePair(row.kr_base, row.kr_compare, 2, false) }}
+                                    </div>
+                                    <div class="player-compare-maps-stat" :class="mapCompareDeltaClass(row.hs_pct_base, row.hs_pct_compare)">
+                                        {{ mapComparePair(row.hs_pct_base, row.hs_pct_compare, 1, true) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
                 </section>
 
                 <section class="player-kpis">
@@ -1904,6 +2411,9 @@ window.PlayerView = {
                 <player-compare-modal
                     :visible="compareVisible"
                     :base-player="profile"
+                    :base-player-id="playerId"
+                    :season="currentSeasonOption?.season || null"
+                    :division="currentSeasonOption?.division || null"
                     :compare-player="comparePlayer"
                     :metrics="compareMetrics"
                     :loading="compareLoading"

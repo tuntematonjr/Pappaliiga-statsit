@@ -32,6 +32,17 @@ async def fetch_player(player_id: str) -> dict[str, Any]:
                 """,
                 {"player_id": player_id},
             )
+            if not rows:
+                rows = await query_async(
+                    """
+                    SELECT player_id, nickname, avatar, faceit_url
+                    FROM players
+                    WHERE LOWER(nickname) = LOWER(:nickname)
+                    ORDER BY player_id ASC
+                    LIMIT 1
+                    """,
+                    {"nickname": player_id},
+                )
         except Exception:
             # Older schemas may not have all optional columns yet.
             rows = await query_async(
@@ -42,6 +53,17 @@ async def fetch_player(player_id: str) -> dict[str, Any]:
                 """,
                 {"player_id": player_id},
             )
+            if not rows:
+                rows = await query_async(
+                    """
+                    SELECT player_id, nickname
+                    FROM players
+                    WHERE LOWER(nickname) = LOWER(:nickname)
+                    ORDER BY player_id ASC
+                    LIMIT 1
+                    """,
+                    {"nickname": player_id},
+                )
         if not rows:
             raise NotFoundError(f"Player '{player_id}' not found")
         player = dict(rows[0])

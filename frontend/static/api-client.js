@@ -673,6 +673,9 @@
                 throw error;
             }
         }
+        if (candidates.length === 1 && lastError) {
+            throw lastError;
+        }
         const error = new ApiEndpointNotFound('API endpoints not found', { paths: tried });
         error.paths = tried;
         if (lastError) {
