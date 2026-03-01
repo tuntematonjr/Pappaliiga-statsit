@@ -250,6 +250,7 @@ class SyncEventQueue:
                         job.target_id,
                         overrides=self._overrides,
                         validate_avatars=self._validate_avatars,
+                        require_complete_played_maps=True,
                     )
                     if not championship_id:
                         raise RuntimeError("match_sync_not_ready")

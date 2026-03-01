@@ -453,7 +453,7 @@ def _extract_map_rows_from_details(
     faction1 = safe_int(score.get("faction1"))
     faction2 = safe_int(score.get("faction2"))
     if faction1 is not None and faction2 is not None:
-        total_maps = max(faction1, faction2)
+        total_maps = faction1 + faction2
         if total_maps > 0:
             winner = _normalize_team_ref(res.get("winner") or res.get("winner_team_id"), team1_id, team2_id)
             s1, s2 = (13, 0) if winner == team1_id else (0, 13)
@@ -469,6 +469,21 @@ def _extract_map_rows_from_details(
                     }
                 )
     return rows
+
+
+def _expected_played_maps_from_details(details: Dict[str, Any] | None) -> Optional[int]:
+    if not isinstance(details, dict):
+        return None
+    results = details.get("results") or {}
+    score = results.get("score") or {}
+    faction1 = safe_int(score.get("faction1"), None)
+    faction2 = safe_int(score.get("faction2"), None)
+    if faction1 is None or faction2 is None:
+        return None
+    total_maps = faction1 + faction2
+    if total_maps <= 0:
+        return None
+    return total_maps
 
 
 def _extract_player_rows(
@@ -909,6 +924,7 @@ async def sync_match_async(
     *,
     is_playoffs: bool,
     banned_lookup: Dict[str, Dict[str, Any]],
+    require_complete_played_maps: bool = False,
     db_semaphore: asyncio.Semaphore | None = None,
     diagnostics: SyncDiagnostics | None = None,
 ) -> NormalisedMatch:
@@ -952,6 +968,18 @@ async def sync_match_async(
     normalise_start = time.perf_counter()
     normalised = _build_normalised_match(ctx, details, stats, votes)
     normalise_elapsed = time.perf_counter() - normalise_start
+
+    if require_complete_played_maps:
+        expected_maps = _expected_played_maps_from_details(details)
+        if expected_maps is not None:
+            map_count = len(normalised.map_rows)
+            status = str(normalised.match_row.get("status") or "").lower()
+            finished_at = normalize_finished_at(normalised.match_row.get("finished_at"))
+            is_played = bool(finished_at) or status in {"finished", "closed", "over", "completed"}
+            if is_played and map_count < expected_maps:
+                raise RuntimeError(
+                    f"match_maps_incomplete: expected={expected_maps} got={map_count} match_id={match_id}"
+                )
 
     current_task = asyncio.current_task()
     if current_task:
@@ -1169,6 +1197,7 @@ async def sync_match_async(
                             ctx.season,
                             ctx.division_num,
                             normalised.map_rows,
+                            allow_shrink=not match_is_played,
                             conn=core_conn,
                             label=f"match:{match_id}:maps",
                         )
@@ -1740,6 +1769,7 @@ async def update_single_match_async(
     *,
     overrides: Mapping[str, dict[str, List[dict[str, str]]]] | None = None,
     validate_avatars: bool = False,
+    require_complete_played_maps: bool = False,
     diagnostics: SyncDiagnostics | None = None,
 ) -> Optional[str]:
     division = _get_division_by_championship_id(match_id)
@@ -1822,6 +1852,7 @@ async def update_single_match_async(
         match_id,
         is_playoffs=is_playoffs,
         banned_lookup=banned_lookup,
+        require_complete_played_maps=require_complete_played_maps,
         diagnostics=diagnostics,
     )
     return championship_id

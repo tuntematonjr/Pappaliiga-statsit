@@ -1762,6 +1762,7 @@ async def upsert_maps_bulk_async(
     division_num: int,
     maps: Sequence[Row],
     *,
+    allow_shrink: bool = True,
     conn: asyncmy.Connection | None = None,
     label: str = "maps",
 ) -> None:
@@ -1786,16 +1787,41 @@ async def upsert_maps_bulk_async(
         async with target_conn.cursor() as cur:
             await cur.executemany(_MAP_UPSERT_SQL, rows)
 
-            # Delete maps no longer present (round index mismatch)
-            delete_sql = """
-                DELETE FROM maps
-                WHERE match_id = %s
-                  AND round_index IS NOT NULL
-            """
-            params: list[Any] = [match_id]
-            if keep_rounds_clause:
-                delete_sql += f" AND round_index NOT IN ({keep_rounds_clause})"
-            await cur.execute(delete_sql, params)
+            existing_count = 0
+            if not allow_shrink:
+                await cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM maps
+                    WHERE match_id = %s
+                      AND round_index IS NOT NULL
+                    """,
+                    (match_id,),
+                )
+                row = await cur.fetchone()
+                existing_count = int((row or [0])[0] or 0)
+
+            incoming_count = len(set(keep_rounds))
+            should_delete_obsolete = allow_shrink or incoming_count >= existing_count
+
+            if should_delete_obsolete:
+                # Delete maps no longer present (round index mismatch)
+                delete_sql = """
+                    DELETE FROM maps
+                    WHERE match_id = %s
+                      AND round_index IS NOT NULL
+                """
+                params: list[Any] = [match_id]
+                if keep_rounds_clause:
+                    delete_sql += f" AND round_index NOT IN ({keep_rounds_clause})"
+                await cur.execute(delete_sql, params)
+            else:
+                LOGGER.warning(
+                    "Skipping map shrink for match %s: existing=%d incoming=%d",
+                    match_id,
+                    existing_count,
+                    incoming_count,
+                )
 
     if conn is not None:
         await _op(conn)
