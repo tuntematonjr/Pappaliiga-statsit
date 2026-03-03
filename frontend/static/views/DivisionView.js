@@ -371,7 +371,8 @@ window.DivisionView = {
         get MapsStats() { return window.MapsStats; },
         get SummaryStatCard() { return window.SummaryStatCard; },
         get SankariCard() { return window.SankariCard; },
-        get UpcomingMatchesList() { return window.UpcomingMatchesList; }
+        get UpcomingMatchesList() { return window.UpcomingMatchesList; },
+        get MatchExpandedDetails() { return window.MatchExpandedDetails; }
     },
     data() {
         const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
@@ -380,6 +381,19 @@ window.DivisionView = {
             divisionStore,
             upcomingStore,
             mapColumns: DIVISION_MAP_COLUMNS,
+            matchViewMode: 'upcoming',
+            divisionMatches: [],
+            divisionMatchesLoading: false,
+            divisionMatchesError: null,
+            expandedPlayedMatches: {},
+            playedMatchBundles: {},
+            playedMatchBundleLoading: {},
+            demoAvailabilityByMatch: {},
+            demoAvailabilityLoading: {},
+            playedRowsPrefetching: false,
+            playedRowsPrefetchKey: '',
+            mapCatalog: [],
+            mapCatalogLoaded: false,
             quickLinks: [
                 { id: 'upcoming', label: 'Tulevat ottelut' },
                 { id: 'summary', label: 'Tilastot' },
@@ -498,10 +512,34 @@ window.DivisionView = {
         upcomingError() {
             return this.upcomingState.error;
         },
+        playedMatches() {
+            const rows = Array.isArray(this.divisionMatches) ? this.divisionMatches : [];
+            return rows
+                .filter(match => this.isPlayedDivisionMatch(match))
+                .sort((a, b) => this.divisionMatchTimestamp(b) - this.divisionMatchTimestamp(a));
+        },
+        matchSectionLoading() {
+            return this.matchViewMode === 'played'
+                ? this.divisionMatchesLoading
+                : this.upcomingLoading;
+        },
+        matchSectionError() {
+            return this.matchViewMode === 'played'
+                ? this.divisionMatchesError
+                : this.upcomingError;
+        },
+        hasMatchSectionData() {
+            return this.matchViewMode === 'played'
+                ? this.playedMatches.length > 0
+                : this.upcomingMatches.length > 0;
+        },
+        hasAnyMatchData() {
+            return this.playedMatches.length > 0 || this.upcomingMatches.length > 0;
+        },
         quickLinksVisible() {
             return this.quickLinks.filter(link => {
                 if (link.id === 'upcoming') {
-                    return this.upcomingLoading || this.upcomingMatches.length > 0;
+                    return this.matchSectionLoading || this.divisionMatchesLoading || this.hasAnyMatchData;
                 }
                 return true;
             });
@@ -774,6 +812,23 @@ window.DivisionView = {
                 if (routeUpdated) return;
                 await this.loadDivision(id);
                 this.loadUpcoming(id);
+                this.loadDivisionMatches(id);
+            }
+        },
+        matchViewMode: {
+            immediate: false,
+            handler(mode) {
+                if (mode === 'played') {
+                    this.prefetchPlayedRowData();
+                }
+            }
+        },
+        divisionMatches: {
+            deep: false,
+            handler() {
+                if (this.matchViewMode === 'played') {
+                    this.prefetchPlayedRowData();
+                }
             }
         },
         teamChipItems: {
@@ -821,10 +876,320 @@ window.DivisionView = {
                 console.error('[DivisionView] upcoming matches fetch failed', error);
             }
         },
+        async loadDivisionMatches(id, options = {}) {
+            if (!id || !window.apiClient || typeof window.apiClient.getDivisionMatches !== 'function') {
+                this.divisionMatches = [];
+                this.divisionMatchesError = null;
+                this.divisionMatchesLoading = false;
+                return;
+            }
+            this.divisionMatchesLoading = true;
+            this.divisionMatchesError = null;
+            try {
+                const rows = await window.apiClient.getDivisionMatches(id, { force: options.force === true });
+                this.divisionMatches = Array.isArray(rows) ? rows : [];
+                if (this.matchViewMode === 'played') {
+                    this.prefetchPlayedRowData();
+                }
+            } catch (error) {
+                this.divisionMatchesError = error?.message || 'Otteluiden lataus epäonnistui';
+                this.divisionMatches = [];
+            } finally {
+                this.divisionMatchesLoading = false;
+            }
+        },
         refreshAll() {
             if (!this.championshipId) return;
             this.loadDivision(this.championshipId, { force: true });
             this.loadUpcoming(this.championshipId, { force: true });
+            this.loadDivisionMatches(this.championshipId, { force: true });
+        },
+        setMatchViewMode(mode) {
+            if (mode !== 'upcoming' && mode !== 'played') return;
+            this.matchViewMode = mode;
+            if (mode === 'played') {
+                this.prefetchPlayedRowData();
+            }
+        },
+        async prefetchPlayedRowData() {
+            const rows = Array.isArray(this.playedMatches) ? this.playedMatches : [];
+            const key = rows.map(match => String(match?.match_id || match?.matchId || '')).filter(Boolean).join('|');
+            if (!rows.length || !key) return;
+            if (this.playedRowsPrefetching) return;
+            if (this.playedRowsPrefetchKey === key) return;
+
+            this.playedRowsPrefetching = true;
+            this.playedRowsPrefetchKey = key;
+
+            const queue = [...rows];
+            const workers = Array.from({ length: Math.min(6, queue.length) }, async () => {
+                while (queue.length) {
+                    const next = queue.shift();
+                    if (!next) continue;
+                    await this.ensureMatchBundle(next);
+                }
+            });
+
+            try {
+                await Promise.allSettled(workers);
+            } finally {
+                this.playedRowsPrefetching = false;
+            }
+        },
+        isPlayedDivisionMatch(match) {
+            if (!match || typeof match !== 'object') return false;
+            const score1 = this.toNumber(match.team1_score ?? match.team1Score, 0);
+            const score2 = this.toNumber(match.team2_score ?? match.team2Score, 0);
+            const finishedAt = this.toNumber(match.finished_at ?? match.finishedAt, 0);
+            return !!match.is_forfeit || finishedAt > 0 || (score1 + score2) > 0;
+        },
+        playedRowRoundDiff(match) {
+            const bundle = this.playedMatchBundles[String(match?.match_id || match?.matchId)] || null;
+            const maps = Array.isArray(bundle?.details?.maps) ? bundle.details.maps : [];
+            if (!maps.length) return null;
+            const diff = maps.reduce((sum, m) => {
+                const left = this.toNumber(m?.score_team1, 0);
+                const right = this.toNumber(m?.score_team2, 0);
+                return sum + (left - right);
+            }, 0);
+            return diff;
+        },
+        playedRowTeamAvatar(match, side = 'team1') {
+            const bundle = this.playedMatchBundles[String(match?.match_id || match?.matchId)] || null;
+            const details = bundle?.details?.match || {};
+            const suffix = side === 'team2' ? '2' : '1';
+
+            const direct = match?.[`team${suffix}_avatar`] || match?.[`team${suffix}Avatar`]
+                || details?.[`team${suffix}_avatar`] || details?.[`team${suffix}Avatar`] || null;
+            if (direct) return direct;
+
+            const teamId = match?.[`team${suffix}_id`] || match?.[`team${suffix}Id`]
+                || details?.[`team${suffix}_id`] || details?.[`team${suffix}Id`] || null;
+            const teamName = match?.[`team${suffix}_name`] || match?.[`team${suffix}Name`]
+                || details?.[`team${suffix}_name`] || details?.[`team${suffix}Name`] || null;
+            const found = this.findTeam(teamId, teamName);
+            return found?.avatar || found?.logo || found?.team_logo || found?.raw?.avatar || found?.raw?.logo || null;
+        },
+        playedRowRoundDiffLead(match) {
+            const diff = this.playedRowRoundDiff(match);
+            if (diff === null) return null;
+
+            const bundle = this.playedMatchBundles[String(match?.match_id || match?.matchId)] || null;
+            const details = bundle?.details?.match || {};
+
+            const team1Name = match?.team1_name || match?.team1Name || 'Joukkue 1';
+            const team2Name = match?.team2_name || match?.team2Name || 'Joukkue 2';
+            const team1Id = match?.team1_id || match?.team1Id || details?.team1_id || details?.team1Id || null;
+            const team2Id = match?.team2_id || match?.team2Id || details?.team2_id || details?.team2Id || null;
+            const team1Avatar = this.playedRowTeamAvatar(match, 'team1');
+            const team2Avatar = this.playedRowTeamAvatar(match, 'team2');
+
+            if (diff > 0) {
+                return { teamId: team1Id, teamName: team1Name, teamAvatar: team1Avatar, value: Math.abs(diff) };
+            }
+            if (diff < 0) {
+                return { teamId: team2Id, teamName: team2Name, teamAvatar: team2Avatar, value: Math.abs(diff) };
+            }
+            return { teamId: null, teamName: 'Tasapeli', teamAvatar: null, value: 0 };
+        },
+        beautifyMapName(raw) {
+            if (!raw) return 'Kartta';
+            const value = String(raw).trim();
+            const lower = value.toLowerCase();
+            if (lower === 'forfeit') return 'Forfeit';
+            const core = lower.startsWith('de_') ? lower.slice(3) : lower;
+            const parts = core.split(/[_-]/).filter(Boolean);
+            if (!parts.length) return value;
+            return parts.map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+        },
+        playedRowMaps(match) {
+            const bundle = this.playedMatchBundles[String(match?.match_id || match?.matchId)] || null;
+            const maps = Array.isArray(bundle?.details?.maps) ? bundle.details.maps : [];
+            return maps.map((map, idx) => ({
+                id: `${match?.match_id || match?.matchId || 'match'}-map-${idx}`,
+                mapName: this.beautifyMapName(map?.map_name || map?.map || 'Kartta'),
+                score1: this.toNumber(map?.score_team1, 0),
+                score2: this.toNumber(map?.score_team2, 0)
+            }));
+        },
+        isPlayedMatchExpanded(matchId) {
+            if (!matchId) return false;
+            return !!this.expandedPlayedMatches[String(matchId)];
+        },
+        async togglePlayedMatchExpand(match) {
+            const matchId = String(match?.match_id || match?.matchId || '');
+            if (!matchId) return;
+            const next = !this.expandedPlayedMatches[matchId];
+            this.expandedPlayedMatches = { ...this.expandedPlayedMatches, [matchId]: next };
+            if (next) {
+                await this.ensureMatchBundle(match);
+                this.ensureMapCatalog();
+            }
+        },
+        playedMatchSummary(match) {
+            const bundle = this.playedMatchBundles[String(match?.match_id || match?.matchId)] || null;
+            const details = bundle?.details?.match || {};
+            const team1Id = match?.team1_id || match?.team1Id || details?.team1_id || details?.team1Id || null;
+            const team2Id = match?.team2_id || match?.team2Id || details?.team2_id || details?.team2Id || null;
+            const team1Name = match?.team1_name || match?.team1Name || details?.team1_name || details?.team1Name || 'Joukkue 1';
+            const team2Name = match?.team2_name || match?.team2Name || details?.team2_name || details?.team2Name || 'Joukkue 2';
+            return {
+                matchId: String(match?.match_id || match?.matchId || details?.match_id || details?.matchId || ''),
+                ts: this.toNumber(details?.ts, this.toNumber(match?.finished_at || match?.finishedAt, 0)) || 0,
+                bestOf: this.toNumber(match?.best_of ?? match?.bestOf ?? details?.best_of ?? details?.bestOf, 0),
+                teamScore: this.toNumber(match?.team1_score ?? match?.team1Score, 0),
+                oppScore: this.toNumber(match?.team2_score ?? match?.team2Score, 0),
+                team1Name,
+                team2Name,
+                opponentName: team2Name,
+                me: { team_id: team1Id, team_name: team1Name },
+                opponent: { team_id: team2Id, team_name: team2Name },
+                maps: Array.isArray(bundle?.details?.maps) ? bundle.details.maps : [],
+                isForfeit: !!match?.is_forfeit
+            };
+        },
+        playedMatchDetails(match) {
+            const bundle = this.playedMatchBundles[String(match?.match_id || match?.matchId)] || null;
+            const summary = this.playedMatchSummary(match);
+            const details = bundle?.details?.match || {};
+            return {
+                ...details,
+                ...summary,
+                team1_id: summary.me?.team_id,
+                team2_id: summary.opponent?.team_id,
+                team1_name: summary.team1Name,
+                team2_name: summary.team2Name,
+                maps: Array.isArray(bundle?.details?.maps) ? bundle.details.maps : []
+            };
+        },
+        playedMatchVetoEntry(match) {
+            const bundle = this.playedMatchBundles[String(match?.match_id || match?.matchId)] || null;
+            return bundle?.details?.veto_entry || null;
+        },
+        playedMatchPlayerStats(match) {
+            const bundle = this.playedMatchBundles[String(match?.match_id || match?.matchId)] || null;
+            return Array.isArray(bundle?.playerStats) ? bundle.playerStats : [];
+        },
+        playedMatchBundleBusy(matchId) {
+            if (!matchId) return false;
+            return !!this.playedMatchBundleLoading[String(matchId)];
+        },
+        availableDemoLinks(match) {
+            const utils = window.MatchLinksUtils;
+            if (!utils || typeof utils.extractAvailableDemoLinks !== 'function') return [];
+            return utils.extractAvailableDemoLinks(this.demoAvailabilityByMatch, match);
+        },
+        isDemoAvailabilityLoading(match) {
+            const matchId = String(match?.match_id || match?.matchId || '');
+            if (!matchId) return false;
+            return !!this.demoAvailabilityLoading[matchId];
+        },
+        async ensureDemoAvailabilityForMatch(match, mapsCount = 0) {
+            const utils = window.MatchLinksUtils;
+            const matchId = String(match?.match_id || match?.matchId || '');
+            if (!matchId || !this.championshipId || !window.apiClient || typeof window.apiClient.getMatchDemoExists !== 'function') {
+                return;
+            }
+            const targetCount = Math.max(0, Number(mapsCount) || 0);
+            if (!targetCount) return;
+
+            const existing = this.demoAvailabilityByMatch[matchId] || {};
+            const existingKeys = Object.keys(existing);
+            if (existingKeys.length >= targetCount) {
+                return;
+            }
+            if (this.demoAvailabilityLoading[matchId]) {
+                return;
+            }
+
+            this.demoAvailabilityLoading = {
+                ...this.demoAvailabilityLoading,
+                [matchId]: true
+            };
+
+            try {
+                const next = (utils && typeof utils.fetchDemoAvailabilityForMatch === 'function')
+                    ? await utils.fetchDemoAvailabilityForMatch({
+                        apiClient: window.apiClient,
+                        championshipId: this.championshipId,
+                        matchId,
+                        mapsCount: targetCount,
+                        existingByIndex: existing,
+                        persistCache: false
+                    })
+                    : { ...existing };
+                this.demoAvailabilityByMatch = {
+                    ...this.demoAvailabilityByMatch,
+                    [matchId]: next
+                };
+            } finally {
+                this.demoAvailabilityLoading = {
+                    ...this.demoAvailabilityLoading,
+                    [matchId]: false
+                };
+            }
+        },
+        async ensureMatchBundle(match) {
+            const matchId = String(match?.match_id || match?.matchId || '');
+            if (!matchId || !window.apiClient || typeof window.apiClient.getMatchBundle !== 'function') return;
+            if (this.playedMatchBundles[matchId]) return;
+            if (this.playedMatchBundleLoading[matchId]) return;
+            this.playedMatchBundleLoading = { ...this.playedMatchBundleLoading, [matchId]: true };
+            try {
+                const payload = await window.apiClient.getMatchBundle(matchId);
+                this.playedMatchBundles = {
+                    ...this.playedMatchBundles,
+                    [matchId]: payload || { details: {}, playerStats: [] }
+                };
+                const mapsCount = Array.isArray(payload?.details?.maps) ? payload.details.maps.length : 0;
+                this.ensureDemoAvailabilityForMatch(match, mapsCount);
+            } catch (error) {
+                this.playedMatchBundles = {
+                    ...this.playedMatchBundles,
+                    [matchId]: { details: {}, playerStats: [] }
+                };
+            } finally {
+                this.playedMatchBundleLoading = { ...this.playedMatchBundleLoading, [matchId]: false };
+            }
+        },
+        async ensureMapCatalog() {
+            if (this.mapCatalogLoaded || !window.apiClient || typeof window.apiClient.getMapsCatalog !== 'function') return;
+            try {
+                const catalog = await window.apiClient.getMapsCatalog();
+                this.mapCatalog = Array.isArray(catalog) ? catalog : [];
+            } catch (_error) {
+                this.mapCatalog = [];
+            } finally {
+                this.mapCatalogLoaded = true;
+            }
+        },
+        divisionMatchTimestamp(match) {
+            if (!match || typeof match !== 'object') return 0;
+            const finished = this.toNumber(match.finished_at ?? match.finishedAt, 0);
+            if (finished > 0) return finished * 1000;
+            return 0;
+        },
+        formatDivisionMatchDate(match) {
+            const ts = this.divisionMatchTimestamp(match);
+            if (!ts) return '—';
+            const date = new Date(ts);
+            return date.toLocaleDateString('fi-FI', { year: 'numeric', month: 'short', day: 'numeric' });
+        },
+        divisionMatchFaceitUrl(match) {
+            const utils = window.MatchLinksUtils;
+            if (!utils || typeof utils.getFaceitRoomUrl !== 'function') return '';
+            const matchId = match?.match_id ?? match?.matchId;
+            return utils.getFaceitRoomUrl(matchId);
+        },
+        divisionTeamRoute(teamId) {
+            if (!teamId || !this.championshipId) return null;
+            return {
+                name: 'team-detail',
+                params: {
+                    championshipId: String(this.championshipId),
+                    teamId: String(teamId)
+                }
+            };
         },
         scrollToSection(id) {
             const el = document.getElementById(id);
@@ -1256,15 +1621,181 @@ window.DivisionView = {
             ></error-message>
 
             <template v-else>
-                <section id="upcoming" class="division-section" v-if="upcomingLoading || upcomingMatches.length">
-                    <upcoming-matches-list
-                        class="division-surface"
-                        :items="upcomingMatches"
-                        :loading="upcomingLoading"
-                        :error="upcomingError"
-                        title="Tulevat ottelut"
-                        empty-message="Ei tulevia otteluita tälle divisioonalle."
-                    ></upcoming-matches-list>
+                <section id="upcoming" class="division-section" v-if="matchSectionLoading || divisionMatchesLoading || hasAnyMatchData">
+                    <div class="division-surface glass-card division-section-card">
+                        <header class="division-section__heading division-section__heading--matches">
+                            <h2 class="title-accent titleUnderlineSection">Ottelut</h2>
+                            <div class="trend-toggles trend-toggles--mode">
+                                <button
+                                    type="button"
+                                    class="trend-toggle"
+                                    :class="{ 'trend-toggle--active': matchViewMode === 'upcoming' }"
+                                    @click="setMatchViewMode('upcoming')"
+                                >Tulevat</button>
+                                <button
+                                    type="button"
+                                    class="trend-toggle"
+                                    :class="{ 'trend-toggle--active': matchViewMode === 'played' }"
+                                    @click="setMatchViewMode('played')"
+                                >Pelatut</button>
+                            </div>
+                        </header>
+
+                        <upcoming-matches-list
+                            v-if="matchViewMode === 'upcoming'"
+                            :items="upcomingMatches"
+                            :loading="upcomingLoading"
+                            :error="upcomingError"
+                            title="Tulevat ottelut"
+                            empty-message="Ei tulevia otteluita tälle divisioonalle."
+                        ></upcoming-matches-list>
+
+                        <div v-else>
+                            <loading-spinner
+                                v-if="divisionMatchesLoading"
+                                message="Pelattuja otteluita ladataan..."
+                            ></loading-spinner>
+                            <error-message
+                                v-else-if="divisionMatchesError"
+                                :message="divisionMatchesError"
+                                @retry="loadDivisionMatches(championshipId, { force: true })"
+                            ></error-message>
+                            <div v-else-if="playedMatches.length" class="table-wrapper">
+                                <table class="data-table matches-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="match-expand-cell"></th>
+                                            <th>Pvm</th>
+                                            <th>Ottelu</th>
+                                            <th>BO</th>
+                                            <th>Tulos</th>
+                                            <th>Eräero</th>
+                                            <th>Maps</th>
+                                            <th>Linkki</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template v-for="match in playedMatches" :key="match.match_id || match.matchId">
+                                        <tr>
+                                            <td class="match-expand-cell">
+                                                <button
+                                                    type="button"
+                                                    class="expand-button"
+                                                    :class="{ 'expand-button--open': isPlayedMatchExpanded(match.match_id || match.matchId) }"
+                                                    @click.stop="togglePlayedMatchExpand(match)"
+                                                >
+                                                    <span class="chevron">›</span>
+                                                </button>
+                                            </td>
+                                            <td>{{ formatDivisionMatchDate(match) }}</td>
+                                            <td>
+                                                <span class="eraro-lead-wrap">
+                                                    <img
+                                                        v-if="playedRowTeamAvatar(match, 'team1')"
+                                                        :src="resolveAvatar(playedRowTeamAvatar(match, 'team1'))"
+                                                        :alt="match.team1_name || match.team1Name || 'Joukkue 1'"
+                                                        class="eraro-lead-logo"
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
+                                                    <router-link
+                                                        v-if="divisionTeamRoute(match.team1_id || match.team1Id)"
+                                                        :to="divisionTeamRoute(match.team1_id || match.team1Id)"
+                                                        class="eraro-lead-team"
+                                                    >{{ match.team1_name || match.team1Name || 'Joukkue 1' }}</router-link>
+                                                    <span v-else class="eraro-lead-team">{{ match.team1_name || match.team1Name || 'Joukkue 1' }}</span>
+                                                    <span class="cell-muted">vs</span>
+                                                    <img
+                                                        v-if="playedRowTeamAvatar(match, 'team2')"
+                                                        :src="resolveAvatar(playedRowTeamAvatar(match, 'team2'))"
+                                                        :alt="match.team2_name || match.team2Name || 'Joukkue 2'"
+                                                        class="eraro-lead-logo"
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
+                                                    <router-link
+                                                        v-if="divisionTeamRoute(match.team2_id || match.team2Id)"
+                                                        :to="divisionTeamRoute(match.team2_id || match.team2Id)"
+                                                        class="eraro-lead-team"
+                                                    >{{ match.team2_name || match.team2Name || 'Joukkue 2' }}</router-link>
+                                                    <span v-else class="eraro-lead-team">{{ match.team2_name || match.team2Name || 'Joukkue 2' }}</span>
+                                                </span>
+                                            </td>
+                                            <td>BO{{ toNumber(match.best_of ?? match.bestOf, 0) || 2 }}</td>
+                                            <td>
+                                                <span>{{ toNumber(match.team1_score ?? match.team1Score, 0) }} - {{ toNumber(match.team2_score ?? match.team2Score, 0) }}</span>
+                                                <span v-if="match.is_forfeit" class="cell-muted"> · FF</span>
+                                            </td>
+                                            <td>
+                                                <span v-if="playedRowRoundDiffLead(match) != null" class="eraro-lead-wrap">
+                                                    <img
+                                                        v-if="playedRowRoundDiffLead(match).teamAvatar"
+                                                        :src="resolveAvatar(playedRowRoundDiffLead(match).teamAvatar)"
+                                                        :alt="playedRowRoundDiffLead(match).teamName"
+                                                        class="eraro-lead-logo"
+                                                        loading="lazy"
+                                                        decoding="async"
+                                                    />
+                                                    <router-link
+                                                        v-if="divisionTeamRoute(playedRowRoundDiffLead(match).teamId)"
+                                                        :to="divisionTeamRoute(playedRowRoundDiffLead(match).teamId)"
+                                                        class="eraro-lead-team"
+                                                    >{{ playedRowRoundDiffLead(match).teamName }}</router-link>
+                                                    <span v-else class="eraro-lead-team">{{ playedRowRoundDiffLead(match).teamName }}</span>
+                                                    <span>: </span>
+                                                    <span class="stat-positive">+{{ playedRowRoundDiffLead(match).value }}</span>
+                                                </span>
+                                                <span v-else class="cell-muted">-</span>
+                                            </td>
+                                            <td>
+                                                <div class="micro-stack" v-if="playedRowMaps(match).length">
+                                                    <span v-for="map in playedRowMaps(match)" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.score1 }}-{{ map.score2 }}</span>
+                                                </div>
+                                                <span v-else class="cell-muted">-</span>
+                                            </td>
+                                            <td>
+                                                <div class="micro-stack" v-if="divisionMatchFaceitUrl(match) || availableDemoLinks(match).length">
+                                                    <a
+                                                        v-if="divisionMatchFaceitUrl(match)"
+                                                        :href="divisionMatchFaceitUrl(match)"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        class="chip chip--link"
+                                                    >Faceit</a>
+                                                    <a
+                                                        v-for="demo in availableDemoLinks(match)"
+                                                        :key="'demo-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
+                                                        :href="demo.url"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        class="chip chip--link"
+                                                    >Demo {{ demo.demoIndex + 1 }}</a>
+                                                </div>
+                                                <span v-else-if="isDemoAvailabilityLoading(match)" class="cell-muted">Tarkistetaan…</span>
+                                                <span v-else class="cell-muted">-</span>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="isPlayedMatchExpanded(match.match_id || match.matchId)" class="match-expand-row">
+                                            <td :colspan="8">
+                                                <div class="match-expand-content">
+                                                    <match-expanded-details
+                                                        :summary="playedMatchSummary(match)"
+                                                        :details="playedMatchDetails(match)"
+                                                        :veto-entry="playedMatchVetoEntry(match)"
+                                                        :player-stats="playedMatchPlayerStats(match)"
+                                                        :map-catalog="mapCatalog"
+                                                        :loading="playedMatchBundleBusy(match.match_id || match.matchId)"
+                                                    ></match-expanded-details>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p v-else class="division-section__empty">Ei pelattuja otteluita tälle divisioonalle.</p>
+                        </div>
+                    </div>
                 </section>
 
                 <section id="summary" class="division-section">

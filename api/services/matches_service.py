@@ -27,6 +27,26 @@ def build_demo_url(championship_id: str, match_id: str, demo_index: int) -> str:
     return f"https://pappa.aukko.net/demos/{championship_id}/{match_id}_{demo_index}.zst"
 
 
+def _normalize_veto_action(status_value: Any) -> str | None:
+    raw = str(status_value or "").strip().lower()
+    if not raw:
+        return None
+    if (
+        "ban" in raw
+        or "drop" in raw
+        or "remove" in raw
+        or "eliminat" in raw
+    ):
+        return "ban"
+    if "pick" in raw or raw in {"picked", "select", "selected"}:
+        return "pick"
+    if "decider" in raw or raw == "decide":
+        return "decider"
+    if "overflow" in raw:
+        return "overflow"
+    return None
+
+
 def _build_etag(championship_id: str, revision: Any, total: int, limit: int, offset: int) -> str:
     source = f"{championship_id}:{revision}:{total}:{limit}:{offset}"
     return hashlib.md5(source.encode("utf-8")).hexdigest()
@@ -92,6 +112,8 @@ async def get_division_matches(
             SELECT
                 m.match_id,
                 m.championship_id,
+                m.best_of,
+                m.status,
                 m.finished_at,
                 m.team1_id,
                 m.team2_id,
@@ -114,6 +136,8 @@ async def get_division_matches(
             GROUP BY
                 m.match_id,
                 m.championship_id,
+                m.best_of,
+                m.status,
                 m.finished_at,
                 m.team1_id,
                 m.team2_id,
@@ -147,7 +171,10 @@ async def get_match_details(match_id: str) -> dict[str, Any]:
         SELECT
                m.match_id,
                m.championship_id,
+               m.best_of,
+               m.status,
                m.finished_at,
+               COALESCE(m.started_at, m.scheduled_at, m.configured_at, m.activity_ts, m.finished_at, 0) AS ts,
                m.team1_id,
                m.team2_id,
                m.is_forfeit,
@@ -173,17 +200,164 @@ async def get_match_details(match_id: str) -> dict[str, Any]:
 
     map_rows = await query_async(
         """
-        SELECT round_index, map_name, score_team1, score_team2, winner_team_id, is_forfeit
-        FROM maps
-        WHERE match_id = :match_id
-        ORDER BY round_index
+        WITH ps_agg AS (
+            SELECT
+                ps.match_id,
+                ps.round_index,
+                ps.team_id,
+                SUM(COALESCE(ps.kills, 0)) AS kills,
+                SUM(COALESCE(ps.deaths, 0)) AS deaths,
+                SUM(COALESCE(ps.damage, 0)) AS dmg,
+                AVG(NULLIF(ps.adr, 0)) AS adr_avg
+            FROM player_stats ps
+            WHERE ps.match_id = :match_id
+            GROUP BY ps.match_id, ps.round_index, ps.team_id
+        ),
+        picks AS (
+            SELECT
+                mv.match_id,
+                mv.map_name,
+                MAX(mv.selected_by_team_id) AS pick_team_id
+            FROM map_votes mv
+            WHERE mv.match_id = :match_id
+              AND LOWER(COALESCE(mv.status, '')) IN ('pick', 'picked')
+            GROUP BY mv.match_id, mv.map_name
+        )
+        SELECT
+            ma.round_index,
+            ma.map_name,
+            ma.score_team1,
+            ma.score_team2,
+            ma.winner_team_id,
+            ma.is_forfeit,
+            mc.image_sm,
+            mc.image_lg,
+            pk.pick_team_id,
+            COALESCE(ps1.kills, 0) AS t1_kills,
+            COALESCE(ps1.deaths, 0) AS t1_deaths,
+            COALESCE(ps1.adr_avg, 0.0) AS t1_adr,
+            COALESCE(ps1.dmg, 0) AS t1_dmg,
+            COALESCE(ps2.kills, 0) AS t2_kills,
+            COALESCE(ps2.deaths, 0) AS t2_deaths,
+            COALESCE(ps2.adr_avg, 0.0) AS t2_adr,
+            COALESCE(ps2.dmg, 0) AS t2_dmg
+        FROM maps ma
+        JOIN matches m ON m.match_id = ma.match_id
+        LEFT JOIN maps_catalog mc ON LOWER(mc.map_id) = LOWER(ma.map_name)
+        LEFT JOIN picks pk ON pk.match_id = ma.match_id AND pk.map_name = ma.map_name
+        LEFT JOIN ps_agg ps1 ON ps1.match_id = ma.match_id AND ps1.round_index = ma.round_index AND ps1.team_id = m.team1_id
+        LEFT JOIN ps_agg ps2 ON ps2.match_id = ma.match_id AND ps2.round_index = ma.round_index AND ps2.team_id = m.team2_id
+        WHERE ma.match_id = :match_id
+        ORDER BY ma.round_index
         """,
         {"match_id": match_id},
     )
 
+    veto_rows = await query_async(
+        """
+        SELECT
+            mv.vote_id,
+            mv.map_name,
+            mv.status,
+            mv.selected_by_team_id,
+            COALESCE(tc.team_name, t.name) AS selected_by_team_name
+        FROM map_votes mv
+        LEFT JOIN matches m ON m.match_id = mv.match_id
+        LEFT JOIN teams t ON t.team_id = mv.selected_by_team_id
+        LEFT JOIN team_championships tc ON tc.team_id = mv.selected_by_team_id AND tc.championship_id = m.championship_id
+        WHERE mv.match_id = :match_id
+        ORDER BY mv.vote_id ASC
+        """,
+        {"match_id": match_id},
+    )
+
+    normalized_maps: list[dict[str, Any]] = []
+    for row in map_rows:
+        t1_kills = int(float(row.get("t1_kills") or 0))
+        t1_deaths = int(float(row.get("t1_deaths") or 0))
+        t2_kills = int(float(row.get("t2_kills") or 0))
+        t2_deaths = int(float(row.get("t2_deaths") or 0))
+        t1_kd = (float(t1_kills) / t1_deaths) if t1_deaths else float(t1_kills)
+        t2_kd = (float(t2_kills) / t2_deaths) if t2_deaths else float(t2_kills)
+
+        normalized_maps.append(
+            {
+                "round_index": int(row.get("round_index") or 0),
+                "map_name": row.get("map_name"),
+                "map": row.get("map_name"),
+                "score_team1": int(float(row.get("score_team1") or 0)),
+                "score_team2": int(float(row.get("score_team2") or 0)),
+                "winner_team_id": row.get("winner_team_id"),
+                "is_forfeit": bool(row.get("is_forfeit")),
+                "image_sm": row.get("image_sm"),
+                "image_lg": row.get("image_lg"),
+                "pick_team_id": row.get("pick_team_id"),
+                "left": {
+                    "kills": t1_kills,
+                    "deaths": t1_deaths,
+                    "adr": float(row.get("t1_adr") or 0.0),
+                    "kd": float(t1_kd),
+                    "dmg": int(float(row.get("t1_dmg") or 0)),
+                },
+                "right": {
+                    "kills": t2_kills,
+                    "deaths": t2_deaths,
+                    "adr": float(row.get("t2_adr") or 0.0),
+                    "kd": float(t2_kd),
+                    "dmg": int(float(row.get("t2_dmg") or 0)),
+                },
+            }
+        )
+
+    veto_steps: list[dict[str, Any]] = []
+    step_order = 1
+    for row in veto_rows:
+        action = _normalize_veto_action(row.get("status"))
+
+        if not action:
+            continue
+
+        if action == "pick":
+            label = "Pick"
+        elif action == "ban":
+            label = "Ban"
+        elif action == "decider":
+            label = "Decider"
+        else:
+            label = "Overflow"
+
+        veto_steps.append(
+            {
+                "step": step_order,
+                "action": action,
+                "label": label,
+                "mapName": row.get("map_name") or "Kartta",
+                "teamId": row.get("selected_by_team_id"),
+                "teamName": row.get("selected_by_team_name") or "",
+            }
+        )
+        step_order += 1
+
+    best_of = int(match.get("best_of") or 0)
+    veto_entry = {
+        "matchId": match.get("match_id"),
+        "format": f"bo{best_of}" if best_of else "",
+        "steps": veto_steps,
+    }
+
     return {
         "match": match,
-        "maps": map_rows,
+        "maps": normalized_maps,
+        "veto_entry": veto_entry,
+    }
+
+
+async def get_match_bundle(match_id: str) -> dict[str, Any]:
+    details = await get_match_details(match_id)
+    player_stats = await get_match_player_stats(match_id)
+    return {
+        "details": details,
+        "player_stats": player_stats,
     }
 
 

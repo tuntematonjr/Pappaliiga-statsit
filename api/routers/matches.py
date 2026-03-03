@@ -15,6 +15,8 @@ router = APIRouter()
 class MatchSummary(CamelModel):
     match_id: str
     championship_id: str
+    best_of: Optional[int] = None
+    status: Optional[str] = None
     finished_at: Optional[int]
     team1_id: Optional[str]
     team2_id: Optional[str]
@@ -63,6 +65,11 @@ class DemoExistsResponse(CamelModel):
     exists: bool
     url: str
     status_code: Optional[int] = None
+
+
+class MatchBundleResponse(CamelModel):
+    details: dict
+    player_stats: list[dict]
 
 
 def _set_revision_headers(response: Response, *, etag: str, revision: Optional[str]) -> None:
@@ -132,4 +139,13 @@ async def get_demo_exists(
         exists=bool(payload.get("exists")),
         url=str(payload.get("url") or ""),
         status_code=payload.get("status_code"),
+    )
+
+
+@router.get("/{match_id}/bundle", response_model=MatchBundleResponse)
+async def get_match_bundle(match_id: str):
+    payload = await matches_service.get_match_bundle(match_id)
+    return MatchBundleResponse(
+        details=payload.get("details") or {},
+        player_stats=payload.get("player_stats") or [],
     )

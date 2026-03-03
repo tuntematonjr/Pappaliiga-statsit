@@ -116,6 +116,9 @@
         upcomingMatches: query => [
             `/api/matches/upcoming${query}`
         ],
+        matchBundle: matchId => [
+            `/api/matches/${matchId}/bundle`
+        ],
         matchDemoExists: query => [
             `/api/matches/demo-exists${query}`
         ]
@@ -1216,6 +1219,23 @@
                 exists: !!payload?.exists,
                 url: payload?.url || '',
                 status_code: payload?.status_code ?? null
+            };
+        }
+
+        async getMatchBundle(matchId, options = {}) {
+            if (!matchId) {
+                throw new Error('matchId is required');
+            }
+            const encMatchId = encodeURIComponent(matchId);
+            const routes = buildRouteCandidates('matchBundle', encMatchId);
+            const result = await fetchWithFallback(routes, {
+                ...options,
+                persistCache: false
+            });
+            const payload = ensureSnakeCaseDeep(result?.data ?? result ?? {});
+            return {
+                details: payload?.details || {},
+                playerStats: Array.isArray(payload?.player_stats) ? payload.player_stats : []
             };
         }
 

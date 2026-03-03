@@ -245,7 +245,7 @@ window.MatchExpandedDetails = {
                         <div class="match-map-metrics">
                             <div class="metric-row metric-row--rd">
                                 <span class="metric-label metric-label--rd">RD +/-</span>
-                                <span class="metric-value" :class="(mapScoreFor(map) - mapScoreAgainst(map)) >= 0 ? 'stat-positive' : 'stat-negative'">{{ formatSigned(mapScoreFor(map) - mapScoreAgainst(map)) }}</span>
+                                <span class="metric-value">{{ formatSigned(mapScoreFor(map) - mapScoreAgainst(map)) }}</span>
                             </div>
                             <div class="metric-grid metric-grid--compare">
                                 <div class="metric-col__title metric-col__title--left">

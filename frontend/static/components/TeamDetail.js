@@ -2498,33 +2498,17 @@ window.TeamDetail = {
             };
         },
         availableDemoLinks(match) {
-            if (!match?.matchId) return [];
-            const byMatch = this.demoAvailabilityCurrent.byMatch || {};
-            const hit = byMatch[String(match.matchId)] || {};
-            return Object.entries(hit)
-                .map(([demoIndex, payload]) => ({
-                    demoIndex: Number(demoIndex),
-                    exists: !!payload?.exists,
-                    url: payload?.url || ''
-                }))
-                .filter(item => item.exists && item.url)
-                .sort((a, b) => a.demoIndex - b.demoIndex);
+            const utils = window.MatchLinksUtils;
+            if (!utils || typeof utils.extractAvailableDemoLinks !== 'function') return [];
+            return utils.extractAvailableDemoLinks(this.demoAvailabilityCurrent.byMatch || {}, match);
         },
         async ensureDemoAvailability(championshipId) {
             if (!championshipId || !window.apiClient) return;
             const key = String(championshipId);
-            const candidates = [];
-            this.matchesList.forEach(match => {
-                if (!match?.played || !match?.matchId) return;
-                const maps = Array.isArray(match.maps) ? match.maps : [];
-                maps.forEach((map, idx) => {
-                    if (map?.isForfeit) return;
-                    candidates.push({
-                        matchId: String(match.matchId),
-                        demoIndex: idx
-                    });
-                });
-            });
+            const utils = window.MatchLinksUtils;
+            const candidates = (utils && typeof utils.buildDemoCandidates === 'function')
+                ? utils.buildDemoCandidates(this.matchesList)
+                : [];
 
             const signature = candidates.map(item => `${item.matchId}:${item.demoIndex}`).join('|');
             const existing = this.demoAvailabilityState[key];
@@ -2557,27 +2541,14 @@ window.TeamDetail = {
                     return;
                 }
 
-                const byMatch = {};
-                await Promise.all(candidates.map(async item => {
-                    try {
-                        const result = await window.apiClient.getMatchDemoExists({
-                            championshipId: key,
-                            matchId: item.matchId,
-                            demoIndex: item.demoIndex
-                        }, { persistCache: false });
-                        if (!byMatch[item.matchId]) byMatch[item.matchId] = {};
-                        byMatch[item.matchId][item.demoIndex] = {
-                            exists: !!result?.exists,
-                            url: result?.url || ''
-                        };
-                    } catch (_error) {
-                        if (!byMatch[item.matchId]) byMatch[item.matchId] = {};
-                        byMatch[item.matchId][item.demoIndex] = {
-                            exists: false,
-                            url: ''
-                        };
-                    }
-                }));
+                const byMatch = (utils && typeof utils.fetchDemoAvailabilityForCandidates === 'function')
+                    ? await utils.fetchDemoAvailabilityForCandidates({
+                        apiClient: window.apiClient,
+                        championshipId: key,
+                        candidates,
+                        persistCache: false
+                    })
+                    : {};
 
                 this.demoAvailabilityState = {
                     ...this.demoAvailabilityState,
