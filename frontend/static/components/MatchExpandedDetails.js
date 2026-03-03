@@ -169,6 +169,12 @@ window.MatchExpandedDetails = {
         mapScoreAgainst(map) {
             return map?.ra ?? map?.score_team2 ?? map?.scoreAgainst ?? 0;
         },
+        mapRoundDiffAbs(map) {
+            const left = Number(this.mapScoreFor(map) ?? 0);
+            const right = Number(this.mapScoreAgainst(map) ?? 0);
+            if (!Number.isFinite(left) || !Number.isFinite(right)) return 0;
+            return Math.abs(Math.round(left - right));
+        },
         mapScoreClass(map, side = 'left') {
             const left = Number(this.mapScoreFor(map) ?? 0);
             const right = Number(this.mapScoreAgainst(map) ?? 0);
@@ -236,6 +242,7 @@ window.MatchExpandedDetails = {
                                         <span :class="['match-map-score__value', mapScoreClass(map, 'left')]">{{ mapScoreFor(map) }}</span>
                                         <span class="match-map-score__sep"> - </span>
                                         <span :class="['match-map-score__value', mapScoreClass(map, 'right')]">{{ mapScoreAgainst(map) }}</span>
+                                        <span class="match-map-score__rd">(RD {{ mapRoundDiffAbs(map) }})</span>
                                     </span>
                                     <router-link v-if="teamRoute(opponentId, opponentName)" :to="teamRoute(opponentId, opponentName)" class="match-map-score__team team-link">{{ opponentName }}</router-link>
                                     <span v-else class="match-map-score__team">{{ opponentName }}</span>
@@ -243,10 +250,6 @@ window.MatchExpandedDetails = {
                             </div>
                         </div>
                         <div class="match-map-metrics">
-                            <div class="metric-row metric-row--rd">
-                                <span class="metric-label metric-label--rd">RD +/-</span>
-                                <span class="metric-value">{{ formatSigned(mapScoreFor(map) - mapScoreAgainst(map)) }}</span>
-                            </div>
                             <div class="metric-grid metric-grid--compare">
                                 <div class="metric-col__title metric-col__title--left">
                                     <router-link v-if="teamRoute(teamId, teamName)" :to="teamRoute(teamId, teamName)" class="team-link">{{ teamName }}</router-link>

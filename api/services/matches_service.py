@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import logging
 from datetime import datetime, timezone
 from typing import Any, Tuple
 import httpx
@@ -17,8 +16,6 @@ from api.services.cache_helpers import (
 )
 from api.services.player_stats_payload import build_player_stats_payload
 from api.utils.cache import AsyncTTLCache
-
-LOGGER = logging.getLogger("uvicorn.error")
 
 _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
@@ -595,25 +592,9 @@ async def get_match_demos(
     if not force:
         cached = await _DEMO_LIST_CACHE.get(cache_key)
         if cached is not None:
-            cached_count = len(cached.get("items") or [])
-            LOGGER.info(
-                "demo_list cache_hit championship_id=%s match_id=%s expected_count=%s items=%s",
-                championship_id,
-                match_id,
-                normalized_expected,
-                cached_count,
-            )
             return cached
 
     probe_indices = _build_demo_probe_indices(normalized_expected)
-    LOGGER.info(
-        "demo_list probe_start championship_id=%s match_id=%s expected_count=%s force=%s probe_indices=%s",
-        championship_id,
-        match_id,
-        normalized_expected,
-        bool(force),
-        probe_indices,
-    )
     timeout = httpx.Timeout(10.0)
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -631,7 +612,6 @@ async def get_match_demos(
         if exists
     ]
     found_items.sort(key=lambda row: row["demo_index"])
-    found_indices = [row.get("demo_index") for row in found_items]
 
     payload = {
         "championship_id": championship_id,
@@ -640,13 +620,4 @@ async def get_match_demos(
     }
     ttl = 300 if found_items else 30
     await _DEMO_LIST_CACHE.set(cache_key, payload, ttl_seconds=ttl)
-    LOGGER.info(
-        "demo_list probe_done championship_id=%s match_id=%s expected_count=%s items=%s ttl=%s found_indices=%s",
-        championship_id,
-        match_id,
-        normalized_expected,
-        len(found_items),
-        ttl,
-        found_indices,
-    )
     return payload

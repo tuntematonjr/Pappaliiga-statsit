@@ -267,6 +267,7 @@ const SANKARI_METRIC_META = {
 const DIVISION_DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
 const DIVISION_UPCOMING_FETCH_MIN_LIMIT = 16;
 const DIVISION_UPCOMING_FETCH_MAX_LIMIT = 40;
+const DIVISION_PLAYED_PREFETCH_CONCURRENCY = 6;
 
 function pickValue(obj, keys) {
     if (!obj) return undefined;
@@ -922,7 +923,7 @@ window.DivisionView = {
             this.playedRowsPrefetchKey = key;
 
             const queue = [...rows];
-            const workers = Array.from({ length: Math.min(3, queue.length) }, async () => {
+            const workers = Array.from({ length: Math.min(DIVISION_PLAYED_PREFETCH_CONCURRENCY, queue.length) }, async () => {
                 while (queue.length) {
                     const next = queue.shift();
                     if (!next) continue;

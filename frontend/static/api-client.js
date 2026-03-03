@@ -39,9 +39,6 @@
     const BREAKER_COOLDOWN_MS = 30000;
     const DIVISION_CACHE_TTL_MS = 2 * 60 * 1000;
     const isDev = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    const demoDebugEnabled =
-        typeof window !== 'undefined' &&
-        (window.PL_DEMO_DEBUG === true || window.PL_DEMO_DEBUG === '1' || isDev);
     const API_ROOT = (() => {
         if (typeof window === 'undefined') {
             return { origin: '', path: '' };
@@ -1207,15 +1204,6 @@
                 throw new Error('championshipId and matchId are required');
             }
 
-            if (demoDebugEnabled && typeof console !== 'undefined') {
-                console.info('[apiClient][demos] request', {
-                    championshipId: String(championshipId),
-                    matchId: String(matchId),
-                    expectedCount: expectedCount ?? null,
-                    forceRefresh: options?.forceRefresh === true
-                });
-            }
-
             const cacheBypass = options?.forceRefresh === true
                 ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
                 : null;
@@ -1240,17 +1228,6 @@
                     url: String(item?.url || '')
                 }))
                 .filter(item => item.demo_index >= 0 && item.url);
-
-            if (demoDebugEnabled && typeof console !== 'undefined') {
-                console.info('[apiClient][demos] response', {
-                    championshipId: String(championshipId),
-                    matchId: String(matchId),
-                    count: normalizedItems.length,
-                    demoIndices: normalizedItems.map(item => item.demo_index),
-                    resolvedPath: result?.meta?.resolvedPath || null,
-                    fromCache: !!result?.meta?.fromCache
-                });
-            }
 
             return normalizedItems;
         }

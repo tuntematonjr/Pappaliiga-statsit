@@ -90,6 +90,16 @@ window.PickBanFlow = {
             if (!name) return null;
             return String(name).trim().toLowerCase();
         },
+        beautifyMapName(raw) {
+            if (!raw) return 'Kartta';
+            const value = String(raw).trim();
+            const lower = value.toLowerCase();
+            if (lower === 'forfeit') return 'Forfeit';
+            const core = lower.startsWith('de_') ? lower.slice(3) : lower;
+            const parts = core.split(/[_-]/).filter(Boolean);
+            if (!parts.length) return value;
+            return parts.map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+        },
         resolveMapImage(step) {
             if (!step) return null;
             const mapName = step?.mapName || step?.map_name || step?.map || '';
@@ -161,7 +171,7 @@ window.PickBanFlow = {
                     <div v-if="resolveMapImage(step)" class="veto-step__map-image">
                         <img :src="resolveMapImage(step)" @error="onImageError(step.mapName)" alt="" />
                     </div>
-                    <div class="veto-step__map">{{ step.mapName }}</div>
+                    <div class="veto-step__map">{{ beautifyMapName(step.mapName) }}</div>
                     <div v-if="step.action !== 'overflow' && step.action !== 'decider'" class="veto-step__actor">
                         <router-link
                             v-if="teamRoute(step.teamId, step.teamName)"
