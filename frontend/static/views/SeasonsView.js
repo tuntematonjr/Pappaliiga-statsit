@@ -7,7 +7,7 @@ window.SeasonsView = {
     },
     template: `
         <div class="seasons-view">
-            <h1 class="title-accent titleUnderlinePage">Seasons & Divisions</h1>
+            <h1 class="title-accent titleUnderlinePage">Kaikki Kaudet</h1>
             
             <loading-spinner v-if="loading" message="Kausia ladataan..."></loading-spinner>
             <error-message v-else-if="error" :message="error" @retry="loadSeasons"></error-message>
@@ -21,9 +21,9 @@ window.SeasonsView = {
                         class="season-card home-section"
                     >
                         <h2 class="section-title title-accent titleUnderlineCard">
-                            Season {{ getSeasonLabel(season) }}
+                            Kausi {{ getSeasonLabel(season) }}
                         </h2>
-                        <p class="season-meta">{{ getDivisionCount(season) }} divisions</p>
+                        <p class="season-meta">{{ getDivisionCount(season) }} divisioonaa</p>
                         
                         <div class="divisions-list">
                             <div 
