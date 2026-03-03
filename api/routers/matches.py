@@ -56,6 +56,15 @@ class UpcomingMatchListResponse(CamelModel):
     meta: PaginationMeta
 
 
+class DemoExistsResponse(CamelModel):
+    championship_id: str
+    match_id: str
+    demo_index: int
+    exists: bool
+    url: str
+    status_code: Optional[int] = None
+
+
 def _set_revision_headers(response: Response, *, etag: str, revision: Optional[str]) -> None:
     response.headers["ETag"] = etag
     if revision:
@@ -106,4 +115,21 @@ async def get_upcoming_matches(
     return UpcomingMatchListResponse(
         items=[UpcomingMatchSummary(**row) for row in items],
         meta=PaginationMeta(total=total, limit=limit, offset=offset),
+    )
+
+
+@router.get("/demo-exists", response_model=DemoExistsResponse)
+async def get_demo_exists(
+    championship_id: str = Query(..., min_length=1),
+    match_id: str = Query(..., min_length=1),
+    demo_index: int = Query(..., ge=0, le=7),
+):
+    payload = await matches_service.check_demo_exists(championship_id, match_id, demo_index)
+    return DemoExistsResponse(
+        championship_id=championship_id,
+        match_id=match_id,
+        demo_index=demo_index,
+        exists=bool(payload.get("exists")),
+        url=str(payload.get("url") or ""),
+        status_code=payload.get("status_code"),
     )

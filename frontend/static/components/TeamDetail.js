@@ -816,6 +816,7 @@ window.TeamDetail = {
             matchesChartHeight: 140,
             expandedMatches: {},
             matchPlayerStatsState: {},
+            demoAvailabilityState: {},
             mapCatalog: [],
             mapCatalogLoading: false,
             mapCatalogLoaded: false,
@@ -827,6 +828,7 @@ window.TeamDetail = {
                 upcoming: {},
                 divisionBaselines: {},
                 matchPlayerStats: {},
+                demoAvailability: {},
                 mapCatalog: {}
             }
         };
@@ -1912,6 +1914,15 @@ window.TeamDetail = {
         matchPlayerStatsLoading() {
             return !!this.matchPlayerStatsCurrent.loading;
         },
+        demoAvailabilityCurrent() {
+            const champId = this.currentChampionshipId;
+            const fallback = { loading: false, error: null, signature: '', byMatch: {} };
+            if (!champId) return fallback;
+            return this.demoAvailabilityState[champId] || fallback;
+        },
+        isDemoAvailabilityLoading() {
+            return !!this.demoAvailabilityCurrent.loading;
+        },
         // Phase 1: Division averages for comparison
         divisionAverages() {
             return this.seasonData?.divisionAverages || {};
@@ -1951,6 +1962,9 @@ window.TeamDetail = {
             handler() {
                 this.loadUpcoming();
                 this.ensureDivisionPlayerBaselines(this.currentChampionshipId);
+                if (this.activeTab === 'matches') {
+                    this.ensureDemoAvailability(this.currentChampionshipId);
+                }
             }
         },
         mapStats: {
@@ -1980,8 +1994,14 @@ window.TeamDetail = {
                 this.$nextTick(() => {
                     this.setupMatchesChartObserver();
                     this.ensureMatchPlayerStats(this.currentChampionshipId);
+                    this.ensureDemoAvailability(this.currentChampionshipId);
                     this.ensureMapCatalog();
                 });
+            }
+        },
+        matchesList() {
+            if (this.activeTab === 'matches') {
+                this.ensureDemoAvailability(this.currentChampionshipId);
             }
         },
         championshipId(newVal) {
@@ -1991,6 +2011,7 @@ window.TeamDetail = {
                 this.expandedMatches = {};
                 if (this.activeTab === 'matches') {
                     this.ensureMatchPlayerStats(String(newVal));
+                    this.ensureDemoAvailability(String(newVal));
                     this.ensureMapCatalog();
                 }
             }
@@ -2021,6 +2042,7 @@ window.TeamDetail = {
             }
             if (this.activeTab === 'matches') {
                 this.ensureMatchPlayerStats(this.currentChampionshipId);
+                this.ensureDemoAvailability(this.currentChampionshipId);
                 this.ensureMapCatalog();
             }
         });
@@ -2474,6 +2496,99 @@ window.TeamDetail = {
                 name: 'team-detail',
                 params: { championshipId, teamId: String(opponentId) }
             };
+        },
+        availableDemoLinks(match) {
+            if (!match?.matchId) return [];
+            const byMatch = this.demoAvailabilityCurrent.byMatch || {};
+            const hit = byMatch[String(match.matchId)] || {};
+            return Object.entries(hit)
+                .map(([demoIndex, payload]) => ({
+                    demoIndex: Number(demoIndex),
+                    exists: !!payload?.exists,
+                    url: payload?.url || ''
+                }))
+                .filter(item => item.exists && item.url)
+                .sort((a, b) => a.demoIndex - b.demoIndex);
+        },
+        async ensureDemoAvailability(championshipId) {
+            if (!championshipId || !window.apiClient) return;
+            const key = String(championshipId);
+            const candidates = [];
+            this.matchesList.forEach(match => {
+                if (!match?.played || !match?.matchId) return;
+                const maps = Array.isArray(match.maps) ? match.maps : [];
+                maps.forEach((map, idx) => {
+                    if (map?.isForfeit) return;
+                    candidates.push({
+                        matchId: String(match.matchId),
+                        demoIndex: idx
+                    });
+                });
+            });
+
+            const signature = candidates.map(item => `${item.matchId}:${item.demoIndex}`).join('|');
+            const existing = this.demoAvailabilityState[key];
+            if (existing?.signature === signature && !existing?.loading && !existing?.error) {
+                return;
+            }
+
+            const loadKey = `${key}::${signature || 'empty'}`;
+            return this.runInFlightLoad('demoAvailability', loadKey, async () => {
+                this.demoAvailabilityState = {
+                    ...this.demoAvailabilityState,
+                    [key]: {
+                        loading: true,
+                        error: null,
+                        signature,
+                        byMatch: existing?.byMatch || {}
+                    }
+                };
+
+                if (!candidates.length) {
+                    this.demoAvailabilityState = {
+                        ...this.demoAvailabilityState,
+                        [key]: {
+                            loading: false,
+                            error: null,
+                            signature,
+                            byMatch: {}
+                        }
+                    };
+                    return;
+                }
+
+                const byMatch = {};
+                await Promise.all(candidates.map(async item => {
+                    try {
+                        const result = await window.apiClient.getMatchDemoExists({
+                            championshipId: key,
+                            matchId: item.matchId,
+                            demoIndex: item.demoIndex
+                        }, { persistCache: false });
+                        if (!byMatch[item.matchId]) byMatch[item.matchId] = {};
+                        byMatch[item.matchId][item.demoIndex] = {
+                            exists: !!result?.exists,
+                            url: result?.url || ''
+                        };
+                    } catch (_error) {
+                        if (!byMatch[item.matchId]) byMatch[item.matchId] = {};
+                        byMatch[item.matchId][item.demoIndex] = {
+                            exists: false,
+                            url: ''
+                        };
+                    }
+                }));
+
+                this.demoAvailabilityState = {
+                    ...this.demoAvailabilityState,
+                    [key]: {
+                        loading: false,
+                        error: null,
+                        signature,
+                        byMatch
+                    }
+                };
+            });
         },
         updateRoute(championshipId, tab) {
             if (!this.$router || !this.$route) return;
@@ -3683,12 +3798,23 @@ window.TeamDetail = {
                                             </td>
                                             <td>
                                                 <div class="micro-stack" v-if="match.maps && match.maps.length">
-                                                    <span v-for="map in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
+                                                    <span v-for="(map, mapIdx) in match.maps" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.scoreFor }}-{{ map.scoreAgainst }}</span>
                                                 </div>
                                                 <span v-else class="cell-muted">-</span>
                                             </td>
                                             <td>
-                                                <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">Faceit Lobbys</a>
+                                                <div class="micro-stack" v-if="match.faceitUrl || availableDemoLinks(match).length">
+                                                    <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">Faceit Lobbys</a>
+                                                    <a
+                                                        v-for="demo in availableDemoLinks(match)"
+                                                        :key="'demo-' + match.matchId + '-' + demo.demoIndex"
+                                                        :href="demo.url"
+                                                        target="_blank"
+                                                        rel="noopener"
+                                                        class="chip chip--link"
+                                                    >Demo {{ demo.demoIndex + 1 }}</a>
+                                                </div>
+                                                <span v-else-if="isDemoAvailabilityLoading && match.played && match.maps && match.maps.length" class="cell-muted">Tarkistetaan…</span>
                                                 <span v-else class="cell-muted">-</span>
                                             </td>
                                         </tr>

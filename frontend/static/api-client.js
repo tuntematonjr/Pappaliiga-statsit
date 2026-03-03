@@ -115,6 +115,9 @@
         ],
         upcomingMatches: query => [
             `/api/matches/upcoming${query}`
+        ],
+        matchDemoExists: query => [
+            `/api/matches/demo-exists${query}`
         ]
     });
 
@@ -1187,6 +1190,32 @@
             return {
                 items,
                 meta: payload?.meta || result?.meta || null
+            };
+        }
+
+        async getMatchDemoExists(params = {}, options = {}) {
+            const championshipId = params.championshipId ?? params.championship_id ?? null;
+            const matchId = params.matchId ?? params.match_id ?? null;
+            const demoIndex = params.demoIndex ?? params.demo_index ?? null;
+            if (!championshipId || !matchId || demoIndex === null || demoIndex === undefined) {
+                throw new Error('championshipId, matchId and demoIndex are required');
+            }
+
+            const query = buildQueryString({
+                championship_id: championshipId,
+                match_id: matchId,
+                demo_index: demoIndex
+            });
+            const routes = buildRouteCandidates('matchDemoExists', query);
+            const result = await fetchWithFallback(routes, {
+                ...options,
+                persistCache: false
+            });
+            const payload = ensureSnakeCaseDeep(result?.data ?? result ?? {});
+            return {
+                exists: !!payload?.exists,
+                url: payload?.url || '',
+                status_code: payload?.status_code ?? null
             };
         }
 

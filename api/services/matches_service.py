@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 from typing import Any, Tuple
+import httpx
 
 from db_async import query_async
 
@@ -17,8 +18,13 @@ from api.utils.cache import AsyncTTLCache
 
 _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=30, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=30, maxsize=256)
+_DEMO_EXISTS_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
+
+
+def build_demo_url(championship_id: str, match_id: str, demo_index: int) -> str:
+    return f"https://pappa.aukko.net/demos/{championship_id}/{match_id}_{demo_index}.zst"
 
 
 def _build_etag(championship_id: str, revision: Any, total: int, limit: int, offset: int) -> str:
@@ -350,4 +356,37 @@ async def get_upcoming_matches(
 
     cache_key = (championship_id, team_id, season, include_playoffs, limit, offset, revision)
     cached_value, _ = await _UPCOMING_MATCH_CACHE.get_or_set(cache_key, producer)
+    return cached_value
+
+
+async def check_demo_exists(championship_id: str, match_id: str, demo_index: int) -> dict[str, Any]:
+    if demo_index < 0:
+        return {"exists": False, "url": build_demo_url(championship_id, match_id, demo_index), "status_code": None}
+
+    url = build_demo_url(championship_id, match_id, demo_index)
+    cache_key = (championship_id, match_id, demo_index)
+
+    async def producer() -> dict[str, Any]:
+        timeout = httpx.Timeout(6.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            try:
+                response = await client.head(url)
+                if response.status_code in (200, 206):
+                    return {"exists": True, "url": url, "status_code": response.status_code}
+                if response.status_code not in (404, 405):
+                    return {"exists": False, "url": url, "status_code": response.status_code}
+            except httpx.HTTPError:
+                pass
+
+            try:
+                response = await client.get(url, headers={"Range": "bytes=0-0"})
+                return {
+                    "exists": response.status_code in (200, 206),
+                    "url": url,
+                    "status_code": response.status_code,
+                }
+            except httpx.HTTPError:
+                return {"exists": False, "url": url, "status_code": None}
+
+    cached_value, _ = await _DEMO_EXISTS_CACHE.get_or_set(cache_key, producer)
     return cached_value
