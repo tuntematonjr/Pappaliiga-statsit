@@ -20,7 +20,7 @@ from api.utils.cache import AsyncTTLCache
 _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _DEMO_LIST_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
-_DEMO_PROBE_SEMAPHORE = asyncio.Semaphore(8)
+_DEMO_PROBE_SEMAPHORE = asyncio.Semaphore(4)
 _DEMO_CACHE_VERSION = 2
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
@@ -567,7 +567,7 @@ async def _probe_demo_exists_retry(
     client: httpx.AsyncClient,
     url: str,
     *,
-    attempts: int = 2,
+    attempts: int = 3,
 ) -> tuple[bool, int | None]:
     last_status: int | None = None
     for attempt in range(max(1, attempts)):
@@ -578,7 +578,10 @@ async def _probe_demo_exists_retry(
         if status_code == 404:
             return False, status_code
         if attempt < attempts - 1:
-            await asyncio.sleep(0.20 * (attempt + 1))
+            if status_code == 429:
+                await asyncio.sleep(0.80 * (attempt + 1))
+            else:
+                await asyncio.sleep(0.20 * (attempt + 1))
     return False, last_status
 
 
