@@ -922,7 +922,7 @@ window.DivisionView = {
             this.playedRowsPrefetchKey = key;
 
             const queue = [...rows];
-            const workers = Array.from({ length: Math.min(6, queue.length) }, async () => {
+            const workers = Array.from({ length: Math.min(3, queue.length) }, async () => {
                 while (queue.length) {
                     const next = queue.shift();
                     if (!next) continue;
@@ -1120,8 +1120,15 @@ window.DivisionView = {
                         mapsCount: targetCount,
                         existingByIndex: existing,
                         refreshFalse: true,
-                        forceRefresh: true,
-                        persistCache: false
+                        forceRefresh: false,
+                        persistCache: false,
+                        onBackgroundResult: (delayedMapped) => {
+                            if (!delayedMapped || !Object.keys(delayedMapped).length) return;
+                            this.demoAvailabilityByMatch = {
+                                ...this.demoAvailabilityByMatch,
+                                [matchId]: delayedMapped
+                            };
+                        }
                     })
                     : { ...existing };
                 this.demoAvailabilityByMatch = {

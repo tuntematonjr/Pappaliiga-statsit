@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 from datetime import datetime, timezone
 from typing import Any, Tuple
 import httpx
@@ -17,9 +18,12 @@ from api.services.cache_helpers import (
 from api.services.player_stats_payload import build_player_stats_payload
 from api.utils.cache import AsyncTTLCache
 
+LOGGER = logging.getLogger("uvicorn.error")
+
 _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _DEMO_LIST_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
+_DEMO_PROBE_SEMAPHORE = asyncio.Semaphore(8)
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
 
@@ -549,8 +553,6 @@ async def _probe_demo_exists_once(client: httpx.AsyncClient, url: str) -> tuple[
         response = await client.head(url)
         if response.status_code in (200, 206):
             return True, response.status_code
-        if response.status_code in (404, 410):
-            return False, response.status_code
     except httpx.HTTPError:
         pass
 
@@ -575,10 +577,8 @@ async def _probe_demo_exists_retry(
         last_status = status_code
         if exists:
             return True, status_code
-        if status_code in (404, 410):
-            return False, status_code
         if attempt < attempts - 1:
-            await asyncio.sleep(0.15 * (attempt + 1))
+            await asyncio.sleep(0.20 * (attempt + 1))
     return False, last_status
 
 
@@ -595,16 +595,31 @@ async def get_match_demos(
     if not force:
         cached = await _DEMO_LIST_CACHE.get(cache_key)
         if cached is not None:
+            cached_count = len(cached.get("items") or [])
+            LOGGER.info(
+                "demo_list cache_hit championship_id=%s match_id=%s expected_count=%s items=%s",
+                championship_id,
+                match_id,
+                normalized_expected,
+                cached_count,
+            )
             return cached
 
     probe_indices = _build_demo_probe_indices(normalized_expected)
-    timeout = httpx.Timeout(8.0)
-    semaphore = asyncio.Semaphore(6)
+    LOGGER.info(
+        "demo_list probe_start championship_id=%s match_id=%s expected_count=%s force=%s probe_indices=%s",
+        championship_id,
+        match_id,
+        normalized_expected,
+        bool(force),
+        probe_indices,
+    )
+    timeout = httpx.Timeout(10.0)
 
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         async def probe_index(demo_index: int) -> tuple[int, str, bool]:
             url = build_demo_url(championship_id, match_id, demo_index)
-            async with semaphore:
+            async with _DEMO_PROBE_SEMAPHORE:
                 exists, _status_code = await _probe_demo_exists_retry(client, url, attempts=3)
             return demo_index, url, exists
 
@@ -616,6 +631,7 @@ async def get_match_demos(
         if exists
     ]
     found_items.sort(key=lambda row: row["demo_index"])
+    found_indices = [row.get("demo_index") for row in found_items]
 
     payload = {
         "championship_id": championship_id,
@@ -624,4 +640,13 @@ async def get_match_demos(
     }
     ttl = 300 if found_items else 30
     await _DEMO_LIST_CACHE.set(cache_key, payload, ttl_seconds=ttl)
+    LOGGER.info(
+        "demo_list probe_done championship_id=%s match_id=%s expected_count=%s items=%s ttl=%s found_indices=%s",
+        championship_id,
+        match_id,
+        normalized_expected,
+        len(found_items),
+        ttl,
+        found_indices,
+    )
     return payload

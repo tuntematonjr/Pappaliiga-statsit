@@ -2549,21 +2549,40 @@ window.TeamDetail = {
 
                 const byMatch = { ...(existing?.byMatch || {}) };
                 if (utils && typeof utils.fetchDemoAvailabilityForMatch === 'function') {
-                    await Promise.all(requests.map(async req => {
-                        const matchId = String(req?.matchId || '');
-                        if (!matchId) return;
-                        const next = await utils.fetchDemoAvailabilityForMatch({
-                            apiClient: window.apiClient,
-                            championshipId: key,
-                            matchId,
-                            mapsCount: Number(req?.expectedCount || 0),
-                            existingByIndex: byMatch[matchId] || {},
-                            refreshFalse: true,
-                            forceRefresh: true,
-                            persistCache: false
-                        });
-                        byMatch[matchId] = next || {};
-                    }));
+                    const maxConcurrency = 4;
+                    for (let idx = 0; idx < requests.length; idx += maxConcurrency) {
+                        const chunk = requests.slice(idx, idx + maxConcurrency);
+                        await Promise.all(chunk.map(async req => {
+                            const matchId = String(req?.matchId || '');
+                            if (!matchId) return;
+                            const next = await utils.fetchDemoAvailabilityForMatch({
+                                apiClient: window.apiClient,
+                                championshipId: key,
+                                matchId,
+                                mapsCount: Number(req?.expectedCount || 0),
+                                existingByIndex: byMatch[matchId] || {},
+                                refreshFalse: true,
+                                forceRefresh: false,
+                                persistCache: false,
+                                onBackgroundResult: (delayedMapped) => {
+                                    if (!delayedMapped || !Object.keys(delayedMapped).length) return;
+                                    this.demoAvailabilityState = {
+                                        ...this.demoAvailabilityState,
+                                        [key]: {
+                                            loading: false,
+                                            error: null,
+                                            signature,
+                                            byMatch: {
+                                                ...(this.demoAvailabilityState?.[key]?.byMatch || {}),
+                                                [matchId]: delayedMapped
+                                            }
+                                        }
+                                    };
+                                }
+                            });
+                            byMatch[matchId] = next || {};
+                        }));
+                    }
                 }
 
                 this.demoAvailabilityState = {

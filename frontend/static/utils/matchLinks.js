@@ -1,4 +1,15 @@
 (function () {
+    const demoDebugEnabled =
+        typeof window !== 'undefined' &&
+        (window.PL_DEMO_DEBUG === true || window.PL_DEMO_DEBUG === '1' || ['localhost', '127.0.0.1'].includes(window.location.hostname));
+    const backgroundRetryDone = new Set();
+
+    function delay(ms) {
+        const timeout = Number(ms);
+        if (!Number.isFinite(timeout) || timeout <= 0) return Promise.resolve();
+        return new Promise(resolve => setTimeout(resolve, timeout));
+    }
+
     function resolveMatchId(match) {
         if (!match || typeof match !== 'object') return null;
         const value = match.matchId ?? match.match_id ?? null;
@@ -99,7 +110,8 @@
         existingByIndex = {},
         refreshFalse = false,
         forceRefresh = false,
-        persistCache = false
+        persistCache = false,
+        onBackgroundResult = null
     }) {
         if (!apiClient) {
             return { ...(existingByIndex || {}) };
@@ -109,6 +121,16 @@
         }
 
         const targetCount = Math.max(0, Number(mapsCount) || 0);
+        if (demoDebugEnabled && typeof console !== 'undefined') {
+            console.info('[matchLinks][demos] availability_start', {
+                championshipId: String(championshipId),
+                matchId: String(matchId),
+                mapsCount: targetCount,
+                forceRefresh: forceRefresh === true,
+                existingKeys: Object.keys(existingByIndex || {}).length
+            });
+        }
+
         const items = await fetchDemoLinksForMatch({
             apiClient,
             championshipId,
@@ -117,8 +139,92 @@
             forceRefresh,
             persistCache
         });
-        const mapped = mapDemoItemsToByIndex(items);
-        if (Object.keys(mapped).length) {
+        let mapped = mapDemoItemsToByIndex(items);
+
+        const shouldRetryForced =
+            !Object.keys(mapped).length &&
+            targetCount > 0 &&
+            forceRefresh !== true;
+
+        if (shouldRetryForced) {
+            if (demoDebugEnabled && typeof console !== 'undefined') {
+                console.info('[matchLinks][demos] forced_retry_start', {
+                    championshipId: String(championshipId),
+                    matchId: String(matchId),
+                    expectedCount: targetCount
+                });
+            }
+            await delay(120);
+            const forcedItems = await fetchDemoLinksForMatch({
+                apiClient,
+                championshipId,
+                matchId,
+                expectedCount: targetCount || null,
+                forceRefresh: true,
+                persistCache: false
+            });
+            mapped = mapDemoItemsToByIndex(forcedItems);
+            if (demoDebugEnabled && typeof console !== 'undefined') {
+                console.info('[matchLinks][demos] forced_retry_done', {
+                    championshipId: String(championshipId),
+                    matchId: String(matchId),
+                    count: Object.keys(mapped).length,
+                    indices: Object.keys(mapped).map(key => Number(key)).sort((a, b) => a - b)
+                });
+            }
+        }
+
+        if (demoDebugEnabled && typeof console !== 'undefined') {
+            console.info('[matchLinks][demos] availability_done', {
+                championshipId: String(championshipId),
+                matchId: String(matchId),
+                count: Object.keys(mapped).length,
+                refreshFalse: refreshFalse === true
+            });
+        }
+
+        const hasMapped = Object.keys(mapped).length > 0;
+        const backgroundKey = `${String(championshipId)}:${String(matchId)}:${targetCount}`;
+        const shouldScheduleBackgroundRetry =
+            !hasMapped &&
+            targetCount > 0 &&
+            forceRefresh !== true &&
+            !backgroundRetryDone.has(backgroundKey);
+
+        if (shouldScheduleBackgroundRetry) {
+            backgroundRetryDone.add(backgroundKey);
+            (async () => {
+                await delay(2500);
+                const delayedItems = await fetchDemoLinksForMatch({
+                    apiClient,
+                    championshipId,
+                    matchId,
+                    expectedCount: targetCount || null,
+                    forceRefresh: true,
+                    persistCache: false
+                });
+                const delayedMapped = mapDemoItemsToByIndex(delayedItems);
+                const delayedCount = Object.keys(delayedMapped).length;
+
+                if (demoDebugEnabled && typeof console !== 'undefined') {
+                    console.info('[matchLinks][demos] background_retry_done', {
+                        championshipId: String(championshipId),
+                        matchId: String(matchId),
+                        count: delayedCount,
+                        indices: Object.keys(delayedMapped).map(key => Number(key)).sort((a, b) => a - b)
+                    });
+                }
+
+                if (delayedCount > 0 && typeof onBackgroundResult === 'function') {
+                    try {
+                        onBackgroundResult(delayedMapped);
+                    } catch (_error) {
+                    }
+                }
+            })();
+        }
+
+        if (hasMapped) {
             return mapped;
         }
         if (refreshFalse) {
