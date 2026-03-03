@@ -1095,7 +1095,11 @@ window.DivisionView = {
 
             const existing = this.demoAvailabilityByMatch[matchId] || {};
             const existingKeys = Object.keys(existing);
-            if (existingKeys.length >= targetCount) {
+            const hasFalseWithinTarget = Array.from({ length: targetCount }).some((_unused, idx) => {
+                const payload = existing[idx];
+                return payload && payload.exists === false;
+            });
+            if (existingKeys.length >= targetCount && !hasFalseWithinTarget) {
                 return;
             }
             if (this.demoAvailabilityLoading[matchId]) {
@@ -1115,6 +1119,7 @@ window.DivisionView = {
                         matchId,
                         mapsCount: targetCount,
                         existingByIndex: existing,
+                        refreshFalse: true,
                         persistCache: false
                     })
                     : { ...existing };

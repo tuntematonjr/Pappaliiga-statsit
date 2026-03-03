@@ -2512,7 +2512,14 @@ window.TeamDetail = {
 
             const signature = candidates.map(item => `${item.matchId}:${item.demoIndex}`).join('|');
             const existing = this.demoAvailabilityState[key];
-            if (existing?.signature === signature && !existing?.loading && !existing?.error) {
+            const hasFalseInExisting = Array.isArray(candidates) && candidates.some(item => {
+                const matchId = String(item?.matchId || '');
+                const demoIndex = Number(item?.demoIndex ?? -1);
+                if (!matchId || demoIndex < 0) return false;
+                const payload = existing?.byMatch?.[matchId]?.[demoIndex];
+                return payload?.exists === false;
+            });
+            if (existing?.signature === signature && !existing?.loading && !existing?.error && !hasFalseInExisting) {
                 return;
             }
 

@@ -47,6 +47,7 @@
         matchId,
         mapsCount,
         existingByIndex = {},
+        refreshFalse = false,
         persistCache = false
     }) {
         if (!apiClient || typeof apiClient.getMatchDemoExists !== 'function') {
@@ -61,7 +62,12 @@
 
         const next = { ...(existingByIndex || {}) };
         await Promise.all(Array.from({ length: targetCount }, async (_unused, idx) => {
-            if (Object.prototype.hasOwnProperty.call(next, idx)) return;
+            const hasExisting = Object.prototype.hasOwnProperty.call(next, idx);
+            if (hasExisting) {
+                const existing = next[idx] || {};
+                const shouldRefreshFalse = refreshFalse === true && existing?.exists === false;
+                if (!shouldRefreshFalse) return;
+            }
             try {
                 const result = await apiClient.getMatchDemoExists({
                     championshipId,
