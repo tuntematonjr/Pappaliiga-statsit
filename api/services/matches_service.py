@@ -21,6 +21,7 @@ _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _DEMO_LIST_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
 _DEMO_PROBE_SEMAPHORE = asyncio.Semaphore(8)
+_DEMO_CACHE_VERSION = 2
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
 
@@ -539,10 +540,8 @@ def _build_demo_probe_indices(expected_count: int | None) -> list[int]:
     base = int(expected_count or 0)
     if base <= 0:
         base = 2
-    limit = min(12, max(2, base + 2))
-    zero_based = list(range(0, limit))
-    one_based = list(range(1, limit + 1))
-    return sorted(set([*zero_based, *one_based]))
+    limit = min(8, max(2, base + 1))
+    return list(range(0, limit))
 
 
 async def _probe_demo_exists_once(client: httpx.AsyncClient, url: str) -> tuple[bool, int | None]:
@@ -550,6 +549,8 @@ async def _probe_demo_exists_once(client: httpx.AsyncClient, url: str) -> tuple[
         response = await client.head(url)
         if response.status_code in (200, 206):
             return True, response.status_code
+        if response.status_code == 404:
+            return False, response.status_code
     except httpx.HTTPError:
         pass
 
@@ -566,7 +567,7 @@ async def _probe_demo_exists_retry(
     client: httpx.AsyncClient,
     url: str,
     *,
-    attempts: int = 3,
+    attempts: int = 2,
 ) -> tuple[bool, int | None]:
     last_status: int | None = None
     for attempt in range(max(1, attempts)):
@@ -574,6 +575,8 @@ async def _probe_demo_exists_retry(
         last_status = status_code
         if exists:
             return True, status_code
+        if status_code == 404:
+            return False, status_code
         if attempt < attempts - 1:
             await asyncio.sleep(0.20 * (attempt + 1))
     return False, last_status
@@ -587,7 +590,7 @@ async def get_match_demos(
     force: bool = False,
 ) -> dict[str, Any]:
     normalized_expected = int(expected_count or 0)
-    cache_key = (championship_id, match_id, normalized_expected)
+    cache_key = (_DEMO_CACHE_VERSION, championship_id, match_id, normalized_expected)
 
     if not force:
         cached = await _DEMO_LIST_CACHE.get(cache_key)

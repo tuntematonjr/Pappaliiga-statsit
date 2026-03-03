@@ -1,12 +1,4 @@
 (function () {
-    const backgroundRetryDone = new Set();
-
-    function delay(ms) {
-        const timeout = Number(ms);
-        if (!Number.isFinite(timeout) || timeout <= 0) return Promise.resolve();
-        return new Promise(resolve => setTimeout(resolve, timeout));
-    }
-
     function resolveMatchId(match) {
         if (!match || typeof match !== 'object') return null;
         const value = match.matchId ?? match.match_id ?? null;
@@ -17,6 +9,13 @@
     function getFaceitRoomUrl(matchId) {
         if (matchId === null || matchId === undefined || matchId === '') return '';
         return `https://www.faceit.com/cs2/room/${matchId}`;
+    }
+
+    function getReplay2DUrl(demoUrl) {
+        if (demoUrl === null || demoUrl === undefined || demoUrl === '') return '';
+        const normalized = String(demoUrl).trim();
+        if (!normalized) return '';
+        return `https://replay.pappa.aukko.net/player?demourl=${encodeURIComponent(normalized)}`;
     }
 
     function extractAvailableDemoLinks(byMatch = {}, match = null) {
@@ -128,56 +127,7 @@
         });
         let mapped = mapDemoItemsToByIndex(items);
 
-        const shouldRetryForced =
-            !Object.keys(mapped).length &&
-            targetCount > 0 &&
-            forceRefresh !== true;
-
-        if (shouldRetryForced) {
-            await delay(120);
-            const forcedItems = await fetchDemoLinksForMatch({
-                apiClient,
-                championshipId,
-                matchId,
-                expectedCount: targetCount || null,
-                forceRefresh: true,
-                persistCache: false
-            });
-            mapped = mapDemoItemsToByIndex(forcedItems);
-        }
-
         const hasMapped = Object.keys(mapped).length > 0;
-        const backgroundKey = `${String(championshipId)}:${String(matchId)}:${targetCount}`;
-        const shouldScheduleBackgroundRetry =
-            !hasMapped &&
-            targetCount > 0 &&
-            forceRefresh !== true &&
-            !backgroundRetryDone.has(backgroundKey);
-
-        if (shouldScheduleBackgroundRetry) {
-            backgroundRetryDone.add(backgroundKey);
-            (async () => {
-                await delay(2500);
-                const delayedItems = await fetchDemoLinksForMatch({
-                    apiClient,
-                    championshipId,
-                    matchId,
-                    expectedCount: targetCount || null,
-                    forceRefresh: true,
-                    persistCache: false
-                });
-                const delayedMapped = mapDemoItemsToByIndex(delayedItems);
-                const delayedCount = Object.keys(delayedMapped).length;
-
-                if (delayedCount > 0 && typeof onBackgroundResult === 'function') {
-                    try {
-                        onBackgroundResult(delayedMapped);
-                    } catch (_error) {
-                    }
-                }
-            })();
-        }
-
         if (hasMapped) {
             return mapped;
         }
@@ -190,6 +140,7 @@
     window.MatchLinksUtils = {
         resolveMatchId,
         getFaceitRoomUrl,
+        getReplay2DUrl,
         extractAvailableDemoLinks,
         buildDemoMatchRequests,
         fetchDemoLinksForMatch,

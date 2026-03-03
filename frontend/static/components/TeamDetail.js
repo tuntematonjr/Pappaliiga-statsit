@@ -2502,6 +2502,31 @@ window.TeamDetail = {
             if (!utils || typeof utils.extractAvailableDemoLinks !== 'function') return [];
             return utils.extractAvailableDemoLinks(this.demoAvailabilityCurrent.byMatch || {}, match);
         },
+        teamMatchReplay2DUrl(demoUrl) {
+            const utils = window.MatchLinksUtils;
+            if (!utils || typeof utils.getReplay2DUrl !== 'function') return '';
+            return utils.getReplay2DUrl(demoUrl);
+        },
+        openTeamReplay2D(demoUrl) {
+            const targetUrl = this.teamMatchReplay2DUrl(demoUrl);
+            if (!targetUrl) return;
+            const popup = window.open('about:blank', '_blank');
+            if (!popup) return;
+            try {
+                popup.opener = null;
+            } catch (_error) {
+            }
+            window.setTimeout(() => {
+                try {
+                    popup.location.replace(targetUrl);
+                } catch (_error) {
+                    try {
+                        popup.location.href = targetUrl;
+                    } catch (_error2) {
+                    }
+                }
+            }, 180);
+        },
         async ensureDemoAvailability(championshipId) {
             if (!championshipId || !window.apiClient) return;
             const key = String(championshipId);
@@ -3820,6 +3845,13 @@ window.TeamDetail = {
                                                         title="Demojen latausmäärä per tunti on rajoitettu."
                                                         class="chip chip--link"
                                                     >Demo {{ demoPos + 1 }}</a>
+                                                    <a
+                                                        v-for="(demo, demoPos) in availableDemoLinks(match)"
+                                                        :key="'demo2d-' + match.matchId + '-' + demo.demoIndex"
+                                                        href="#"
+                                                        @click.prevent="openTeamReplay2D(demo.url)"
+                                                        class="chip chip--link"
+                                                    >2D Demo {{ demoPos + 1 }}</a>
                                                 </div>
                                                 <span v-else-if="isDemoAvailabilityLoading && match.played && match.maps && match.maps.length" class="cell-muted">Tarkistetaan…</span>
                                                 <span v-else class="cell-muted">-</span>

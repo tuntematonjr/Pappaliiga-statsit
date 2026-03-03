@@ -1199,6 +1199,31 @@ window.DivisionView = {
             const matchId = match?.match_id ?? match?.matchId;
             return utils.getFaceitRoomUrl(matchId);
         },
+        divisionMatchReplay2DUrl(demoUrl) {
+            const utils = window.MatchLinksUtils;
+            if (!utils || typeof utils.getReplay2DUrl !== 'function') return '';
+            return utils.getReplay2DUrl(demoUrl);
+        },
+        openReplay2D(demoUrl) {
+            const targetUrl = this.divisionMatchReplay2DUrl(demoUrl);
+            if (!targetUrl) return;
+            const popup = window.open('about:blank', '_blank');
+            if (!popup) return;
+            try {
+                popup.opener = null;
+            } catch (_error) {
+            }
+            window.setTimeout(() => {
+                try {
+                    popup.location.replace(targetUrl);
+                } catch (_error) {
+                    try {
+                        popup.location.href = targetUrl;
+                    } catch (_error2) {
+                    }
+                }
+            }, 180);
+        },
         divisionTeamRoute(teamId) {
             if (!teamId || !this.championshipId) return null;
             return {
@@ -1789,6 +1814,13 @@ window.DivisionView = {
                                                         title="Demojen latausmäärä per tunti on rajoitettu."
                                                         class="chip chip--link"
                                                     >Demo {{ demoPos + 1 }}</a>
+                                                    <a
+                                                        v-for="(demo, demoPos) in availableDemoLinks(match)"
+                                                        :key="'demo2d-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
+                                                        href="#"
+                                                        @click.prevent="openReplay2D(demo.url)"
+                                                        class="chip chip--link"
+                                                    >2D Demo {{ demoPos + 1 }}</a>
                                                 </div>
                                                 <span v-else-if="isDemoAvailabilityLoading(match)" class="cell-muted">Tarkistetaan…</span>
                                                 <span v-else class="cell-muted">-</span>
