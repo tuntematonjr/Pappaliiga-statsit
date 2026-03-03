@@ -25,7 +25,7 @@
             .sort((a, b) => a.demoIndex - b.demoIndex);
     }
 
-    function buildDemoCandidates(matches = []) {
+    function buildDemoMatchRequests(matches = []) {
         if (!Array.isArray(matches)) return [];
         const out = [];
         matches.forEach(match => {
@@ -33,20 +33,62 @@
             const matchId = resolveMatchId(match);
             if (!matchId) return;
             const maps = Array.isArray(match.maps) ? match.maps : [];
-            if (maps.length) {
-                maps.forEach((_map, idx) => {
-                    out.push({ matchId, demoIndex: idx });
-                });
-                return;
-            }
+            const mapsCount = maps.length;
             const bestOf = Number(match.bestOf ?? match.best_of ?? 0);
-            if (Number.isFinite(bestOf) && bestOf > 0) {
-                for (let idx = 0; idx < bestOf; idx += 1) {
-                    out.push({ matchId, demoIndex: idx });
-                }
-            }
+            const expectedCount = Math.max(mapsCount, Number.isFinite(bestOf) && bestOf > 0 ? bestOf : 0, 2);
+            out.push({ matchId, expectedCount });
         });
         return out;
+    }
+
+    function mapDemoItemsToByIndex(items = []) {
+        const byIndex = {};
+        const sorted = [...(Array.isArray(items) ? items : [])]
+            .map(item => ({
+                sourceIndex: Number(item?.demo_index ?? item?.demoIndex ?? -1),
+                url: String(item?.url || '')
+            }))
+            .filter(item => item.sourceIndex >= 0 && item.url)
+            .sort((a, b) => a.sourceIndex - b.sourceIndex);
+
+        sorted.forEach((item, visualIndex) => {
+            byIndex[visualIndex] = {
+                exists: true,
+                url: item.url,
+                sourceIndex: item.sourceIndex
+            };
+        });
+        return byIndex;
+    }
+
+    async function fetchDemoLinksForMatch({
+        apiClient,
+        championshipId,
+        matchId,
+        expectedCount = null,
+        forceRefresh = false,
+        persistCache = false
+    }) {
+        if (!apiClient || typeof apiClient.getMatchDemos !== 'function') {
+            return [];
+        }
+        if (!championshipId || !matchId) {
+            return [];
+        }
+
+        try {
+            const items = await apiClient.getMatchDemos({
+                championshipId,
+                matchId,
+                expectedCount
+            }, {
+                persistCache,
+                forceRefresh
+            });
+            return Array.isArray(items) ? items : [];
+        } catch (_error) {
+            return [];
+        }
     }
 
     async function fetchDemoAvailabilityForMatch({
@@ -59,7 +101,7 @@
         forceRefresh = false,
         persistCache = false
     }) {
-        if (!apiClient || typeof apiClient.getMatchDemoExists !== 'function') {
+        if (!apiClient) {
             return { ...(existingByIndex || {}) };
         }
         if (!championshipId || !matchId) {
@@ -67,86 +109,30 @@
         }
 
         const targetCount = Math.max(0, Number(mapsCount) || 0);
-        if (!targetCount) return { ...(existingByIndex || {}) };
-
-        const next = { ...(existingByIndex || {}) };
-        await Promise.all(Array.from({ length: targetCount }, async (_unused, idx) => {
-            const hasExisting = Object.prototype.hasOwnProperty.call(next, idx);
-            if (hasExisting) {
-                const existing = next[idx] || {};
-                const shouldRefreshFalse = refreshFalse === true && existing?.exists === false;
-                if (!shouldRefreshFalse) return;
-            }
-            try {
-                const result = await apiClient.getMatchDemoExists({
-                    championshipId,
-                    matchId,
-                    demoIndex: idx
-                }, {
-                    persistCache,
-                    forceRefresh: forceRefresh === true || (refreshFalse === true && hasExisting)
-                });
-                next[idx] = {
-                    exists: !!result?.exists,
-                    url: result?.url || ''
-                };
-            } catch (_error) {
-                next[idx] = { exists: false, url: '' };
-            }
-        }));
-        return next;
-    }
-
-    async function fetchDemoAvailabilityForCandidates({
-        apiClient,
-        championshipId,
-        candidates,
-        existingByMatch = {},
-        refreshFalse = false,
-        forceRefresh = false,
-        persistCache = false
-    }) {
-        const byMatch = { ...(existingByMatch || {}) };
-        if (!apiClient || typeof apiClient.getMatchDemoExists !== 'function') return byMatch;
-        if (!championshipId || !Array.isArray(candidates) || !candidates.length) return byMatch;
-
-        await Promise.all(candidates.map(async item => {
-            const matchId = String(item?.matchId || '');
-            const demoIndex = Number(item?.demoIndex ?? -1);
-            if (!matchId || demoIndex < 0) return;
-            const existingPayload = byMatch?.[matchId]?.[demoIndex] || null;
-            if (existingPayload && !(refreshFalse && existingPayload.exists === false)) {
-                return;
-            }
-            try {
-                const result = await apiClient.getMatchDemoExists({
-                    championshipId,
-                    matchId,
-                    demoIndex
-                }, {
-                    persistCache,
-                    forceRefresh: forceRefresh === true || (refreshFalse === true && existingPayload?.exists === false)
-                });
-                if (!byMatch[matchId]) byMatch[matchId] = {};
-                byMatch[matchId][demoIndex] = {
-                    exists: !!result?.exists,
-                    url: result?.url || ''
-                };
-            } catch (_error) {
-                if (!byMatch[matchId]) byMatch[matchId] = {};
-                byMatch[matchId][demoIndex] = { exists: false, url: '' };
-            }
-        }));
-
-        return byMatch;
+        const items = await fetchDemoLinksForMatch({
+            apiClient,
+            championshipId,
+            matchId,
+            expectedCount: targetCount || null,
+            forceRefresh,
+            persistCache
+        });
+        const mapped = mapDemoItemsToByIndex(items);
+        if (Object.keys(mapped).length) {
+            return mapped;
+        }
+        if (refreshFalse) {
+            return { ...(existingByIndex || {}) };
+        }
+        return mapped;
     }
 
     window.MatchLinksUtils = {
         resolveMatchId,
         getFaceitRoomUrl,
         extractAvailableDemoLinks,
-        buildDemoCandidates,
-        fetchDemoAvailabilityForMatch,
-        fetchDemoAvailabilityForCandidates
+        buildDemoMatchRequests,
+        fetchDemoLinksForMatch,
+        fetchDemoAvailabilityForMatch
     };
 })();

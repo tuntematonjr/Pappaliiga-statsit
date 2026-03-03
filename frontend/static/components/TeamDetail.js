@@ -2506,18 +2506,17 @@ window.TeamDetail = {
             if (!championshipId || !window.apiClient) return;
             const key = String(championshipId);
             const utils = window.MatchLinksUtils;
-            const candidates = (utils && typeof utils.buildDemoCandidates === 'function')
-                ? utils.buildDemoCandidates(this.matchesList)
+            const requests = (utils && typeof utils.buildDemoMatchRequests === 'function')
+                ? utils.buildDemoMatchRequests(this.matchesList)
                 : [];
 
-            const signature = candidates.map(item => `${item.matchId}:${item.demoIndex}`).join('|');
+            const signature = requests.map(item => `${item.matchId}:${item.expectedCount || 0}`).join('|');
             const existing = this.demoAvailabilityState[key];
-            const hasFalseInExisting = Array.isArray(candidates) && candidates.some(item => {
+            const hasFalseInExisting = Array.isArray(requests) && requests.some(item => {
                 const matchId = String(item?.matchId || '');
-                const demoIndex = Number(item?.demoIndex ?? -1);
-                if (!matchId || demoIndex < 0) return false;
-                const payload = existing?.byMatch?.[matchId]?.[demoIndex];
-                return payload?.exists === false;
+                if (!matchId) return false;
+                const map = existing?.byMatch?.[matchId] || {};
+                return Object.values(map).some(payload => payload?.exists === false);
             });
             if (existing?.signature === signature && !existing?.loading && !existing?.error && !hasFalseInExisting) {
                 return;
@@ -2535,7 +2534,7 @@ window.TeamDetail = {
                     }
                 };
 
-                if (!candidates.length) {
+                if (!requests.length) {
                     this.demoAvailabilityState = {
                         ...this.demoAvailabilityState,
                         [key]: {
@@ -2548,17 +2547,24 @@ window.TeamDetail = {
                     return;
                 }
 
-                const byMatch = (utils && typeof utils.fetchDemoAvailabilityForCandidates === 'function')
-                    ? await utils.fetchDemoAvailabilityForCandidates({
-                        apiClient: window.apiClient,
-                        championshipId: key,
-                        candidates,
-                        existingByMatch: existing?.byMatch || {},
-                        refreshFalse: true,
-                        forceRefresh: true,
-                        persistCache: false
-                    })
-                    : {};
+                const byMatch = { ...(existing?.byMatch || {}) };
+                if (utils && typeof utils.fetchDemoAvailabilityForMatch === 'function') {
+                    await Promise.all(requests.map(async req => {
+                        const matchId = String(req?.matchId || '');
+                        if (!matchId) return;
+                        const next = await utils.fetchDemoAvailabilityForMatch({
+                            apiClient: window.apiClient,
+                            championshipId: key,
+                            matchId,
+                            mapsCount: Number(req?.expectedCount || 0),
+                            existingByIndex: byMatch[matchId] || {},
+                            refreshFalse: true,
+                            forceRefresh: true,
+                            persistCache: false
+                        });
+                        byMatch[matchId] = next || {};
+                    }));
+                }
 
                 this.demoAvailabilityState = {
                     ...this.demoAvailabilityState,
@@ -3787,14 +3793,14 @@ window.TeamDetail = {
                                                 <div class="micro-stack" v-if="match.faceitUrl || availableDemoLinks(match).length">
                                                     <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">Faceit Lobbys</a>
                                                     <a
-                                                        v-for="demo in availableDemoLinks(match)"
+                                                        v-for="(demo, demoPos) in availableDemoLinks(match)"
                                                         :key="'demo-' + match.matchId + '-' + demo.demoIndex"
                                                         :href="demo.url"
                                                         target="_blank"
                                                         rel="noopener"
                                                         title="Demojen latausmäärä per tunti on rajoitettu."
                                                         class="chip chip--link"
-                                                    >Demo {{ demo.demoIndex + 1 }}</a>
+                                                    >Demo {{ demoPos + 1 }}</a>
                                                 </div>
                                                 <span v-else-if="isDemoAvailabilityLoading && match.played && match.maps && match.maps.length" class="cell-muted">Tarkistetaan…</span>
                                                 <span v-else class="cell-muted">-</span>

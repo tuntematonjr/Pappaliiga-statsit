@@ -119,8 +119,8 @@
         matchBundle: matchId => [
             `/api/matches/${matchId}/bundle`
         ],
-        matchDemoExists: query => [
-            `/api/matches/demo-exists${query}`
+        matchDemos: (matchId, query) => [
+            `/api/matches/${matchId}/demos${query}`
         ]
     });
 
@@ -1196,12 +1196,12 @@
             };
         }
 
-        async getMatchDemoExists(params = {}, options = {}) {
+        async getMatchDemos(params = {}, options = {}) {
             const championshipId = params.championshipId ?? params.championship_id ?? null;
             const matchId = params.matchId ?? params.match_id ?? null;
-            const demoIndex = params.demoIndex ?? params.demo_index ?? null;
-            if (!championshipId || !matchId || demoIndex === null || demoIndex === undefined) {
-                throw new Error('championshipId, matchId and demoIndex are required');
+            const expectedCount = params.expectedCount ?? params.expected_count ?? null;
+            if (!championshipId || !matchId) {
+                throw new Error('championshipId and matchId are required');
             }
 
             const cacheBypass = options?.forceRefresh === true
@@ -1210,21 +1210,24 @@
 
             const query = buildQueryString({
                 championship_id: championshipId,
-                match_id: matchId,
-                demo_index: demoIndex,
+                expected_count: expectedCount,
+                force: options?.forceRefresh === true ? true : null,
                 _cb: cacheBypass
             });
-            const routes = buildRouteCandidates('matchDemoExists', query);
+            const encMatchId = encodeURIComponent(matchId);
+            const routes = buildRouteCandidates('matchDemos', encMatchId, query);
             const result = await fetchWithFallback(routes, {
                 ...options,
                 persistCache: false
             });
             const payload = ensureSnakeCaseDeep(result?.data ?? result ?? {});
-            return {
-                exists: !!payload?.exists,
-                url: payload?.url || '',
-                status_code: payload?.status_code ?? null
-            };
+            const items = Array.isArray(payload?.items) ? payload.items : [];
+            return items
+                .map(item => ({
+                    demo_index: Number(item?.demo_index ?? item?.demoIndex ?? -1),
+                    url: String(item?.url || '')
+                }))
+                .filter(item => item.demo_index >= 0 && item.url);
         }
 
         async getMatchBundle(matchId, options = {}) {

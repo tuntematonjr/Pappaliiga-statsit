@@ -1087,7 +1087,7 @@ window.DivisionView = {
         async ensureDemoAvailabilityForMatch(match, mapsCount = 0) {
             const utils = window.MatchLinksUtils;
             const matchId = String(match?.match_id || match?.matchId || '');
-            if (!matchId || !this.championshipId || !window.apiClient || typeof window.apiClient.getMatchDemoExists !== 'function') {
+            if (!matchId || !this.championshipId || !window.apiClient || typeof window.apiClient.getMatchDemos !== 'function') {
                 return;
             }
             const targetCount = Math.max(0, Number(mapsCount) || 0);
@@ -1154,7 +1154,7 @@ window.DivisionView = {
                     match?.best_of ?? match?.bestOf ?? payload?.details?.match?.best_of ?? payload?.details?.match?.bestOf,
                     0
                 );
-                const mapsCount = Math.max(mapsCountFromPayload, bestOf);
+                const mapsCount = Math.max(mapsCountFromPayload, bestOf, 2);
                 this.ensureDemoAvailabilityForMatch(match, mapsCount);
             } catch (error) {
                 // Keep previous successful bundle if any; do not lock this match to empty payload.
@@ -1773,14 +1773,14 @@ window.DivisionView = {
                                                         class="chip chip--link"
                                                     >Faceit</a>
                                                     <a
-                                                        v-for="demo in availableDemoLinks(match)"
+                                                        v-for="(demo, demoPos) in availableDemoLinks(match)"
                                                         :key="'demo-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
                                                         :href="demo.url"
                                                         target="_blank"
                                                         rel="noopener"
                                                         title="Demojen latausmäärä per tunti on rajoitettu."
                                                         class="chip chip--link"
-                                                    >Demo {{ demo.demoIndex + 1 }}</a>
+                                                    >Demo {{ demoPos + 1 }}</a>
                                                 </div>
                                                 <span v-else-if="isDemoAvailabilityLoading(match)" class="cell-muted">Tarkistetaan…</span>
                                                 <span v-else class="cell-muted">-</span>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from datetime import datetime, timezone
 from typing import Any, Tuple
@@ -18,9 +19,7 @@ from api.utils.cache import AsyncTTLCache
 
 _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
-_DEMO_EXISTS_POS_CACHE = AsyncTTLCache(ttl_seconds=86400, maxsize=4096)
-_DEMO_EXISTS_NEG_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
-_DEMO_EXISTS_ERR_CACHE = AsyncTTLCache(ttl_seconds=45, maxsize=2048)
+_DEMO_LIST_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
 
@@ -535,55 +534,94 @@ async def get_upcoming_matches(
     return cached_value
 
 
-async def check_demo_exists(championship_id: str, match_id: str, demo_index: int) -> dict[str, Any]:
-    if demo_index < 0:
-        return {"exists": False, "url": build_demo_url(championship_id, match_id, demo_index), "status_code": None}
+def _build_demo_probe_indices(expected_count: int | None) -> list[int]:
+    base = int(expected_count or 0)
+    if base <= 0:
+        base = 2
+    limit = min(12, max(2, base + 2))
+    zero_based = list(range(0, limit))
+    one_based = list(range(1, limit + 1))
+    return sorted(set([*zero_based, *one_based]))
 
-    url = build_demo_url(championship_id, match_id, demo_index)
-    cache_key = (championship_id, match_id, demo_index)
 
-    cached_positive = await _DEMO_EXISTS_POS_CACHE.get(cache_key)
-    if cached_positive is not None:
-        return cached_positive
+async def _probe_demo_exists_once(client: httpx.AsyncClient, url: str) -> tuple[bool, int | None]:
+    try:
+        response = await client.head(url)
+        if response.status_code in (200, 206):
+            return True, response.status_code
+        if response.status_code in (404, 410):
+            return False, response.status_code
+    except httpx.HTTPError:
+        pass
 
-    cached_negative = await _DEMO_EXISTS_NEG_CACHE.get(cache_key)
-    if cached_negative is not None:
-        return cached_negative
+    try:
+        response = await client.get(url, headers={"Range": "bytes=0-0"})
+        if response.status_code in (200, 206):
+            return True, response.status_code
+        return False, response.status_code
+    except httpx.HTTPError:
+        return False, None
 
-    cached_error = await _DEMO_EXISTS_ERR_CACHE.get(cache_key)
-    if cached_error is not None:
-        return cached_error
 
-    timeout = httpx.Timeout(6.0)
+async def _probe_demo_exists_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    attempts: int = 3,
+) -> tuple[bool, int | None]:
+    last_status: int | None = None
+    for attempt in range(max(1, attempts)):
+        exists, status_code = await _probe_demo_exists_once(client, url)
+        last_status = status_code
+        if exists:
+            return True, status_code
+        if status_code in (404, 410):
+            return False, status_code
+        if attempt < attempts - 1:
+            await asyncio.sleep(0.15 * (attempt + 1))
+    return False, last_status
+
+
+async def get_match_demos(
+    championship_id: str,
+    match_id: str,
+    *,
+    expected_count: int | None = None,
+    force: bool = False,
+) -> dict[str, Any]:
+    normalized_expected = int(expected_count or 0)
+    cache_key = (championship_id, match_id, normalized_expected)
+
+    if not force:
+        cached = await _DEMO_LIST_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+    probe_indices = _build_demo_probe_indices(normalized_expected)
+    timeout = httpx.Timeout(8.0)
+    semaphore = asyncio.Semaphore(6)
+
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        try:
-            response = await client.head(url)
-            if response.status_code in (200, 206):
-                payload = {"exists": True, "url": url, "status_code": response.status_code}
-                await _DEMO_EXISTS_POS_CACHE.set(cache_key, payload)
-                return payload
-            if response.status_code not in (404, 405):
-                payload = {"exists": False, "url": url, "status_code": response.status_code}
-                await _DEMO_EXISTS_NEG_CACHE.set(cache_key, payload, ttl_seconds=120)
-                return payload
-        except httpx.HTTPError:
-            pass
+        async def probe_index(demo_index: int) -> tuple[int, str, bool]:
+            url = build_demo_url(championship_id, match_id, demo_index)
+            async with semaphore:
+                exists, _status_code = await _probe_demo_exists_retry(client, url, attempts=3)
+            return demo_index, url, exists
 
-        try:
-            response = await client.get(url, headers={"Range": "bytes=0-0"})
-            payload = {
-                "exists": response.status_code in (200, 206),
-                "url": url,
-                "status_code": response.status_code,
-            }
-            if payload["exists"]:
-                await _DEMO_EXISTS_POS_CACHE.set(cache_key, payload)
-            elif response.status_code in (404, 410):
-                await _DEMO_EXISTS_NEG_CACHE.set(cache_key, payload, ttl_seconds=300)
-            else:
-                await _DEMO_EXISTS_NEG_CACHE.set(cache_key, payload, ttl_seconds=120)
-            return payload
-        except httpx.HTTPError:
-            payload = {"exists": False, "url": url, "status_code": None}
-            await _DEMO_EXISTS_ERR_CACHE.set(cache_key, payload, ttl_seconds=45)
-            return payload
+        results = await asyncio.gather(*(probe_index(idx) for idx in probe_indices))
+
+    found_items = [
+        {"demo_index": int(demo_index), "url": str(url)}
+        for demo_index, url, exists in results
+        if exists
+    ]
+    found_items.sort(key=lambda row: row["demo_index"])
+
+    payload = {
+        "championship_id": championship_id,
+        "match_id": match_id,
+        "items": found_items,
+    }
+    ttl = 300 if found_items else 30
+    await _DEMO_LIST_CACHE.set(cache_key, payload, ttl_seconds=ttl)
+    return payload

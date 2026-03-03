@@ -58,13 +58,15 @@ class UpcomingMatchListResponse(CamelModel):
     meta: PaginationMeta
 
 
-class DemoExistsResponse(CamelModel):
+class DemoLinkItem(CamelModel):
+    demo_index: int
+    url: str
+
+
+class DemoListResponse(CamelModel):
     championship_id: str
     match_id: str
-    demo_index: int
-    exists: bool
-    url: str
-    status_code: Optional[int] = None
+    items: List[DemoLinkItem]
 
 
 class MatchBundleResponse(CamelModel):
@@ -125,20 +127,23 @@ async def get_upcoming_matches(
     )
 
 
-@router.get("/demo-exists", response_model=DemoExistsResponse)
-async def get_demo_exists(
+@router.get("/{match_id}/demos", response_model=DemoListResponse)
+async def get_match_demos(
+    match_id: str,
     championship_id: str = Query(..., min_length=1),
-    match_id: str = Query(..., min_length=1),
-    demo_index: int = Query(..., ge=0, le=7),
+    expected_count: Optional[int] = Query(None, ge=1, le=12),
+    force: bool = Query(False),
 ):
-    payload = await matches_service.check_demo_exists(championship_id, match_id, demo_index)
-    return DemoExistsResponse(
+    payload = await matches_service.get_match_demos(
+        championship_id,
+        match_id,
+        expected_count=expected_count,
+        force=force,
+    )
+    return DemoListResponse(
         championship_id=championship_id,
         match_id=match_id,
-        demo_index=demo_index,
-        exists=bool(payload.get("exists")),
-        url=str(payload.get("url") or ""),
-        status_code=payload.get("status_code"),
+        items=[DemoLinkItem(**row) for row in (payload.get("items") or [])],
     )
 
 
