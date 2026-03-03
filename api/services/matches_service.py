@@ -18,7 +18,9 @@ from api.utils.cache import AsyncTTLCache
 
 _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
-_DEMO_EXISTS_CACHE = AsyncTTLCache(ttl_seconds=86400, maxsize=4096)
+_DEMO_EXISTS_POS_CACHE = AsyncTTLCache(ttl_seconds=86400, maxsize=4096)
+_DEMO_EXISTS_NEG_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
+_DEMO_EXISTS_ERR_CACHE = AsyncTTLCache(ttl_seconds=45, maxsize=2048)
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
 
@@ -540,27 +542,48 @@ async def check_demo_exists(championship_id: str, match_id: str, demo_index: int
     url = build_demo_url(championship_id, match_id, demo_index)
     cache_key = (championship_id, match_id, demo_index)
 
-    async def producer() -> dict[str, Any]:
-        timeout = httpx.Timeout(6.0)
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            try:
-                response = await client.head(url)
-                if response.status_code in (200, 206):
-                    return {"exists": True, "url": url, "status_code": response.status_code}
-                if response.status_code not in (404, 405):
-                    return {"exists": False, "url": url, "status_code": response.status_code}
-            except httpx.HTTPError:
-                pass
+    cached_positive = await _DEMO_EXISTS_POS_CACHE.get(cache_key)
+    if cached_positive is not None:
+        return cached_positive
 
-            try:
-                response = await client.get(url, headers={"Range": "bytes=0-0"})
-                return {
-                    "exists": response.status_code in (200, 206),
-                    "url": url,
-                    "status_code": response.status_code,
-                }
-            except httpx.HTTPError:
-                return {"exists": False, "url": url, "status_code": None}
+    cached_negative = await _DEMO_EXISTS_NEG_CACHE.get(cache_key)
+    if cached_negative is not None:
+        return cached_negative
 
-    cached_value, _ = await _DEMO_EXISTS_CACHE.get_or_set(cache_key, producer)
-    return cached_value
+    cached_error = await _DEMO_EXISTS_ERR_CACHE.get(cache_key)
+    if cached_error is not None:
+        return cached_error
+
+    timeout = httpx.Timeout(6.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        try:
+            response = await client.head(url)
+            if response.status_code in (200, 206):
+                payload = {"exists": True, "url": url, "status_code": response.status_code}
+                await _DEMO_EXISTS_POS_CACHE.set(cache_key, payload)
+                return payload
+            if response.status_code not in (404, 405):
+                payload = {"exists": False, "url": url, "status_code": response.status_code}
+                await _DEMO_EXISTS_NEG_CACHE.set(cache_key, payload, ttl_seconds=120)
+                return payload
+        except httpx.HTTPError:
+            pass
+
+        try:
+            response = await client.get(url, headers={"Range": "bytes=0-0"})
+            payload = {
+                "exists": response.status_code in (200, 206),
+                "url": url,
+                "status_code": response.status_code,
+            }
+            if payload["exists"]:
+                await _DEMO_EXISTS_POS_CACHE.set(cache_key, payload)
+            elif response.status_code in (404, 410):
+                await _DEMO_EXISTS_NEG_CACHE.set(cache_key, payload, ttl_seconds=300)
+            else:
+                await _DEMO_EXISTS_NEG_CACHE.set(cache_key, payload, ttl_seconds=120)
+            return payload
+        except httpx.HTTPError:
+            payload = {"exists": False, "url": url, "status_code": None}
+            await _DEMO_EXISTS_ERR_CACHE.set(cache_key, payload, ttl_seconds=45)
+            return payload
