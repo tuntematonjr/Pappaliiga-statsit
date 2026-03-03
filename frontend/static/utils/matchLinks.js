@@ -33,10 +33,18 @@
             const matchId = resolveMatchId(match);
             if (!matchId) return;
             const maps = Array.isArray(match.maps) ? match.maps : [];
-            maps.forEach((map, idx) => {
-                if (map?.isForfeit) return;
-                out.push({ matchId, demoIndex: idx });
-            });
+            if (maps.length) {
+                maps.forEach((_map, idx) => {
+                    out.push({ matchId, demoIndex: idx });
+                });
+                return;
+            }
+            const bestOf = Number(match.bestOf ?? match.best_of ?? 0);
+            if (Number.isFinite(bestOf) && bestOf > 0) {
+                for (let idx = 0; idx < bestOf; idx += 1) {
+                    out.push({ matchId, demoIndex: idx });
+                }
+            }
         });
         return out;
     }
@@ -48,6 +56,7 @@
         mapsCount,
         existingByIndex = {},
         refreshFalse = false,
+        forceRefresh = false,
         persistCache = false
     }) {
         if (!apiClient || typeof apiClient.getMatchDemoExists !== 'function') {
@@ -73,7 +82,10 @@
                     championshipId,
                     matchId,
                     demoIndex: idx
-                }, { persistCache });
+                }, {
+                    persistCache,
+                    forceRefresh: forceRefresh === true || (refreshFalse === true && hasExisting)
+                });
                 next[idx] = {
                     exists: !!result?.exists,
                     url: result?.url || ''
@@ -89,9 +101,12 @@
         apiClient,
         championshipId,
         candidates,
+        existingByMatch = {},
+        refreshFalse = false,
+        forceRefresh = false,
         persistCache = false
     }) {
-        const byMatch = {};
+        const byMatch = { ...(existingByMatch || {}) };
         if (!apiClient || typeof apiClient.getMatchDemoExists !== 'function') return byMatch;
         if (!championshipId || !Array.isArray(candidates) || !candidates.length) return byMatch;
 
@@ -99,12 +114,19 @@
             const matchId = String(item?.matchId || '');
             const demoIndex = Number(item?.demoIndex ?? -1);
             if (!matchId || demoIndex < 0) return;
+            const existingPayload = byMatch?.[matchId]?.[demoIndex] || null;
+            if (existingPayload && !(refreshFalse && existingPayload.exists === false)) {
+                return;
+            }
             try {
                 const result = await apiClient.getMatchDemoExists({
                     championshipId,
                     matchId,
                     demoIndex
-                }, { persistCache });
+                }, {
+                    persistCache,
+                    forceRefresh: forceRefresh === true || (refreshFalse === true && existingPayload?.exists === false)
+                });
                 if (!byMatch[matchId]) byMatch[matchId] = {};
                 byMatch[matchId][demoIndex] = {
                     exists: !!result?.exists,

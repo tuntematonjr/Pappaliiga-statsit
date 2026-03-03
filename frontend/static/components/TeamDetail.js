@@ -2553,6 +2553,9 @@ window.TeamDetail = {
                         apiClient: window.apiClient,
                         championshipId: key,
                         candidates,
+                        existingByMatch: existing?.byMatch || {},
+                        refreshFalse: true,
+                        forceRefresh: true,
                         persistCache: false
                     })
                     : {};

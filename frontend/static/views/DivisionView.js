@@ -1120,6 +1120,7 @@ window.DivisionView = {
                         mapsCount: targetCount,
                         existingByIndex: existing,
                         refreshFalse: true,
+                        forceRefresh: true,
                         persistCache: false
                     })
                     : { ...existing };
@@ -1137,7 +1138,9 @@ window.DivisionView = {
         async ensureMatchBundle(match) {
             const matchId = String(match?.match_id || match?.matchId || '');
             if (!matchId || !window.apiClient || typeof window.apiClient.getMatchBundle !== 'function') return;
-            if (this.playedMatchBundles[matchId]) return;
+            const existingBundle = this.playedMatchBundles[matchId];
+            const existingMaps = Array.isArray(existingBundle?.details?.maps) ? existingBundle.details.maps.length : 0;
+            if (existingBundle && existingMaps > 0) return;
             if (this.playedMatchBundleLoading[matchId]) return;
             this.playedMatchBundleLoading = { ...this.playedMatchBundleLoading, [matchId]: true };
             try {
@@ -1146,13 +1149,15 @@ window.DivisionView = {
                     ...this.playedMatchBundles,
                     [matchId]: payload || { details: {}, playerStats: [] }
                 };
-                const mapsCount = Array.isArray(payload?.details?.maps) ? payload.details.maps.length : 0;
+                const mapsCountFromPayload = Array.isArray(payload?.details?.maps) ? payload.details.maps.length : 0;
+                const bestOf = this.toNumber(
+                    match?.best_of ?? match?.bestOf ?? payload?.details?.match?.best_of ?? payload?.details?.match?.bestOf,
+                    0
+                );
+                const mapsCount = Math.max(mapsCountFromPayload, bestOf);
                 this.ensureDemoAvailabilityForMatch(match, mapsCount);
             } catch (error) {
-                this.playedMatchBundles = {
-                    ...this.playedMatchBundles,
-                    [matchId]: { details: {}, playerStats: [] }
-                };
+                // Keep previous successful bundle if any; do not lock this match to empty payload.
             } finally {
                 this.playedMatchBundleLoading = { ...this.playedMatchBundleLoading, [matchId]: false };
             }

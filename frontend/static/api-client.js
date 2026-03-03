@@ -1204,10 +1204,15 @@
                 throw new Error('championshipId, matchId and demoIndex are required');
             }
 
+            const cacheBypass = options?.forceRefresh === true
+                ? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+                : null;
+
             const query = buildQueryString({
                 championship_id: championshipId,
                 match_id: matchId,
-                demo_index: demoIndex
+                demo_index: demoIndex,
+                _cb: cacheBypass
             });
             const routes = buildRouteCandidates('matchDemoExists', query);
             const result = await fetchWithFallback(routes, {
