@@ -16,9 +16,9 @@ from api.services.cache_helpers import (
 from api.services.player_stats_payload import build_player_stats_payload
 from api.utils.cache import AsyncTTLCache
 
-_MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=30, maxsize=256)
-_UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=30, maxsize=256)
-_DEMO_EXISTS_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
+_MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
+_UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
+_DEMO_EXISTS_CACHE = AsyncTTLCache(ttl_seconds=86400, maxsize=4096)
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
 
