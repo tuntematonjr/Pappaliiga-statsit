@@ -1949,13 +1949,6 @@ window.PlayerView = {
                             {{ comparePlayer ? 'Vaihda vertailupelaaja' : 'Vertaa pelaajaa' }}
                         </button>
                         <button
-                            v-if="String(playerId || '') === '5a278777-ed6d-45e9-983f-3d5a71f6a6c0'"
-                            type="button"
-                            class="btn-secondary"
-                        >
-                            Avaa 2D demot
-                        </button>
-                        <button
                             v-if="comparePlayer"
                             type="button"
                             class="btn-secondary"
