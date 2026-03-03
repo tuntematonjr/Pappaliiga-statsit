@@ -1768,6 +1768,7 @@ window.DivisionView = {
                                                         :href="demo.url"
                                                         target="_blank"
                                                         rel="noopener"
+                                                        title="Demojen latausmäärä per tunti on rajoitettu."
                                                         class="chip chip--link"
                                                     >Demo {{ demo.demoIndex + 1 }}</a>
                                                 </div>
