@@ -92,12 +92,7 @@ window.TeamsView = {
             if (teamChampionshipId != null && teamChampionshipId !== '') {
                 return String(teamChampionshipId);
             }
-            if (this.selectedSeasonId) {
-                return String(this.selectedSeasonId);
-            }
-            const newestSeason = Array.isArray(this.seasons) && this.seasons.length ? this.seasons[0] : null;
-            const newestSeasonId = this.getSeasonId(newestSeason);
-            return newestSeasonId != null ? String(newestSeasonId) : null;
+            return null;
         },
         getTeamRoute(team) {
             const teamId = this.getTeamId(team);

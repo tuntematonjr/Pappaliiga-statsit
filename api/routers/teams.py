@@ -18,6 +18,7 @@ class TeamInfo(CamelModel):
     display_name: Optional[str]
     avatar: Optional[str]
     faceit_url: Optional[str]
+    championship_id: Optional[str] = None
 
 
 class TeamSeasonStats(CamelModel):

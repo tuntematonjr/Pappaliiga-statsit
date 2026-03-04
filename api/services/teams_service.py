@@ -172,6 +172,27 @@ async def list_teams(
             f"""
             SELECT
                 t.team_id,
+                                COALESCE(
+                                        (
+                                                SELECT tc2.championship_id
+                                                FROM team_championships tc2
+                                                JOIN championships c2 ON c2.championship_id = tc2.championship_id
+                                                WHERE tc2.team_id = t.team_id
+                                                    AND {season_name_where}
+                                                ORDER BY tc2.updated_at DESC, tc2.created_at DESC
+                                                LIMIT 1
+                                        ),
+                                        (
+                                                SELECT c3.championship_id
+                                                FROM team_season_totals tst3
+                                                JOIN championships c3 ON c3.season = tst3.season AND c3.division_num = tst3.division_num
+                                                WHERE tst3.team_id = t.team_id
+                                                    AND tst3.season = :season
+                                                    {"AND tst3.division_num = :division" if division is not None else ""}
+                                                ORDER BY c3.is_playoffs ASC, c3.championship_id
+                                                LIMIT 1
+                                        )
+                                ) AS championship_id,
                 COALESCE(
                     NULLIF((
                         SELECT tc2.team_name
@@ -219,9 +240,31 @@ async def list_teams(
     else:
         rows = await query_async(
             """
-            SELECT team_id, name AS team_name, name AS display_name, avatar
-            FROM teams
-            ORDER BY name, team_id
+            SELECT
+                t.team_id,
+                COALESCE(
+                    (
+                        SELECT tc.championship_id
+                        FROM team_championships tc
+                        JOIN championships c ON c.championship_id = tc.championship_id
+                        WHERE tc.team_id = t.team_id
+                        ORDER BY c.season DESC, c.is_playoffs ASC, tc.updated_at DESC, tc.created_at DESC
+                        LIMIT 1
+                    ),
+                    (
+                        SELECT c4.championship_id
+                        FROM team_season_totals tst4
+                        JOIN championships c4 ON c4.season = tst4.season AND c4.division_num = tst4.division_num
+                        WHERE tst4.team_id = t.team_id
+                        ORDER BY c4.season DESC, c4.is_playoffs ASC, c4.championship_id
+                        LIMIT 1
+                    )
+                ) AS championship_id,
+                t.name AS team_name,
+                t.name AS display_name,
+                t.avatar
+            FROM teams t
+            ORDER BY t.name, t.team_id
             LIMIT :limit
             """,
             {"limit": limit},
