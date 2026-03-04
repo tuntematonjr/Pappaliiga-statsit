@@ -87,6 +87,38 @@ window.TeamsView = {
         getTeamId(team) {
             return team?.team_id || team?.teamId || null;
         },
+        getPreferredChampionshipId(team) {
+            const teamChampionshipId = team?.championship_id || team?.championshipId || null;
+            if (teamChampionshipId != null && teamChampionshipId !== '') {
+                return String(teamChampionshipId);
+            }
+            if (this.selectedSeasonId) {
+                return String(this.selectedSeasonId);
+            }
+            const newestSeason = Array.isArray(this.seasons) && this.seasons.length ? this.seasons[0] : null;
+            const newestSeasonId = this.getSeasonId(newestSeason);
+            return newestSeasonId != null ? String(newestSeasonId) : null;
+        },
+        getTeamRoute(team) {
+            const teamId = this.getTeamId(team);
+            if (!teamId) {
+                return { name: 'teams' };
+            }
+            const championshipId = this.getPreferredChampionshipId(team);
+            if (championshipId) {
+                return {
+                    name: 'team-detail',
+                    params: {
+                        championshipId,
+                        teamId: String(teamId)
+                    }
+                };
+            }
+            return {
+                name: 'team',
+                params: { teamId: String(teamId) }
+            };
+        },
         getTeamAvatar(team) {
             const fallback = window.PAPPALIIGA_DEFAULT_LOGO || '';
             const src = team?.avatar || fallback;
@@ -145,7 +177,7 @@ window.TeamsView = {
                 <router-link
                     v-for="team in filteredTeams"
                     :key="getTeamId(team)"
-                    :to="{ name: 'team', params: { teamId: getTeamId(team) } }"
+                    :to="getTeamRoute(team)"
                     class="teams-list-card"
                 >
                     <img
