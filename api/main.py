@@ -31,6 +31,14 @@ import time
 _app_start_time = time.time()
 logger = logging.getLogger(__name__)
 
+SPA_NO_STORE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "CDN-Cache-Control": "no-store",
+    "Surrogate-Control": "no-store",
+}
+
 
 # Load environment variables from .env file if present
 env_path = Path(__file__).parent.parent / ".env"
@@ -142,7 +150,7 @@ async def root(request: Request):
         return await share_preview.build_preview_for_spa_path(request, "")
 
     if index_path.exists():
-        return FileResponse(str(index_path))
+        return FileResponse(str(index_path), headers=SPA_NO_STORE_HEADERS)
     else:
         return {
             "message": "Pappaliiga Stats API",
@@ -195,7 +203,7 @@ async def spa_fallback(full_path: str, request: Request):
     index_path = frontend_dir / "index.html"
 
     if index_path.exists():
-        return FileResponse(str(index_path))
+        return FileResponse(str(index_path), headers=SPA_NO_STORE_HEADERS)
     else:
         raise HTTPException(status_code=404, detail="Frontend not found")
 
