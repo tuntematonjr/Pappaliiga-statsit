@@ -104,7 +104,7 @@ async def add_cache_control_headers(request: Request, call_next):
         return response
 
     if path.startswith("/static/"):
-        response.headers["Cache-Control"] = "public, no-cache, must-revalidate"
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
 

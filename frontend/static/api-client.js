@@ -18,9 +18,14 @@
         cacheTtlMs: Number((typeof window !== 'undefined' && window.PL_API_CACHE_TTL_MS) || 300000)
     });
 
+    const BUILD_ID =
+        (typeof window !== 'undefined' && window.PL_BUILD_ID)
+            ? String(window.PL_BUILD_ID)
+            : 'dev';
+
     const MEMORY_CACHE = new Map();
-    const PERSIST_KEY = 'pl:cache:v1';
-    const CACHE_META_KEY = 'pl:cache:meta';
+    const PERSIST_KEY = `pl:cache:${BUILD_ID}:data`;
+    const CACHE_META_KEY = `pl:cache:${BUILD_ID}:meta`;
     const MAX_PERSISTED_ENTRIES = Math.max(
         25,
         Number((typeof window !== 'undefined' && window.PL_API_PERSIST_MAX_KEYS) || 120)
