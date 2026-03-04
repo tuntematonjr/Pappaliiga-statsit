@@ -633,6 +633,8 @@ function normalizeMatch(match, teamId = null) {
             pickTeamId: m.pick_team_id || null,
             isForfeit: !!m.is_forfeit,
             winnerTeamId: mapWinnerId,
+            demoUrl: m.demo_url || m.demoUrl || m.download_url || m.downloadUrl || '',
+            demoUrls: Array.isArray(m.demo_urls || m.demoUrls) ? (m.demo_urls || m.demoUrls) : [],
             adr: toNumber(myStats.adr),
             kd: toNumber(myStats.kd),
             kills: toNumber(myStats.kills),
@@ -684,6 +686,8 @@ function normalizeMatch(match, teamId = null) {
         me: mySide,
         opponent: oppSide,
         faceitUrl: match.faceitUrl || '',
+        demoUrl: match.demo_url || match.demoUrl || '',
+        demoUrls: Array.isArray(match.demo_urls || match.demoUrls) ? (match.demo_urls || match.demoUrls) : [],
         maps
     };
 }
@@ -1906,7 +1910,8 @@ window.TeamDetail = {
             const champId = this.currentChampionshipId;
             const fallback = { items: [], byMatch: {}, loading: false, error: null };
             if (!champId) return fallback;
-            return this.matchPlayerStatsState[champId] || fallback;
+            const scopedKey = this.scopedSeasonKey(champId);
+            return this.matchPlayerStatsState[scopedKey] || fallback;
         },
         matchPlayerStatsByMatch() {
             return this.matchPlayerStatsCurrent.byMatch || {};
@@ -1918,7 +1923,8 @@ window.TeamDetail = {
             const champId = this.currentChampionshipId;
             const fallback = { loading: false, error: null, signature: '', byMatch: {} };
             if (!champId) return fallback;
-            return this.demoAvailabilityState[champId] || fallback;
+            const scopedKey = this.scopedSeasonKey(champId);
+            return this.demoAvailabilityState[scopedKey] || fallback;
         },
         isDemoAvailabilityLoading() {
             return !!this.demoAvailabilityCurrent.loading;
@@ -1963,7 +1969,7 @@ window.TeamDetail = {
                 this.loadUpcoming();
                 this.ensureDivisionPlayerBaselines(this.currentChampionshipId);
                 if (this.activeTab === 'matches') {
-                    this.ensureDemoAvailability(this.currentChampionshipId);
+                    this.ensureMatchesTabData(this.currentChampionshipId);
                 }
             }
         },
@@ -1993,15 +1999,13 @@ window.TeamDetail = {
             if (newVal === 'matches') {
                 this.$nextTick(() => {
                     this.setupMatchesChartObserver();
-                    this.ensureMatchPlayerStats(this.currentChampionshipId);
-                    this.ensureDemoAvailability(this.currentChampionshipId);
-                    this.ensureMapCatalog();
+                    this.ensureMatchesTabData(this.currentChampionshipId);
                 });
             }
         },
         matchesList() {
             if (this.activeTab === 'matches') {
-                this.ensureDemoAvailability(this.currentChampionshipId);
+                this.ensureMatchesTabData(this.currentChampionshipId);
             }
         },
         championshipId(newVal) {
@@ -2010,9 +2014,7 @@ window.TeamDetail = {
                 this.fetchSeason(String(newVal), { force: true });
                 this.expandedMatches = {};
                 if (this.activeTab === 'matches') {
-                    this.ensureMatchPlayerStats(String(newVal));
-                    this.ensureDemoAvailability(String(newVal));
-                    this.ensureMapCatalog();
+                    this.ensureMatchesTabData(String(newVal));
                 }
             }
         },
@@ -2041,9 +2043,7 @@ window.TeamDetail = {
                 this.ensureMapCatalog();
             }
             if (this.activeTab === 'matches') {
-                this.ensureMatchPlayerStats(this.currentChampionshipId);
-                this.ensureDemoAvailability(this.currentChampionshipId);
-                this.ensureMapCatalog();
+                this.ensureMatchesTabData(this.currentChampionshipId);
             }
         });
     },
@@ -2077,6 +2077,32 @@ window.TeamDetail = {
 
             this.inFlightLoads[group][key] = task;
             return task;
+        },
+        scopedSeasonKey(championshipId) {
+            if (!championshipId) return null;
+            const teamPart = this.teamId ? String(this.teamId) : 'unknown';
+            return `${teamPart}::${String(championshipId)}`;
+        },
+        hasDemoCandidateMatches() {
+            const matches = Array.isArray(this.matchesList) ? this.matchesList : [];
+            return matches.some(match => !!match?.played && Array.isArray(match?.maps) && match.maps.length > 0);
+        },
+        async ensureMatchesTabData(championshipId) {
+            if (!championshipId || !this.teamId) return;
+            const key = this.scopedSeasonKey(championshipId);
+            if (!key) return;
+            const loadKey = `${key}::hydrate`;
+            return this.runInFlightLoad('season', loadKey, async () => {
+                const hasMatches = Array.isArray(this.matchesList) && this.matchesList.length > 0;
+                const hasDemoCandidates = this.hasDemoCandidateMatches();
+                if ((!hasMatches || !hasDemoCandidates) && this.teamStore) {
+                    await this.teamStore.fetchTeamPage(this.teamId, championshipId, { force: true });
+                    await this.$nextTick();
+                }
+                this.ensureMatchPlayerStats(championshipId);
+                this.ensureDemoAvailability(championshipId);
+                this.ensureMapCatalog();
+            });
         },
         formatDate(ts) {
             return formatMatchDate(ts);
@@ -2452,9 +2478,7 @@ window.TeamDetail = {
                     this.loadUpcoming();
                     if (this.activeTab === 'matches') {
                         await this.$nextTick();
-                        this.ensureMatchPlayerStats(this.currentChampionshipId);
-                        this.ensureDemoAvailability(this.currentChampionshipId);
-                        this.ensureMapCatalog();
+                        this.ensureMatchesTabData(this.currentChampionshipId);
                     }
                 } catch (err) {
                     console.error('TeamDetail bootstrap failed', err);
@@ -2469,9 +2493,7 @@ window.TeamDetail = {
                     await this.teamStore.fetchTeamPage(this.teamId, championshipId, options);
                     if (this.activeTab === 'matches') {
                         await this.$nextTick();
-                        this.ensureMatchPlayerStats(String(championshipId));
-                        this.ensureDemoAvailability(String(championshipId));
-                        this.ensureMapCatalog();
+                        this.ensureMatchesTabData(String(championshipId));
                     }
                 } catch (err) {
                     console.error('TeamDetail season fetch failed', err);
@@ -2541,7 +2563,9 @@ window.TeamDetail = {
         },
         async ensureDemoAvailability(championshipId) {
             if (!championshipId || !window.apiClient) return;
-            const key = String(championshipId);
+            const key = this.scopedSeasonKey(championshipId);
+            if (!key) return;
+            const championshipKey = String(championshipId);
             const utils = window.MatchLinksUtils;
             const requests = (utils && typeof utils.buildDemoMatchRequests === 'function')
                 ? utils.buildDemoMatchRequests(this.matchesList)
@@ -2594,7 +2618,7 @@ window.TeamDetail = {
                             if (!matchId) return;
                             const next = await utils.fetchDemoAvailabilityForMatch({
                                 apiClient: window.apiClient,
-                                championshipId: key,
+                                championshipId: championshipKey,
                                 matchId,
                                 mapsCount: Number(req?.expectedCount || 0),
                                 existingByIndex: byMatch[matchId] || {},
@@ -2668,10 +2692,11 @@ window.TeamDetail = {
         },
         async ensureMatchPlayerStats(championshipId) {
             if (!championshipId || !this.teamId || !window.apiClient) return;
-            const key = String(championshipId);
+            const key = this.scopedSeasonKey(championshipId);
+            if (!key) return;
             const existing = this.matchPlayerStatsState[key];
             if (existing?.items?.length && !existing?.loading) return;
-            const loadKey = `${this.teamId}::${key}`;
+            const loadKey = `${key}::players`;
             return this.runInFlightLoad('matchPlayerStats', loadKey, async () => {
                 this.matchPlayerStatsState = {
                     ...this.matchPlayerStatsState,

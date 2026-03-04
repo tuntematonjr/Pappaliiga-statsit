@@ -23,8 +23,15 @@
         }
         const fresh = now() - segment.fetchedAt < FRESH_MS;
         if (!fresh) return false;
-        if (championshipId && segment.data && segment.data.currentChampionshipId) {
-            return String(segment.data.currentChampionshipId) === String(championshipId);
+        if (championshipId) {
+            const resolvedChampionship =
+                segment?.data?.currentChampionshipId
+                || segment?.data?.current_championship_id
+                || null;
+            if (!resolvedChampionship) {
+                return false;
+            }
+            return String(resolvedChampionship) === String(championshipId);
         }
         return fresh;
     }
@@ -75,7 +82,12 @@
                         const data = await window.apiClient.getTeamPage(teamId, targetChampionship);
                         entry.page.data = data || {};
                         entry.page.fetchedAt = now();
-                        entry.selectedChampionship = data?.currentChampionshipId || targetChampionship || null;
+                        const resolvedChampionship =
+                            data?.currentChampionshipId
+                            || data?.current_championship_id
+                            || targetChampionship
+                            || null;
+                        entry.selectedChampionship = resolvedChampionship;
                         return entry.page.data;
                     } catch (error) {
                         entry.page.error = error?.message || 'Joukkuesivun lataus epäonnistui';

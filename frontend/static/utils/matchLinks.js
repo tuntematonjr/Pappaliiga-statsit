@@ -18,11 +18,55 @@
         return `https://replay.pappa.aukko.net/player?demourl=${encodeURIComponent(normalized)}`;
     }
 
+    function collectInlineDemoUrls(match) {
+        if (!match || typeof match !== 'object') return [];
+        const urls = [];
+        const addUrl = value => {
+            if (value === null || value === undefined) return;
+            const normalized = String(value).trim();
+            if (!normalized) return;
+            if (!/^https?:\/\//i.test(normalized)) return;
+            urls.push(normalized);
+        };
+
+        const appendFromArray = items => {
+            if (!Array.isArray(items)) return;
+            items.forEach(item => {
+                if (typeof item === 'string') {
+                    addUrl(item);
+                    return;
+                }
+                if (!item || typeof item !== 'object') return;
+                addUrl(item.url || item.demo_url || item.demoUrl || item.download_url || item.downloadUrl || null);
+            });
+        };
+
+        addUrl(match.demo_url || match.demoUrl || null);
+        appendFromArray(match.demo_urls || match.demoUrls || match.demos || match.demo_links || match.demoLinks || []);
+
+        const maps = Array.isArray(match.maps) ? match.maps : [];
+        maps.forEach(map => {
+            if (!map || typeof map !== 'object') return;
+            addUrl(map.demo_url || map.demoUrl || map.download_url || map.downloadUrl || null);
+            appendFromArray(map.demo_urls || map.demoUrls || map.demos || map.demo_links || map.demoLinks || []);
+        });
+
+        return Array.from(new Set(urls));
+    }
+
+    function extractInlineDemoLinks(match = null) {
+        const urls = collectInlineDemoUrls(match);
+        return urls.map((url, index) => ({
+            demoIndex: index,
+            exists: true,
+            url
+        }));
+    }
+
     function extractAvailableDemoLinks(byMatch = {}, match = null) {
         const matchId = resolveMatchId(match);
-        if (!matchId) return [];
-        const hit = byMatch?.[matchId] || {};
-        return Object.entries(hit)
+        const hit = matchId ? (byMatch?.[matchId] || {}) : {};
+        const resolved = Object.entries(hit)
             .map(([demoIndex, payload]) => ({
                 demoIndex: Number(demoIndex),
                 exists: !!payload?.exists,
@@ -30,6 +74,10 @@
             }))
             .filter(item => item.exists && item.url)
             .sort((a, b) => a.demoIndex - b.demoIndex);
+        if (resolved.length > 0) {
+            return resolved;
+        }
+        return extractInlineDemoLinks(match);
     }
 
     function buildDemoMatchRequests(matches = []) {
@@ -141,6 +189,7 @@
         resolveMatchId,
         getFaceitRoomUrl,
         getReplay2DUrl,
+        extractInlineDemoLinks,
         extractAvailableDemoLinks,
         buildDemoMatchRequests,
         fetchDemoLinksForMatch,

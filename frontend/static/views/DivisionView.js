@@ -1106,7 +1106,25 @@ window.DivisionView = {
         availableDemoLinks(match) {
             const utils = window.MatchLinksUtils;
             if (!utils || typeof utils.extractAvailableDemoLinks !== 'function') return [];
-            return utils.extractAvailableDemoLinks(this.demoAvailabilityByMatch, match);
+            const resolved = utils.extractAvailableDemoLinks(this.demoAvailabilityByMatch, match);
+            if (Array.isArray(resolved) && resolved.length) {
+                return resolved;
+            }
+            const matchId = String(match?.match_id || match?.matchId || '');
+            const bundle = matchId ? this.playedMatchBundles[matchId] : null;
+            const details = bundle?.details || null;
+            if (!details) {
+                return resolved;
+            }
+            const fallbackMatch = {
+                ...(match || {}),
+                maps: Array.isArray(details.maps) ? details.maps : (Array.isArray(match?.maps) ? match.maps : []),
+                demo_urls: details.demo_urls || details.demoUrls || match?.demo_urls || match?.demoUrls || []
+            };
+            if (typeof utils.extractInlineDemoLinks === 'function') {
+                return utils.extractInlineDemoLinks(fallbackMatch);
+            }
+            return resolved;
         },
         isDemoAvailabilityLoading(match) {
             const matchId = String(match?.match_id || match?.matchId || '');
