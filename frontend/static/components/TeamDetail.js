@@ -842,8 +842,18 @@ window.TeamDetail = {
             if (!this.teamStore || !this.teamId) return null;
             return this.teamStore.getTeamState(this.teamId);
         },
+        pageCacheChampionshipId() {
+            if (this.selectedChampionship) return String(this.selectedChampionship);
+            if (this.championshipId) return String(this.championshipId);
+            return null;
+        },
         pageSegment() {
-            return this.teamEntry?.page || createSegment();
+            if (!this.teamStore || !this.teamId || typeof this.teamStore.getTeamPageSegment !== 'function') {
+                return this.teamEntry?.page || createSegment();
+            }
+            return this.teamStore.getTeamPageSegment(this.teamId, this.pageCacheChampionshipId)
+                || this.teamEntry?.page
+                || createSegment();
         },
         pageData() {
             return this.pageSegment.data || null;

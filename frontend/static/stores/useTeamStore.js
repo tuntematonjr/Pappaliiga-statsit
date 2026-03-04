@@ -17,6 +17,12 @@
         };
     }
 
+    function cacheKeyFor(teamId, championshipId) {
+        const teamPart = String(teamId || '');
+        const champPart = championshipId ? String(championshipId) : 'auto';
+        return `${teamPart}::${champPart}`;
+    }
+
     function isFresh(segment, championshipId) {
         if (!segment || !segment.fetchedAt || segment.error) {
             return false;
@@ -46,6 +52,15 @@
                     if (!teamId) return null;
                     return state.teams[teamId] || null;
                 };
+            },
+            getTeamPageSegment(state) {
+                return (teamId, championshipId = null) => {
+                    if (!teamId) return null;
+                    const entry = state.teams[teamId] || null;
+                    if (!entry) return null;
+                    const key = cacheKeyFor(teamId, championshipId);
+                    return entry.pages?.[key] || entry.page || null;
+                };
             }
         },
         actions: {
@@ -53,6 +68,7 @@
                 if (!teamId) return null;
                 if (!this.teams[teamId]) {
                     this.teams[teamId] = {
+                        pages: {},
                         page: createSegment(),
                         selectedChampionship: null
                     };
@@ -64,41 +80,52 @@
                 const entry = this.ensureTeamEntry(teamId);
                 const { force = false } = options;
                 const targetChampionship = championshipId || entry.selectedChampionship || null;
+                const key = cacheKeyFor(teamId, targetChampionship);
+                if (!entry.pages[key]) {
+                    entry.pages[key] = createSegment();
+                }
+                const segment = entry.pages[key];
+                entry.page = segment;
 
-                if (entry.page.loading && entry.page.promise) {
+                if (segment.loading && segment.promise) {
                     try {
-                        await entry.page.promise;
+                        await segment.promise;
                     } catch (_error) {
                     }
                 }
-                if (!force && isFresh(entry.page, targetChampionship)) {
-                    return entry.page.data;
+                if (!force && isFresh(segment, targetChampionship)) {
+                    return segment.data;
                 }
 
-                entry.page.loading = true;
-                entry.page.error = null;
-                entry.page.promise = (async () => {
+                segment.loading = true;
+                segment.error = null;
+                segment.promise = (async () => {
                     try {
                         const data = await window.apiClient.getTeamPage(teamId, targetChampionship);
-                        entry.page.data = data || {};
-                        entry.page.fetchedAt = now();
+                        segment.data = data || {};
+                        segment.fetchedAt = now();
                         const resolvedChampionship =
                             data?.currentChampionshipId
                             || data?.current_championship_id
                             || targetChampionship
                             || null;
                         entry.selectedChampionship = resolvedChampionship;
-                        return entry.page.data;
+                        if (resolvedChampionship) {
+                            const resolvedKey = cacheKeyFor(teamId, resolvedChampionship);
+                            entry.pages[resolvedKey] = segment;
+                        }
+                        entry.page = segment;
+                        return segment.data;
                     } catch (error) {
-                        entry.page.error = error?.message || 'Joukkuesivun lataus epäonnistui';
+                        segment.error = error?.message || 'Joukkuesivun lataus epäonnistui';
                         throw error;
                     } finally {
-                        entry.page.loading = false;
-                        entry.page.promise = null;
+                        segment.loading = false;
+                        segment.promise = null;
                     }
                 })();
 
-                return entry.page.promise;
+                return segment.promise;
             }
         }
     });
