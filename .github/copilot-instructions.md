@@ -57,6 +57,20 @@
 - Season selector defaults to latest; use championship names to differentiate playoffs vs regular.
 - API base resolves at runtime (`window.PL_API_URL` or `window.__API_BASE__` or origin + `/api`).
 
+### SPA navigation & caching guardrails (important)
+- Never `return` early from route watchers right after route normalization (`router.replace`) if data fetch should still run.
+- When route params change quickly, guard async loaders with request tokens so stale responses cannot overwrite the latest view state.
+- Prefer remount safety for detail pages on param changes:
+	- app-level `router-view` keyed by route name + params (`frontend/static/app-main.js`)
+	- local `:key` on detail wrappers when needed (e.g. `TeamDetailView`).
+- In-flight keys must include route context (team/player + championship) so SPA transitions do not reuse wrong pending work.
+- Team store fetches should await active in-flight promise before deciding freshness; avoid returning stale `entry.page.data` while another championship is loading.
+- Demo links:
+	- probe results should be strict (do not treat 429 as “exists”)
+	- avoid aggressive duplicate probe retries that spike rate limits
+	- 2D replay links should open in a new tab without redirecting the current tab.
+- Hosted Linux/proxy deployments: persistent browser cache must be build-versioned (`PL_BUILD_ID`), and static responses should use no-store headers to avoid stale JS after deploy.
+
 ## Common Pitfalls
 1) Exceeding DB pool budget when raising `--max-concurrency`/`--max-db-concurrency` without bumping `DB_POOL_MAX_SIZE`.
 2) Skipping `_retry_on_deadlock` or bypassing `db_async.py` helpers for writes.
@@ -64,6 +78,8 @@
 4) Forgetting banned-team handling—set `ignored_due_ban` so stats exclude those matches.
 5) Bypassing `faceit_client_async.py` (ignores limiter) or running sync without diagnostics (`SYNC_DIAGNOSTICS`).
 6) Breaking SPA deep links—keep backend fallback in place and include `championship` query on team links inside a division.
+7) SPA stale-state regressions after internal navigation: route watcher early-returns, non-contextual in-flight keys, or missing request-token guards can make views require F5.
+8) Hosted env mismatch vs local: stale localStorage/API cache or proxy/static caching can hide fresh frontend fixes until hard refresh.
 
 ## Key Files
 - Data sync: `sync.py`, `sync_pipeline.py`, `division_registry.py`, `faceit_client_async.py`, `division_overrides.json`.
