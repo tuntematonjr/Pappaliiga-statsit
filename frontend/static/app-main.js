@@ -102,9 +102,12 @@ const app = createApp({
         <GlobalNav />
         <main class="main-content">
             <div class="layout-boundary main-surface">
-                <router-view v-slot="{ Component }">
+                <router-view v-slot="{ Component, route }">
                     <transition name="fade" mode="out-in">
-                        <component :is="Component"></component>
+                        <component
+                            :is="Component"
+                            :key="(route && route.name ? String(route.name) : '') + '::' + JSON.stringify((route && route.params) || {})"
+                        ></component>
                     </transition>
                 </router-view>
             </div>

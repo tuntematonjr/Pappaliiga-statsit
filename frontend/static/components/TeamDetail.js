@@ -2450,6 +2450,12 @@ window.TeamDetail = {
                         this.updateRoute(this.selectedChampionship, this.activeTab);
                     }
                     this.loadUpcoming();
+                    if (this.activeTab === 'matches') {
+                        await this.$nextTick();
+                        this.ensureMatchPlayerStats(this.currentChampionshipId);
+                        this.ensureDemoAvailability(this.currentChampionshipId);
+                        this.ensureMapCatalog();
+                    }
                 } catch (err) {
                     console.error('TeamDetail bootstrap failed', err);
                 }
@@ -2461,6 +2467,12 @@ window.TeamDetail = {
             return this.runInFlightLoad('season', key, async () => {
                 try {
                     await this.teamStore.fetchTeamPage(this.teamId, championshipId, options);
+                    if (this.activeTab === 'matches') {
+                        await this.$nextTick();
+                        this.ensureMatchPlayerStats(String(championshipId));
+                        this.ensureDemoAvailability(String(championshipId));
+                        this.ensureMapCatalog();
+                    }
                 } catch (err) {
                     console.error('TeamDetail season fetch failed', err);
                 }

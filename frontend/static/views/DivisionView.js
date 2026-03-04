@@ -403,7 +403,10 @@ window.DivisionView = {
                 { id: 'heroes', label: 'Sankarit' }
             ],
             activeTeamChipId: null,
-            sankariPlaceholderOrderCache: {}
+            sankariPlaceholderOrderCache: {},
+            divisionLoadToken: 0,
+            upcomingLoadToken: 0,
+            matchesLoadToken: 0
         };
     },
     computed: {
@@ -809,8 +812,14 @@ window.DivisionView = {
             immediate: true,
             async handler(id) {
                 if (!id) return;
-                const routeUpdated = this.syncCompactRoute(id);
-                if (routeUpdated) return;
+                this.syncCompactRoute(id);
+                this.expandedPlayedMatches = {};
+                this.playedMatchBundles = {};
+                this.playedMatchBundleLoading = {};
+                this.demoAvailabilityByMatch = {};
+                this.demoAvailabilityLoading = {};
+                this.playedRowsPrefetching = false;
+                this.playedRowsPrefetchKey = '';
                 await this.loadDivision(id);
                 this.loadUpcoming(id);
                 this.loadDivisionMatches(id);
@@ -859,15 +868,20 @@ window.DivisionView = {
         },
         async loadDivision(id, options = {}) {
             if (!id || !this.divisionStore) return;
+            const requestToken = ++this.divisionLoadToken;
             const requests = [
                 this.divisionStore.fetchDivisionDetails(id, { force: options.force === true }),
                 this.divisionStore.fetchDivisionStandings(id, { force: options.force === true }),
                 this.divisionStore.fetchDivisionMaps(id, { force: options.force === true })
             ];
             await Promise.allSettled(requests);
+            if (requestToken !== this.divisionLoadToken) {
+                return;
+            }
         },
         async loadUpcoming(id, options = {}) {
             if (!id || !this.upcomingStore) return;
+            const requestToken = ++this.upcomingLoadToken;
             try {
                 await this.upcomingStore.fetchUpcomingMatches(
                     { championshipId: id, limit: this.upcomingFetchLimit, offset: 0 },
@@ -875,6 +889,10 @@ window.DivisionView = {
                 );
             } catch (error) {
                 console.error('[DivisionView] upcoming matches fetch failed', error);
+            } finally {
+                if (requestToken !== this.upcomingLoadToken) {
+                    return;
+                }
             }
         },
         async loadDivisionMatches(id, options = {}) {
@@ -884,18 +902,28 @@ window.DivisionView = {
                 this.divisionMatchesLoading = false;
                 return;
             }
+            const requestToken = ++this.matchesLoadToken;
             this.divisionMatchesLoading = true;
             this.divisionMatchesError = null;
             try {
                 const rows = await window.apiClient.getDivisionMatches(id, { force: options.force === true });
+                if (requestToken !== this.matchesLoadToken || String(id) !== String(this.championshipId || '')) {
+                    return;
+                }
                 this.divisionMatches = Array.isArray(rows) ? rows : [];
                 if (this.matchViewMode === 'played') {
                     this.prefetchPlayedRowData();
                 }
             } catch (error) {
+                if (requestToken !== this.matchesLoadToken || String(id) !== String(this.championshipId || '')) {
+                    return;
+                }
                 this.divisionMatchesError = error?.message || 'Otteluiden lataus epäonnistui';
                 this.divisionMatches = [];
             } finally {
+                if (requestToken !== this.matchesLoadToken || String(id) !== String(this.championshipId || '')) {
+                    return;
+                }
                 this.divisionMatchesLoading = false;
             }
         },

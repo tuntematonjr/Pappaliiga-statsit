@@ -16,6 +16,7 @@ window.TeamDetailView = {
         <div class="team-detail-view">
             <team-detail
                 v-if="teamId"
+                :key="String(teamId) + '::' + String(championshipId || 'auto')"
                 :team-id="teamId"
                 :championship-id="championshipId"
             ></team-detail>

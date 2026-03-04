@@ -12,7 +12,8 @@
             data: null,
             loading: false,
             error: null,
-            fetchedAt: null
+            fetchedAt: null,
+            promise: null
         };
     }
 
@@ -57,8 +58,11 @@
                 const { force = false } = options;
                 const targetChampionship = championshipId || entry.selectedChampionship || null;
 
-                if (entry.page.loading) {
-                    return entry.page.data;
+                if (entry.page.loading && entry.page.promise) {
+                    try {
+                        await entry.page.promise;
+                    } catch (_error) {
+                    }
                 }
                 if (!force && isFresh(entry.page, targetChampionship)) {
                     return entry.page.data;
@@ -66,18 +70,23 @@
 
                 entry.page.loading = true;
                 entry.page.error = null;
-                try {
-                    const data = await window.apiClient.getTeamPage(teamId, targetChampionship);
-                    entry.page.data = data || {};
-                    entry.page.fetchedAt = now();
-                    entry.selectedChampionship = data?.currentChampionshipId || targetChampionship || null;
-                    return entry.page.data;
-                } catch (error) {
-                    entry.page.error = error?.message || 'Joukkuesivun lataus epäonnistui';
-                    throw error;
-                } finally {
-                    entry.page.loading = false;
-                }
+                entry.page.promise = (async () => {
+                    try {
+                        const data = await window.apiClient.getTeamPage(teamId, targetChampionship);
+                        entry.page.data = data || {};
+                        entry.page.fetchedAt = now();
+                        entry.selectedChampionship = data?.currentChampionshipId || targetChampionship || null;
+                        return entry.page.data;
+                    } catch (error) {
+                        entry.page.error = error?.message || 'Joukkuesivun lataus epäonnistui';
+                        throw error;
+                    } finally {
+                        entry.page.loading = false;
+                        entry.page.promise = null;
+                    }
+                })();
+
+                return entry.page.promise;
             }
         }
     });

@@ -1484,7 +1484,8 @@ window.PlayerView = {
         },
         async bootstrap() {
             if (!this.playerStore || !this.playerId) return;
-            const key = String(this.playerId);
+            const requestedChampionshipId = this.requestedChampionshipId() || 'auto';
+            const key = `${String(this.playerId)}::${String(requestedChampionshipId)}`;
             return this.runInFlightLoad('bootstrap', key, async () => {
                 this.compareVisible = false;
                 this.compareMetrics = [];
