@@ -55,7 +55,8 @@ window.SeasonsView = {
         return {
             loading: true,
             error: null,
-            seasons: []
+            seasons: [],
+            seasonsLoadToken: 0
         };
     },
     async mounted() {
@@ -63,11 +64,16 @@ window.SeasonsView = {
     },
     methods: {
         async loadSeasons() {
+            const requestToken = ++this.seasonsLoadToken;
             this.loading = true;
             this.error = null;
             
             try {
-                const seasons = await window.apiClient.getSeasons();
+                const seasons = await window.apiClient.getSeasons({
+                    force: true,
+                    noCache: true,
+                    persistCache: false
+                });
                 const normalized = await Promise.all(
                     (Array.isArray(seasons) ? seasons : []).map(async season => {
                         const seasonId = season.season ?? season.id ?? season.season_id ?? season.seasonId;
@@ -75,7 +81,11 @@ window.SeasonsView = {
 
                         if (seasonId != null) {
                             try {
-                                const response = await window.apiClient.getDivisions(seasonId);
+                                const response = await window.apiClient.getDivisions(seasonId, {
+                                    force: true,
+                                    noCache: true,
+                                    persistCache: false
+                                });
                                 const fullList = response?.data ?? response ?? [];
                                 const hasPlayoffsStarted =
                                     typeof window !== 'undefined' && window.divisionNormalizer?.hasPlayoffsStarted
@@ -124,10 +134,19 @@ window.SeasonsView = {
                         };
                     })
                 );
+                if (requestToken !== this.seasonsLoadToken) {
+                    return;
+                }
                 this.seasons = normalized;
             } catch (err) {
+                if (requestToken !== this.seasonsLoadToken) {
+                    return;
+                }
                 this.error = err.message || 'Kausien lataus epäonnistui';
             } finally {
+                if (requestToken !== this.seasonsLoadToken) {
+                    return;
+                }
                 this.loading = false;
             }
         },

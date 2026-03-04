@@ -797,10 +797,10 @@
             return { data: payload || {}, meta: result?.meta || {} };
         }
 
-        async getDivisions(seasonId) {
+        async getDivisions(seasonId, options = {}) {
             const identifier = encodeSeasonId(seasonId);
             const routes = buildRouteCandidates('divisions', identifier);
-            const result = await fetchWithFallback(routes);
+            const result = await fetchWithFallback(routes, options);
             const basePayload = result?.data ?? result;
             const { list, meta: payloadMeta } = extractDivisionArray(basePayload);
             const meta = { ...(payloadMeta || {}), ...(result?.meta || {}) };
@@ -814,9 +814,9 @@
             return await fetchJson('/stats/summary/all');
         }
 
-        async getSeasons() {
+        async getSeasons(options = {}) {
             const routes = buildRouteCandidates('seasons');
-            const result = await fetchWithFallback(routes);
+            const result = await fetchWithFallback(routes, options);
             const payload = result?.data ?? result;
             return Array.isArray(payload) ? payload : [];
         }

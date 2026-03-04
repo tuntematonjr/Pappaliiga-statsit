@@ -11,7 +11,9 @@ window.PlayersView = {
             seasons: [],
             selectedSeasonId: '',
             players: [],
-            search: ''
+            search: '',
+            seasonsLoadToken: 0,
+            playersLoadToken: 0
         };
     },
     computed: {
@@ -47,16 +49,28 @@ window.PlayersView = {
     },
     methods: {
         async loadSeasons() {
+            const requestToken = ++this.seasonsLoadToken;
             try {
-                const rows = await window.apiClient.getSeasons();
+                const rows = await window.apiClient.getSeasons({
+                    force: true,
+                    noCache: true,
+                    persistCache: false
+                });
                 const normalized = Array.isArray(rows) ? [...rows] : [];
+                if (requestToken !== this.seasonsLoadToken) {
+                    return;
+                }
                 this.seasons = normalized.sort((a, b) => Number(this.getSeasonId(b) || 0) - Number(this.getSeasonId(a) || 0));
             } catch (error) {
+                if (requestToken !== this.seasonsLoadToken) {
+                    return;
+                }
                 console.warn('[PlayersView] seasons fetch failed', error);
                 this.seasons = [];
             }
         },
         async loadPlayers() {
+            const requestToken = ++this.playersLoadToken;
             this.loading = true;
             this.error = null;
             try {
@@ -64,13 +78,26 @@ window.PlayersView = {
                 if (this.selectedSeasonId) {
                     params.season = this.selectedSeasonId;
                 }
-                const rows = await window.apiClient.getPlayers(params);
+                const rows = await window.apiClient.getPlayers(params, {
+                    force: true,
+                    noCache: true,
+                    persistCache: false
+                });
+                if (requestToken !== this.playersLoadToken) {
+                    return;
+                }
                 this.players = Array.isArray(rows)
                     ? [...rows].sort((a, b) => this.getPlayerName(a).localeCompare(this.getPlayerName(b), 'fi'))
                     : [];
             } catch (error) {
+                if (requestToken !== this.playersLoadToken) {
+                    return;
+                }
                 this.error = error?.message || 'Pelaajien lataus epäonnistui';
             } finally {
+                if (requestToken !== this.playersLoadToken) {
+                    return;
+                }
                 this.loading = false;
             }
         },
