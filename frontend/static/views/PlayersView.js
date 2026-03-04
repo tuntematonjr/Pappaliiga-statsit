@@ -80,6 +80,33 @@ window.PlayersView = {
         getPlayerId(player) {
             return player?.player_id || player?.playerId || null;
         },
+        getPreferredChampionshipId(player) {
+            const championshipId = player?.championship_id || player?.championshipId || null;
+            if (championshipId != null && String(championshipId).trim() !== '') {
+                return String(championshipId);
+            }
+            return null;
+        },
+        getPlayerRoute(player) {
+            const playerId = this.getPlayerId(player);
+            if (!playerId) {
+                return { name: 'players' };
+            }
+            const championshipId = this.getPreferredChampionshipId(player);
+            if (championshipId) {
+                return {
+                    name: 'player-detail',
+                    params: {
+                        championshipId,
+                        playerId: String(playerId)
+                    }
+                };
+            }
+            return {
+                name: 'player',
+                params: { playerId: String(playerId) }
+            };
+        },
         getPlayerAvatar(player) {
             const fallback = window.PAPPALIIGA_DEFAULT_LOGO || '';
             const src = player?.avatar || fallback;
@@ -145,7 +172,7 @@ window.PlayersView = {
                 <router-link
                     v-for="player in filteredPlayers"
                     :key="getPlayerId(player)"
-                    :to="{ name: 'player', params: { playerId: getPlayerId(player) } }"
+                    :to="getPlayerRoute(player)"
                     class="teams-list-card"
                 >
                     <img

@@ -320,6 +320,13 @@ function createSegment() {
     return { data: null, loading: false, error: null };
 }
 
+function isLikelyChampionshipUuid(value) {
+    if (value === null || value === undefined) return false;
+    const normalized = String(value).trim();
+    if (!normalized) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized);
+}
+
 function buildSeasonOption(season) {
     const championshipId = String(season.championship_id || season.championshipId || season.id || '');
     const seasonNum = toNumber(season.season);
@@ -1469,7 +1476,8 @@ window.PlayerView = {
             const raw = this.$route?.params?.championshipId;
             if (raw === null || raw === undefined) return null;
             const value = String(raw).trim();
-            return value || null;
+            if (!value) return null;
+            return isLikelyChampionshipUuid(value) ? value : null;
         },
         resolvePreferredSeasonId(options = []) {
             if (!Array.isArray(options) || !options.length) return null;

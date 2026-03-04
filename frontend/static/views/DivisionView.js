@@ -406,7 +406,10 @@ window.DivisionView = {
             sankariPlaceholderOrderCache: {},
             divisionLoadToken: 0,
             upcomingLoadToken: 0,
-            matchesLoadToken: 0
+            matchesLoadToken: 0,
+            championshipResolveToken: 0,
+            resolvedChampionshipId: null,
+            resolvedRouteSource: null
         };
     },
     computed: {
@@ -812,7 +815,19 @@ window.DivisionView = {
             immediate: true,
             async handler(id) {
                 if (!id) return;
-                this.syncCompactRoute(id);
+                const rawId = String(id);
+                const resolveToken = ++this.championshipResolveToken;
+                const resolvedId = await this.resolveChampionshipId(rawId);
+                if (resolveToken !== this.championshipResolveToken) {
+                    return;
+                }
+                if (!resolvedId) {
+                    return;
+                }
+                const normalizedId = String(resolvedId);
+                this.resolvedRouteSource = rawId;
+                this.resolvedChampionshipId = normalizedId;
+                this.syncCompactRoute(normalizedId);
                 this.expandedPlayedMatches = {};
                 this.playedMatchBundles = {};
                 this.playedMatchBundleLoading = {};
@@ -820,9 +835,9 @@ window.DivisionView = {
                 this.demoAvailabilityLoading = {};
                 this.playedRowsPrefetching = false;
                 this.playedRowsPrefetchKey = '';
-                await this.loadDivision(id);
-                this.loadUpcoming(id);
-                this.loadDivisionMatches(id);
+                await this.loadDivision(normalizedId);
+                this.loadUpcoming(normalizedId);
+                this.loadDivisionMatches(normalizedId);
             }
         },
         matchViewMode: {
@@ -849,6 +864,30 @@ window.DivisionView = {
         }
     },
     methods: {
+        isLikelyChampionshipUuid(value) {
+            if (value === null || value === undefined) return false;
+            const normalized = String(value).trim();
+            if (!normalized) return false;
+            return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(normalized);
+        },
+        async resolveChampionshipId(rawId) {
+            const normalizedRaw = String(rawId || '').trim();
+            if (!normalizedRaw) return null;
+            if (this.isLikelyChampionshipUuid(normalizedRaw)) {
+                return normalizedRaw;
+            }
+            if (!window.apiClient || typeof window.apiClient.getDivisionById !== 'function') {
+                return null;
+            }
+            try {
+                const details = await window.apiClient.getDivisionById(normalizedRaw, { force: true, noCache: true });
+                const canonical = details?.championship_id || details?.championshipId || null;
+                if (!canonical) return null;
+                return String(canonical);
+            } catch (_error) {
+                return null;
+            }
+        },
         syncCompactRoute(championshipId) {
             if (!this.$router || !this.$route || !championshipId) return false;
             const targetName = 'division';
@@ -907,7 +946,8 @@ window.DivisionView = {
             this.divisionMatchesError = null;
             try {
                 const rows = await window.apiClient.getDivisionMatches(id, { force: options.force === true });
-                if (requestToken !== this.matchesLoadToken || String(id) !== String(this.championshipId || '')) {
+                const activeChampionshipId = String(this.resolvedChampionshipId || this.championshipId || '');
+                if (requestToken !== this.matchesLoadToken || String(id) !== activeChampionshipId) {
                     return;
                 }
                 this.divisionMatches = Array.isArray(rows) ? rows : [];
@@ -915,13 +955,15 @@ window.DivisionView = {
                     this.prefetchPlayedRowData();
                 }
             } catch (error) {
-                if (requestToken !== this.matchesLoadToken || String(id) !== String(this.championshipId || '')) {
+                const activeChampionshipId = String(this.resolvedChampionshipId || this.championshipId || '');
+                if (requestToken !== this.matchesLoadToken || String(id) !== activeChampionshipId) {
                     return;
                 }
                 this.divisionMatchesError = error?.message || 'Otteluiden lataus epäonnistui';
                 this.divisionMatches = [];
             } finally {
-                if (requestToken !== this.matchesLoadToken || String(id) !== String(this.championshipId || '')) {
+                const activeChampionshipId = String(this.resolvedChampionshipId || this.championshipId || '');
+                if (requestToken !== this.matchesLoadToken || String(id) !== activeChampionshipId) {
                     return;
                 }
                 this.divisionMatchesLoading = false;

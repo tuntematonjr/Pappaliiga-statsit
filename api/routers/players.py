@@ -18,6 +18,7 @@ class PlayerInfo(CamelModel):
     nickname: str
     avatar: Optional[str]
     faceit_url: Optional[str]
+    championship_id: Optional[str] = None
 
 
 class PlayerSeasonStats(CamelModel):

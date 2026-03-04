@@ -456,6 +456,16 @@ async def list_players(
         query = """
             SELECT DISTINCT
                 p.player_id,
+                (
+                    SELECT pcx.championship_id
+                    FROM player_championships pcx
+                    JOIN championships cx ON cx.championship_id = pcx.championship_id
+                    WHERE pcx.player_id = p.player_id
+                      AND cx.season = :season
+                      {division_filter_subquery}
+                    ORDER BY pcx.updated_at DESC, pcx.created_at DESC
+                    LIMIT 1
+                ) AS championship_id,
                 COALESCE(pc.player_name, p.nickname) AS nickname,
                 p.avatar,
                 p.faceit_url
@@ -477,7 +487,11 @@ async def list_players(
         if team_id:
             filters.append("pst.team_id = :team_id")
             params["team_id"] = team_id
-        query = query.format(where_clause=" AND ".join(filters))
+        division_filter_subquery = "AND cx.division_num = :division" if division is not None else ""
+        query = query.format(
+            where_clause=" AND ".join(filters),
+            division_filter_subquery=division_filter_subquery,
+        )
         query += " ORDER BY nickname LIMIT :limit"
         try:
             rows = await query_async(query, params)
@@ -485,6 +499,16 @@ async def list_players(
             fallback_query = """
                 SELECT DISTINCT
                     p.player_id,
+                    (
+                        SELECT pcx.championship_id
+                        FROM player_championships pcx
+                        JOIN championships cx ON cx.championship_id = pcx.championship_id
+                        WHERE pcx.player_id = p.player_id
+                          AND cx.season = :season
+                          {division_filter_subquery}
+                        ORDER BY pcx.updated_at DESC, pcx.created_at DESC
+                        LIMIT 1
+                    ) AS championship_id,
                     COALESCE(pc.player_name, p.nickname) AS nickname
                 FROM players p
                 JOIN player_season_totals pst ON pst.player_id = p.player_id
@@ -497,15 +521,30 @@ async def list_players(
                    AND pc.championship_id = c.championship_id
                 WHERE {where_clause}
             """
-            fallback_query = fallback_query.format(where_clause=" AND ".join(filters))
+            fallback_query = fallback_query.format(
+                where_clause=" AND ".join(filters),
+                division_filter_subquery=division_filter_subquery,
+            )
             fallback_query += " ORDER BY nickname LIMIT :limit"
             rows = await query_async(fallback_query, params)
     else:
         try:
             rows = await query_async(
                 """
-                SELECT player_id, nickname, avatar, faceit_url
-                FROM players
+                SELECT
+                    p.player_id,
+                    (
+                        SELECT pc.championship_id
+                        FROM player_championships pc
+                        JOIN championships c ON c.championship_id = pc.championship_id
+                        WHERE pc.player_id = p.player_id
+                        ORDER BY c.season DESC, c.is_playoffs ASC, pc.updated_at DESC, pc.created_at DESC
+                        LIMIT 1
+                    ) AS championship_id,
+                    p.nickname,
+                    p.avatar,
+                    p.faceit_url
+                FROM players p
                 ORDER BY nickname
                 LIMIT :limit
                 """,
@@ -514,8 +553,18 @@ async def list_players(
         except Exception:
             rows = await query_async(
                 """
-                SELECT player_id, nickname
-                FROM players
+                SELECT
+                    p.player_id,
+                    (
+                        SELECT pc.championship_id
+                        FROM player_championships pc
+                        JOIN championships c ON c.championship_id = pc.championship_id
+                        WHERE pc.player_id = p.player_id
+                        ORDER BY c.season DESC, c.is_playoffs ASC, pc.updated_at DESC, pc.created_at DESC
+                        LIMIT 1
+                    ) AS championship_id,
+                    p.nickname
+                FROM players p
                 ORDER BY nickname
                 LIMIT :limit
                 """,
