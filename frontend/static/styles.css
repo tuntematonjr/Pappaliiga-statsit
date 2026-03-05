@@ -3336,6 +3336,7 @@
 .radar-chart__wrap {
     width: min(480px, 100%);
     aspect-ratio: 1 / 1;
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -3346,6 +3347,32 @@
     width: 100%;
     height: auto;
     flex: 1 1 auto;
+}
+
+.radar-chart__comparison {
+    mix-blend-mode: screen;
+}
+
+.radar-chart__shape {
+    mix-blend-mode: screen;
+}
+
+.radar-chart__point {
+    pointer-events: auto;
+    transition: opacity 120ms ease, filter 120ms ease;
+}
+
+.radar-chart__point:hover {
+    opacity: 1;
+    filter: brightness(1.2);
+}
+
+.radar-chart__point--comparison {
+    opacity: 0.92;
+}
+
+.radar-chart__point--player {
+    filter: drop-shadow(0 0 4px rgba(96, 165, 250, 0.55));
 }
 
 .radar-chart__label {
@@ -3379,34 +3406,84 @@
 }
 
 .radar-chart__metric-values {
-    margin-top: 0.35rem;
+    margin-top: 0.42rem;
     width: min(560px, 100%);
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    justify-items: center;
-    gap: 0.25rem 0.6rem;
+    overflow-x: auto;
 }
 
-.radar-chart__metric-row {
-    display: flex;
-    align-items: baseline;
-    gap: 0.25rem;
-    font-size: 0.74rem;
-    color: rgba(208, 220, 242, 0.9);
+.radar-chart__metric-table {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid rgba(118, 163, 233, 0.2);
+    background: linear-gradient(180deg, rgba(10, 24, 58, 0.52), rgba(8, 18, 44, 0.44));
+    padding: 0.2rem 0.36rem;
+}
+
+.radar-chart__metric-grid {
+    display: grid;
+    grid-template-columns: minmax(110px, 1.5fr) repeat(5, minmax(48px, 0.72fr));
+    align-items: center;
+    column-gap: 0.35rem;
+}
+
+.radar-chart__metric-head {
+    min-height: 1.45rem;
+    border-bottom: 1px solid rgba(120, 165, 228, 0.2);
+    color: rgba(176, 197, 229, 0.82);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.radar-chart__metric-line {
+    min-height: 1.72rem;
+    border-bottom: 1px solid rgba(116, 156, 214, 0.14);
+}
+
+.radar-chart__metric-line:last-child {
+    border-bottom: none;
+}
+
+.radar-chart__metric-col {
+    font-size: 0.78rem;
+    color: rgba(220, 233, 255, 0.94);
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
-.radar-chart__metric-name {
-    color: rgba(223, 234, 255, 0.96);
+.radar-chart__metric-col--name {
     font-weight: 700;
+    color: rgba(230, 240, 255, 0.98);
 }
 
-.radar-chart__metric-text {
-    color: rgba(190, 206, 232, 0.9);
+.radar-chart__metric-col--player {
+    color: #93c5fd;
+}
+
+.radar-chart__metric-col--division {
+    color: #fbbf24;
+}
+
+.radar-chart__metric-col--season {
+    color: #4ade80;
 }
 
 .radar-chart__metric-diff {
+    justify-self: end;
     font-weight: 700;
+    font-size: 0.75rem;
+}
+
+@media (max-width: 620px) {
+    .radar-chart__metric-grid {
+        grid-template-columns: minmax(92px, 1.3fr) repeat(5, minmax(44px, 0.66fr));
+        column-gap: 0.28rem;
+    }
+
+    .radar-chart__metric-col {
+        font-size: 0.73rem;
+    }
 }
 
 .radar-chart__metric-diff.is-pos {
@@ -3419,6 +3496,33 @@
 
 .radar-chart__metric-diff.is-zero {
     color: rgba(200, 212, 236, 0.9);
+}
+
+.radar-chart__tooltip {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    pointer-events: none;
+    z-index: 6;
+    min-width: 120px;
+    max-width: 220px;
+    padding: 0.32rem 0.46rem;
+    border-radius: 8px;
+    background: rgba(7, 14, 34, 0.96);
+    border: 1px solid rgba(125, 170, 235, 0.35);
+    box-shadow: 0 8px 20px rgba(2, 6, 16, 0.45);
+}
+
+.radar-chart__tooltip-title {
+    font-size: 0.68rem;
+    color: rgba(206, 224, 249, 0.95);
+    white-space: nowrap;
+}
+
+.radar-chart__tooltip-value {
+    margin-top: 0.06rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: rgba(233, 243, 255, 0.98);
 }
 
 

@@ -87,6 +87,9 @@
         divisionAverages: championshipId => [
             `/api/stats/division/${championshipId}/averages`
         ],
+        seasonAverages: seasonId => [
+            `/api/stats/season/${seasonId}/averages`
+        ],
         teamsList: query => [
             `/api/teams${query}`
         ],
@@ -897,6 +900,17 @@
             }
             const encodedId = encodeURIComponent(championshipId);
             const routes = buildRouteCandidates('divisionAverages', encodedId);
+            const result = await fetchWithFallback(routes, options);
+            const payload = result?.data ?? result ?? {};
+            return ensureSnakeCaseDeep(payload) || {};
+        }
+
+        async getSeasonAverages(seasonId, options = {}) {
+            if (seasonId === null || seasonId === undefined || seasonId === '') {
+                throw new Error('seasonId is required');
+            }
+            const encodedId = encodeURIComponent(seasonId);
+            const routes = buildRouteCandidates('seasonAverages', encodedId);
             const result = await fetchWithFallback(routes, options);
             const payload = result?.data ?? result ?? {};
             return ensureSnakeCaseDeep(payload) || {};

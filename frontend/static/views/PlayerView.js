@@ -4,7 +4,7 @@ const PLAYER_KPI_SCHEMA = [
     { key: 'adr', label: 'ADR', decimals: 1, max: 130 },
     { key: 'hs_pct', label: 'HS%', decimals: 1, max: 100, percent: true },
     { key: 'entry_pct', label: 'Entry %', decimals: 1, max: 100, percent: true },
-    { key: 'first_kills', label: 'First Kills', decimals: 0, max: 220 },
+    { key: 'first_kills', label: 'First Kills', decimals: 0, max: 220, dynamicMax: true, dynamicMinMax: 40, dynamicHeadroom: 1.15 },
     { key: 'flash_success_pct', label: 'Flash Suc %', decimals: 1, max: 100, percent: true },
     { key: 'utility_success_pct', label: 'Utility Suc %', decimals: 1, max: 100, percent: true }
 ];
@@ -290,14 +290,20 @@ function buildKpis(stats) {
 }
 
 function buildRadarMetrics(kpis) {
-    return kpis.map(kpi => ({
-        key: kpi.key,
-        label: kpi.label,
-        value: kpi.value,
-        max: kpi.max,
-        decimals: PLAYER_KPI_SCHEMA.find(def => def.key === kpi.key)?.decimals ?? 1,
-        percent: Boolean(PLAYER_KPI_SCHEMA.find(def => def.key === kpi.key)?.percent)
-    }));
+    return kpis.map(kpi => {
+        const schema = PLAYER_KPI_SCHEMA.find(def => def.key === kpi.key) || {};
+        return {
+            key: kpi.key,
+            label: kpi.label,
+            value: kpi.value,
+            max: kpi.max,
+            decimals: schema.decimals ?? 1,
+            percent: Boolean(schema.percent),
+            dynamicMax: Boolean(schema.dynamicMax),
+            dynamicMinMax: schema.dynamicMinMax,
+            dynamicHeadroom: schema.dynamicHeadroom
+        };
+    });
 }
 
 function buildCompareMetrics(baseKpis, compareKpis) {
@@ -726,11 +732,13 @@ window.PlayerView = {
             playerStore,
             selectedSeasonId: null,
             divisionAveragesByChampionship: {},
+            seasonAveragesBySeason: {},
             inFlightLoads: {
                 bootstrap: {},
                 mapStats: {},
                 progression: {},
                 divisionAverages: {},
+                seasonAverages: {},
                 allProgressions: {}
             },
             trendScope: 'all',
@@ -1180,15 +1188,17 @@ window.PlayerView = {
             if (!this.selectedSeasonId) return null;
             return this.divisionAveragesByChampionship?.[String(this.selectedSeasonId)] || null;
         },
+        selectedSeasonAverages() {
+            const seasonValue = Number(this.currentSeasonOption?.season ?? this.selectedSeasonStats?.season);
+            if (!Number.isFinite(seasonValue)) return null;
+            return this.seasonAveragesBySeason?.[String(seasonValue)] || null;
+        },
         radarComparisons() {
             const averages = this.selectedDivisionAverages;
-            if (!averages || typeof averages !== 'object') return [];
+            const seasonAverages = this.selectedSeasonAverages;
             const metrics = this.radarMetrics || [];
             const metricKeys = metrics.map(metric => String(metric.key || ''));
             if (!metricKeys.length) return [];
-            const aggregates = averages.aggregates && typeof averages.aggregates === 'object'
-                ? averages.aggregates
-                : null;
             const medianKeyByMetric = {
                 kd: 'median_kd',
                 adr: 'median_adr',
@@ -1200,20 +1210,42 @@ window.PlayerView = {
                 utility_success_pct: 'median_utility_success_pct'
             };
 
-            return [
-                {
+            const buildSeriesValues = source => {
+                if (!source || typeof source !== 'object') return null;
+                const aggregates = source.aggregates && typeof source.aggregates === 'object'
+                    ? source.aggregates
+                    : null;
+                return metricKeys.reduce((acc, key) => {
+                    const medianKey = medianKeyByMetric[key] || `median_${key}`;
+                    const direct = source[medianKey];
+                    const nested = aggregates ? aggregates[medianKey] : null;
+                    acc[key] = toNumber(direct ?? nested, 0);
+                    return acc;
+                }, {});
+            };
+
+            const series = [];
+            const divisionValues = buildSeriesValues(averages);
+            if (divisionValues) {
+                series.push({
                     key: 'division_median',
                     label: 'Division median',
                     color: '#f59e0b',
-                    values: metricKeys.reduce((acc, key) => {
-                        const medianKey = medianKeyByMetric[key] || `median_${key}`;
-                        const direct = averages[medianKey];
-                        const nested = aggregates ? aggregates[medianKey] : null;
-                        acc[key] = toNumber(direct ?? nested, 0);
-                        return acc;
-                    }, {})
-                }
-            ];
+                    values: divisionValues
+                });
+            }
+
+            const seasonValues = buildSeriesValues(seasonAverages);
+            if (seasonValues) {
+                series.push({
+                    key: 'season_median',
+                    label: 'Season median',
+                    color: '#22c55e',
+                    values: seasonValues
+                });
+            }
+
+            return series;
         },
         mapStats() {
             return Array.isArray(this.mapStatsSegment.data) ? this.mapStatsSegment.data : [];
@@ -1320,6 +1352,7 @@ window.PlayerView = {
                 this.loadMapStats();
                 this.loadSelectedProgression();
                 this.loadDivisionAverages();
+                this.loadSeasonAverages();
                 this.syncRouteBreadcrumbContext();
                 this.comparePlayer = null;
                 this.compareSeasonsRaw = [];
@@ -1588,6 +1621,28 @@ window.PlayerView = {
                     this.divisionAveragesByChampionship = {
                         ...(this.divisionAveragesByChampionship || {}),
                         [championshipId]: {}
+                    };
+                }
+            });
+        },
+        async loadSeasonAverages() {
+            if (!window.apiClient?.getSeasonAverages) return;
+            const seasonValue = Number(this.currentSeasonOption?.season ?? this.selectedSeasonStats?.season);
+            if (!Number.isFinite(seasonValue)) return;
+            const seasonKey = String(seasonValue);
+            if (this.seasonAveragesBySeason?.[seasonKey]) return;
+            return this.runInFlightLoad('seasonAverages', seasonKey, async () => {
+                try {
+                    const data = await window.apiClient.getSeasonAverages(seasonValue);
+                    this.seasonAveragesBySeason = {
+                        ...(this.seasonAveragesBySeason || {}),
+                        [seasonKey]: data && typeof data === 'object' ? data : {}
+                    };
+                } catch (error) {
+                    console.error('Season averages failed', error);
+                    this.seasonAveragesBySeason = {
+                        ...(this.seasonAveragesBySeason || {}),
+                        [seasonKey]: {}
                     };
                 }
             });

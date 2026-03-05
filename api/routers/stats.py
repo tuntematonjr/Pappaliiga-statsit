@@ -57,3 +57,12 @@ async def get_division_averages(championship_id: str):
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return averages
+
+
+@router.get("/season/{season_id}/averages")
+async def get_season_averages(season_id: int):
+    try:
+        averages = await stats_service.get_season_averages(season_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return averages
