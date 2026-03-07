@@ -277,6 +277,7 @@ window.MatchExpandedDetails = {
                         <div class="match-map-players">
                             <div class="map-players" v-if="playersAvailable(mapRoundIndex(map))">
                                 <div class="map-players__team">
+                                    <div class="map-players__title">Pelaava kokoonpano</div>
                                     <div class="map-players__label">
                                         <router-link v-if="teamRoute(teamId, teamName)" :to="teamRoute(teamId, teamName)" class="team-link">{{ teamName }}</router-link>
                                         <span v-else>{{ teamName }}</span>
@@ -293,6 +294,7 @@ window.MatchExpandedDetails = {
                                     </div>
                                 </div>
                                 <div class="map-players__team">
+                                    <div class="map-players__title">Pelaava kokoonpano</div>
                                     <div class="map-players__label">
                                         <router-link v-if="teamRoute(opponentId, opponentName)" :to="teamRoute(opponentId, opponentName)" class="team-link">{{ opponentName }}</router-link>
                                         <span v-else>{{ opponentName }}</span>

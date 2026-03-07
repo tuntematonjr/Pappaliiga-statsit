@@ -81,7 +81,7 @@ function buildColumnGroups(columns, groupMeta) {
 
 const MAP_COLUMNS = [
     { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '210px', tooltip: 'Kartta', group: 'map' },
-    { key: 'totalRoundsPlayed', label: 'Erät pelattu', sortable: true, numeric: true, decimals: 0, colClass: 'mono-num', tooltip: 'Todellinen pelattujen erien määrä', group: 'rounds' },
+    { key: 'totalRoundsPlayed', label: 'Eriä pelattu', sortable: true, numeric: true, decimals: 0, colClass: 'mono-num', tooltip: 'Todellinen pelattujen erien määrä', group: 'rounds' },
     { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', tooltip: 'Average Damage per Round', group: 'combat' },
     { key: 'kr', label: 'KR', sortable: true, numeric: true, decimals: 3, colClass: 'mono-num', tooltip: 'Kills per round', group: 'combat' },
     { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', tooltip: 'Kills / Deaths', group: 'combat' },
@@ -782,6 +782,7 @@ window.TeamDetail = {
         get LoadingSpinner() { return window.LoadingSpinner; },
         get ErrorMessage() { return window.ErrorMessage; },
         get SortableTable() { return window.SortableTable; },
+        get SharedMapPerformanceTable() { return window.SharedMapPerformanceTable; },
         get PickBanFlow() { return window.PickBanFlow; },
         get MatchExpandedDetails() { return window.MatchExpandedDetails; }
     },
@@ -3064,283 +3065,14 @@ window.TeamDetail = {
                         </div>
                     </div>
 
-                    <div class="scout-panel scout-table">
-                        <div class="section-heading">
-                            <div>
-                        <h3 class="section-title titleUnderline">Karttakohtainen suorituskyky</h3>
-                        <span class="section-sub">{{ mapViewMode === 'summary' ? 'Yhteenveto: Voitot, pickit, bannit, eräero' : 'Laaja: Karttakohtaiset pelaajatilastot' }}</span>
-                        <div v-if="mapViewMode === 'full'" class="section-legend">📊 <strong>Pääarvo</strong> = kokonaisluku · <strong>Sulkeissa</strong> = {{ subMetricLabel() }}</div>
-                            </div>
-                            <div class="section-heading-actions">
-                                <div v-if="mapViewMode === 'full'" class="submetric-toggle">
-                                    <button
-                                        type="button"
-                                        class="btn-submetric"
-                                        :class="mapSubMetricMode === 'perRound' ? 'active' : ''"
-                                        @click="mapSubMetricMode = 'perRound'"
-                                    >Per-erä</button>
-                                    <button
-                                        type="button"
-                                        class="btn-submetric"
-                                        :class="mapSubMetricMode === 'perMap' ? 'active' : ''"
-                                        @click="mapSubMetricMode = 'perMap'"
-                                    >Per-kartta</button>
-                                </div>
-                                <button 
-                                    type="button" 
-                                    class="btn-toggle-view" 
-                                    @click="mapViewMode = mapViewMode === 'summary' ? 'full' : 'summary'"
-                                    :title="mapViewMode === 'summary' ? 'Näytä karttakohtaiset pelaajatilastot' : 'Näytä voitto/pick/ban yhteenveto'"
-                                >
-                                    <span v-if="mapViewMode === 'summary'">Laaja näkymä</span>
-                                    <span v-else>Yhteenveto</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div>
-                            <button type="button" class="btn-reset-sort" @click="resetMapSort">Nollaa lajittelu</button>
-                        </div>
-                        <div v-if="mapViewMode === 'summary'" ref="mapSummaryWrapper" class="table-wrapper table-wrapper--scroll">
-                            <sortable-table
-                                :key="scoutTableKey"
-                                :columns="SCOUT_MAP_COLUMNS"
-                                :header-groups="scoutHeaderGroups"
-                                :data="scoutMapRows"
-                                :default-sort="scoutMapDefaultSort"
-                                :sticky-header="true"
-                                :compact="true"
-                                class="map-summary-table"
-                            >
-                                <template #cell-mapName="{ row }">
-                                    <div class="map-name">
-                                        <img v-if="row.mapImage" :src="row.mapImage" class="map-logo" alt="" />
-                                        <span class="map-name-text">{{ row.mapName }}</span>
-                                    </div>
-                                </template>
-                                <template #cell-played="{ row }">
-                                    <div class="scout-cell mono-num" :class="row.played <= 2 ? 'mono-muted' : ''">{{ row.played }}</div>
-                                </template>
-                                <template #cell-picks="{ row }">
-                                    <div class="scout-cell mono-num">{{ row.picks }}</div>
-                                </template>
-                                <template #cell-oppPicks="{ row }">
-                                    <div class="scout-cell mono-num">{{ row.oppPicks }}</div>
-                                </template>
-                                <template #cell-winrate="{ row }">
-                                    <div
-                                        v-if="row.played > 0"
-                                        class="scout-cell mono-num"
-                                        :style="winHeatStyle(row.winrate)"
-                                        :title="heatTooltip('Win %', formatPercent(row.winrate || 0, 1), 'W–L ' + formatWinLoss(row.wins || 0, row.losses || 0))"
-                                    >
-                                        {{ formatPercent(row.winrate || 0, 1) }} ({{ formatWinLoss(row.wins || 0, row.losses || 0) }})
-                                    </div>
-                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
-                                </template>
-                                <template #cell-pickWinRate="{ row }">
-                                    <div
-                                        v-if="row.picks > 0"
-                                        class="scout-cell mono-num"
-                                        :style="winHeatStyle(row.pickWinRate)"
-                                        :title="heatTooltip('Win % (oma pick)', formatPercent(row.pickWinRate || 0, 1), 'W–L ' + formatWinLoss(row.pickWins || 0, Math.max(0, (row.picks || 0) - (row.pickWins || 0))))"
-                                    >
-                                        {{ formatPercent(row.pickWinRate || 0, 1) }} ({{ formatWinLoss(row.pickWins || 0, Math.max(0, (row.picks || 0) - (row.pickWins || 0))) }})
-                                    </div>
-                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
-                                </template>
-                                <template #cell-oppPickWinRate="{ row }">
-                                    <div
-                                        v-if="row.oppPicks > 0"
-                                        class="scout-cell mono-num"
-                                        :style="winHeatStyle(row.oppPickWinRate)"
-                                        :title="heatTooltip('Win % (vastustajan pick)', formatPercent(row.oppPickWinRate || 0, 1), 'W–L ' + formatWinLoss(row.oppPickWins || 0, Math.max(0, (row.oppPicks || 0) - (row.oppPickWins || 0))))"
-                                    >
-                                        {{ formatPercent(row.oppPickWinRate || 0, 1) }} ({{ formatWinLoss(row.oppPickWins || 0, Math.max(0, (row.oppPicks || 0) - (row.oppPickWins || 0))) }})
-                                    </div>
-                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
-                                </template>
-                                <template #cell-kd="{ row }">
-                                    <div
-                                        v-if="row.played > 0"
-                                        class="scout-cell mono-num"
-                                        :style="kdHeatStyle(row.kd)"
-                                        :title="heatTooltip('K/D', formatNumber(row.kd, 2))"
-                                    >{{ formatNumber(row.kd, 2) }}</div>
-                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
-                                </template>
-                                <template #cell-adr="{ row }">
-                                    <div
-                                        v-if="row.played > 0"
-                                        class="scout-cell mono-num"
-                                        :style="adrHeatStyle(row.adr)"
-                                        :title="heatTooltip('ADR', formatNumber(row.adr, 1))"
-                                    >{{ formatNumber(row.adr, 1) }}</div>
-                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
-                                </template>
-                                <template #cell-rd="{ row }">
-                                    <div
-                                        v-if="row.played > 0"
-                                        class="scout-cell mono-num"
-                                        :style="rdHeatStyle(row.rd)"
-                                        :title="heatTooltip('Eräero', formatNumber(row.rd, 0))"
-                                    >{{ formatNumber(row.rd, 0) }}</div>
-                                    <span v-else class="cell-muted mono-num" title="Ei dataa valitulle kaudelle.">—</span>
-                                </template>
-                            </sortable-table>
-                        </div>
-
-                        <div v-if="mapViewMode === 'full'" ref="mapFullWrapper" class="table-wrapper table-wrapper--scroll">
-                            <sortable-table
-                                v-if="mapStats.length"
-                                :key="detailedTableKey"
-                                :columns="MAP_COLUMNS"
-                                :header-groups="mapHeaderGroups"
-                                :data="mapStats"
-                                :default-sort="mapDefaultSort"
-                                :sticky-header="true"
-                                :compact="true"
-                                class="map-full-table"
-                            >
-                                <template #cell-mapName="{ row }">
-                                    <div class="map-name">
-                                        <img v-if="row.mapImage" :src="row.mapImage" class="map-logo" alt="" />
-                                        <span class="map-name-text">{{ row.mapName }}</span>
-                                    </div>
-                                </template>
-                                <template #cell-totalRoundsPlayed="{ row }">
-                                    <div class="scout-cell scout-cell--stacked mono-num">
-                                        <div>{{ formatNumber(row.totalRoundsPlayed, 0) }}</div>
-                                        <div
-                                            v-if="row.roundsWon || row.roundsLost"
-                                            class="rounds-breakdown"
-                                        >
-                                            <span class="rounds-won">+{{ formatNumber(row.roundsWon, 0) }}</span>
-                                            <span class="rounds-sep">/</span>
-                                            <span class="rounds-lost">-{{ formatNumber(row.roundsLost, 0) }}</span>
-                                            <span
-                                                class="rounds-diff"
-                                                :class="(row.roundsWon - row.roundsLost) >= 0 ? 'rounds-diff--pos' : 'rounds-diff--neg'"
-                                            >
-                                                ({{ (row.roundsWon - row.roundsLost) >= 0 ? '+' : '' }}{{ formatNumber(row.roundsWon - row.roundsLost, 0) }})
-                                            </span>
-                                        </div>
-                                    </div>
-                                </template>
-                                <template #cell-roundsPerMapAvg="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.roundsPerMapAvg, 1) }}</div>
-                                </template>
-                                <template #cell-adr="{ row }">
-                                    <div
-                                        class="scout-cell mono-num"
-                                        :style="adrHeatStyle(row.adr)"
-                                        :title="heatTooltip('ADR', formatNumber(row.adr, 1))"
-                                    >{{ formatNumber(row.adr, 1) }}</div>
-                                </template>
-                                <template #cell-kr="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.kr, 3) }}</div>
-                                </template>
-                                <template #cell-kd="{ row }">
-                                    <div
-                                        class="scout-cell mono-num"
-                                        :style="kdHeatStyle(row.kd)"
-                                        :title="heatTooltip('K/D', formatNumber(row.kd, 2))"
-                                    >{{ formatNumber(row.kd, 2) }}</div>
-                                </template>
-                                <template #cell-hsPct="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.hsPct, 1) }}</div>
-                                </template>
-                                <template #cell-kills="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.kills, 0) }}</div>
-                                </template>
-                                <template #cell-deaths="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.deaths, 0) }}</div>
-                                </template>
-                                <template #cell-assists="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.assists, 0) }}</div>
-                                </template>
-                                <template #cell-udpr="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.udpr, 1) }}</div>
-                                </template>
-                                <template #cell-mvps="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.mvps, 0) }}</div>
-                                </template>
-                                <template #cell-enemiesFlashed="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.enemiesFlashed, 0) }}</div>
-                                </template>
-                                <template #cell-flashSuccessPct="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.flashSuccessPct, 1) }}</div>
-                                </template>
-                                <template #cell-flashCount="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.flashCount, 0) }}</div>
-                                </template>
-                                <template #cell-multi2k="{ row }">
-                                    <div class="scout-cell scout-cell--stacked mono-num">
-                                        <div>{{ formatNumber(row.multi2k, 0) }}</div>
-                                        <div v-if="shouldShowSubMetric(row.multi2kPerRound, row.multi2kPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.multi2kPerRound, row.multi2kPerMap, 3) }})
-                                        </div>
-                                    </div>
-                                </template>
-                                <template #cell-multi3k="{ row }">
-                                    <div class="scout-cell scout-cell--stacked mono-num">
-                                        <div>{{ formatNumber(row.multi3k, 0) }}</div>
-                                        <div v-if="shouldShowSubMetric(row.multi3kPerRound, row.multi3kPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.multi3kPerRound, row.multi3kPerMap, 3) }})
-                                        </div>
-                                    </div>
-                                </template>
-                                <template #cell-multi4k="{ row }">
-                                    <div class="scout-cell scout-cell--stacked mono-num">
-                                        <div>{{ formatNumber(row.multi4k, 0) }}</div>
-                                        <div v-if="shouldShowSubMetric(row.multi4kPerRound, row.multi4kPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.multi4kPerRound, row.multi4kPerMap, 3) }})
-                                        </div>
-                                    </div>
-                                </template>
-                                <template #cell-multi5k="{ row }">
-                                    <div class="scout-cell scout-cell--stacked mono-num">
-                                        <div>{{ formatNumber(row.multi5k, 0) }}</div>
-                                        <div v-if="shouldShowSubMetric(row.multi5kPerRound, row.multi5kPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.multi5kPerRound, row.multi5kPerMap, 3) }})
-                                        </div>
-                                    </div>
-                                </template>
-                                <template #cell-pistolKills="{ row }">
-                                    <div class="scout-cell scout-cell--stacked mono-num">
-                                        <div>{{ formatNumber(row.pistolKills, 0) }}</div>
-                                        <div v-if="shouldShowSubMetric(row.pistolKillsPerRound, row.pistolKillsPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.pistolKillsPerRound, row.pistolKillsPerMap, 3) }})
-                                        </div>
-                                    </div>
-                                </template>
-                                <template #cell-sniperKills="{ row }">
-                                    <div class="scout-cell scout-cell--stacked mono-num">
-                                        <div>{{ formatNumber(row.sniperKills, 0) }}</div>
-                                        <div v-if="shouldShowSubMetric(row.sniperKillsPerRound, row.sniperKillsPerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.sniperKillsPerRound, row.sniperKillsPerMap, 3) }})
-                                        </div>
-                                    </div>
-                                </template>
-                                <template #cell-totalDamage="{ row }">
-                                    <div class="scout-cell scout-cell--stacked mono-num">
-                                        <div>{{ formatNumber(row.totalDamage, 0) }}</div>
-                                        <div v-if="shouldShowSubMetric(row.totalDamagePerRound, row.totalDamagePerMap)" class="sub-metric-line">
-                                            ({{ subMetricValue(row.totalDamagePerRound, row.totalDamagePerMap, 1) }})
-                                        </div>
-                                    </div>
-                                </template>
-                                <template #cell-clutchKills="{ row }">
-                                    <div class="scout-cell mono-num">{{ formatNumber(row.clutchKills, 0) }}</div>
-                                </template>
-                            </sortable-table>
-                            <div v-else class="empty-state-container">
-                                <div class="empty-state-card">
-                                    <h3 class="empty-state-title">Ei karttadataa</h3>
-                                    <p class="empty-state-description">Tälle kaudelle ei ole karttakohtaisia tilastoja.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <shared-map-performance-table
+                        :map-stats="mapStats"
+                        :map-catalog="mapCatalog"
+                        title="Karttakohtainen suorituskyky"
+                        subtitle-summary="Yhteenveto: Voitot, pickit, bannit, eräero"
+                        subtitle-full="Laaja: Karttakohtaiset pelaajatilastot"
+                        :show-panel-container="true"
+                    ></shared-map-performance-table>
 
                     <div class="scout-panel scout-performance-trends" ref="performanceTrendPanel">
                         <div class="section-heading section-heading--split">

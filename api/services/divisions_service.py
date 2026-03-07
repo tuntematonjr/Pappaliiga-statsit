@@ -595,14 +595,17 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
     primary_rows = await query_async(
         """
         WITH division_matches AS (
-            SELECT match_id
+            SELECT match_id, team1_id, team2_id
         FROM matches
         WHERE championship_id = :champ_id
         ),
         division_maps AS (
             SELECT
+                m.match_id,
                 m.map_id,
                 m.map_name,
+                m.winner_team_id,
+                REPLACE(LOWER(m.map_name), 'de_', '') AS map_key,
                 COALESCE(m.score_team1, 0) AS score_team1,
                 COALESCE(m.score_team2, 0) AS score_team2
             FROM maps m
@@ -612,7 +615,7 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
         ),
         player_totals AS (
             SELECT
-                LOWER(dm.map_name) AS map_key,
+                dm.map_key,
                 dm.map_name,
                 COUNT(DISTINCT dm.map_id) AS maps_played,
                 SUM(ps.kills) AS kills,
@@ -620,39 +623,115 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
                 SUM(ps.damage) AS damage,
                 AVG(ps.adr) AS adr,
                 AVG(ps.kr) AS kr,
+                AVG(ps.hs_pct) AS hs_pct,
                 SUM(ps.utility_damage) AS utility_damage,
                 SUM(ps.enemies_flashed) AS enemies_flashed,
                 SUM(ps.flash_count) AS flash_count,
+                SUM(ps.flash_successes) AS flash_successes,
                 SUM(ps.sniper_kills) AS sniper_kills,
                 SUM(ps.assists) AS assists,
+                SUM(ps.mvps) AS mvps,
                 SUM(ps.mk_2k) AS k2,
                 SUM(ps.mk_3k) AS k3,
                 SUM(ps.mk_4k) AS k4,
                 SUM(ps.mk_5k) AS ace,
-                SUM(ps.pistol_kills) AS pistol_kills
+                SUM(ps.pistol_kills) AS pistol_kills,
+                SUM(ps.clutch_kills) AS clutch_kills
             FROM division_maps dm
             LEFT JOIN player_stats ps ON (
                 ps.map_id = dm.map_id
                 AND ps.is_forfeit_map = 0
             )
-            GROUP BY LOWER(dm.map_name), dm.map_name
+            GROUP BY dm.map_key, dm.map_name
         ),
         round_totals AS (
             SELECT
-                LOWER(dm.map_name) AS map_key,
+                dm.map_key,
                 SUM(dm.score_team1 + dm.score_team2) AS rounds_played
             FROM division_maps dm
-            GROUP BY LOWER(dm.map_name)
+            GROUP BY dm.map_key
         ),
         map_vote_totals AS (
             SELECT
-                LOWER(v.map_name) AS map_key,
-                COUNT(*) AS banned
+                REPLACE(LOWER(v.map_name), 'de_', '') AS map_key,
+                SUM(
+                    CASE
+                        WHEN LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto') THEN 1 ELSE 0
+                    END
+                ) AS banned,
+                SUM(
+                    CASE
+                        WHEN LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto')
+                         AND COALESCE(v.round_num, 0) = 1 THEN 1 ELSE 0
+                    END
+                ) AS ban1,
+                SUM(
+                    CASE
+                        WHEN LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto')
+                         AND COALESCE(v.round_num, 0) = 2 THEN 1 ELSE 0
+                    END
+                ) AS ban2,
+                SUM(
+                    CASE
+                        WHEN LOWER(v.status) IN ('decider','overflow') THEN 1 ELSE 0
+                    END
+                ) AS decov
             FROM map_votes v
             JOIN division_matches dm ON dm.match_id = v.match_id
             WHERE v.map_name IS NOT NULL
-              AND LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto')
-            GROUP BY LOWER(v.map_name)
+              AND LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto','decider','overflow')
+            GROUP BY REPLACE(LOWER(v.map_name), 'de_', '')
+        ),
+        map_winner_per_match AS (
+            SELECT
+                dm.match_id,
+                dm.map_key,
+                MAX(dm.winner_team_id) AS winner_team_id
+            FROM division_maps dm
+            GROUP BY dm.match_id, dm.map_key
+        ),
+        map_pick_events AS (
+            SELECT
+                v.match_id,
+                REPLACE(LOWER(v.map_name), 'de_', '') AS map_key,
+                COALESCE(
+                    NULLIF(v.selected_by_team_id, ''),
+                    CASE
+                        WHEN LOWER(COALESCE(v.selected_by_faction, '')) = 'faction1' THEN dm.team1_id
+                        WHEN LOWER(COALESCE(v.selected_by_faction, '')) = 'faction2' THEN dm.team2_id
+                        ELSE NULL
+                    END
+                ) AS pick_team_id
+            FROM map_votes v
+            JOIN division_matches dm ON dm.match_id = v.match_id
+            WHERE v.map_name IS NOT NULL
+              AND LOWER(v.status) IN ('picked','pick')
+        ),
+        map_pick_totals AS (
+            SELECT
+                pe.map_key,
+                COUNT(*) AS picks,
+                SUM(
+                    CASE
+                        WHEN pe.pick_team_id IS NOT NULL
+                             AND mw.winner_team_id IS NOT NULL
+                             AND mw.winner_team_id = pe.pick_team_id
+                        THEN 1 ELSE 0
+                    END
+                ) AS pick_wins,
+                SUM(
+                    CASE
+                        WHEN pe.pick_team_id IS NOT NULL
+                             AND mw.winner_team_id IS NOT NULL
+                             AND mw.winner_team_id <> pe.pick_team_id
+                        THEN 1 ELSE 0
+                    END
+                ) AS opp_pick_wins
+            FROM map_pick_events pe
+            LEFT JOIN map_winner_per_match mw
+              ON mw.match_id = pe.match_id
+             AND mw.map_key = pe.map_key
+            GROUP BY pe.map_key
         )
         SELECT
             pt.map_name,
@@ -660,24 +739,37 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
             mc.image_sm,
             pt.maps_played,
             COALESCE(mvt.banned, 0) AS banned,
+            COALESCE(mvt.ban1, 0) AS ban1,
+            COALESCE(mvt.ban2, 0) AS ban2,
+            COALESCE(mvt.decov, 0) AS decov,
+            COALESCE(mpt.picks, 0) AS picks,
+            COALESCE(mpt.pick_wins, 0) AS pick_wins,
+            COALESCE(mpt.opp_pick_wins, 0) AS opp_pick_wins,
             COALESCE(pt.kills, 0) AS kills,
             COALESCE(pt.deaths, 0) AS deaths,
             COALESCE(pt.damage, 0) AS damage,
             COALESCE(rt.rounds_played, 0) AS rounds_played,
             COALESCE(pt.adr, 0) AS adr,
             COALESCE(pt.kr, 0) AS kr,
+            COALESCE(pt.hs_pct, 0) AS hs_pct,
+            COALESCE(pt.mvps, 0) AS mvps,
             CASE WHEN COALESCE(pt.deaths, 0) = 0 THEN 0 ELSE COALESCE(pt.utility_damage, 0) / NULLIF(pt.deaths, 0) END AS udpr,
             CASE WHEN COALESCE(pt.flash_count, 0) = 0 THEN 0 ELSE COALESCE(pt.enemies_flashed, 0) / NULLIF(pt.flash_count, 0) END AS enemy_flash,
+            COALESCE(pt.enemies_flashed, 0) AS enemies_flashed,
+            COALESCE(pt.flash_count, 0) AS flash_count,
+            COALESCE(pt.flash_successes, 0) AS flash_successes,
             COALESCE(pt.sniper_kills, 0) AS sniper_kills,
             COALESCE(pt.assists, 0) AS assists,
             COALESCE(pt.k2, 0) AS k2,
             COALESCE(pt.k3, 0) AS k3,
             COALESCE(pt.k4, 0) AS k4,
             COALESCE(pt.ace, 0) AS ace,
-            COALESCE(pt.pistol_kills, 0) AS pistol_kills
+            COALESCE(pt.pistol_kills, 0) AS pistol_kills,
+            COALESCE(pt.clutch_kills, 0) AS clutch_kills
         FROM player_totals pt
         LEFT JOIN round_totals rt ON rt.map_key = pt.map_key
         LEFT JOIN map_vote_totals mvt ON mvt.map_key = pt.map_key
+        LEFT JOIN map_pick_totals mpt ON mpt.map_key = pt.map_key
         LEFT JOIN maps_catalog mc ON mc.map_id = pt.map_name
         ORDER BY pt.maps_played DESC, pt.map_name
         """,
@@ -698,6 +790,12 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
             snipers = int(r.get("sniper_kills") or 0)
             assists = int(r.get("assists") or 0)
             bans = int(r.get("banned") or 0)
+            ban1 = int(r.get("ban1") or 0)
+            ban2 = int(r.get("ban2") or 0)
+            decov = int(r.get("decov") or 0)
+            picks = int(r.get("picks") or 0)
+            pick_wins = int(r.get("pick_wins") or 0)
+            opp_pick_wins = int(r.get("opp_pick_wins") or 0)
             result.append(
                 {
                     "map_name": r.get("map_name") or r.get("map_id") or "Unknown",
@@ -705,14 +803,28 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
                     "image_sm": r.get("image_sm"),
                     "maps_played": maps_played,
                     "banned": bans,
+                    "ban1": ban1,
+                    "ban2": ban2,
+                    "decov": decov,
+                    "picks": picks,
+                    "opp_picks": picks,
+                    "pick_wins": pick_wins,
+                    "opp_pick_wins": opp_pick_wins,
+                    "pick_win_rate": round((pick_wins / picks) * 100, 1) if picks else 0.0,
+                    "opp_pick_win_rate": round((opp_pick_wins / picks) * 100, 1) if picks else 0.0,
                     "kills": kills,
                     "deaths": deaths,
                     "damage": damage,
                     "rounds_played": rounds_played,
                     "adr": adr,
                     "kr": kr,
+                    "hs_pct": float(r.get("hs_pct") or 0.0),
+                    "mvps": int(r.get("mvps") or 0),
                     "udpr": float(r.get("udpr") or (utility_damage / max(deaths, 1))),
                     "enemy_flash": float(r.get("enemy_flash") or 0.0),
+                    "enemies_flashed": int(r.get("enemies_flashed") or 0),
+                    "flash_count": int(r.get("flash_count") or 0),
+                    "flash_successes": int(r.get("flash_successes") or 0),
                     "sniper_kills": snipers,
                     "assists": assists,
                     "k2": int(r.get("k2") or 0),
@@ -720,6 +832,7 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
                     "k4": int(r.get("k4") or 0),
                     "ace": int(r.get("ace") or 0),
                     "pistol_kills": int(r.get("pistol_kills") or 0),
+                    "clutch_kills": int(r.get("clutch_kills") or 0),
                     "pick_rate": round((maps_played / max(rounds_played, 1)) * 100, 1) if rounds_played else 0.0,
                 }
             )

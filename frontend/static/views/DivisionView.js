@@ -369,6 +369,7 @@ window.DivisionView = {
         get LoadingSpinner() { return window.LoadingSpinner; },
         get ErrorMessage() { return window.ErrorMessage; },
         get TeamComparisonBoard() { return window.TeamComparisonBoard; },
+        get SharedMapPerformanceTable() { return window.SharedMapPerformanceTable; },
         get MapsStats() { return window.MapsStats; },
         get SummaryStatCard() { return window.SummaryStatCard; },
         get SankariCard() { return window.SankariCard; },
@@ -1791,146 +1792,241 @@ window.DivisionView = {
                                 :message="divisionMatchesError"
                                 @retry="loadDivisionMatches(championshipId, { force: true })"
                             ></error-message>
-                            <div v-else-if="playedMatches.length" class="table-wrapper">
-                                <table class="data-table matches-table">
-                                    <thead>
-                                        <tr>
-                                            <th class="match-expand-cell"></th>
-                                            <th>Pvm</th>
-                                            <th>Ottelu</th>
-                                            <th>BO</th>
-                                            <th>Tulos</th>
-                                            <th>Eräero</th>
-                                            <th>Maps</th>
-                                            <th>Linkki</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <template v-for="match in playedMatches" :key="match.match_id || match.matchId">
-                                        <tr>
-                                            <td class="match-expand-cell">
-                                                <button
-                                                    type="button"
-                                                    class="expand-button"
-                                                    :class="{ 'expand-button--open': isPlayedMatchExpanded(match.match_id || match.matchId) }"
-                                                    @click.stop="togglePlayedMatchExpand(match)"
-                                                >
-                                                    <span class="chevron">›</span>
-                                                </button>
-                                            </td>
-                                            <td>{{ formatDivisionMatchDate(match) }}</td>
-                                            <td>
-                                                <span class="eraro-lead-wrap">
-                                                    <img
-                                                        v-if="playedRowTeamAvatar(match, 'team1')"
-                                                        :src="resolveAvatar(playedRowTeamAvatar(match, 'team1'))"
-                                                        :alt="match.team1_name || match.team1Name || 'Joukkue 1'"
-                                                        class="eraro-lead-logo"
-                                                        loading="lazy"
-                                                        decoding="async"
-                                                    />
-                                                    <router-link
-                                                        v-if="divisionTeamRoute(match.team1_id || match.team1Id)"
-                                                        :to="divisionTeamRoute(match.team1_id || match.team1Id)"
-                                                        class="eraro-lead-team"
-                                                    >{{ match.team1_name || match.team1Name || 'Joukkue 1' }}</router-link>
-                                                    <span v-else class="eraro-lead-team">{{ match.team1_name || match.team1Name || 'Joukkue 1' }}</span>
-                                                    <span class="cell-muted">vs</span>
-                                                    <img
-                                                        v-if="playedRowTeamAvatar(match, 'team2')"
-                                                        :src="resolveAvatar(playedRowTeamAvatar(match, 'team2'))"
-                                                        :alt="match.team2_name || match.team2Name || 'Joukkue 2'"
-                                                        class="eraro-lead-logo"
-                                                        loading="lazy"
-                                                        decoding="async"
-                                                    />
-                                                    <router-link
-                                                        v-if="divisionTeamRoute(match.team2_id || match.team2Id)"
-                                                        :to="divisionTeamRoute(match.team2_id || match.team2Id)"
-                                                        class="eraro-lead-team"
-                                                    >{{ match.team2_name || match.team2Name || 'Joukkue 2' }}</router-link>
-                                                    <span v-else class="eraro-lead-team">{{ match.team2_name || match.team2Name || 'Joukkue 2' }}</span>
-                                                </span>
-                                            </td>
-                                            <td>BO{{ toNumber(match.best_of ?? match.bestOf, 0) || 2 }}</td>
-                                            <td>
-                                                <span>{{ toNumber(match.team1_score ?? match.team1Score, 0) }} - {{ toNumber(match.team2_score ?? match.team2Score, 0) }}</span>
+                            <div v-else-if="playedMatches.length" class="played-matches-layout">
+                                <div class="table-wrapper played-matches-desktop">
+                                    <table class="data-table matches-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="match-expand-cell"></th>
+                                                <th>Pvm</th>
+                                                <th>Ottelu</th>
+                                                <th>BO</th>
+                                                <th>Tulos</th>
+                                                <th>Eräero</th>
+                                                <th>Maps</th>
+                                                <th>Linkki</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <template v-for="match in playedMatches" :key="match.match_id || match.matchId">
+                                            <tr>
+                                                <td class="match-expand-cell">
+                                                    <button
+                                                        type="button"
+                                                        class="expand-button"
+                                                        :class="{ 'expand-button--open': isPlayedMatchExpanded(match.match_id || match.matchId) }"
+                                                        @click.stop="togglePlayedMatchExpand(match)"
+                                                    >
+                                                        <span class="chevron">›</span>
+                                                    </button>
+                                                </td>
+                                                <td>{{ formatDivisionMatchDate(match) }}</td>
+                                                <td>
+                                                    <span class="eraro-lead-wrap">
+                                                        <img
+                                                            v-if="playedRowTeamAvatar(match, 'team1')"
+                                                            :src="resolveAvatar(playedRowTeamAvatar(match, 'team1'))"
+                                                            :alt="match.team1_name || match.team1Name || 'Joukkue 1'"
+                                                            class="eraro-lead-logo"
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                        />
+                                                        <router-link
+                                                            v-if="divisionTeamRoute(match.team1_id || match.team1Id)"
+                                                            :to="divisionTeamRoute(match.team1_id || match.team1Id)"
+                                                            class="eraro-lead-team"
+                                                        >{{ match.team1_name || match.team1Name || 'Joukkue 1' }}</router-link>
+                                                        <span v-else class="eraro-lead-team">{{ match.team1_name || match.team1Name || 'Joukkue 1' }}</span>
+                                                        <span class="cell-muted">vs</span>
+                                                        <img
+                                                            v-if="playedRowTeamAvatar(match, 'team2')"
+                                                            :src="resolveAvatar(playedRowTeamAvatar(match, 'team2'))"
+                                                            :alt="match.team2_name || match.team2Name || 'Joukkue 2'"
+                                                            class="eraro-lead-logo"
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                        />
+                                                        <router-link
+                                                            v-if="divisionTeamRoute(match.team2_id || match.team2Id)"
+                                                            :to="divisionTeamRoute(match.team2_id || match.team2Id)"
+                                                            class="eraro-lead-team"
+                                                        >{{ match.team2_name || match.team2Name || 'Joukkue 2' }}</router-link>
+                                                        <span v-else class="eraro-lead-team">{{ match.team2_name || match.team2Name || 'Joukkue 2' }}</span>
+                                                    </span>
+                                                </td>
+                                                <td>BO{{ toNumber(match.best_of ?? match.bestOf, 0) || 2 }}</td>
+                                                <td>
+                                                    <span>{{ toNumber(match.team1_score ?? match.team1Score, 0) }} - {{ toNumber(match.team2_score ?? match.team2Score, 0) }}</span>
+                                                    <span v-if="match.is_forfeit" class="cell-muted"> · FF</span>
+                                                </td>
+                                                <td>
+                                                    <span v-if="playedRowRoundDiffLead(match) != null" class="eraro-lead-wrap">
+                                                        <img
+                                                            v-if="playedRowRoundDiffLead(match).teamAvatar"
+                                                            :src="resolveAvatar(playedRowRoundDiffLead(match).teamAvatar)"
+                                                            :alt="playedRowRoundDiffLead(match).teamName"
+                                                            class="eraro-lead-logo"
+                                                            loading="lazy"
+                                                            decoding="async"
+                                                        />
+                                                        <router-link
+                                                            v-if="divisionTeamRoute(playedRowRoundDiffLead(match).teamId)"
+                                                            :to="divisionTeamRoute(playedRowRoundDiffLead(match).teamId)"
+                                                            class="eraro-lead-team"
+                                                        >{{ playedRowRoundDiffLead(match).teamName }}</router-link>
+                                                        <span v-else class="eraro-lead-team">{{ playedRowRoundDiffLead(match).teamName }}</span>
+                                                        <span>: </span>
+                                                        <span class="stat-positive">+{{ playedRowRoundDiffLead(match).value }}</span>
+                                                    </span>
+                                                    <span v-else class="cell-muted">-</span>
+                                                </td>
+                                                <td>
+                                                    <div class="micro-stack" v-if="playedRowMaps(match).length">
+                                                        <span v-for="map in playedRowMaps(match)" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.score1 }}-{{ map.score2 }}</span>
+                                                    </div>
+                                                    <span v-else class="cell-muted">-</span>
+                                                </td>
+                                                <td>
+                                                    <div class="micro-stack" v-if="divisionMatchFaceitUrl(match) || availableDemoLinks(match).length">
+                                                        <a
+                                                            v-if="divisionMatchFaceitUrl(match)"
+                                                            :href="divisionMatchFaceitUrl(match)"
+                                                            target="_blank"
+                                                            rel="noopener"
+                                                            class="chip chip--link"
+                                                        >Faceit</a>
+                                                        <a
+                                                            v-for="(demo, demoPos) in availableDemoLinks(match)"
+                                                            :key="'demo-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
+                                                            :href="demo.url"
+                                                            target="_blank"
+                                                            rel="noopener"
+                                                            title="Demojen latausmäärä per tunti on rajoitettu."
+                                                            class="chip chip--link"
+                                                        >Demo {{ demoPos + 1 }}</a>
+                                                        <a
+                                                            v-for="(demo, demoPos) in availableDemoLinks(match)"
+                                                            :key="'demo2d-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
+                                                            href="#"
+                                                            @click.prevent="openReplay2D(demo.url)"
+                                                            class="chip chip--link"
+                                                        >2D Demo {{ demoPos + 1 }}</a>
+                                                    </div>
+                                                    <span v-else-if="isDemoAvailabilityLoading(match)" class="cell-muted">Tarkistetaan…</span>
+                                                    <span v-else class="cell-muted">-</span>
+                                                </td>
+                                            </tr>
+                                            <tr v-if="isPlayedMatchExpanded(match.match_id || match.matchId)" class="match-expand-row">
+                                                <td :colspan="8">
+                                                    <div class="match-expand-content">
+                                                        <match-expanded-details
+                                                            :summary="playedMatchSummary(match)"
+                                                            :details="playedMatchDetails(match)"
+                                                            :veto-entry="playedMatchVetoEntry(match)"
+                                                            :player-stats="playedMatchPlayerStats(match)"
+                                                            :map-catalog="mapCatalog"
+                                                            :loading="playedMatchBundleBusy(match.match_id || match.matchId)"
+                                                        ></match-expanded-details>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="played-matches-mobile" role="list">
+                                    <article
+                                        v-for="match in playedMatches"
+                                        :key="'mobile-' + (match.match_id || match.matchId)"
+                                        class="played-match-card"
+                                        role="listitem"
+                                    >
+                                        <header class="played-match-card__head">
+                                            <div class="played-match-card__date">{{ formatDivisionMatchDate(match) }}</div>
+                                            <button
+                                                type="button"
+                                                class="expand-button"
+                                                :class="{ 'expand-button--open': isPlayedMatchExpanded(match.match_id || match.matchId) }"
+                                                @click.stop="togglePlayedMatchExpand(match)"
+                                            >
+                                                <span class="chevron">›</span>
+                                            </button>
+                                        </header>
+
+                                        <div class="played-match-card__teams">
+                                            <div class="played-match-card__team">
+                                                <img
+                                                    v-if="playedRowTeamAvatar(match, 'team1')"
+                                                    :src="resolveAvatar(playedRowTeamAvatar(match, 'team1'))"
+                                                    :alt="match.team1_name || match.team1Name || 'Joukkue 1'"
+                                                    class="played-match-card__logo"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                />
+                                                <router-link
+                                                    v-if="divisionTeamRoute(match.team1_id || match.team1Id)"
+                                                    :to="divisionTeamRoute(match.team1_id || match.team1Id)"
+                                                    class="played-match-card__team-name"
+                                                >{{ match.team1_name || match.team1Name || 'Joukkue 1' }}</router-link>
+                                                <span v-else class="played-match-card__team-name">{{ match.team1_name || match.team1Name || 'Joukkue 1' }}</span>
+                                            </div>
+                                            <span class="played-match-card__vs">vs</span>
+                                            <div class="played-match-card__team">
+                                                <img
+                                                    v-if="playedRowTeamAvatar(match, 'team2')"
+                                                    :src="resolveAvatar(playedRowTeamAvatar(match, 'team2'))"
+                                                    :alt="match.team2_name || match.team2Name || 'Joukkue 2'"
+                                                    class="played-match-card__logo"
+                                                    loading="lazy"
+                                                    decoding="async"
+                                                />
+                                                <router-link
+                                                    v-if="divisionTeamRoute(match.team2_id || match.team2Id)"
+                                                    :to="divisionTeamRoute(match.team2_id || match.team2Id)"
+                                                    class="played-match-card__team-name"
+                                                >{{ match.team2_name || match.team2Name || 'Joukkue 2' }}</router-link>
+                                                <span v-else class="played-match-card__team-name">{{ match.team2_name || match.team2Name || 'Joukkue 2' }}</span>
+                                            </div>
+                                        </div>
+
+                                        <div class="played-match-card__stats">
+                                            <span class="played-match-pill">BO{{ toNumber(match.best_of ?? match.bestOf, 0) || 2 }}</span>
+                                            <span class="played-match-pill">
+                                                {{ toNumber(match.team1_score ?? match.team1Score, 0) }} - {{ toNumber(match.team2_score ?? match.team2Score, 0) }}
                                                 <span v-if="match.is_forfeit" class="cell-muted"> · FF</span>
-                                            </td>
-                                            <td>
-                                                <span v-if="playedRowRoundDiffLead(match) != null" class="eraro-lead-wrap">
-                                                    <img
-                                                        v-if="playedRowRoundDiffLead(match).teamAvatar"
-                                                        :src="resolveAvatar(playedRowRoundDiffLead(match).teamAvatar)"
-                                                        :alt="playedRowRoundDiffLead(match).teamName"
-                                                        class="eraro-lead-logo"
-                                                        loading="lazy"
-                                                        decoding="async"
-                                                    />
-                                                    <router-link
-                                                        v-if="divisionTeamRoute(playedRowRoundDiffLead(match).teamId)"
-                                                        :to="divisionTeamRoute(playedRowRoundDiffLead(match).teamId)"
-                                                        class="eraro-lead-team"
-                                                    >{{ playedRowRoundDiffLead(match).teamName }}</router-link>
-                                                    <span v-else class="eraro-lead-team">{{ playedRowRoundDiffLead(match).teamName }}</span>
-                                                    <span>: </span>
-                                                    <span class="stat-positive">+{{ playedRowRoundDiffLead(match).value }}</span>
-                                                </span>
-                                                <span v-else class="cell-muted">-</span>
-                                            </td>
-                                            <td>
-                                                <div class="micro-stack" v-if="playedRowMaps(match).length">
-                                                    <span v-for="map in playedRowMaps(match)" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.score1 }}-{{ map.score2 }}</span>
-                                                </div>
-                                                <span v-else class="cell-muted">-</span>
-                                            </td>
-                                            <td>
-                                                <div class="micro-stack" v-if="divisionMatchFaceitUrl(match) || availableDemoLinks(match).length">
-                                                    <a
-                                                        v-if="divisionMatchFaceitUrl(match)"
-                                                        :href="divisionMatchFaceitUrl(match)"
-                                                        target="_blank"
-                                                        rel="noopener"
-                                                        class="chip chip--link"
-                                                    >Faceit</a>
-                                                    <a
-                                                        v-for="(demo, demoPos) in availableDemoLinks(match)"
-                                                        :key="'demo-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
-                                                        :href="demo.url"
-                                                        target="_blank"
-                                                        rel="noopener"
-                                                        title="Demojen latausmäärä per tunti on rajoitettu."
-                                                        class="chip chip--link"
-                                                    >Demo {{ demoPos + 1 }}</a>
-                                                    <a
-                                                        v-for="(demo, demoPos) in availableDemoLinks(match)"
-                                                        :key="'demo2d-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
-                                                        href="#"
-                                                        @click.prevent="openReplay2D(demo.url)"
-                                                        class="chip chip--link"
-                                                    >2D Demo {{ demoPos + 1 }}</a>
-                                                </div>
-                                                <span v-else-if="isDemoAvailabilityLoading(match)" class="cell-muted">Tarkistetaan…</span>
-                                                <span v-else class="cell-muted">-</span>
-                                            </td>
-                                        </tr>
-                                        <tr v-if="isPlayedMatchExpanded(match.match_id || match.matchId)" class="match-expand-row">
-                                            <td :colspan="8">
-                                                <div class="match-expand-content">
-                                                    <match-expanded-details
-                                                        :summary="playedMatchSummary(match)"
-                                                        :details="playedMatchDetails(match)"
-                                                        :veto-entry="playedMatchVetoEntry(match)"
-                                                        :player-stats="playedMatchPlayerStats(match)"
-                                                        :map-catalog="mapCatalog"
-                                                        :loading="playedMatchBundleBusy(match.match_id || match.matchId)"
-                                                    ></match-expanded-details>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                        </template>
-                                    </tbody>
-                                </table>
+                                            </span>
+                                            <span v-if="playedRowRoundDiffLead(match) != null" class="played-match-pill">
+                                                {{ playedRowRoundDiffLead(match).teamName }}: +{{ playedRowRoundDiffLead(match).value }}
+                                            </span>
+                                        </div>
+
+                                        <div class="played-match-card__maps" v-if="playedRowMaps(match).length">
+                                            <span v-for="map in playedRowMaps(match)" :key="map.id" class="micro-chip">{{ map.mapName }} {{ map.score1 }}-{{ map.score2 }}</span>
+                                        </div>
+
+                                        <div class="played-match-card__actions">
+                                            <a
+                                                v-if="divisionMatchFaceitUrl(match)"
+                                                :href="divisionMatchFaceitUrl(match)"
+                                                target="_blank"
+                                                rel="noopener"
+                                                class="chip chip--link"
+                                            >Faceit</a>
+                                        </div>
+
+                                        <div v-if="isPlayedMatchExpanded(match.match_id || match.matchId)" class="match-expand-content played-match-card__expanded">
+                                            <match-expanded-details
+                                                :summary="playedMatchSummary(match)"
+                                                :details="playedMatchDetails(match)"
+                                                :veto-entry="playedMatchVetoEntry(match)"
+                                                :player-stats="playedMatchPlayerStats(match)"
+                                                :map-catalog="mapCatalog"
+                                                :loading="playedMatchBundleBusy(match.match_id || match.matchId)"
+                                            ></match-expanded-details>
+                                        </div>
+                                    </article>
+                                </div>
                             </div>
                             <p v-else class="division-section__empty">Ei pelattuja otteluita tälle divisioonalle.</p>
                         </div>
@@ -1978,17 +2074,20 @@ window.DivisionView = {
                 </section>
 
                 <section id="maps" class="division-section">
-                    <maps-stats
-                        class="division-surface glass-card"
-                        title="Karttatilastot"
-                        :loading="mapsLoading"
-                        :error="mapsError"
-                        :map-stats="mapStats"
-                        :columns="mapColumns"
-                        heading-variant="main"
-                        :show-header="true"
-                        :sticky-header="true"
-                    ></maps-stats>
+                    <div class="division-surface glass-card division-section-card">
+                        <loading-spinner v-if="mapsLoading" message="Karttatilastoja ladataan..."></loading-spinner>
+                        <error-message v-else-if="mapsError" :message="mapsError"></error-message>
+                        <shared-map-performance-table
+                            v-else
+                            :map-stats="mapStats"
+                            :map-catalog="mapCatalog"
+                            title="Karttatilastot"
+                            subtitle-summary="Yhteenveto: karttamaarat, bannit ja suorituskyky"
+                            subtitle-full="Laaja: Karttakohtaiset pelaajatilastot"
+                            :show-panel-container="true"
+                            variant="division"
+                        ></shared-map-performance-table>
+                    </div>
                 </section>
 
                 <section id="heroes" class="division-section division-section--heroes">

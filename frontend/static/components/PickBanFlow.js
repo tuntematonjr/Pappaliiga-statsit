@@ -168,17 +168,22 @@ window.PickBanFlow = {
                         <div class="veto-step__order">#{{ step.step }}</div>
                         <div class="veto-step__title">{{ step.label }}</div>
                     </div>
-                    <div v-if="resolveMapImage(step)" class="veto-step__map-image">
-                        <img :src="resolveMapImage(step)" @error="onImageError(step.mapName)" alt="" />
-                    </div>
-                    <div class="veto-step__map">{{ beautifyMapName(step.mapName) }}</div>
-                    <div v-if="step.action !== 'overflow' && step.action !== 'decider'" class="veto-step__actor">
-                        <router-link
-                            v-if="teamRoute(step.teamId, step.teamName)"
-                            :to="teamRoute(step.teamId, step.teamName)"
-                            class="team-link"
-                        >{{ step.teamName || 'Järjestelmä' }}</router-link>
-                        <span v-else>{{ step.teamName || 'Järjestelmä' }}</span>
+                    <div class="veto-step__body">
+                        <div class="veto-step__thumb">
+                            <img v-if="resolveMapImage(step)" :src="resolveMapImage(step)" @error="onImageError(step.mapName)" alt="" />
+                            <div v-else class="map-thumb--placeholder">No image</div>
+                        </div>
+                        <div class="veto-step__meta">
+                            <div class="veto-step__map">{{ beautifyMapName(step.mapName) }}</div>
+                            <div v-if="step.action !== 'overflow' && step.action !== 'decider'" class="veto-step__actor">
+                                <router-link
+                                    v-if="teamRoute(step.teamId, step.teamName)"
+                                    :to="teamRoute(step.teamId, step.teamName)"
+                                    class="team-link"
+                                >{{ step.teamName || 'Järjestelmä' }}</router-link>
+                                <span v-else>{{ step.teamName || 'Järjestelmä' }}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

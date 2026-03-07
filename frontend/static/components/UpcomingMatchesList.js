@@ -96,6 +96,7 @@
         if (!ts) return 'Aika tarkentuu';
         try {
             return new Date(ts).toLocaleString('fi-FI', {
+                weekday: 'short',
                 day: 'numeric',
                 month: 'short',
                 year: 'numeric',

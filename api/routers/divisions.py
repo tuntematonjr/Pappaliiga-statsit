@@ -44,21 +44,36 @@ class MapVoteStats(CamelModel):
     image_sm: Optional[str]
     maps_played: int
     banned: int
+    ban1: int = 0
+    ban2: int = 0
+    decov: int = 0
+    picks: int = 0
+    opp_picks: int = 0
+    pick_wins: int = 0
+    opp_pick_wins: int = 0
+    pick_win_rate: float = 0.0
+    opp_pick_win_rate: float = 0.0
     kills: int
     deaths: int
     damage: int
     rounds_played: int
     adr: float
     kr: float
+    hs_pct: float = 0.0
     udpr: float
     enemy_flash: float
+    enemies_flashed: int = 0
+    flash_count: int = 0
+    flash_successes: int = 0
     sniper_kills: int
     assists: int
+    mvps: int = 0
     k2: int
     k3: int
     k4: int
     ace: int
     pistol_kills: int
+    clutch_kills: int = 0
     pick_rate: float
 
 

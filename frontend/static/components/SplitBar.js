@@ -59,6 +59,12 @@ window.SplitBar = {
         total() {
             return this.wins + this.losses;
         },
+        shellClass() {
+            const classes = ['bar-split-shell'];
+            if (this.total === 0) classes.push('is-empty');
+            if (this.total > 0 && (this.wins === 0 || this.losses === 0)) classes.push('is-one-sided');
+            return classes.join(' ');
+        },
         winPercentage() {
             if (this.total === 0) return 50;
             return (this.wins / this.total) * 100;
@@ -116,6 +122,11 @@ window.SplitBar = {
             if (this.isAnimating) classes.push('bar-split--animating');
             if (this.showClash && this.hasClashMeeting) classes.push('bar-split--clash');
             return classes.join(' ');
+        },
+        dividerStyle() {
+            return {
+                left: this.winTargetWidth
+            };
         }
     },
     watch: {
@@ -156,10 +167,11 @@ window.SplitBar = {
         }
     },
     template: `
-        <div class="bar-split-shell" :style="{ height: height, '--split-win': winTargetWidth }">
+        <div :class="shellClass" :style="{ height: height, '--split-win': winTargetWidth }">
             <div :class="barClass" :style="{ height: '100%' }">
                 <div :class="winClass" :style="winStyle"></div>
                 <div :class="lossClass" :style="lossStyle"></div>
+                <span v-if="total > 0 && wins > 0 && losses > 0" class="bar-split-divider" :style="dividerStyle" aria-hidden="true"></span>
                 <div v-if="showShimmer && total > 0" class="split-shimmer" aria-hidden="true"></div>
                 <span v-if="showLabels" class="label label-left">{{ leftText || (wins + 'W') }}</span>
                 <span v-if="showLabels" class="label label-right">{{ rightText || (losses + 'L') }}</span>

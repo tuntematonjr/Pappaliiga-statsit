@@ -268,7 +268,7 @@ window.TeamComparisonBoard = {
                             <split-bar
                                 :wins="row.split.wins"
                                 :losses="row.split.losses"
-                                height="24px"
+                                height="30px"
                                 :left-text="formatInteger(row.wins) + ' voittoa'"
                                 :right-text="formatInteger(row.losses) + ' tappiota'"
                                 :show-percent="false"
