@@ -3705,7 +3705,7 @@ window.TeamDetail = {
                             :data="players"
                             :default-sort="playerDefaultSort"
                             :colorize-columns="[]"
-                            :mobile-column-limit="6"
+                            :mobile-column-limit="5"
                             :sticky-header="true"
                             :compact="false"
                         >
