@@ -75,15 +75,15 @@ window.TeamComparisonBoard = {
     data() {
         return {
             columns: [
-                { key: 'team', label: 'Joukkue', sortable: true, align: 'left', colClass: 'col-team col-name', width: '260px' },
-                { key: 'matches', label: 'Ottelut', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '90px' },
-                { key: 'wins', label: 'Voitot', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px' },
-                { key: 'losses', label: 'Tappiot', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px' },
-                { key: 'split', label: 'Voittojakauma', sortable: false, colClass: 'col-bar' },
-                { key: 'win_rate', label: 'Voittoprosentti', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-b', width: '120px' },
-                { key: 'round_diff', label: 'Erä-ero', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-b', width: '110px' },
-                { key: 'kd', label: 'K/D', sortable: true, numeric: true, align: 'center', decimals: 2, colClass: 'col-stat col-group-c', width: '90px' },
-                { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'center', decimals: 1, colClass: 'col-stat col-group-c', width: '100px' }
+                { key: 'team', label: 'Joukkue', sortable: true, align: 'left', colClass: 'col-team col-name', width: '260px', mobilePinned: true, mobilePriority: 1 },
+                { key: 'matches', label: 'Ottelut', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '90px', mobileLabel: 'Ott.', mobilePriority: 2 },
+                { key: 'wins', label: 'Voitot', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px', mobileHidden: true },
+                { key: 'losses', label: 'Tappiot', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px', mobileHidden: true },
+                { key: 'split', label: 'Voittojakauma', sortable: false, colClass: 'col-bar', mobileLabel: 'W-L', mobilePriority: 3 },
+                { key: 'win_rate', label: 'Voittoprosentti', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-b', width: '120px', mobileLabel: 'WR%', mobilePriority: 4 },
+                { key: 'round_diff', label: 'Erä-ero', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-b', width: '110px', mobileLabel: 'Eraero', mobilePriority: 5 },
+                { key: 'kd', label: 'K/D', sortable: true, numeric: true, align: 'center', decimals: 2, colClass: 'col-stat col-group-c', width: '90px', mobileHidden: true },
+                { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'center', decimals: 1, colClass: 'col-stat col-group-c', width: '100px', mobileHidden: true }
             ]
         };
     },
@@ -226,6 +226,7 @@ window.TeamComparisonBoard = {
                         :columns="columns"
                         :data="rows"
                         :defaultSort="defaultSort"
+                        :mobile-column-limit="5"
                         class="team-comparison-table"
                         :compact="true"
                         :sticky-header="stickyHeader"

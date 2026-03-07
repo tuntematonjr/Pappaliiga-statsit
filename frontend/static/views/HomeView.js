@@ -1016,7 +1016,7 @@ window.HomeView = {
                 ></error-message>
                 <div
                     v-else
-                    class="summary-card-grid"
+                    class="summary-card-grid summary-card-grid--lifetime"
                     role="list"
                 >
                     <summary-stat-card
@@ -1232,6 +1232,8 @@ window.HomeView = {
                         :search-query="divisionSearch"
                         :show-season-picker="false"
                         :show-controls="false"
+                        :group-by-division="true"
+                        :collapsible-groups="true"
                         @change-season="handleSeasonSelect"
                         @change-filter="setDivisionFilter"
                         @change-search="divisionSearch = $event"

@@ -31,24 +31,24 @@ window.MapStatsTable = {
     data() {
         return {
             defaultColumns: [
-                { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name', width: '210px' },
-                { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '88px' },
-                { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '88px' },
-                { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '94px' },
-                { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 0, width: '88px' },
-                { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '88px' },
-                { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '88px' },
-                { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '88px' },
-                { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'right', decimals: 1, width: '90px' },
-                { key: 'kr', label: 'K/R', sortable: true, numeric: true, align: 'right', decimals: 2, width: '78px' },
-                { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, align: 'right', decimals: 2, width: '94px' },
-                { key: 'enemy_flash', label: 'Enemy/Flash', sortable: true, numeric: true, align: 'right', decimals: 2, width: '108px' },
-                { key: 'mk_2k', label: '2K', sortable: true, numeric: true, align: 'right', width: '68px' },
-                { key: 'mk_3k', label: '3K', sortable: true, numeric: true, align: 'right', width: '68px' },
-                { key: 'mk_4k', label: '4K', sortable: true, numeric: true, align: 'right', width: '68px' },
-                { key: 'mk_5k', label: '5K', sortable: true, numeric: true, align: 'right', width: '68px' },
-                { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '104px' },
-                { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '104px' }
+                { key: 'map_name', label: 'Kartta', sortable: true, align: 'left', colClass: 'col-name col-map-name', width: '210px', mobilePinned: true, mobilePriority: 1 },
+                { key: 'maps_played', label: 'Pelattu', sortable: true, numeric: true, align: 'right', width: '88px', mobileLabel: 'Pel.', mobilePriority: 2 },
+                { key: 'banned', label: 'Bannit', sortable: true, numeric: true, align: 'right', width: '88px', mobilePriority: 5 },
+                { key: 'rounds_played', label: 'Rundeja', sortable: true, numeric: true, align: 'right', width: '94px', mobileLabel: 'Erät', mobileHidden: true },
+                { key: 'r_per_map', label: 'R/Map', sortable: true, numeric: true, align: 'right', decimals: 0, width: '88px', mobileHidden: true },
+                { key: 'kills', label: 'Killed', sortable: true, numeric: true, align: 'right', width: '88px', mobileHidden: true },
+                { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, align: 'right', width: '88px', mobileHidden: true },
+                { key: 'assists', label: 'Assists', sortable: true, numeric: true, align: 'right', width: '88px', mobileHidden: true },
+                { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'right', decimals: 1, width: '90px', mobilePriority: 3 },
+                { key: 'kr', label: 'K/R', sortable: true, numeric: true, align: 'right', decimals: 2, width: '78px', mobilePriority: 4 },
+                { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, align: 'right', decimals: 2, width: '94px', mobileHidden: true },
+                { key: 'enemy_flash', label: 'Enemy/Flash', sortable: true, numeric: true, align: 'right', decimals: 2, width: '108px', mobileHidden: true },
+                { key: 'mk_2k', label: '2K', sortable: true, numeric: true, align: 'right', width: '68px', mobileHidden: true },
+                { key: 'mk_3k', label: '3K', sortable: true, numeric: true, align: 'right', width: '68px', mobileHidden: true },
+                { key: 'mk_4k', label: '4K', sortable: true, numeric: true, align: 'right', width: '68px', mobileHidden: true },
+                { key: 'mk_5k', label: '5K', sortable: true, numeric: true, align: 'right', width: '68px', mobileHidden: true },
+                { key: 'pistol_kills', label: 'Pistol Kills', sortable: true, numeric: true, align: 'right', width: '104px', mobileHidden: true },
+                { key: 'sniper_kills', label: 'Sniper Kills', sortable: true, numeric: true, align: 'right', width: '104px', mobileHidden: true }
             ],
             defaultColorizeColumns: [],
             defaultSort: { column: 'maps_played', order: 'desc', numeric: true },
@@ -213,6 +213,7 @@ window.MapStatsTable = {
                     :data="rows"
                     :defaultSort="defaultSort"
                     :colorizeColumns="colorizeColumns"
+                    :mobile-column-limit="5"
                     :sticky-header="stickyHeader"
                     :compact="true"
                 >

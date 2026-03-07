@@ -2,31 +2,31 @@
 // Every DB-backed field is surfaced as a stat, column, chart point or tooltip.
 
 const PLAYER_COLUMNS = [
-    { key: 'nickname', label: 'Pelaaja', sortable: true, colClass: 'col-name', group: 'identity', tooltip: 'Pelaajan nimi, roolibadget ja kauden kartta/erämäärä.' },
-    { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true, group: 'volume', tooltip: 'Pelattujen karttojen määrä tällä kaudella.' },
-    { key: 'roundsPlayed', label: 'R', sortable: true, numeric: true, group: 'volume', tooltip: 'Pelattujen erien kokonaismäärä.' },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd', group: 'core', tooltip: 'Tapot / kuolemat. Yli 1.00 tarkoittaa enemmän tappoja kuin kuolemia.' },
-    { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 2, group: 'core', tooltip: 'Kills per round: tapot per pelattu erä.' },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr', group: 'core', tooltip: 'Average Damage per Round: keskimääräinen vahinko per erä.' },
-    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, group: 'core', tooltip: 'Headshot-osuus prosenteissa kaikista tapoista.' },
-    { key: 'kills', label: 'Kills', sortable: true, numeric: true, group: 'combat', tooltip: 'Kaikki tapot yhteensä.' },
-    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, group: 'combat', tooltip: 'Kaikki kuolemat yhteensä.' },
-    { key: 'assists', label: 'A', sortable: true, numeric: true, group: 'combat', tooltip: 'Assistit yhteensä.' },
-    { key: 'clutchKills', label: 'Clutch K', sortable: true, numeric: true, group: 'combat', tooltip: 'Tapot clutch-tilanteissa.' },
-    { key: 'entryLine', label: 'Entry', sortable: true, numeric: true, group: 'impact', tooltip: 'Entry-voitot / entry-yritykset sekä onnistumisprosentti.' },
-    { key: 'clutch1v1Line', label: '1v1', sortable: true, numeric: true, group: 'impact', tooltip: 'Voitetut 1v1 clutchit / yritykset.' },
-    { key: 'clutch1v2Line', label: '1v2', sortable: true, numeric: true, group: 'impact', tooltip: 'Voitetut 1v2 clutchit / yritykset.' },
-    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, group: 'impact', tooltip: 'MVP-merkintöjen määrä.' },
-    { key: 'damage', label: 'Dmg', sortable: true, numeric: true, group: 'utility', tooltip: 'Kokonaisvahinko kaikissa kartoissa.' },
-    { key: 'utilityDamage', label: 'U-Dmg', sortable: true, numeric: true, group: 'utility', tooltip: 'Utility-vahinko yhteensä (kranaatit ym.).' },
-    { key: 'enemiesFlashed', label: 'Flashed', sortable: true, numeric: true, group: 'utility', tooltip: 'Kuinka monta vastustajaa pelaaja on väläyttänyt.' },
-    { key: 'flashSuccessLine', label: 'Flash%', sortable: true, numeric: true, group: 'utility', tooltip: 'Flash-successit / heitetyt flashit sekä onnistumisprosentti.' },
-    { key: 'mk2k', label: '2K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 2 tappoa.' },
-    { key: 'mk3k', label: '3K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 3 tappoa.' },
-    { key: 'mk4k', label: '4K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 4 tappoa.' },
-    { key: 'mk5k', label: 'Ace', sortable: true, numeric: true, group: 'multis', tooltip: 'Ace: kierrokset, joissa pelaaja tappoi koko vastustajajoukkueen (5K).' },
-    { key: 'sniperKills', label: 'Sniper', sortable: true, numeric: true, group: 'weapons', tooltip: 'Sniper-tappojen määrä.' },
-    { key: 'pistolKills', label: 'Pistol', sortable: true, numeric: true, group: 'weapons', tooltip: 'Pistoolitappojen määrä.' }
+    { key: 'nickname', label: 'Pelaaja', sortable: true, colClass: 'col-name', group: 'identity', tooltip: 'Pelaajan nimi, roolibadget ja kauden kartta/erämäärä.', mobilePinned: true, mobilePriority: 1 },
+    { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true, group: 'volume', tooltip: 'Pelattujen karttojen määrä tällä kaudella.', mobilePriority: 2 },
+    { key: 'roundsPlayed', label: 'R', sortable: true, numeric: true, group: 'volume', tooltip: 'Pelattujen erien kokonaismäärä.', mobileHidden: true },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd', group: 'core', tooltip: 'Tapot / kuolemat. Yli 1.00 tarkoittaa enemmän tappoja kuin kuolemia.', mobilePriority: 3 },
+    { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 2, group: 'core', tooltip: 'Kills per round: tapot per pelattu erä.', mobileHidden: true },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr', group: 'core', tooltip: 'Average Damage per Round: keskimääräinen vahinko per erä.', mobilePriority: 4 },
+    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, group: 'core', tooltip: 'Headshot-osuus prosenteissa kaikista tapoista.', mobilePriority: 5 },
+    { key: 'kills', label: 'Kills', sortable: true, numeric: true, group: 'combat', tooltip: 'Kaikki tapot yhteensä.', mobileHidden: true },
+    { key: 'deaths', label: 'Deaths', sortable: true, numeric: true, group: 'combat', tooltip: 'Kaikki kuolemat yhteensä.', mobileHidden: true },
+    { key: 'assists', label: 'A', sortable: true, numeric: true, group: 'combat', tooltip: 'Assistit yhteensä.', mobileHidden: true },
+    { key: 'clutchKills', label: 'Clutch K', sortable: true, numeric: true, group: 'combat', tooltip: 'Tapot clutch-tilanteissa.', mobileHidden: true },
+    { key: 'entryLine', label: 'Entry', sortable: true, numeric: true, group: 'impact', tooltip: 'Entry-voitot / entry-yritykset sekä onnistumisprosentti.', mobilePriority: 6 },
+    { key: 'clutch1v1Line', label: '1v1', sortable: true, numeric: true, group: 'impact', tooltip: 'Voitetut 1v1 clutchit / yritykset.', mobileHidden: true },
+    { key: 'clutch1v2Line', label: '1v2', sortable: true, numeric: true, group: 'impact', tooltip: 'Voitetut 1v2 clutchit / yritykset.', mobileHidden: true },
+    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, group: 'impact', tooltip: 'MVP-merkintöjen määrä.', mobileHidden: true },
+    { key: 'damage', label: 'Dmg', sortable: true, numeric: true, group: 'utility', tooltip: 'Kokonaisvahinko kaikissa kartoissa.', mobileHidden: true },
+    { key: 'utilityDamage', label: 'U-Dmg', sortable: true, numeric: true, group: 'utility', tooltip: 'Utility-vahinko yhteensä (kranaatit ym.).', mobileHidden: true },
+    { key: 'enemiesFlashed', label: 'Flashed', sortable: true, numeric: true, group: 'utility', tooltip: 'Kuinka monta vastustajaa pelaaja on väläyttänyt.', mobileHidden: true },
+    { key: 'flashSuccessLine', label: 'Flash%', sortable: true, numeric: true, group: 'utility', tooltip: 'Flash-successit / heitetyt flashit sekä onnistumisprosentti.', mobileHidden: true },
+    { key: 'mk2k', label: '2K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 2 tappoa.', mobileHidden: true },
+    { key: 'mk3k', label: '3K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 3 tappoa.', mobileHidden: true },
+    { key: 'mk4k', label: '4K', sortable: true, numeric: true, group: 'multis', tooltip: 'Kierrokset, joissa pelaaja sai 4 tappoa.', mobileHidden: true },
+    { key: 'mk5k', label: 'Ace', sortable: true, numeric: true, group: 'multis', tooltip: 'Ace: kierrokset, joissa pelaaja tappoi koko vastustajajoukkueen (5K).', mobileHidden: true },
+    { key: 'sniperKills', label: 'Sniper', sortable: true, numeric: true, group: 'weapons', tooltip: 'Sniper-tappojen määrä.', mobileHidden: true },
+    { key: 'pistolKills', label: 'Pistol', sortable: true, numeric: true, group: 'weapons', tooltip: 'Pistoolitappojen määrä.', mobileHidden: true }
 ];
 
 const MAP_GROUP_META = {
@@ -3705,6 +3705,7 @@ window.TeamDetail = {
                             :data="players"
                             :default-sort="playerDefaultSort"
                             :colorize-columns="[]"
+                            :mobile-column-limit="6"
                             :sticky-header="true"
                             :compact="false"
                         >

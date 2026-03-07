@@ -255,7 +255,6 @@ async def _compute_division_details(championship_id: str, season: int, division_
                 m.team2_id
             FROM maps mp
             JOIN division_matches m ON m.match_id = mp.match_id
-            WHERE COALESCE(mp.is_forfeit, 0) = 0
         ),
         team_map_rows AS (
             SELECT

@@ -134,6 +134,7 @@
             showDivision: { type: Boolean, default: false },
             showFaceit: { type: Boolean, default: true },
             showHeader: { type: Boolean, default: true },
+            compact: { type: Boolean, default: false },
             groupByDayDivision: { type: Boolean, default: false },
             showWeekSeparators: { type: Boolean, default: true },
             separatorGranularity: { type: String, default: 'week' }
@@ -310,7 +311,7 @@
             }
         },
         template: `
-            <section class="upcoming-matches glass-card">
+            <section :class="['upcoming-matches', 'glass-card', compact ? 'upcoming-matches--compact' : '']">
                 <header v-if="showHeader" class="upcoming-matches__header">
                     <div>
                         <h2 class="title-accent titleUnderlineSection">{{ title }}</h2>

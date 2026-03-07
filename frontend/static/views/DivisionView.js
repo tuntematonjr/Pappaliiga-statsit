@@ -1779,6 +1779,8 @@ window.DivisionView = {
                             :loading="upcomingLoading"
                             :error="upcomingError"
                             title="Tulevat ottelut"
+                            :show-header="false"
+                            :compact="true"
                             empty-message="Ei tulevia otteluita tälle divisioonalle."
                         ></upcoming-matches-list>
 

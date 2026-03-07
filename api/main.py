@@ -31,6 +31,28 @@ import time
 _app_start_time = time.time()
 logger = logging.getLogger(__name__)
 
+
+class _SuppressProxyImageAccessFilter(logging.Filter):
+    """Hide noisy access log lines for proxied image requests."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            message = record.getMessage()
+        except Exception:
+            return True
+        return " /api/proxy-image" not in message
+
+
+def _install_access_log_filters() -> None:
+    access_logger = logging.getLogger("uvicorn.access")
+    for existing in access_logger.filters:
+        if isinstance(existing, _SuppressProxyImageAccessFilter):
+            return
+    access_logger.addFilter(_SuppressProxyImageAccessFilter())
+
+
+_install_access_log_filters()
+
 SPA_NO_STORE_HEADERS = {
     "Cache-Control": "no-cache, no-store, must-revalidate",
     "Pragma": "no-cache",

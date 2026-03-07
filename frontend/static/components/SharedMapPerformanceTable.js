@@ -91,56 +91,56 @@ const SM_SCOUT_GROUP_META = {
 };
 
 const SM_MAP_COLUMNS = [
-    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '210px', group: 'map' },
-    { key: 'totalRoundsPlayed', label: 'Eriä pelattu', sortable: true, numeric: true, colClass: 'mono-num', group: 'rounds' },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', group: 'combat' },
-    { key: 'kr', label: 'KR', sortable: true, numeric: true, decimals: 3, colClass: 'mono-num', group: 'combat' },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', group: 'combat' },
-    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', group: 'combat' },
-    { key: 'kills', label: 'Tapot', sortable: true, numeric: true, colClass: 'mono-num col-kills', group: 'kills' },
-    { key: 'deaths', label: 'Kuolemat', sortable: true, numeric: true, colClass: 'mono-num col-deaths', group: 'kills' },
-    { key: 'assists', label: 'Assist', sortable: true, numeric: true, colClass: 'mono-num', group: 'kills' },
-    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', group: 'utility' },
-    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, colClass: 'mono-num col-mvps', group: 'awards' },
-    { key: 'enemiesFlashed', label: 'Enemies flashed', sortable: true, numeric: true, colClass: 'mono-num', group: 'flash' },
-    { key: 'flashSuccessPct', label: 'Flash%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', group: 'flash' },
-    { key: 'flashCount', label: 'Flashbangit', sortable: true, numeric: true, colClass: 'mono-num', group: 'flash' },
-    { key: 'multi2k', label: '2k', sortable: true, numeric: true, colClass: 'mono-num', group: 'multikill' },
-    { key: 'multi3k', label: '3k', sortable: true, numeric: true, colClass: 'mono-num', group: 'multikill' },
-    { key: 'multi4k', label: '4k', sortable: true, numeric: true, colClass: 'mono-num', group: 'multikill' },
-    { key: 'multi5k', label: 'Ace', sortable: true, numeric: true, colClass: 'mono-num', group: 'multikill' },
-    { key: 'pistolKills', label: 'Pistooli', sortable: true, numeric: true, colClass: 'mono-num', group: 'weapons' },
-    { key: 'sniperKills', label: 'Sniper', sortable: true, numeric: true, colClass: 'mono-num', group: 'weapons' },
-    { key: 'totalDamage', label: 'Vahinko', sortable: true, numeric: true, colClass: 'mono-num', group: 'damage' },
-    { key: 'clutchKills', label: 'Clutch', sortable: true, numeric: true, colClass: 'mono-num', group: 'clutch' }
+    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '210px', group: 'map', mobilePinned: true, mobilePriority: 1 },
+    { key: 'totalRoundsPlayed', label: 'Eriä pelattu', sortable: true, numeric: true, colClass: 'mono-num', group: 'rounds', mobileLabel: 'Erät', mobilePriority: 2 },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', group: 'combat', mobilePriority: 3 },
+    { key: 'kr', label: 'KR', sortable: true, numeric: true, decimals: 3, colClass: 'mono-num', group: 'combat', mobileHidden: true },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', group: 'combat', mobilePriority: 4 },
+    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', group: 'combat', mobilePriority: 5 },
+    { key: 'kills', label: 'Tapot', sortable: true, numeric: true, colClass: 'mono-num col-kills', group: 'kills', mobileHidden: true },
+    { key: 'deaths', label: 'Kuolemat', sortable: true, numeric: true, colClass: 'mono-num col-deaths', group: 'kills', mobileHidden: true },
+    { key: 'assists', label: 'Assist', sortable: true, numeric: true, colClass: 'mono-num', group: 'kills', mobileHidden: true },
+    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', group: 'utility', mobileHidden: true },
+    { key: 'mvps', label: 'MVP', sortable: true, numeric: true, colClass: 'mono-num col-mvps', group: 'awards', mobileHidden: true },
+    { key: 'enemiesFlashed', label: 'Enemies flashed', sortable: true, numeric: true, colClass: 'mono-num', group: 'flash', mobileLabel: 'Flashed', mobileHidden: true },
+    { key: 'flashSuccessPct', label: 'Flash%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', group: 'flash', mobileHidden: true },
+    { key: 'flashCount', label: 'Flashbangit', sortable: true, numeric: true, colClass: 'mono-num', group: 'flash', mobileHidden: true },
+    { key: 'multi2k', label: '2k', sortable: true, numeric: true, colClass: 'mono-num', group: 'multikill', mobileHidden: true },
+    { key: 'multi3k', label: '3k', sortable: true, numeric: true, colClass: 'mono-num', group: 'multikill', mobileHidden: true },
+    { key: 'multi4k', label: '4k', sortable: true, numeric: true, colClass: 'mono-num', group: 'multikill', mobileHidden: true },
+    { key: 'multi5k', label: 'Ace', sortable: true, numeric: true, colClass: 'mono-num', group: 'multikill', mobileHidden: true },
+    { key: 'pistolKills', label: 'Pistooli', sortable: true, numeric: true, colClass: 'mono-num', group: 'weapons', mobileHidden: true },
+    { key: 'sniperKills', label: 'Sniper', sortable: true, numeric: true, colClass: 'mono-num', group: 'weapons', mobileHidden: true },
+    { key: 'totalDamage', label: 'Vahinko', sortable: true, numeric: true, colClass: 'mono-num', group: 'damage', mobileHidden: true },
+    { key: 'clutchKills', label: 'Clutch', sortable: true, numeric: true, colClass: 'mono-num', group: 'clutch', mobileHidden: true }
 ];
 
 const SM_SCOUT_MAP_COLUMNS = [
-    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px', group: 'map' },
-    { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played', group: 'usage' },
-    { key: 'picks', label: 'Omat pickit', sortable: true, numeric: true, colClass: 'mono-num col-picks', group: 'usage' },
-    { key: 'oppPicks', label: 'Vastustajan pickit', sortable: true, numeric: true, colClass: 'mono-num col-opp-picks', group: 'usage' },
-    { key: 'winrate', label: 'Win %', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate', group: 'results' },
-    { key: 'pickWinRate', label: 'Win % (oma pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-own', group: 'results' },
-    { key: 'oppPickWinRate', label: 'Win % (vastustajan pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-opp', group: 'results' },
-    { key: 'rd', label: 'Eraero', sortable: true, numeric: true, colClass: 'mono-num col-rd', group: 'performance' },
-    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', group: 'performance' },
-    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', group: 'performance' },
-    { key: 'ban1', label: '1. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban1', group: 'veto' },
-    { key: 'ban2', label: '2. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban2', group: 'veto' },
-    { key: 'oppBan', label: 'Vastustajan banni', sortable: true, numeric: true, colClass: 'mono-num col-opp-ban', group: 'veto' },
-    { key: 'totalOwnBan', label: 'Banneja yhteensa', sortable: true, numeric: true, colClass: 'mono-num col-ban-total', group: 'veto' },
-    { key: 'decov', label: 'Decider / overflow', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series' }
+    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px', group: 'map', mobilePinned: true, mobilePriority: 1 },
+    { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played', group: 'usage', mobilePriority: 2 },
+    { key: 'picks', label: 'Omat pickit', sortable: true, numeric: true, colClass: 'mono-num col-picks', group: 'usage', mobileLabel: 'Omat', mobileHidden: true },
+    { key: 'oppPicks', label: 'Vastustajan pickit', sortable: true, numeric: true, colClass: 'mono-num col-opp-picks', group: 'usage', mobileLabel: 'Vast.', mobileHidden: true },
+    { key: 'winrate', label: 'Win %', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate', group: 'results', mobileLabel: 'WR%', mobilePriority: 3 },
+    { key: 'pickWinRate', label: 'Win % (oma pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-own', group: 'results', mobileLabel: 'Oma WR%', mobileHidden: true },
+    { key: 'oppPickWinRate', label: 'Win % (vastustajan pick)', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-winrate-opp', group: 'results', mobileLabel: 'Vast. WR%', mobileHidden: true },
+    { key: 'rd', label: 'Eraero', sortable: true, numeric: true, colClass: 'mono-num col-rd', group: 'performance', mobileLabel: 'Eraero', mobilePriority: 4 },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', group: 'performance', mobilePriority: 5 },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', group: 'performance', mobileHidden: true },
+    { key: 'ban1', label: '1. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban1', group: 'veto', mobileLabel: '1. banni', mobileHidden: true },
+    { key: 'ban2', label: '2. banni (oma)', sortable: true, numeric: true, colClass: 'mono-num col-ban2', group: 'veto', mobileLabel: '2. banni', mobileHidden: true },
+    { key: 'oppBan', label: 'Vastustajan banni', sortable: true, numeric: true, colClass: 'mono-num col-opp-ban', group: 'veto', mobileLabel: 'Vast. banni', mobileHidden: true },
+    { key: 'totalOwnBan', label: 'Banneja yhteensa', sortable: true, numeric: true, colClass: 'mono-num col-ban-total', group: 'veto', mobileLabel: 'Bannit', mobilePriority: 6 },
+    { key: 'decov', label: 'Decider / overflow', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series', mobileLabel: 'Decider', mobilePriority: 7 }
 ];
 
 const SM_SCOUT_MAP_COLUMNS_DIVISION = [
-    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px', group: 'map' },
-    { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played', group: 'usage' },
-    { key: 'pickMatchup', label: 'WR% pickit (oma vs vast.)', sortable: false, colClass: 'col-pick-matchup', group: 'results' },
-    { key: 'totalOwnBan', label: 'Total bannatty', sortable: true, numeric: true, colClass: 'mono-num col-ban-total', group: 'veto' },
-    { key: 'ban1', label: '1st ban', sortable: true, numeric: true, colClass: 'mono-num col-ban1', group: 'veto' },
-    { key: 'ban2', label: '2nd ban', sortable: true, numeric: true, colClass: 'mono-num col-ban2', group: 'veto' },
-    { key: 'decov', label: 'Decider', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series' }
+    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px', group: 'map', mobilePinned: true, mobilePriority: 1 },
+    { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played', group: 'usage', mobilePriority: 2 },
+    { key: 'pickMatchup', label: 'WR% pickit (oma vs vast.)', sortable: false, colClass: 'col-pick-matchup', group: 'results', mobileLabel: 'Pick WR', mobilePriority: 3 },
+    { key: 'totalOwnBan', label: 'Total bannatty', sortable: true, numeric: true, colClass: 'mono-num col-ban-total', group: 'veto', mobileLabel: 'Bannit', mobilePriority: 4 },
+    { key: 'ban1', label: '1st ban', sortable: true, numeric: true, colClass: 'mono-num col-ban1', group: 'veto', mobileHidden: true },
+    { key: 'ban2', label: '2nd ban', sortable: true, numeric: true, colClass: 'mono-num col-ban2', group: 'veto', mobileHidden: true },
+    { key: 'decov', label: 'Decider', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series', mobilePriority: 5 }
 ];
 
 window.SharedMapPerformanceTable = {
@@ -492,6 +492,7 @@ window.SharedMapPerformanceTable = {
                     :header-groups="scoutHeaderGroups"
                     :data="scoutMapRows"
                     :default-sort="scoutMapDefaultSort"
+                    :mobile-column-limit="variant === 'division' ? 5 : 6"
                     :sticky-header="true"
                     :compact="true"
                     class="map-summary-table"
@@ -556,6 +557,7 @@ window.SharedMapPerformanceTable = {
                     :header-groups="mapHeaderGroups"
                     :data="normalizedRows"
                     :default-sort="mapDefaultSort"
+                    :mobile-column-limit="5"
                     :sticky-header="true"
                     :compact="true"
                     class="map-full-table"

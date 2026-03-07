@@ -53,6 +53,14 @@ window.SortableTable = {
         onToggleGroup: {
             type: Function,
             default: null
+        },
+        mobileColumnLimit: {
+            type: Number,
+            default: null
+        },
+        mobileBreakpoint: {
+            type: Number,
+            default: 768
         }
     },
     setup(props) {
@@ -62,7 +70,7 @@ window.SortableTable = {
         const { colorizeColumn, getCellStyle } = window.useCellColorization();
 
         const hasAppliedDefault = Vue.ref(false);
-        const isMobile = Vue.ref(window.innerWidth <= 768);
+        const isMobile = Vue.ref(window.innerWidth <= props.mobileBreakpoint);
         
         const hasDefaultColumn = Vue.computed(() => {
             if (!props.defaultSort || !Array.isArray(props.columns)) return false;
@@ -76,15 +84,76 @@ window.SortableTable = {
             if (props.collapsedGroups && props.collapsedGroups.size > 0) {
                 cols = cols.filter(col => !props.collapsedGroups.has(col.group));
             }
-            
-            // Mobile filtering disabled - show all columns
-            
-            return cols;
+
+            if (!isMobile.value) {
+                return cols;
+            }
+
+            const responsiveCols = cols.filter(col => col.mobileHidden !== true);
+            const hasMobileMetadata = responsiveCols.some(col => col.mobilePinned || Number.isFinite(col.mobilePriority));
+            const mobileLimit = Number.isFinite(props.mobileColumnLimit) && props.mobileColumnLimit > 0
+                ? props.mobileColumnLimit
+                : null;
+
+            if (!mobileLimit && !hasMobileMetadata) {
+                return responsiveCols;
+            }
+
+            const limit = mobileLimit ? Math.max(mobileLimit, 1) : responsiveCols.length;
+            const pinnedKeys = new Set(
+                responsiveCols
+                    .filter(col => col.mobilePinned)
+                    .map(col => col.key)
+            );
+            const prioritized = responsiveCols
+                .filter(col => !pinnedKeys.has(col.key))
+                .map((col, index) => ({
+                    col,
+                    index,
+                    priority: Number.isFinite(col.mobilePriority) ? col.mobilePriority : Number.MAX_SAFE_INTEGER
+                }))
+                .sort((left, right) => {
+                    if (left.priority !== right.priority) return left.priority - right.priority;
+                    return left.index - right.index;
+                });
+            const selectedKeys = new Set(Array.from(pinnedKeys));
+            const remainingSlots = Math.max(0, limit - selectedKeys.size);
+
+            prioritized.slice(0, remainingSlots).forEach(item => selectedKeys.add(item.col.key));
+
+            return responsiveCols.filter(col => selectedKeys.has(col.key));
+        });
+
+        const visibleHeaderGroups = Vue.computed(() => {
+            if (!Array.isArray(props.headerGroups) || !props.headerGroups.length) {
+                return [];
+            }
+
+            const groupMeta = new Map(props.headerGroups.map(group => [group.key, group]));
+            const groups = [];
+
+            visibleColumns.value.forEach(column => {
+                const key = column.group || '__ungrouped';
+                const meta = groupMeta.get(key) || {};
+                const last = groups[groups.length - 1];
+                if (!last || last.key !== key) {
+                    groups.push({
+                        key,
+                        label: meta.label || '',
+                        className: meta.className || '',
+                        colSpan: 1
+                    });
+                    return;
+                }
+                last.colSpan += 1;
+            });
+
+            return groups.filter(group => group.colSpan > 0);
         });
 
         // Update mobile state on resize
         const handleResize = () => {
-            isMobile.value = window.innerWidth <= 768;
+            isMobile.value = window.innerWidth <= props.mobileBreakpoint;
         };
         
         Vue.onMounted(() => {
@@ -163,7 +232,9 @@ window.SortableTable = {
             sortedData,
             hasAppliedDefault,
             hasDefaultColumn,
-            visibleColumns
+            visibleColumns,
+            visibleHeaderGroups,
+            isMobile
         };
     },
     computed: {
@@ -234,6 +305,13 @@ window.SortableTable = {
             if (this.currentSort && this.currentSort.column === column.key) classes.push('active');
             if (this.isDefaultSortColumn(column)) classes.push('is-default');
             return classes.join(' ');
+        },
+        getColumnLabel(column) {
+            if (!column) return '';
+            if (this.isMobile && typeof column.mobileLabel === 'string' && column.mobileLabel) {
+                return column.mobileLabel;
+            }
+            return column.label;
         },
         getCellClass(column, row) {
             const classes = [];
@@ -335,9 +413,9 @@ window.SortableTable = {
                         <col v-for="column in visibleColumns" :key="column.key" :style="column.width ? ('width:' + column.width) : null" :class="column.colClass || ''" />
                     </colgroup>
                     <thead>
-                        <tr v-if="headerGroups && headerGroups.length" class="table-group-header">
+                        <tr v-if="visibleHeaderGroups && visibleHeaderGroups.length" class="table-group-header">
                             <th
-                                v-for="(group, idx) in headerGroups"
+                                v-for="(group, idx) in visibleHeaderGroups"
                                 :key="group.label + '-' + idx"
                                 :colspan="group.colSpan"
                                 :class="getGroupClass(group)"
@@ -368,7 +446,7 @@ window.SortableTable = {
                                 :aria-sort="getAriaSort(column)"
                             >
                                 <span class="th-content">
-                                    {{ column.label }}
+                                    {{ getColumnLabel(column) }}
                                     <span v-if="column.sortable !== false && getSortIndicator(column.key)" class="sort-indicator">
                                         {{ getSortIndicator(column.key) }}
                                     </span>
@@ -388,7 +466,7 @@ window.SortableTable = {
                                 :key="column.key"
                                 :class="[getCellClass(column, row), column.colClass || '']"
                                 :style="{ textAlign: getCellAlign(column) }"
-                                :data-label="column.label"
+                                :data-label="getColumnLabel(column)"
                                 :title="getCellTooltip(column, row)"
                             >
                                 <!-- Special-case map_name column to use a static named slot and inline image rendering -->

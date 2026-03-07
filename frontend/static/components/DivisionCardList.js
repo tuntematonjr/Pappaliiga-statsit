@@ -56,13 +56,6 @@
     });
     const STORAGE_KEY = 'pappaliiga:last-division';
     const isDevEnv = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    const verboseCardLogs = Boolean(
-        typeof window !== 'undefined' && window.PAPPALIIGA_DEBUG_CARD_MODEL === true
-    );
-    const verboseListLogs = Boolean(
-        typeof window !== 'undefined' && window.PAPPALIIGA_DEBUG_DIVISION_LIST === true
-    );
-    const loggedCardDebugIds = new Set();
 
     function getStoredDivisionId() {
         try {
@@ -75,11 +68,71 @@
 
     function inferTierFromDivisionId(divisionId) {
         const numeric = Number(divisionId);
+        if (numeric === 0) return 0;
         if (numeric >= 1 && numeric <= 5) return 1;
         if (numeric >= 6 && numeric <= 10) return 2;
         if (numeric >= 11 && numeric <= 15) return 3;
         if (numeric >= 16 && numeric <= 20) return 4;
         return 5;
+    }
+
+    function inferDivisionIndexFromName(rawName) {
+        const text = String(rawName || '').trim();
+        if (!text) return null;
+        if (/mestaruussarja/i.test(text)) return 0;
+
+        const divMatch = text.match(/(?:^|\s)(\d+)\s*divisioona(?:\b|\s|$)/i);
+        if (divMatch && Number.isFinite(Number(divMatch[1]))) {
+            return Number(divMatch[1]);
+        }
+
+        const trailingNumber = text.match(/(\d+)$/);
+        if (trailingNumber && Number.isFinite(Number(trailingNumber[1]))) {
+            return Number(trailingNumber[1]);
+        }
+
+        return null;
+    }
+
+    function inferDivisionIndex(division) {
+        if (!division) return null;
+        const candidates = [
+            division.divisionNumber,
+            division.division_num,
+            division.divisionNum,
+            division.division,
+            division.number,
+            division.rank
+        ];
+
+        for (const candidate of candidates) {
+            const numeric = Number(candidate);
+            if (Number.isFinite(numeric) && numeric >= 0) {
+                return numeric;
+            }
+        }
+
+        const fromName = inferDivisionIndexFromName(division.title || division.name);
+        if (fromName != null) {
+            return fromName;
+        }
+
+        return null;
+    }
+
+    function inferTierMetaFromDivisionNumber(divisionNumber) {
+        const numeric = Number(divisionNumber);
+        if (!Number.isFinite(numeric) || numeric <= 0) {
+            if (numeric === 0) {
+                return { id: 0, label: 'Mestaruussarja (Div 0)', range: 'Div 0', order: 0 };
+            }
+            return { id: 5, label: 'Tier 5 (Div 21+)', range: 'Div 21+', order: 5 };
+        }
+        if (numeric >= 1 && numeric <= 5) return { id: 1, label: 'Tier 1 (Div 1-5)', range: 'Div 1-5', order: 1 };
+        if (numeric >= 6 && numeric <= 10) return { id: 2, label: 'Tier 2 (Div 6-10)', range: 'Div 6-10', order: 2 };
+        if (numeric >= 11 && numeric <= 15) return { id: 3, label: 'Tier 3 (Div 11-15)', range: 'Div 11-15', order: 3 };
+        if (numeric >= 16 && numeric <= 20) return { id: 4, label: 'Tier 4 (Div 16-20)', range: 'Div 16-20', order: 4 };
+        return { id: 5, label: 'Tier 5 (Div 21+)', range: 'Div 21+', order: 5 };
     }
 
     function storeDivisionId(id) {
@@ -193,12 +246,124 @@
         if (card?.tierMeta) {
             return card.tierMeta;
         }
-        const value = Number(card?.tier) || 5;
-        if (value === 1) return { id: 1, label: 'Tier 1 (Div 1-5)', range: 'Div 1-5', order: 1 };
-        if (value === 2) return { id: 2, label: 'Tier 2 (Div 6-10)', range: 'Div 6-10', order: 2 };
-        if (value === 3) return { id: 3, label: 'Tier 3 (Div 11-15)', range: 'Div 11-15', order: 3 };
-        if (value === 4) return { id: 4, label: 'Tier 4 (Div 16-20)', range: 'Div 16-20', order: 4 };
-        return { id: 5, label: 'Tier 5 (Div 21-25)', range: 'Div 21-25', order: 5 };
+        const divisionNumber = inferDivisionIndex(card);
+        if (divisionNumber != null) {
+            return inferTierMetaFromDivisionNumber(divisionNumber);
+        }
+        const value = Number(card?.tier);
+        if (Number.isFinite(value) && value > 0) {
+            if (value === 1) return { id: 1, label: 'Tier 1 (Div 1-5)', range: 'Div 1-5', order: 1 };
+            if (value === 2) return { id: 2, label: 'Tier 2 (Div 6-10)', range: 'Div 6-10', order: 2 };
+            if (value === 3) return { id: 3, label: 'Tier 3 (Div 11-15)', range: 'Div 11-15', order: 3 };
+            if (value === 4) return { id: 4, label: 'Tier 4 (Div 16-20)', range: 'Div 16-20', order: 4 };
+            return { id: 5, label: 'Tier 5 (Div 21+)', range: 'Div 21+', order: 5 };
+        }
+        if (value === 0) {
+            return { id: 0, label: 'Mestaruussarja (Div 0)', range: 'Div 0', order: 0 };
+        }
+        return inferTierMetaFromDivisionNumber(inferTierFromDivisionId(card?.id ?? card?.divisionId ?? card?.division_id));
+    }
+
+    function buildDivisionNumberGroups(cards, targetGroupSize = 5) {
+        const source = Array.isArray(cards) ? cards : [];
+        const numbered = source
+            .filter(card => Number.isFinite(Number(card?.divisionNumber)) && Number(card?.divisionNumber) >= 0)
+            .sort((a, b) => Number(a.divisionNumber) - Number(b.divisionNumber));
+        const unknown = source.filter(card => !Number.isFinite(Number(card?.divisionNumber)));
+
+        const groups = [];
+
+        const total = numbered.length;
+        if (total > 0) {
+            const safeTarget = Math.max(1, Number(targetGroupSize) || 5);
+            const groupCount = Math.max(1, Math.ceil(total / safeTarget));
+            const baseSize = Math.floor(total / groupCount);
+            const remainder = total % groupCount;
+
+            let cursor = 0;
+            for (let index = 0; index < groupCount; index += 1) {
+                const size = baseSize + (index < remainder ? 1 : 0);
+                const chunk = numbered.slice(cursor, cursor + size);
+                cursor += size;
+                if (!chunk.length) continue;
+
+                const minDivision = Number(chunk[0].divisionNumber);
+                const maxDivision = Number(chunk[chunk.length - 1].divisionNumber);
+                const rangeLabel = minDivision === maxDivision ? `Div ${minDivision}` : `Div ${minDivision}-${maxDivision}`;
+                const label =
+                    minDivision === 0 && maxDivision === 0
+                        ? 'Mestaruussarja (Div 0)'
+                        : minDivision === 0
+                          ? `Mestaruussarja + Div 1-${maxDivision}`
+                          : rangeLabel;
+
+                groups.push({
+                    id: `div-${minDivision}-${maxDivision}`,
+                    label,
+                    rangeLabel,
+                    cards: chunk,
+                    minDivision,
+                    maxDivision
+                });
+            }
+        }
+
+        if (unknown.length) {
+            groups.push({
+                id: 'div-unknown',
+                label: 'Tuntematon divisioona',
+                rangeLabel: 'N/A',
+                cards: unknown,
+                minDivision: null,
+                maxDivision: null
+            });
+        }
+
+        return groups;
+    }
+
+    function buildGroupProgress(cards) {
+        const source = Array.isArray(cards) ? cards : [];
+        let regularPlayed = 0;
+        let regularTotal = 0;
+        let playoffPlayed = 0;
+        let playoffTotal = 0;
+
+        source.forEach(card => {
+            const seasonPlayed = clampMatchCount(card?.season?.matchesPlayed ?? 0);
+            const seasonTotal = clampMatchCount(card?.season?.matchesTotal ?? 0);
+            const playoffPlayedValue = clampMatchCount(card?.playoffs?.matchesPlayed ?? 0);
+            const playoffTotalValue = clampMatchCount(card?.playoffs?.matchesTotal ?? 0);
+
+            regularPlayed += seasonPlayed;
+            regularTotal += seasonTotal;
+            playoffPlayed += playoffPlayedValue;
+            playoffTotal += playoffTotalValue;
+        });
+
+        const overallPlayed = regularPlayed + playoffPlayed;
+        const overallTotal = regularTotal + playoffTotal;
+
+        return {
+            regular: {
+                played: regularPlayed,
+                total: regularTotal,
+                label: 'Runko',
+                color: 'regular'
+            },
+            playoff: {
+                played: playoffPlayed,
+                total: playoffTotal,
+                label: 'PO',
+                color: 'playoff'
+            },
+            overall: {
+                played: overallPlayed,
+                total: overallTotal,
+                label: 'Kausi',
+                color: 'overall'
+            }
+        };
     }
 
     function cleanDivisionName(rawName) {
@@ -256,28 +421,27 @@
         if (!division) {
             return null;
         }
-        
-        if (verboseCardLogs && division.tier === 0) {
-            const divisionId = String(division.id || division.divisionId || division.division_id || '');
-            if (divisionId && !loggedCardDebugIds.has(divisionId)) {
-                loggedCardDebugIds.add(divisionId);
-                console.log('[buildCardModel] Processing division:', {
-                    id: divisionId,
-                    name: division.name,
-                    season: division.season,
-                    status: division.status,
-                    bestPlayer: division.bestPlayer || division.best_player,
-                    mvpTeam: division.mvpTeam || division.mvp_team
-                });
-            }
-        }
-        
-        const tierMeta = inferTierMeta(division);
-        
+
         // Handle both camelCase and snake_case from API
         const divisionId = division.divisionId || division.division_id || division.id;
-        const divisionNum = division.division_num || division.divisionNum || division.tier;
-        
+        const divisionNum = inferDivisionIndex({
+            divisionNumber: division.division_num ?? division.divisionNum ?? division.divisionNumber,
+            division_num: division.division_num,
+            divisionNum: division.divisionNum,
+            division: division.division,
+            number: division.number,
+            rank: division.rank,
+            name: division.name,
+            title: division.title
+        });
+        const tierMeta = inferTierMeta({
+            ...division,
+            id: divisionId,
+            divisionNumber: divisionNum,
+            division_num: divisionNum,
+            divisionNum: divisionNum
+        });
+
         // Season data
         const seasonMatchesPlayed = clampMatchCount(
             division.season?.matches_played ?? division.season?.matchesPlayed ?? 0
@@ -319,7 +483,7 @@
             null;
         // Clean the division name - remove season suffix
         const cleanName = cleanDivisionName(division.name);
-        const title = cleanName || (divisionNum ? `Division ${divisionNum}` : 'Division');
+        const title = cleanName || (divisionNum != null ? `Division ${divisionNum}` : 'Division');
         const seasonValue = resolveDivisionSeason(division);
         
         // Extract best player and MVP team info
@@ -748,7 +912,7 @@
 
     window.DivisionCardList = {
         name: 'DivisionCardList',
-        components: { SeasonBar, DivisionCard, DivisionProgressBar },
+        components: { SeasonBar, DivisionCard, DivisionProgressBar, CircularProgress: window.CircularProgress },
         props: {
             divisions: { type: Array, default: () => [] },
             emptyMessage: { type: String, default: 'Ei divisioonia saatavilla' },
@@ -762,7 +926,11 @@
             warningMessage: { type: String, default: '' },
             isLoading: { type: Boolean, default: false },
             showSeasonPicker: { type: Boolean, default: true },
-            showControls: { type: Boolean, default: true }
+            showControls: { type: Boolean, default: true },
+            groupByDivision: { type: Boolean, default: false },
+            collapsibleGroups: { type: Boolean, default: false },
+            groupByTier: { type: Boolean, default: false },
+            collapsibleTiers: { type: Boolean, default: false }
         },
         emits: ['change-season', 'change-filter', 'change-search', 'reset-filters'],
         data() {
@@ -772,10 +940,18 @@
                 renderBatchSize: 8,
                 sentinelObserver: null,
                 teamCountOverrides: {},
-                teamCountRequests: {}
+                teamCountRequests: {},
+                collapsedGroupIds: [],
+                knownGroupIds: []
             };
         },
         computed: {
+            groupingEnabled() {
+                return Boolean(this.groupByDivision || this.groupByTier);
+            },
+            collapsibleEnabled() {
+                return Boolean(this.collapsibleGroups || this.collapsibleTiers);
+            },
             cardModels() {
                 if (!Array.isArray(this.divisions)) {
                     return [];
@@ -812,11 +988,23 @@
                             };
                             const fallbackDivisionId = (entry.divisionId ?? entry.division_id ?? Number(entry.id)) || index;
                             const fallbackTierSource = entry.divisionId ?? entry.division_id ?? entry.id;
+                            const fallbackDivisionNum = inferDivisionIndex({
+                                divisionNumber: entry.division_num ?? entry.divisionNum ?? entry.divisionNumber,
+                                division_num: entry.division_num,
+                                divisionNum: entry.divisionNum,
+                                division: entry.division,
+                                number: entry.number,
+                                rank: entry.rank,
+                                name: entry.name,
+                                title: entry.title
+                            });
                             return buildCardModel({
                                 id: String(safeId),
                                 divisionId: fallbackDivisionId,
                                 name: entry.name || `Division ${(entry.division_id ?? entry.divisionId ?? index)}`,
                                 tier: Number(entry.tier) || inferTierFromDivisionId(fallbackTierSource),
+                                division_num: fallbackDivisionNum,
+                                divisionNumber: fallbackDivisionNum,
                                 season: fallbackSeason,
                                 playoffs: fallbackPlayoffs,
                                 slug: entry.slug || String(safeId),
@@ -845,27 +1033,58 @@
                         return card.searchIndex.includes(search);
                     })
                     .sort((a, b) => {
-                        // Sort by division number (division_num from API)
-                        const aNum = Number(a.divisionNumber) || 0;
-                        const bNum = Number(b.divisionNumber) || 0;
+                        // Sort by stable inferred division index so tier/group order is deterministic.
+                        const aNum = Number.isFinite(Number(a.divisionNumber)) ? Number(a.divisionNumber) : Number.MAX_SAFE_INTEGER;
+                        const bNum = Number.isFinite(Number(b.divisionNumber)) ? Number(b.divisionNumber) : Number.MAX_SAFE_INTEGER;
+                        if (aNum !== bNum) {
+                            return aNum - bNum;
+                        }
+                        const aTitle = String(a.title || '');
+                        const bTitle = String(b.title || '');
+                        if (aTitle !== bTitle) {
+                            return aTitle.localeCompare(bTitle, 'fi');
+                        }
                         return aNum - bNum;
                     });
-                if (verboseListLogs) {
-                    console.info(
-                        `[DivisionCardList] filtered ${sorted.length} cards (status=${filterState}, search="${this.searchQuery}")`
-                    );
-                }
                 return sorted;
             },
             visibleCards() {
+                if (this.groupingEnabled) {
+                    return this.filteredCards;
+                }
                 const limit = this.renderCount || this.renderBatchSize;
                 return this.filteredCards.slice(0, limit);
             },
             hasMoreCards() {
+                if (this.groupingEnabled) {
+                    return false;
+                }
                 return this.visibleCards.length < this.filteredCards.length;
             },
             hasVisibleDivisions() {
                 return this.filteredCards.length > 0;
+            },
+            visibleDivisionGroups() {
+                if (!this.groupingEnabled) {
+                    return [];
+                }
+                const source = Array.isArray(this.visibleCards) ? this.visibleCards : [];
+                const allSource = Array.isArray(this.filteredCards) ? this.filteredCards : [];
+                const visibleGroups = buildDivisionNumberGroups(source);
+                const allGroups = buildDivisionNumberGroups(allSource);
+                const totalsByRange = new Map(allGroups.map(group => [group.rangeLabel, group]));
+
+                return visibleGroups.map(group => {
+                    const totalGroup = totalsByRange.get(group.rangeLabel) || group;
+                    const completed = (totalGroup.cards || []).filter(entry => entry?.state === DivisionStatus.COMPLETE).length;
+                    const progress = buildGroupProgress(totalGroup.cards || group.cards);
+                    return {
+                        ...group,
+                        totalCount: totalGroup.cards?.length || group.cards.length,
+                        completedCount: completed,
+                        progress
+                    };
+                });
             }
         },
         watch: {
@@ -874,35 +1093,34 @@
                 handler() {
                     this.teamCountOverrides = {};
                     this.teamCountRequests = {};
+                    this.syncGroupCollapseState();
                     this.resetVirtualWindow();
                 }
             },
             filterState() {
+                this.syncGroupCollapseState();
                 this.resetVirtualWindow();
             },
             searchQuery() {
+                this.syncGroupCollapseState();
                 this.resetVirtualWindow();
             },
-            cardModels(newValue) {
-                if (verboseListLogs) {
-                    console.info('[DivisionCardList] cardModels updated', {
-                        count: Array.isArray(newValue) ? newValue.length : 0
-                    });
-                }
-            },
+            cardModels() {},
             filteredCards(newValue) {
-                if (verboseListLogs) {
-                    const totalVisible = Array.isArray(newValue) ? newValue.length : 0;
-                    console.info('[DivisionCardList] filteredCards updated', {
-                        visibleDivisions: totalVisible
-                    });
+                if (!this.groupingEnabled) {
+                    this.$nextTick(() => this.observeSentinel());
                 }
-                this.$nextTick(() => this.observeSentinel());
             },
             visibleCards: {
                 immediate: true,
                 handler(newValue) {
                     this.ensureTeamCounts(newValue);
+                }
+            },
+            visibleDivisionGroups: {
+                immediate: true,
+                handler() {
+                    this.syncGroupCollapseState();
                 }
             }
         },
@@ -925,6 +1143,43 @@
             },
             handleReset() {
                 this.$emit('reset-filters');
+            },
+            syncGroupCollapseState() {
+                if (!this.groupingEnabled || !this.collapsibleEnabled) {
+                    this.collapsedGroupIds = [];
+                    this.knownGroupIds = [];
+                    return;
+                }
+                const validIds = (this.visibleDivisionGroups || []).map(group => group.id);
+                if (!validIds.length) {
+                    this.collapsedGroupIds = [];
+                    this.knownGroupIds = [];
+                    return;
+                }
+                const knownSet = new Set(this.knownGroupIds || []);
+                const collapsedSet = new Set(
+                    (this.collapsedGroupIds || []).filter(id => validIds.includes(id))
+                );
+                validIds.forEach(id => {
+                    if (!knownSet.has(id)) {
+                        collapsedSet.add(id);
+                    }
+                });
+                this.collapsedGroupIds = validIds.filter(id => collapsedSet.has(id));
+                this.knownGroupIds = [...validIds];
+            },
+            toggleGroup(groupId) {
+                if (!this.collapsibleEnabled) {
+                    return;
+                }
+                if (this.collapsedGroupIds.includes(groupId)) {
+                    this.collapsedGroupIds = this.collapsedGroupIds.filter(id => id !== groupId);
+                    return;
+                }
+                this.collapsedGroupIds = [...this.collapsedGroupIds, groupId];
+            },
+            isGroupCollapsed(groupId) {
+                return this.collapsibleEnabled && this.collapsedGroupIds.includes(groupId);
             },
             ensureTeamCounts(cards) {
                 if (typeof window === 'undefined' || !window.apiClient) {
@@ -956,6 +1211,10 @@
                 });
             },
             resetVirtualWindow() {
+                if (this.groupingEnabled) {
+                    this.renderCount = this.filteredCards.length;
+                    return;
+                }
                 if (!Array.isArray(this.filteredCards) || !this.filteredCards.length) {
                     this.renderCount = this.renderBatchSize;
                     this.$nextTick(() => this.observeSentinel());
@@ -974,6 +1233,11 @@
                 }
             },
             initSentinelObserver() {
+                if (this.groupingEnabled) {
+                    this.sentinelObserver = null;
+                    this.renderCount = this.filteredCards.length || this.renderBatchSize;
+                    return;
+                }
                 if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
                     this.sentinelObserver = null;
                     this.renderCount = this.filteredCards.length || this.renderBatchSize;
@@ -1033,7 +1297,80 @@
                     </div>
                 </template>
                 <template v-else-if="hasVisibleDivisions">
-                    <div class="division-list" role="list">
+                    <template v-if="groupingEnabled">
+                        <section
+                            v-for="group in visibleDivisionGroups"
+                            :key="'group-' + group.id"
+                            class="tier-section"
+                        >
+                            <button
+                                v-if="collapsibleEnabled"
+                                type="button"
+                                class="tier-section__toggle"
+                                :aria-expanded="!isGroupCollapsed(group.id)"
+                                @click="toggleGroup(group.id)"
+                            >
+                                <span class="tier-section__header">
+                                    <span class="tier-section__title">{{ group.label }}</span>
+                                    <span class="tier-section__subtitle">{{ group.totalCount }} divisioonaa · {{ group.completedCount }} valmiina</span>
+                                    <span class="tier-section__pills" aria-hidden="true">
+                                        <span class="tier-section__pill">Näkyvissä {{ group.cards.length }}</span>
+                                        <span class="tier-section__pill">Valmiit {{ group.completedCount }}/{{ group.totalCount }}</span>
+                                    </span>
+                                </span>
+                                <span
+                                    v-if="isGroupCollapsed(group.id)"
+                                    class="tier-section__quick-progress"
+                                    aria-hidden="true"
+                                >
+                                    <circular-progress
+                                        :value="group.progress.regular.played"
+                                        :max="group.progress.regular.total"
+                                        :label="group.progress.regular.label"
+                                        :color="group.progress.regular.color"
+                                        :size="52"
+                                        :stroke-width="6"
+                                    ></circular-progress>
+                                    <circular-progress
+                                        :value="group.progress.playoff.played"
+                                        :max="group.progress.playoff.total"
+                                        :label="group.progress.playoff.label"
+                                        :color="group.progress.playoff.color"
+                                        :size="52"
+                                        :stroke-width="6"
+                                    ></circular-progress>
+                                    <circular-progress
+                                        :value="group.progress.overall.played"
+                                        :max="group.progress.overall.total"
+                                        :label="group.progress.overall.label"
+                                        :color="group.progress.overall.color"
+                                        :size="52"
+                                        :stroke-width="6"
+                                    ></circular-progress>
+                                </span>
+                                <span class="tier-section__chevron" :class="{ 'is-open': !isGroupCollapsed(group.id) }" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                                        <path d="M7 10l5 5 5-5z"></path>
+                                    </svg>
+                                </span>
+                            </button>
+                            <div v-else class="tier-section__header">
+                                <span class="tier-section__title">{{ group.label }}</span>
+                                <span class="tier-section__subtitle">{{ group.totalCount }} divisioonaa · {{ group.completedCount }} valmiina</span>
+                            </div>
+                            <div v-if="!isGroupCollapsed(group.id)" class="tier-section__body">
+                                <div class="division-list" role="list">
+                                    <division-card
+                                        v-for="division in group.cards"
+                                        :key="division.id"
+                                        :division="division"
+                                        @remember="rememberDivision"
+                                    ></division-card>
+                                </div>
+                            </div>
+                        </section>
+                    </template>
+                    <div v-else class="division-list" role="list">
                         <division-card
                             v-for="division in visibleCards"
                             :key="division.id"
