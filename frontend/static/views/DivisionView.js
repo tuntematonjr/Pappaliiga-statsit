@@ -593,6 +593,113 @@ window.DivisionView = {
             if (!this.divisionDetails) return 'Divisioona';
             return this.divisionDetails.name || `Divisioona ${this.divisionDetails.division_num}`;
         },
+        nextUpcomingMatch() {
+            return Array.isArray(this.upcomingMatches) && this.upcomingMatches.length
+                ? this.upcomingMatches[0]
+                : null;
+        },
+        divisionHeroMetaItems() {
+            const items = [];
+            const season = this.divisionDetails?.season;
+            const divisionNum = this.divisionDetails?.division_num;
+            const progress = this.matchProgressMetric;
+
+            if (season != null && season !== '') {
+                items.push({ key: 'season', label: `Season ${season}` });
+            }
+            if (divisionNum != null && divisionNum !== '') {
+                items.push({
+                    key: 'division',
+                    label: Number(divisionNum) === 0 ? 'Mestaruussarja' : `Div ${divisionNum}`
+                });
+            }
+            if (progress.total > 0) {
+                items.push({
+                    key: 'progress',
+                    label: `${formatIntegerMetric(progress.played)}/${formatIntegerMetric(progress.total)} ottelua`
+                });
+            }
+            if (this.upcomingMatches.length > 0) {
+                items.push({ key: 'upcoming', label: `${formatIntegerMetric(this.upcomingMatches.length)} tulevaa` });
+            } else if (this.playedMatches.length > 0) {
+                items.push({ key: 'played', label: `${formatIntegerMetric(this.playedMatches.length)} pelattua` });
+            }
+
+            return items.slice(0, 4);
+        },
+        divisionHeroStats() {
+            const aggregates = this.derivedAggregates || {};
+            const teamCount = this.toNumber(
+                aggregates.team_count ?? this.divisionDetails?.team_count ?? this.standings.length,
+                0
+            );
+            const playerCount = this.toNumber(
+                aggregates.player_count ?? this.divisionDetails?.player_count,
+                0
+            );
+            const progress = this.matchProgressMetric;
+            const mapsCount = this.toNumber(aggregates.maps_played_total ?? this.mapStats.length, 0);
+            const nextMatchTs = this.nextUpcomingMatch ? this.upcomingMatchTimestamp(this.nextUpcomingMatch) : Number.POSITIVE_INFINITY;
+
+            return [
+                {
+                    key: 'teams',
+                    label: 'Joukkueet',
+                    value: formatIntegerMetric(teamCount),
+                    tone: 'cool'
+                },
+                {
+                    key: 'players',
+                    label: 'Pelaajat',
+                    value: formatIntegerMetric(playerCount),
+                    tone: 'violet'
+                },
+                {
+                    key: 'matches',
+                    label: 'Eteneminen',
+                    value: progress.percent != null
+                        ? `${formatPercentMetric(progress.percent)} %`
+                        : formatIntegerMetric(progress.played),
+                    meta: progress.total > 0
+                        ? `${formatIntegerMetric(progress.played)} / ${formatIntegerMetric(progress.total)} ottelua`
+                        : 'Ottelutiedot päivittyvät',
+                    tone: 'cyan'
+                },
+                Number.isFinite(nextMatchTs) && nextMatchTs < Number.POSITIVE_INFINITY
+                    ? {
+                        key: 'next-match',
+                        label: 'Seuraava',
+                        value: this.formatHeroTimestamp(nextMatchTs),
+                        meta: 'Seuraava vahvistettu ottelu',
+                        tone: 'mint'
+                    }
+                    : {
+                        key: 'maps',
+                        label: 'Kartat',
+                        value: formatIntegerMetric(mapsCount),
+                        meta: 'Karttadataa seurannassa',
+                        tone: 'amber'
+                    }
+            ];
+        },
+        divisionHeroLede() {
+            const aggregates = this.derivedAggregates || {};
+            const teamCount = this.toNumber(
+                aggregates.team_count ?? this.divisionDetails?.team_count ?? this.standings.length,
+                0
+            );
+            const playerCount = this.toNumber(
+                aggregates.player_count ?? this.divisionDetails?.player_count,
+                0
+            );
+            const progress = this.matchProgressMetric;
+            const parts = [];
+            if (teamCount > 0) parts.push(`${formatIntegerMetric(teamCount)} joukkuetta`);
+            if (playerCount > 0) parts.push(`${formatIntegerMetric(playerCount)} pelaajaa`);
+            if (progress.percent != null) parts.push(`${formatPercentMetric(progress.percent)} % kaudesta pelattu`);
+            if (!parts.length) return 'Divisioonan ottelut, tilastot, kartat ja sankarit samassa näkymässä.';
+            return parts.join(' · ');
+        },
         statMetrics() {
             if (!this.divisionDetails) {
                 return [];
@@ -1282,6 +1389,19 @@ window.DivisionView = {
             const date = new Date(ts);
             return date.toLocaleDateString('fi-FI', { year: 'numeric', month: 'short', day: 'numeric' });
         },
+        formatHeroTimestamp(ts) {
+            if (!Number.isFinite(ts) || ts <= 0) {
+                return 'Ajankohta avoin';
+            }
+            try {
+                return new Date(ts).toLocaleDateString('fi-FI', {
+                    day: 'numeric',
+                    month: 'short'
+                });
+            } catch (_error) {
+                return 'Ajankohta avoin';
+            }
+        },
         divisionMatchFaceitUrl(match) {
             const utils = window.MatchLinksUtils;
             if (!utils || typeof utils.getFaceitRoomUrl !== 'function') return '';
@@ -1723,8 +1843,31 @@ window.DivisionView = {
             <section class="division-hero glass-card" aria-labelledby="division-title">
                 <div class="division-hero__grid">
                     <div class="division-hero__identity">
-                        <div>
+                        <div class="division-hero__identity-copy">
+                            <p class="section-eyebrow division-hero__eyebrow">DIVISIOONA</p>
                             <h1 id="division-title" class="title-accent titleUnderlinePage">{{ divisionTitle }}</h1>
+                            <p class="division-hero__lede">{{ divisionHeroLede }}</p>
+                            <div v-if="divisionHeroMetaItems.length" class="division-hero__meta" role="list">
+                                <span
+                                    v-for="item in divisionHeroMetaItems"
+                                    :key="item.key"
+                                    class="division-hero__meta-chip"
+                                    role="listitem"
+                                >{{ item.label }}</span>
+                            </div>
+                        </div>
+                        <div v-if="divisionHeroStats.length" class="division-hero__stats" role="list">
+                            <article
+                                v-for="stat in divisionHeroStats"
+                                :key="stat.key"
+                                class="division-hero__stat"
+                                :class="'division-hero__stat--' + stat.tone"
+                                role="listitem"
+                            >
+                                <span class="division-hero__stat-label">{{ stat.label }}</span>
+                                <strong class="division-hero__stat-value">{{ stat.value }}</strong>
+                                <span v-if="stat.meta" class="division-hero__stat-meta">{{ stat.meta }}</span>
+                            </article>
                         </div>
                     </div>
                 </div>
@@ -1756,7 +1899,11 @@ window.DivisionView = {
                 <section id="upcoming" class="division-section" v-if="matchSectionLoading || divisionMatchesLoading || hasAnyMatchData">
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading division-section__heading--matches">
-                            <h2 class="title-accent titleUnderlineSection">Ottelut</h2>
+                            <div class="division-section__heading-copy">
+                                <p class="section-eyebrow">OTTELUKESKUS</p>
+                                <h2 class="title-accent titleUnderlineSection">Ottelut</h2>
+                                <p class="division-section__lede">Tulevat kohtaamiset ja pelattujen otteluiden tarkempi ottelupaketti samassa näkymässä.</p>
+                            </div>
                             <div class="trend-toggles trend-toggles--mode">
                                 <button
                                     type="button"
@@ -2038,7 +2185,9 @@ window.DivisionView = {
                 <section id="summary" class="division-section">
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading">
+                            <p class="section-eyebrow">YLEISKUVA</p>
                             <h2 class="title-accent titleUnderlineSection">Divisioonan tilastot</h2>
+                            <p class="division-section__lede">Nopea kooste kauden volyymista, tempoista ja tehokkuusluvuista.</p>
                         </header>
                         <div class="summary-card-grid division-summary-grid" role="list">
                             <summary-stat-card
@@ -2055,6 +2204,11 @@ window.DivisionView = {
 
                 <section id="standings" class="division-section division-section--stacked">
                     <div class="division-team-module">
+                        <header class="division-section__heading division-section__heading--standings">
+                            <p class="section-eyebrow">JOUKKUEET</p>
+                            <h2 class="title-accent titleUnderlineSection">Joukkuevertailu</h2>
+                            <p class="division-section__lede">Sarjataulukko, voittorakenne ja kierrospohjainen suoritus samassa taulukossa.</p>
+                        </header>
                         <div class="division-team-panels">
                             <team-comparison-board
                                 class="division-team-panel division-team-panel--table"
@@ -2077,6 +2231,11 @@ window.DivisionView = {
 
                 <section id="maps" class="division-section">
                     <div class="division-surface glass-card division-section-card">
+                        <header class="division-section__heading">
+                            <p class="section-eyebrow">KARTTAPOOLI</p>
+                            <h2 class="title-accent titleUnderlineSection">Karttatilastot</h2>
+                            <p class="division-section__lede">Karttamäärät, bannit ja karttakohtainen suoritus divisioonan tasolla.</p>
+                        </header>
                         <loading-spinner v-if="mapsLoading" message="Karttatilastoja ladataan..."></loading-spinner>
                         <error-message v-else-if="mapsError" :message="mapsError"></error-message>
                         <shared-map-performance-table
@@ -2095,7 +2254,9 @@ window.DivisionView = {
                 <section id="heroes" class="division-section division-section--heroes">
                     <div class="division-surface glass-card division-section-card division-section-card--heroes">
                         <header class="division-section__heading">
+                            <p class="section-eyebrow">HUIPUT</p>
                             <h2 class="title-accent titleUnderlineSection">Divarin Sankarit</h2>
+                            <p class="division-section__lede">Kuka dominoi damagea, clutch-hetkiä, utilitya ja puhtaita fragilukuja juuri tässä divisioonassa.</p>
                         </header>
                         <loading-spinner
                             v-if="sankariLoading && !hasSankariGroups"

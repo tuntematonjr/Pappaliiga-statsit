@@ -43,6 +43,10 @@ window.SplitBar = {
         showClash: {
             type: Boolean,
             default: true
+        },
+        compactBreakpoint: {
+            type: Number,
+            default: 600
         }
     },
     data() {
@@ -52,7 +56,8 @@ window.SplitBar = {
                 loss: '0%'
             },
             initialised: false,
-            isAnimating: false
+            isAnimating: false,
+            viewportWidth: typeof window !== 'undefined' ? window.innerWidth : Number.MAX_SAFE_INTEGER
         };
     },
     computed: {
@@ -127,6 +132,26 @@ window.SplitBar = {
             return {
                 left: this.winTargetWidth
             };
+        },
+        useCompactSummary() {
+            return Number(this.viewportWidth) <= Number(this.compactBreakpoint);
+        },
+        compactShellClass() {
+            const classes = ['split-summary'];
+            if (this.total === 0) classes.push('is-empty');
+            return classes.join(' ');
+        },
+        compactWinLabel() {
+            return `${this.wins}W`;
+        },
+        compactLossLabel() {
+            return `${this.losses}L`;
+        },
+        compactCenterLabel() {
+            if (!this.total) {
+                return 'Ei dataa';
+            }
+            return this.centerPercent;
         }
     },
     watch: {
@@ -139,6 +164,9 @@ window.SplitBar = {
         }
     },
     methods: {
+        handleResize() {
+            this.viewportWidth = typeof window !== 'undefined' ? window.innerWidth : Number.MAX_SAFE_INTEGER;
+        },
         updateSegmentWidths(targets) {
             const nextTargets = {
                 win: targets?.win ?? '0%',
@@ -166,8 +194,23 @@ window.SplitBar = {
             });
         }
     },
+    mounted() {
+        if (typeof window !== 'undefined') {
+            window.addEventListener('resize', this.handleResize);
+        }
+    },
+    beforeUnmount() {
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('resize', this.handleResize);
+        }
+    },
     template: `
-        <div :class="shellClass" :style="{ height: height, '--split-win': winTargetWidth }">
+        <div v-if="useCompactSummary" :class="compactShellClass">
+            <span class="split-summary__pill split-summary__pill--win">{{ compactWinLabel }}</span>
+            <span class="split-summary__pill split-summary__pill--center">{{ compactCenterLabel }}</span>
+            <span class="split-summary__pill split-summary__pill--loss">{{ compactLossLabel }}</span>
+        </div>
+        <div v-else :class="shellClass" :style="{ height: height, '--split-win': winTargetWidth }">
             <div :class="barClass" :style="{ height: '100%' }">
                 <div :class="winClass" :style="winStyle"></div>
                 <div :class="lossClass" :style="lossStyle"></div>

@@ -529,7 +529,7 @@ window.SharedMapPerformanceTable = {
                                 height="40px"
                                 :left-text="formatPickMatchupLeft(row)"
                                 :right-text="formatPickMatchupRight(row)"
-                                :show-percent="false"
+                                :show-percent="true"
                             />
                         </div>
                         <span v-else class="cell-muted mono-num">-</span>

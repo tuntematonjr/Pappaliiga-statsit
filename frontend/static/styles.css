@@ -2098,17 +2098,37 @@
 }
 /* ---- Division view ---- */
 .division-view {
+    --division-shell-glow: rgba(62, 123, 255, 0.18);
+    --division-border-soft: rgba(110, 150, 235, 0.16);
     display: flex;
     flex-direction: column;
     gap: clamp(1.75rem, 3.2vw, 2.6rem);
 }
 
 .division-hero {
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     gap: clamp(0.85rem, 2vw, 1.35rem);
     padding: clamp(1.15rem, 2.4vw, 2rem);
     border-radius: clamp(20px, 2.5vw, 28px);
+    border: 1px solid rgba(104, 144, 245, 0.22);
+    background:
+        radial-gradient(circle at top center, rgba(88, 142, 255, 0.18), transparent 42%),
+        linear-gradient(180deg, rgba(17, 29, 62, 0.94), rgba(10, 17, 38, 0.97));
+    box-shadow: 0 28px 46px rgba(5, 11, 26, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.division-hero::before {
+    content: '';
+    position: absolute;
+    inset: auto -8% -36% auto;
+    width: min(42vw, 460px);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(77, 132, 255, 0.2), transparent 68%);
+    pointer-events: none;
 }
 
 .division-hero__grid {
@@ -2121,23 +2141,124 @@
 .division-hero__identity {
     display: flex;
     align-items: center;
-    gap: clamp(1rem, 2vw, 1.5rem);
+    justify-content: space-between;
+    gap: clamp(1rem, 2.2vw, 1.8rem);
     flex-wrap: wrap;
-    justify-content: center;
-    text-align: center;
     width: 100%;
+    position: relative;
+    z-index: 1;
 }
-.division-hero__identity > div {
-    width: 100%;
+
+.division-hero__identity-copy {
+    flex: 1 1 420px;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 0.65rem;
+}
+
+.division-hero__eyebrow {
+    margin: 0;
+}
+
+.division-hero__identity-copy .titleUnderlinePage {
+    margin: 0;
+}
+
+.division-hero__lede {
+    margin: 0;
+    max-width: 62ch;
+    color: rgba(219, 229, 252, 0.78);
+    font-size: clamp(0.96rem, 1.45vw, 1.08rem);
+    line-height: 1.55;
+}
+
+.division-hero__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.division-hero__meta-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid rgba(114, 154, 240, 0.22);
+    background: rgba(8, 16, 34, 0.72);
+    color: rgba(230, 238, 255, 0.92);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.division-hero__stats {
+    flex: 0 1 420px;
+    width: min(100%, 440px);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.division-hero__stat {
+    display: grid;
+    gap: 0.28rem;
+    padding: 0.95rem 1rem;
+    border-radius: 18px;
+    border: 1px solid rgba(118, 156, 240, 0.16);
+    background: linear-gradient(180deg, rgba(7, 14, 31, 0.9), rgba(10, 18, 40, 0.82));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.division-hero__stat--cool {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px rgba(104, 150, 255, 0.06);
+}
+
+.division-hero__stat--violet {
+    background: linear-gradient(180deg, rgba(21, 16, 46, 0.88), rgba(12, 18, 40, 0.84));
+}
+
+.division-hero__stat--cyan {
+    background: linear-gradient(180deg, rgba(8, 24, 46, 0.88), rgba(11, 18, 38, 0.84));
+}
+
+.division-hero__stat--mint {
+    background: linear-gradient(180deg, rgba(10, 28, 34, 0.9), rgba(10, 18, 33, 0.86));
+}
+
+.division-hero__stat--amber {
+    background: linear-gradient(180deg, rgba(34, 24, 12, 0.9), rgba(16, 17, 31, 0.86));
+}
+
+.division-hero__stat-label {
+    color: rgba(186, 201, 238, 0.74);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.division-hero__stat-value {
+    font-size: clamp(1.2rem, 1.9vw, 1.55rem);
+    line-height: 1.1;
+    color: rgba(245, 248, 255, 0.97);
+}
+
+.division-hero__stat-meta {
+    color: rgba(188, 204, 238, 0.72);
+    font-size: 0.74rem;
+    line-height: 1.35;
 }
 
 .division-hero__nav {
     display: flex;
     flex-wrap: wrap;
     gap: 0.65rem;
-    justify-content: center;
+    justify-content: flex-start;
+    position: relative;
+    z-index: 1;
 }
 
 .division-hero__nav-link {
@@ -2182,9 +2303,22 @@
     text-align: center;
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.4rem;
     align-items: center;
     margin-bottom: 0;
+}
+
+.division-section__heading-copy {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.division-section__lede {
+    margin: 0;
+    max-width: 64ch;
+    color: rgba(202, 214, 243, 0.72);
+    font-size: 0.92rem;
+    line-height: 1.5;
 }
 
 .division-section__empty {
@@ -2199,9 +2333,11 @@
 
 .division-surface {
     border-radius: clamp(18px, 2vw, 24px);
-    background: linear-gradient(160deg, rgba(10, 16, 32, 0.88), rgba(6, 12, 28, 0.9));
-    border: 1px solid rgba(98, 138, 246, 0.2);
-    box-shadow: 0 26px 45px rgba(5, 9, 20, 0.45);
+    background:
+        linear-gradient(180deg, rgba(13, 22, 46, 0.74), rgba(8, 14, 32, 0.95)),
+        linear-gradient(160deg, rgba(10, 16, 32, 0.88), rgba(6, 12, 28, 0.9));
+    border: 1px solid rgba(98, 138, 246, 0.16);
+    box-shadow: 0 26px 45px rgba(5, 9, 20, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .division-view .upcoming-matches,
@@ -2211,10 +2347,10 @@
 }
 
 .division-section-card {
-    padding: clamp(0.95rem, 1.5vw, 1.25rem);
+    padding: clamp(1.05rem, 1.6vw, 1.45rem);
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
+    gap: 1rem;
 }
 
 .division-section-card .division-section__heading {
@@ -2232,7 +2368,7 @@
 .division-team-module {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.05rem;
     margin-top: 0;
 }
 
@@ -2257,12 +2393,46 @@
     width: 100%;
     margin-top: 0;
     grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
-    gap: 0.65rem;
+    gap: 0.75rem;
+}
+
+.division-summary-grid .kausikooste-card {
+    min-height: 0;
+    padding: 0.95rem 0.8rem;
+    border-radius: 16px;
+    border: 1px solid rgba(113, 151, 232, 0.16);
+    background: linear-gradient(180deg, rgba(7, 12, 28, 0.86), rgba(11, 18, 38, 0.94));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.division-summary-grid .kausikooste-card__value {
+    font-size: 1.16rem;
+}
+
+.division-summary-grid .kausikooste-card__label {
+    font-size: 0.72rem;
+}
+
+.division-summary-grid .kausikooste-card__subtitle {
+    font-size: 0.68rem;
 }
 
 .division-section__heading--matches {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
     gap: 1rem;
     margin-bottom: 0.2rem;
+    text-align: left;
+}
+
+.division-section__heading--matches .division-section__heading-copy {
+    flex: 1 1 auto;
+}
+
+.division-section__heading--standings {
+    margin-bottom: 0.15rem;
 }
 
 .division-section--heroes {
@@ -2281,10 +2451,14 @@
     font-size: clamp(1.8rem, 3vw, 2.2rem);
 }
 
+.division-section-card--heroes {
+    padding-top: clamp(1.15rem, 1.8vw, 1.55rem);
+}
+
 .sankari-groups {
     display: flex;
     flex-direction: column;
-    gap: clamp(1.6rem, 2.5vw, 2.2rem);
+    gap: clamp(1.7rem, 2.5vw, 2.3rem);
 }
 
 .sankari-group {
@@ -2292,13 +2466,19 @@
     flex-direction: column;
     gap: clamp(0.75rem, 1.2vw, 1rem);
     align-items: stretch;
-    padding-top: 0.4rem;
+    padding-top: 0.7rem;
     padding-bottom: clamp(1rem, 2vw, 1.4rem);
+    border-top: 1px solid rgba(115, 150, 230, 0.12);
+}
+
+.sankari-group:first-child {
+    border-top: none;
+    padding-top: 0.15rem;
 }
 
 .sankari-group__label {
     text-align: center;
-    padding-top: 0.15rem;
+    padding-top: 0.05rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2348,6 +2528,44 @@
         --division-mobile-surface-padding: 1rem;
     }
 
+    .division-hero__identity {
+        justify-content: center;
+    }
+
+    .division-hero__identity-copy {
+        align-items: center;
+        text-align: center;
+    }
+
+    .division-hero__meta {
+        justify-content: center;
+    }
+
+    .division-hero__stats {
+        width: 100%;
+    }
+
+    .division-hero__nav {
+        justify-content: center;
+    }
+
+    .division-section__heading--matches {
+        align-items: center;
+        text-align: center;
+        flex-direction: column;
+    }
+
+    .division-section__heading--matches .division-section__heading-copy {
+        width: 100%;
+        justify-items: center;
+        text-align: center;
+    }
+
+    .division-section__heading--matches .trend-toggles--mode {
+        width: 100%;
+        justify-content: center;
+    }
+
     .division-view .division-surface,
     .division-view .division-team-panel,
     .division-view .maps-stats.card,
@@ -2370,6 +2588,11 @@
         width: calc(100% + 0.5rem);
     }
 
+    .division-view .team-comparison-table .table-sortable tbody td,
+    .division-view .team-comparison-table .table-sortable thead th {
+        padding-inline: 0.65rem;
+    }
+
     .division-view .sankari-card__head {
         align-items: center;
     }
@@ -2386,14 +2609,71 @@
     .division-view {
         --division-mobile-surface-padding: 0.85rem 0.75rem;
     }
+
+    .division-view .division-section {
+        margin-top: 0.95rem;
+    }
+
+    .division-view .division-section + .division-section {
+        margin-top: 1.1rem;
+    }
+
+    .division-view .division-section__lede {
+        font-size: 0.84rem;
+    }
+
+    .division-view .division-hero__nav {
+        gap: 0.45rem;
+    }
+
+    .division-view .division-hero__nav-link,
+    .division-view .trend-toggle {
+        min-height: 38px;
+        padding-inline: 0.85rem;
+        font-size: 0.78rem;
+    }
+
+    .division-view .division-section__heading--matches .trend-toggles--mode {
+        gap: 0.45rem;
+    }
+
+    .division-view .played-match-card {
+        padding: 0.85rem 0.8rem;
+        border-radius: 16px;
+    }
+
+    .division-view .played-match-card__teams {
+        gap: 0.55rem;
+    }
+
+    .division-view .played-match-card__stats,
+    .division-view .played-match-card__maps,
+    .division-view .played-match-card__actions {
+        gap: 0.4rem;
+    }
+
+    .division-view .team-comparison-table .table-sortable {
+        min-width: 620px;
+    }
+
+    .division-hero__stats {
+        grid-template-columns: 1fr;
+    }
+
+    .division-hero__meta-chip {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 
 .sankari-card {
     padding: clamp(1.1rem, 2vw, 1.45rem);
-    border: 1px solid rgba(130, 165, 255, 0.2);
-    background: linear-gradient(180deg, rgba(28, 38, 78, 0.82) 0%, rgba(12, 18, 42, 0.95) 100%);
-    box-shadow: 0 18px 40px rgba(18, 32, 72, 0.5);
+    border: 1px solid rgba(130, 165, 255, 0.16);
+    background:
+        linear-gradient(180deg, rgba(24, 36, 74, 0.72) 0%, rgba(10, 17, 39, 0.95) 100%),
+        radial-gradient(circle at top center, rgba(78, 126, 245, 0.16), transparent 60%);
+    box-shadow: 0 18px 40px rgba(18, 32, 72, 0.38);
     transition: transform 160ms ease, box-shadow 180ms ease, border-color 160ms ease;
     min-height: 100%;
     height: 100%;
@@ -2404,8 +2684,8 @@
 .sankari-card:hover,
 .sankari-card:focus-within {
     transform: translateY(-4px);
-    border-color: rgba(160, 200, 255, 0.35);
-    box-shadow: 0 22px 48px rgba(24, 50, 100, 0.6);
+    border-color: rgba(160, 200, 255, 0.28);
+    box-shadow: 0 22px 48px rgba(24, 50, 100, 0.44);
 }
 
 .sankari-card__content {
@@ -3525,33 +3805,6 @@
     background: rgba(7, 14, 34, 0.96);
     border: 1px solid rgba(125, 170, 235, 0.35);
     box-shadow: 0 8px 20px rgba(2, 6, 16, 0.45);
-}
-
-.radar-chart__tooltip-title {
-    font-size: 0.68rem;
-    color: rgba(206, 224, 249, 0.95);
-    white-space: nowrap;
-}
-
-.radar-chart__tooltip-value {
-    margin-top: 0.06rem;
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: rgba(233, 243, 255, 0.98);
-}
-
-
-.compare-modal {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1200;
-}
-
-.compare-modal__backdrop {
-    position: absolute;
     inset: 0;
     background: rgba(4, 6, 12, 0.7);
 }
@@ -4322,11 +4575,13 @@ html, body {
         width: 38px;
         height: 38px;
     }
+
     .map-name {
         gap: 0.6rem;
         align-items: center;
         padding: 8px 0;
     }
+
     .map-name-text {
         font-size: 0.95rem;
         line-height: 1.5;
@@ -5151,6 +5406,47 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
     line-height: 24px;
     font-size: 0.85rem;
     color: #fff;
+}
+
+.split-summary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.32rem;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: nowrap;
+}
+
+.split-summary__pill {
+    min-height: 24px;
+    padding: 0.22rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(8, 14, 30, 0.84);
+    color: rgba(242, 246, 255, 0.94);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+
+.split-summary__pill--win {
+    border-color: rgba(90, 220, 210, 0.28);
+    color: rgba(153, 247, 232, 0.96);
+    background: rgba(12, 45, 52, 0.55);
+}
+
+.split-summary__pill--center {
+    border-color: rgba(120, 155, 235, 0.22);
+    color: rgba(235, 240, 252, 0.98);
+}
+
+.split-summary__pill--loss {
+    border-color: rgba(255, 158, 144, 0.22);
+    color: rgba(255, 194, 184, 0.96);
+    background: rgba(58, 23, 25, 0.55);
 }
 
 .pick-matchup-cell {

@@ -272,7 +272,7 @@ window.TeamComparisonBoard = {
                                 height="30px"
                                 :left-text="formatInteger(row.wins) + ' voittoa'"
                                 :right-text="formatInteger(row.losses) + ' tappiota'"
-                                :show-percent="false"
+                                :show-percent="true"
                             ></split-bar>
                         </template>
                     </sortable-table>
