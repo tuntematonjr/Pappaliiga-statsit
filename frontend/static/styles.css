@@ -65,10 +65,6 @@
     text-shadow: 0 8px 22px rgba(14, 32, 66, 0.45), 0 0 14px rgba(106, 186, 255, 0.25);
     text-wrap: balance;
     text-align: center;
-}
-
-/* ---- Animated Title Underlines ---- */
-.title-accent {
     --title-underline-delay: 0s;
     --title-underline-duration: 6s;
     --title-underline-gap: 0.35rem;
@@ -82,6 +78,8 @@
     --title-underline-absolute: var(--title-underline-min);
     --title-underline-animation-name: none;
 }
+
+/* ---- Animated Title Underlines ---- */
 
 .title-accent::after {
     content: '';
@@ -4050,13 +4048,6 @@
     padding: clamp(0.75rem, 2vw, 1.25rem) 0;
 }
 
-.nav-container {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: clamp(1.25rem, 4vw, 2.5rem);
-}
-
 .nav-brand {
     display: flex;
     align-items: center;
@@ -4214,12 +4205,6 @@ html, body {
 }
 
 @media (max-width: 768px) {
-    .nav-container {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
-
     .nav-brand {
         width: 100%;
         flex-direction: column;
@@ -4422,20 +4407,10 @@ html, body {
 }
 
 /* Cards */
-.stat-cards,
-.top-players-grid,
 .seasons-grid {
     display: grid;
     gap: 1.5rem;
     margin: 2rem 0;
-}
-
-.stat-cards {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-
-.top-players-grid {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 }
 
 .seasons-grid {
@@ -4530,15 +4505,6 @@ html, body {
     color: var(--bg-900);
 }
 
-.faceit-link {
-    color: var(--text-dim);
-    text-decoration: none;
-}
-
-.faceit-link:hover {
-    color: var(--accent);
-}
-
 /* Map Stats Table */
 .map-stats-table {
     display: flex;
@@ -4618,20 +4584,21 @@ html, body {
     opacity: 0;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .nav-container {
-        flex-direction: column;
-        gap: 1rem;
-    }
-
-    .stat-cards {
-        grid-template-columns: repeat(2, 1fr);
-    }
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    background: var(--chip-bg);
+    border: 1px solid var(--border);
+    color: var(--fg);
+    white-space: nowrap;
+    line-height: 1.2;
+    letter-spacing: 0.2px;
 }
-
-
-.chip { display:inline-flex; align-items:center; gap:8px; padding:4px 8px; border-radius:999px; font-size:0.9rem; font-weight:600; }
 .chip--accent { background: linear-gradient(90deg, rgba(58,163,255,0.12), rgba(125,211,252,0.08)); color: var(--accent-2); border:1px solid rgba(58,163,255,0.12); }
 .chip--ok { background: linear-gradient(90deg, rgba(57,217,138,0.07), rgba(57,217,138,0.03)); color: var(--ok); border:1px solid rgba(57,217,138,0.12); }
 .chip--warn { background: linear-gradient(90deg, rgba(244,191,79,0.07), rgba(244,191,79,0.03)); color: var(--warn); border:1px solid rgba(244,191,79,0.12); }
@@ -4670,8 +4637,6 @@ img.logo.promo-logo {
 	margin-right: 6px;
 	border-radius: 3px;
 }
-
-*{box-sizing:border-box;}
 
 html {
 	overflow-x: hidden;
@@ -4844,7 +4809,6 @@ a{ color:var(--accent); text-decoration:none; }
 	border-color: rgba(255,255,255,0.35);
 	box-shadow: 0 12px 26px rgba(45, 120, 255, 0.25);
 }
-.btn-primary{ background:linear-gradient(180deg, #3aa3ff, #2a7cd6); border:none; color:#fff; }
 .btn-ghost{ background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); }
 .btn-floating{
         position:fixed; right:18px; bottom:18px; z-index:50;
@@ -4924,7 +4888,7 @@ a{ color:var(--accent); text-decoration:none; }
 /* ---- Enhanced Index Page Styles ---- */
 
 /* Ensure section titles have consistent baseline alignment */
-.section-title {
+.seasons-view .section-title {
 	text-align: center;
 	font-size: 1.8rem;
 	font-weight: 700;
@@ -5069,19 +5033,6 @@ tbody tr:nth-child(even){ background:var(--table-alt); }
 th:first-child,td:first-child{ text-align:left; background:var(--table-bg); }
 tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
 .chips{ display:flex; gap:.5rem; flex-wrap:wrap; margin:.4rem 0 .8rem; }
-
-/* Unified chip system */
-.chip{ 
-	font-size:.95rem; 
-	padding:.35rem .65rem; 
-	border-radius:999px; 
-	background:var(--chip-bg); 
-	border:1px solid var(--border); 
-	color:var(--fg);
-	white-space:nowrap;
-	line-height:1.2;
-	letter-spacing:.2px;
-}
 
 .bar{ position:relative; background:#1b2a4a; height:20px; border-radius:8px; overflow:hidden; }
 .bar>span{ position:absolute; left:0; top:0; bottom:0; width:0%; background:var(--accent); }
@@ -5475,38 +5426,13 @@ tbody tr:hover{ outline:1px solid #1e2b4a; background:#152247; }
 .cell-muted{ color:var(--muted); }
 th[title]{ text-decoration: underline dotted #777; text-underline-offset:3px; cursor:help; }
 
-/* ---- Legacy Division summary grid (unused) ---- */
-.div-summary-legacy{
-	display:grid;
-	grid-template-columns: 1fr 1fr; /* left/right columns */
-	gap:1rem;
-	margin:.75rem 0 1rem;
-	align-items: start;
-}
-.div-summary-legacy .card{ grid-column: auto !important; }
-.div-summary-legacy .card:hover{ transform: none; }
-.summary-grid{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.6rem; }
-.summary-item{ background:var(--table-alt); border:1px solid var(--border); border-radius:6px; padding:.5rem .6rem; text-align:center; }
-.summary-item .label{ color:var(--muted); font-size:.9rem; }
-.summary-item .val{ font-size:1.15rem; font-weight:600; }
-
 /* Responsiveness removed - desktop layout maintained on all screen sizes */
 
 /* Enhanced Season Indicators */
-.season-meta {
+.seasons-view .season-meta {
 	font-size: 0.8em;
 	color: var(--muted);
 	font-weight: 400;
-}
-
-/* Division Grid per Season */
-.season-divisions {
-	display: none;
-}
-
-.season-divisions.active {
-	display: block;
-	animation: fadeIn 0.3s ease-in-out;
 }
 
 /* --- Responsive mobile improvements --- */
@@ -7786,11 +7712,14 @@ a:focus,
     animation: fadeIn 0.3s ease-out;
 }
 
-.section-title {
+.team-detail .section-title,
+.player-view .section-title,
+.shared-map-performance .section-title,
+.match-details-panel .section-title {
     font-size: 1.6rem;
     margin-bottom: 1.5rem;
     color: #E6E6E6;
-    display: inline-block;
+    display: block;
 }
 
 .titleUnderline {
@@ -7885,7 +7814,12 @@ a:focus,
 }
 
 .table-wrapper {
+    position: relative;
     overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    will-change: scroll-position;
     border-radius: var(--radius-sm);
     border: 1px solid rgba(98, 138, 246, 0.16);
     background: linear-gradient(180deg, rgba(13, 21, 43, 0.82), rgba(10, 17, 36, 0.94));
@@ -8044,7 +7978,10 @@ a:focus,
 }
 
 /* ---- Team page enhancements ---- */
-.section-heading {
+.team-detail .section-heading,
+.player-view .section-heading,
+.shared-map-performance .section-heading,
+.match-details-panel .section-heading {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -8053,15 +7990,14 @@ a:focus,
     margin-bottom: 1rem;
 }
 
-.section-sub {
+.team-detail .section-sub,
+.player-view .section-sub,
+.shared-map-performance .section-sub,
+.match-details-panel .section-sub {
     color: var(--muted);
     font-size: 0.9rem;
     display: block;
     margin-top: 0.25rem;
-}
-
-.section-title {
-    display: block;
 }
 
 .overview-grid {
@@ -11262,15 +11198,6 @@ a:focus,
     }
 }
 
-/* Improve scroll performance */
-.table-wrapper {
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
-    will-change: scroll-position;
-}
-
 /* Add visual indicator for scrollable tables */
 .table-wrapper[data-scrollable="true"]::after {
     content: '→';
@@ -11328,11 +11255,7 @@ a:focus,
     font-weight: 700;
 }
 
-.teams-view {
-    display: grid;
-    gap: 1rem;
-}
-
+.teams-view,
 .players-view {
     display: grid;
     gap: 1rem;
