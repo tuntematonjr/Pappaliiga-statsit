@@ -21,7 +21,7 @@ window.SeasonsView = {
                         class="season-card home-section"
                     >
                         <h2 class="section-title title-accent titleUnderlineCard">
-                            Kausi {{ getSeasonLabel(season) }}
+                            {{ getSeasonLabel(season) }}
                         </h2>
                         <p class="season-meta">{{ getDivisionCount(season) }} divisioonaa</p>
                         

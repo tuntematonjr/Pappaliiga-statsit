@@ -985,11 +985,25 @@ window.HomeView = {
                         </div>
                     </header>
                     <p class="partner-callout__body">{{ callout.description }}</p>
-                    <footer class="partner-callout__footer">
-                        <a :href="callout.primaryHref" class="btn-primary" target="_blank" rel="noopener">
+                    <footer
+                        class="partner-callout__footer"
+                        :class="{ 'partner-callout__footer--single': !(callout.secondaryHref && callout.secondaryLabel) }"
+                    >
+                        <a
+                            :href="callout.primaryHref"
+                            class="btn-primary partner-callout__action partner-callout__action--primary"
+                            target="_blank"
+                            rel="noopener"
+                        >
                             {{ callout.primaryLabel }}
                         </a>
-                        <a :href="callout.secondaryHref" class="btn-link" target="_blank" rel="noopener">
+                        <a
+                            v-if="callout.secondaryHref && callout.secondaryLabel"
+                            :href="callout.secondaryHref"
+                            class="btn-secondary partner-callout__action partner-callout__action--secondary"
+                            target="_blank"
+                            rel="noopener"
+                        >
                             {{ callout.secondaryLabel }}
                         </a>
                     </footer>

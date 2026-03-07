@@ -4440,7 +4440,7 @@ html, body {
     border-color: var(--accent);
 }
 
-.season-card h2 {
+.season-card h2:not(.section-title) {
     color: var(--text-dim);
     font-size: 0.9rem;
     text-transform: uppercase;
@@ -4887,17 +4887,19 @@ a{ color:var(--accent); text-decoration:none; }
 
 /* ---- Enhanced Index Page Styles ---- */
 
-/* Ensure section titles have consistent baseline alignment */
-.seasons-view .section-title {
-	text-align: center;
-	font-size: 1.8rem;
-	font-weight: 700;
-	margin: 0 0 32px 0;
-	background: linear-gradient(135deg, var(--fg), var(--accent-2));
-	background-clip: text;
-	-webkit-background-clip: text;
-	-webkit-text-fill-color: transparent;
-	line-height: 1.2;
+/* Ensure season card titles keep their own card-scale styling */
+.season-card .section-title {
+    margin: 0 0 0.75rem 0;
+    text-align: left;
+    line-height: 1.2;
+    --title-accent-font-size: clamp(1rem, 1.35vw, 1.14rem);
+    --title-accent-font-weight: 700;
+    --title-accent-letter-spacing: 0.05em;
+    --title-accent-transform: uppercase;
+    --title-accent-underline-gap: 0.24rem;
+    --title-accent-underline-thickness: 2px;
+    --title-accent-underline-opacity: 0.58;
+    color: var(--text-dim);
 }
 
 .season-progress-section {
@@ -11663,15 +11665,60 @@ a:focus,
 .home-view .partner-callout__footer {
     margin-top: auto;
     width: 100%;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
     gap: 0.5rem;
 }
 
-.home-view .partner-callout__footer .btn-primary,
-.home-view .partner-callout__footer .btn-link {
-    min-height: 34px;
-    padding: 0.45rem 0.8rem;
-    font-size: 0.78rem;
+.home-view .partner-callout__footer--single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.home-view .partner-callout__action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0.65rem 0.9rem;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    box-shadow: 0 12px 24px rgba(6, 12, 28, 0.28);
+}
+
+.home-view .partner-callout__action--primary {
+    color: #08111f;
+    background: linear-gradient(135deg, rgba(112, 189, 255, 0.96), rgba(112, 240, 255, 0.88));
+    border: 1px solid rgba(160, 231, 255, 0.58);
+}
+
+.home-view .partner-callout__action--primary:hover,
+.home-view .partner-callout__action--primary:focus-visible {
+    color: #06101d;
+    background: linear-gradient(135deg, rgba(142, 208, 255, 1), rgba(133, 244, 255, 0.94));
+    box-shadow: 0 16px 28px rgba(54, 132, 255, 0.28), 0 0 18px rgba(116, 227, 255, 0.22);
+}
+
+.home-view .partner-callout__action--secondary {
+    color: #dff4ff;
+    background: rgba(16, 31, 63, 0.84);
+    border: 1px solid rgba(135, 186, 255, 0.3);
+}
+
+.home-view .partner-callout__action--secondary:hover,
+.home-view .partner-callout__action--secondary:focus-visible {
+    color: #f4fbff;
+    background: rgba(24, 42, 82, 0.94);
+    border-color: rgba(173, 219, 255, 0.52);
+    box-shadow: 0 16px 28px rgba(10, 20, 42, 0.32), 0 0 16px rgba(120, 180, 255, 0.16);
 }
 
 .home-view .stats-section {
