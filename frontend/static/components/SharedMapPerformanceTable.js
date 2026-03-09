@@ -143,6 +143,17 @@ const SM_SCOUT_MAP_COLUMNS_DIVISION = [
     { key: 'decov', label: 'Decider', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series', mobilePriority: 5 }
 ];
 
+const SM_SCOUT_MAP_COLUMNS_PLAYER = [
+    { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px', group: 'map', mobilePinned: true, mobilePriority: 1 },
+    { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played', group: 'usage', mobilePriority: 2 },
+    { key: 'totalRoundsPlayed', label: 'Eriä', sortable: true, numeric: true, colClass: 'mono-num', group: 'usage', mobilePriority: 3 },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'mono-num col-kd', group: 'performance', mobilePriority: 4 },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num col-adr', group: 'performance', mobilePriority: 5 },
+    { key: 'kr', label: 'K/R', sortable: true, numeric: true, decimals: 3, colClass: 'mono-num', group: 'performance', mobileHidden: true },
+    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, colClass: 'mono-num', group: 'performance', mobilePriority: 6 },
+    { key: 'rd', label: 'Eräero', sortable: true, numeric: true, colClass: 'mono-num col-rd', group: 'performance', mobileHidden: true }
+];
+
 window.SharedMapPerformanceTable = {
     name: 'SharedMapPerformanceTable',
     components: {
@@ -177,11 +188,20 @@ window.SharedMapPerformanceTable = {
         variant: {
             type: String,
             default: 'team'
+        },
+        defaultView: {
+            type: String,
+            default: 'summary'
+        },
+        allowViewToggle: {
+            type: Boolean,
+            default: true
         }
     },
     data() {
+        const initialView = this.defaultView === 'full' ? 'full' : 'summary';
         return {
-            mapViewMode: 'summary',
+            mapViewMode: initialView,
             mapSubMetricMode: 'perRound',
             scoutTableKey: 0,
             detailedTableKey: 0,
@@ -216,9 +236,14 @@ window.SharedMapPerformanceTable = {
             return { column: 'totalRoundsPlayed', order: 'desc', numeric: true };
         },
         resolvedScoutColumns() {
-            return this.variant === 'division' ? SM_SCOUT_MAP_COLUMNS_DIVISION : this.SCOUT_MAP_COLUMNS;
+            if (this.variant === 'division') return SM_SCOUT_MAP_COLUMNS_DIVISION;
+            if (this.variant === 'player') return SM_SCOUT_MAP_COLUMNS_PLAYER;
+            return this.SCOUT_MAP_COLUMNS;
         },
         resolvedMapColumns() {
+            if (this.variant === 'player') {
+                return this.MAP_COLUMNS.map(column => ({ ...column, mobileHidden: false }));
+            }
             return this.MAP_COLUMNS;
         },
         mapMaxRoundDiff() {
@@ -227,6 +252,15 @@ window.SharedMapPerformanceTable = {
         }
     },
     watch: {
+        defaultView(newValue) {
+            const nextView = newValue === 'full' ? 'full' : 'summary';
+            this.mapViewMode = nextView;
+        },
+        allowViewToggle(newValue) {
+            if (!newValue) {
+                this.mapViewMode = this.defaultView === 'full' ? 'full' : 'summary';
+            }
+        },
         mapStats: {
             immediate: true,
             handler(newStats) {
@@ -275,7 +309,19 @@ window.SharedMapPerformanceTable = {
             const totalOwnBan = smToNumber(entry?.totalOwnBan ?? entry?.total_own_ban ?? raw?.totalOwnBan ?? raw?.total_own_ban ?? entry?.banned ?? raw?.banned, 0);
             const roundsWon = smToNumber(entry?.roundsWon ?? entry?.rounds_won ?? raw?.roundsWon ?? raw?.rounds_won, 0);
             const roundsLost = smToNumber(entry?.roundsLost ?? entry?.rounds_lost ?? raw?.roundsLost ?? raw?.rounds_lost, 0);
-            const totalRoundsPlayed = smToNumber(entry?.totalRoundsPlayed ?? entry?.total_rounds_played ?? entry?.rounds_played ?? raw?.totalRoundsPlayed ?? raw?.total_rounds_played ?? raw?.rounds_played, roundsWon + roundsLost);
+            const totalRoundsPlayed = smToNumber(
+                entry?.totalRoundsPlayed
+                ?? entry?.total_rounds_played
+                ?? entry?.rounds_played
+                ?? entry?.total_rounds
+                ?? entry?.rounds
+                ?? raw?.totalRoundsPlayed
+                ?? raw?.total_rounds_played
+                ?? raw?.rounds_played
+                ?? raw?.total_rounds
+                ?? raw?.rounds,
+                roundsWon + roundsLost
+            );
             const kills = smToNumber(entry?.kills ?? raw?.kills, 0);
             const deaths = smToNumber(entry?.deaths ?? raw?.deaths, 0);
             const assists = smToNumber(entry?.assists ?? raw?.assists, 0);
@@ -475,7 +521,7 @@ window.SharedMapPerformanceTable = {
                         <button type="button" class="btn-submetric" :class="mapSubMetricMode === 'perRound' ? 'active' : ''" @click="mapSubMetricMode = 'perRound'">Per-era</button>
                         <button type="button" class="btn-submetric" :class="mapSubMetricMode === 'perMap' ? 'active' : ''" @click="mapSubMetricMode = 'perMap'">Per-kartta</button>
                     </div>
-                    <button type="button" class="btn-toggle-view" @click="mapViewMode = mapViewMode === 'summary' ? 'full' : 'summary'">
+                    <button v-if="allowViewToggle" type="button" class="btn-toggle-view" @click="mapViewMode = mapViewMode === 'summary' ? 'full' : 'summary'">
                         <span v-if="mapViewMode === 'summary'">Laaja nakyma</span>
                         <span v-else>Yhteenveto</span>
                     </button>
@@ -492,7 +538,7 @@ window.SharedMapPerformanceTable = {
                     :header-groups="scoutHeaderGroups"
                     :data="scoutMapRows"
                     :default-sort="scoutMapDefaultSort"
-                    :mobile-column-limit="variant === 'division' ? 5 : 6"
+                    :mobile-column-limit="variant === 'division' ? 5 : (variant === 'player' ? 6 : 6)"
                     :sticky-header="true"
                     :compact="true"
                     class="map-summary-table"
@@ -557,7 +603,7 @@ window.SharedMapPerformanceTable = {
                     :header-groups="mapHeaderGroups"
                     :data="normalizedRows"
                     :default-sort="mapDefaultSort"
-                    :mobile-column-limit="5"
+                    :mobile-column-limit="variant === 'player' ? null : 5"
                     :sticky-header="true"
                     :compact="true"
                     class="map-full-table"

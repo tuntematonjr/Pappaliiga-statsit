@@ -723,7 +723,7 @@ window.PlayerView = {
         get ErrorMessage() { return window.ErrorMessage; },
         get StatPanel() { return window.StatPanel; },
         get RadarChart() { return window.RadarChart; },
-        get MapsStats() { return window.MapsStats; },
+        get SharedMapPerformanceTable() { return window.SharedMapPerformanceTable; },
         get PlayerCompareModal() { return window.PlayerCompareModal; }
     },
     data() {
@@ -2455,14 +2455,25 @@ window.PlayerView = {
                 </section>
 
                 <section class="player-maps">
-                    <maps-stats
-                        v-if="selectedSeasonId"
-                        title="Karttakohtainen suoritus"
+                    <loading-spinner
+                        v-if="selectedSeasonId && mapStatsSegment.loading"
+                        message="Karttatilastoja ladataan..."
+                    ></loading-spinner>
+                    <error-message
+                        v-else-if="selectedSeasonId && mapStatsSegment.error"
+                        :message="mapStatsSegment.error"
+                    ></error-message>
+                    <shared-map-performance-table
+                        v-else-if="selectedSeasonId"
                         :map-stats="mapStats"
-                        :loading="mapStatsSegment.loading"
-                        :error="mapStatsSegment.error"
-                        :columns="null"
-                    ></maps-stats>
+                        title="Karttakohtainen suorituskyky"
+                        subtitle-summary="Yhteenveto: pelatut kartat, erät, K/D, ADR, HS%"
+                        subtitle-full="Laaja: karttakohtaiset pelaajatilastot"
+                        :show-panel-container="true"
+                        variant="player"
+                        default-view="full"
+                        :allow-view-toggle="false"
+                    ></shared-map-performance-table>
                 </section>
 
                 <player-compare-modal
