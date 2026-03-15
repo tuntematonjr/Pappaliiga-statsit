@@ -21,7 +21,7 @@ _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _DEMO_LIST_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
 _DEMO_PROBE_SEMAPHORE = asyncio.Semaphore(4)
-_DEMO_CACHE_VERSION = 2
+_DEMO_CACHE_VERSION = 3
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
 
@@ -540,7 +540,7 @@ def _build_demo_probe_indices(expected_count: int | None) -> list[int]:
     base = int(expected_count or 0)
     if base <= 0:
         base = 2
-    limit = min(8, max(2, base + 1))
+    limit = min(8, max(2, base))
     return list(range(0, limit))
 
 

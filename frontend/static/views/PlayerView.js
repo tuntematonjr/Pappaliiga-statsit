@@ -2009,7 +2009,7 @@ window.PlayerView = {
                                 </option>
                             </select>
                         </label>
-                        <button type="button" class="btn-primary" @click="handleCompareOpen">
+                        <button type="button" class="btn-primary player-controls__compare" @click="handleCompareOpen">
                             {{ comparePlayer ? 'Vaihda vertailupelaaja' : 'Vertaa pelaajaa' }}
                         </button>
                         <button

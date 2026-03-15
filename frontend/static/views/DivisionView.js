@@ -598,35 +598,6 @@ window.DivisionView = {
                 ? this.upcomingMatches[0]
                 : null;
         },
-        divisionHeroMetaItems() {
-            const items = [];
-            const season = this.divisionDetails?.season;
-            const divisionNum = this.divisionDetails?.division_num;
-            const progress = this.matchProgressMetric;
-
-            if (season != null && season !== '') {
-                items.push({ key: 'season', label: `Season ${season}` });
-            }
-            if (divisionNum != null && divisionNum !== '') {
-                items.push({
-                    key: 'division',
-                    label: Number(divisionNum) === 0 ? 'Mestaruussarja' : `Div ${divisionNum}`
-                });
-            }
-            if (progress.total > 0) {
-                items.push({
-                    key: 'progress',
-                    label: `${formatIntegerMetric(progress.played)}/${formatIntegerMetric(progress.total)} ottelua`
-                });
-            }
-            if (this.upcomingMatches.length > 0) {
-                items.push({ key: 'upcoming', label: `${formatIntegerMetric(this.upcomingMatches.length)} tulevaa` });
-            } else if (this.playedMatches.length > 0) {
-                items.push({ key: 'played', label: `${formatIntegerMetric(this.playedMatches.length)} pelattua` });
-            }
-
-            return items.slice(0, 4);
-        },
         divisionHeroStats() {
             const aggregates = this.derivedAggregates || {};
             const teamCount = this.toNumber(
@@ -681,24 +652,6 @@ window.DivisionView = {
                         tone: 'amber'
                     }
             ];
-        },
-        divisionHeroLede() {
-            const aggregates = this.derivedAggregates || {};
-            const teamCount = this.toNumber(
-                aggregates.team_count ?? this.divisionDetails?.team_count ?? this.standings.length,
-                0
-            );
-            const playerCount = this.toNumber(
-                aggregates.player_count ?? this.divisionDetails?.player_count,
-                0
-            );
-            const progress = this.matchProgressMetric;
-            const parts = [];
-            if (teamCount > 0) parts.push(`${formatIntegerMetric(teamCount)} joukkuetta`);
-            if (playerCount > 0) parts.push(`${formatIntegerMetric(playerCount)} pelaajaa`);
-            if (progress.percent != null) parts.push(`${formatPercentMetric(progress.percent)} % kaudesta pelattu`);
-            if (!parts.length) return 'Divisioonan ottelut, tilastot, kartat ja sankarit samassa näkymässä.';
-            return parts.join(' · ');
         },
         statMetrics() {
             if (!this.divisionDetails) {
@@ -1844,17 +1797,7 @@ window.DivisionView = {
                 <div class="division-hero__grid">
                     <div class="division-hero__identity">
                         <div class="division-hero__identity-copy">
-                            <p class="section-eyebrow division-hero__eyebrow">DIVISIOONA</p>
                             <h1 id="division-title" class="title-accent titleUnderlinePage">{{ divisionTitle }}</h1>
-                            <p class="division-hero__lede">{{ divisionHeroLede }}</p>
-                            <div v-if="divisionHeroMetaItems.length" class="division-hero__meta" role="list">
-                                <span
-                                    v-for="item in divisionHeroMetaItems"
-                                    :key="item.key"
-                                    class="division-hero__meta-chip"
-                                    role="listitem"
-                                >{{ item.label }}</span>
-                            </div>
                         </div>
                         <div v-if="divisionHeroStats.length" class="division-hero__stats" role="list">
                             <article
@@ -1900,7 +1843,6 @@ window.DivisionView = {
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading division-section__heading--matches">
                             <div class="division-section__heading-copy">
-                                <p class="section-eyebrow">OTTELUKESKUS</p>
                                 <h2 class="title-accent titleUnderlineSection">Ottelut</h2>
                                 <p class="division-section__lede">Tulevat kohtaamiset ja pelattujen otteluiden tarkempi ottelupaketti samassa näkymässä.</p>
                             </div>
@@ -2185,7 +2127,6 @@ window.DivisionView = {
                 <section id="summary" class="division-section">
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading">
-                            <p class="section-eyebrow">YLEISKUVA</p>
                             <h2 class="title-accent titleUnderlineSection">Divisioonan tilastot</h2>
                             <p class="division-section__lede">Nopea kooste kauden volyymista, tempoista ja tehokkuusluvuista.</p>
                         </header>
@@ -2205,7 +2146,6 @@ window.DivisionView = {
                 <section id="standings" class="division-section division-section--stacked">
                     <div class="division-team-module">
                         <header class="division-section__heading division-section__heading--standings">
-                            <p class="section-eyebrow">JOUKKUEET</p>
                             <h2 class="title-accent titleUnderlineSection">Joukkuevertailu</h2>
                             <p class="division-section__lede">Sarjataulukko, voittorakenne ja kierrospohjainen suoritus samassa taulukossa.</p>
                         </header>
@@ -2217,7 +2157,7 @@ window.DivisionView = {
                                 :error="standingsError"
                                 :title="'Joukkuevertailu'"
                                 :subtitle="'Klikkaa joukkueen nimeä avataksesi joukkuesivun.'"
-                                :show-header="true"
+                                :show-header="false"
                                 :show-rank="false"
                                 :sticky-header="true"
                                 :highlight-team-id="activeTeamChipId"
@@ -2232,7 +2172,6 @@ window.DivisionView = {
                 <section id="maps" class="division-section">
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading">
-                            <p class="section-eyebrow">KARTTAPOOLI</p>
                             <h2 class="title-accent titleUnderlineSection">Karttatilastot</h2>
                             <p class="division-section__lede">Karttamäärät, bannit ja karttakohtainen suoritus divisioonan tasolla.</p>
                         </header>
@@ -2254,7 +2193,6 @@ window.DivisionView = {
                 <section id="heroes" class="division-section division-section--heroes">
                     <div class="division-surface glass-card division-section-card division-section-card--heroes">
                         <header class="division-section__heading">
-                            <p class="section-eyebrow">HUIPUT</p>
                             <h2 class="title-accent titleUnderlineSection">Divarin Sankarit</h2>
                             <p class="division-section__lede">Kuka dominoi damagea, clutch-hetkiä, utilitya ja puhtaita fragilukuja juuri tässä divisioonassa.</p>
                         </header>

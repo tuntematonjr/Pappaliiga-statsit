@@ -53,13 +53,21 @@ window.PlayerCompareModal = {
                 .slice(0, 100);
         },
         selectedCandidate() {
-            if (!this.selectedCandidateId) return null;
-            return this.normalizedCandidates.find(item => String(item.player_id) === String(this.selectedCandidateId)) || null;
+            if (!this.resolvedCandidateId) return null;
+            return this.normalizedCandidates.find(item => String(item.player_id) === String(this.resolvedCandidateId)) || null;
+        },
+        resolvedCandidateId() {
+            if (this.selectedCandidateId) return String(this.selectedCandidateId);
+            const needle = String(this.searchQuery || '').trim().toLowerCase();
+            if (!needle) return '';
+            const exact = this.normalizedCandidates.find(item => String(item.nickname || '').trim().toLowerCase() === needle);
+            if (!exact) return '';
+            return String(exact.player_id || '');
         },
         submitDisabled() {
             if (this.loading || this.loadingCandidates) return true;
-            if (!this.selectedCandidateId) return true;
-            return String(this.selectedCandidateId) === String(this.normalizedBasePlayerId);
+            if (!this.resolvedCandidateId) return true;
+            return String(this.resolvedCandidateId) === String(this.normalizedBasePlayerId);
         }
     },
     watch: {
@@ -151,7 +159,7 @@ window.PlayerCompareModal = {
         },
         handleSubmit() {
             if (this.submitDisabled) return;
-            this.$emit('submit', String(this.selectedCandidateId).trim());
+            this.$emit('submit', String(this.resolvedCandidateId).trim());
         },
         delta(metric) {
             const base = Number(metric?.base);
@@ -211,9 +219,10 @@ window.PlayerCompareModal = {
                                     v-model="searchQuery"
                                     type="text"
                                     placeholder="Kirjoita pelaajan nimi"
+                                    @keydown.enter.prevent="handleSubmit"
                                 />
                             </label>
-                            <button type="submit" class="btn-primary" :disabled="submitDisabled">
+                            <button type="submit" class="btn-primary compare-modal__submit" :disabled="submitDisabled" @click="handleSubmit">
                                 Hae vertailu
                             </button>
                         </form>
