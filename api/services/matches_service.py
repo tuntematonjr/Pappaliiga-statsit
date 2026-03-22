@@ -607,7 +607,7 @@ async def get_match_demos(
         """
         SELECT m.round_index, COALESCE(mc.pretty_name, m.map_name) AS map_name
         FROM maps m
-        LEFT JOIN maps_catalog mc ON mc.map_name = m.map_name
+        LEFT JOIN maps_catalog mc ON LOWER(mc.map_id) = LOWER(m.map_name)
         WHERE m.match_id = %s
         ORDER BY m.round_index
         """,
