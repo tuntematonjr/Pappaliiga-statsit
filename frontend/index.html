@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="theme-color" content="#0b1020">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pappaliiga Stats">
+    <title>Pappaliiga Stats</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260304-global3">
+    <!-- Favicon: inline SVG (data URI) used to avoid extra requests; also provide a static fallback at /favicon.svg -->
+    <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%232b6cb0'/><text x='8' y='11' font-size='9' text-anchor='middle' fill='white' font-family='Arial, Helvetica, sans-serif'>PL</text></svg>">
+    <!-- Vue 3 production builds (prefer local, fallback to CDN if allowed) -->
+    <script src="/static/lib/vue.global.prod.js"></script>
+    <script>if (typeof Vue === 'undefined') { document.write('<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"><\\/script>'); }</script>
+    <script src="/static/lib/vue-router.global.prod.js"></script>
+    <script>if (typeof VueRouter === 'undefined') { document.write('<script src="https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js"><\\/script>'); }</script>
+    <!-- Pinia with vue-demi polyfill for browser -->
+    <script src="/static/lib/vue-demi.iife.js"></script>
+    <script>if (typeof VueDemi === 'undefined') { document.write('<script src="https://unpkg.com/vue-demi@0.14.6/lib/index.iife.js"><\\/script>'); }</script>
+    <script src="/static/lib/pinia.iife.js"></script>
+    <script>if (typeof Pinia === 'undefined') { document.write('<script src="https://unpkg.com/pinia@2.1.7/dist/pinia.iife.js"><\\/script>'); }</script>
+    <!-- If CDN scripts fail (offline or blocked), present a clear message and stop further app scripts -->
+    <script>
+        (function () {
+            var missing = [];
+            if (typeof Vue === 'undefined') missing.push('Vue');
+            if (typeof VueRouter === 'undefined') missing.push('VueRouter');
+            if (typeof Pinia === 'undefined') missing.push('Pinia');
+            if (missing.length) {
+                // Show a user-facing message and abort loading further JS to avoid noisy console errors
+                var msg = 'Required frontend libraries failed to load: ' + missing.join(', ') + '.\n';
+                msg += 'This can happen when the development machine is offline or CDN access is blocked.\n';
+                msg += 'Options: 1) Enable network/CDN access, 2) add local vendor copies under /static/lib and update index.html.';
+                try {
+                    document.open();
+                    document.write('<!doctype html><html><head><meta charset="utf-8"><title>Missing dependencies</title>');
+                    document.write('<style>body{font-family:system-ui,Segoe UI,Arial;background:#0b1220;color:#e6eef8;padding:40px;} .box{max-width:900px;margin:40px auto;background:#081023;border:1px solid #123;background:linear-gradient(180deg,#071021,#081426);padding:24px;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,0.6);} h1{margin:0 0 8px;font-size:20px} p{margin:8px 0;color:#9fb3d6} code{background:#021124;padding:2px 6px;border-radius:4px;color:#cfe7ff}</style>');
+                    document.write('</head><body><div class="box"><h1>Frontend libraries failed to load</h1>');
+                    document.write('<p>The app could not load required JavaScript libraries from the CDN.</p>');
+                    document.write('<p><strong>Missing:</strong> ' + missing.join(', ') + '</p>');
+                    document.write('<p>Fixes:</p><ol><li>Ensure this machine has internet access so the CDN (unpkg.com) can be reached.</li><li>Or download the library bundles and place them under <code>/static/lib</code>, then update <code>frontend/index.html</code> to reference those local files.</li></ol>');
+                    document.write('<p>If you want, run <code>python -m http.server</code> from a machine with internet to serve vendor files, or contact the project maintainer.</p>');
+                    document.write('</div></body></html>');
+                    document.close();
+                } catch (e) {
+                    console.error('Failed to render missing-deps page', e);
+                }
+                // Halt further script execution by throwing
+                throw new Error('Missing frontend libraries: ' + missing.join(', '));
+            }
+        })();
+    </script>
+</head>
+<body>
+    <nav class="main-nav">
+        <div class="layout-boundary nav-container">
+            <div class="nav-brand">
+                <div class="brand-lockup">
+                    <span class="logo-wrap logo-card logo-card--armafinland">
+                        <img src="https://armafinland.fi/logot/images/armafin-logo-400px.png" alt="Armafinland logo" class="nav-logo nav-logo--afi">
+                    </span>
+                    <span class="brand-divider" aria-hidden="true"></span>
+                    <span class="logo-wrap logo-card logo-card--pappaliiga">
+                        <img src="https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png" alt="Pappaliiga logo" class="nav-logo nav-logo--ppl">
+                    </span>
+                </div>
+                <div class="nav-copy">
+                    <span class="nav-title">AFI · Pappaliiga Stats Hub</span>
+                </div>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link">Etusivu</a>
+                <a href="/seasons" class="nav-link">Kaudet</a>
+                <a href="/teams" class="nav-link">Joukkueet</a>
+                <a href="/players" class="nav-link">Pelaajat</a>
+                <a href="/season/current/upcoming" class="nav-link">Tulevat ottelut</a>
+            </div>
+        </div>
+    </nav>
+
+    <div id="app">
+        <!-- Vue app mounts here -->
+    </div>
+
+    <footer class="main-footer">
+        <div class="layout-boundary footer-inner">
+            <p>&copy; 2025-2026 Pappaliiga Stats · Tehty ❤️ kanssa Pappaliigalle T: Cultti</p>
+        </div>
+    </footer>
+
+    <script>
+        window.PL_BUILD_ID = '20260304-global7';
+    </script>
+
+    <!-- API Client -->
+    <script src="/static/api-client.js?v=20260304-global11"></script>
+    <!-- Shared constants -->
+    <script src="/static/constants.js"></script>
+    <!-- Composables (must load before components that use them) -->
+    <script src="/static/composables/useTableSort.js"></script>
+    <script src="/static/composables/useCellColorization.js"></script>
+
+    <script src="/static/utils/divisionNormalizer.js"></script>
+    <script src="/static/utils/mapImages.js"></script>
+    <script src="/static/utils/mobile-utils.js"></script>
+    <script src="/static/utils/matchLinks.js?v=20260304-global12"></script>
+
+    <!-- Stores -->
+    <script src="/static/stores/useSeasonsStore.js"></script>
+    <script src="/static/stores/useHomeStore.js"></script>
+    <script src="/static/stores/useDivisionStore.js"></script>
+    <script src="/static/stores/useUpcomingStore.js"></script>
+    <script src="/static/stores/useTeamStore.js?v=20260304-global3"></script>
+    <script src="/static/stores/usePlayerStore.js"></script>
+    
+    <!-- Vue Components -->
+    <script src="/static/components/GlobalNav.js"></script>
+    <script src="/static/components/LoadingSpinner.js"></script>
+    <script src="/static/components/ErrorMessage.js"></script>
+    <script src="/static/components/MapStatsTable.js"></script>
+    <script src="/static/components/MapsStats.js"></script>
+    <script src="/static/components/TeamComparisonBoard.js"></script>
+    <script src="/static/components/ProgressBar.js"></script>
+    <script src="/static/components/SplitBar.js"></script>
+    <script src="/static/components/SortableTable.js"></script>
+    <script src="/static/components/SharedMapPerformanceTable.js"></script>
+    <script src="/static/components/HeroBanner.js"></script>
+    <script src="/static/components/SeasonToggle.js"></script>
+    <script src="/static/components/StatPanel.js"></script>
+    <script src="/static/components/SummaryStatCard.js"></script>
+    <script src="/static/components/SankariCard.js"></script>
+    <script src="/static/components/CircularProgress.js"></script>
+    <script src="/static/components/DivisionCardList.js"></script>
+    <script src="/static/components/SparklineChart.js"></script>
+    <script src="/static/components/RadarChart.js"></script>
+    <script src="/static/components/PlayerCompareModal.js"></script>
+    <script src="/static/components/PickBanFlow.js"></script>
+    <script src="/static/components/MatchExpandedDetails.js?v=20260303-global"></script>
+    <script src="/static/components/UpcomingMatchesList.js?v=20260304-global1"></script>
+    <script src="/static/components/TeamDetail.js?v=20260304-global15"></script>
+    
+    <!-- Views -->
+    <script src="/static/views/HomeView.js?v=20260304-global1"></script>
+    <script src="/static/views/SeasonsView.js?v=20260304-global16"></script>
+    <script src="/static/views/TeamsView.js?v=20260304-global3"></script>
+    <script src="/static/views/PlayersView.js?v=20260304-global2"></script>
+    <script src="/static/views/UpcomingMatchesView.js?v=20260304-global4"></script>
+    <script src="/static/views/DivisionView.js?v=20260304-global19"></script>
+    <script src="/static/views/TeamDetailView.js?v=20260304-global2"></script>
+    <script src="/static/views/PlayerView.js?v=20260304-global2"></script>
+    <script src="/static/views/DebugView.js"></script>
+    
+    <!-- UI Enhancements -->
+    <script src="/static/glow-effects.js"></script>
+
+    <!-- Main App -->
+    <script src="/static/app-main.js?v=20260304-global2"></script>
+</body>
+</html>

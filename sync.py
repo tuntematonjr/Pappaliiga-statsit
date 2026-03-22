@@ -1,940 +1,559 @@
-# sync.py
-# Championship-centric sync for Pappaliiga (CS2).
-# - Reads divisions from faceit_config.DIVISIONS (JSON-backed)
-# - Upserts championships
-# - Fetches matches (+ details), map veto history, and (best-effort) per-map/team/player stats
-# All comments in English by design.
+
 
 from __future__ import annotations
+
 import argparse
-import re
+import asyncio
+import logging
+import os
+from pathlib import Path
 import sys
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-import sqlite3
-import logging
-from logging.handlers import RotatingFileHandler
+from typing import Any, Sequence
 
-from faceit_config import DIVISIONS, CURRENT_SEASON
-from faceit_client import (
-    list_championship_matches, get_match_details, get_match_stats, get_democracy_history, get_team_details
+from db_async import create_schema_async, fetch_val, reset_db_async, connection, upsert_championships_async
+from division_overrides import load_division_overrides
+from division_naming import build_division_name
+from faceit_client_async import get_rate_limit_stats, reset_rate_limit_stats, shutdown_clients
+import faceit_config
+from sync_pipeline import ChampionshipSyncResult, sync_championship_async, update_single_match_async
+from utils import format_hms, log_stage
+from utils.log_files import (
+    DEFAULT_LOG_MAX_AGE_DAYS,
+    DEFAULT_LOG_MAX_TOTAL_BYTES,
+    build_timestamped_log_path,
+    prune_log_files,
 )
-from db import (
-    get_conn, init_db,
-    upsert_championship, upsert_match,
-    upsert_team_season,
-    upsert_maps, upsert_map_votes,
-    upsert_player_stats,
-    upsert_map_catalog, add_map_to_season_pool,
-    upsert_players_bulk,
-)
+from division_registry import refresh_divisions
+from runtime_diagnostics import SyncDiagnostics
 
-_SCORE_RE = re.compile(r"^\s*(\d+)\s*[/\:]\s*(\d+)\s*$")
-
-# Configure logging with rotation (max 5 MB per file, keep 3 backups)
-logFile = "sync.log"
-handler = RotatingFileHandler(logFile, maxBytes=5*1024*1024, backupCount=3, encoding="utf-8")
-logging.basicConfig(
-    level=logging.INFO,  # was DEBUG
-    handlers=[handler],
-    format="%(asctime)s %(levelname)s:%(name)s:%(message)s"
-)
-
-# ---- helpers ---------------------------------------------------------------
-
-def safe_int(v: Any, default: Optional[int] = None) -> Optional[int]:
-    try:
-        return int(v)
-    except Exception:
-        return default
-
-def safe_float(v: Any, default: Optional[float] = None) -> Optional[float]:
-    try:
-        # Faceit may occasionally return "1,23"; normalize it to use a dot
-        s = str(v).replace(",", ".")
-        return float(s)
-    except Exception:
-        return default
-
-def _is_bye_id(x: Optional[str]) -> bool:
-    return str(x or "").lower() == "bye"
-
-def _is_bye_match_summary(m: dict) -> bool:
-    return _is_bye_id(m.get("team1_id")) or _is_bye_id(m.get("team2_id"))
-
-def _is_bye_match_details(details: dict) -> bool:
-    teams = (details or {}).get("teams") or {}
-    f1 = teams.get("faction1") or {}
-    f2 = teams.get("faction2") or {}
-    return _is_bye_id(f1.get("faction_id")) or _is_bye_id(f2.get("faction_id"))
-
-def _map_tickets_from_democracy(demo_json: dict) -> list[dict]:
-    payload = demo_json.get("payload") if isinstance(demo_json, dict) else None
-    tickets = payload.get("tickets", []) if isinstance(payload, dict) else []
-    return [tk for tk in tickets
-            if isinstance(tk, dict) and str(tk.get("entity_type") or "").lower() == "map"]
-
-# --- progress bar with ETA --------------------------------------------------
-
-def _fmt_hms(seconds: float) -> str:
-    seconds = max(0, int(seconds))
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
-    if h > 0:
-        return f"{h:d}:{m:02d}:{s:02d}"
-    return f"{m:d}:{s:02d}"
-
-def _progress_bar(prefix: str, i: int, total: int, start_ts: float, skipped: int = 0, width: int = 32) -> None:
-    """
-    In-place progress bar with ETA and skipped counter.
-      Example:
-        Div1 — All [########------------] 12/100 (12%) | skipped 5 | elapsed 0:25 | ETA 2:56
-    """
-    i = max(0, min(i, total))
-    pct = 0 if total <= 0 else int(100 * i / total)
-    fill = 0 if total <= 0 else int(width * i / total)
-    bar = "#" * fill + "-" * (width - fill)
-
-    elapsed = max(0.0, time.time() - start_ts)
-    rate = (i / elapsed) if elapsed > 0 else 0.0
-    remaining = ((total - i) / rate) if rate > 0 else 0.0
-    msg = (
-        f"{prefix} [{bar}] {i}/{total} ({pct}%)"
-        f" | skipped {skipped}"
-        f" | elapsed {_fmt_hms(elapsed)}"
-        f" | ETA {_fmt_hms(remaining)}"
-    )
-    print("\r" + msg, end="", file=sys.stdout, flush=True)
-    if i >= total:
-        print("", file=sys.stdout, flush=True)  # newline at end
-
-# ---- transformers for stats payload ---------------------------------------
-
-def _persist_map_catalog_from_details(con: sqlite3.Connection, details: dict, season: int) -> None:
-    voting = (details or {}).get("voting") or {}
-    msec = voting.get("map") or {}
-    entities = msec.get("entities") or []
-
-    def _pretty_for(ent: dict, map_id: str) -> str:
-        raw = (ent.get("name") or "").strip()
-        mid = (map_id or "").lower()
-        if raw.lower() == "dust2" or "dust2" in mid:
-            return "Dust II"
-        if raw:
-            return raw
-        slug = (map_id or "").replace("de_", "").replace("_", " ").strip()
-        return slug.title() if slug else map_id
-
-    for ent in entities:
-        map_id = ent.get("class_name") or ent.get("game_map_id") or ent.get("guid") or ""
-        if not map_id:
-            continue
-        pretty = _pretty_for(ent, map_id)
-        img_sm = ent.get("image_sm") or ""
-        img_lg = ent.get("image_lg") or ""
-
-        row = {
-            "map_id": map_id.lower(),
-            "pretty_name": pretty,
-            "image_sm": img_sm,
-            "image_lg": img_lg,
-        }
-        upsert_map_catalog(con, row)
-        add_map_to_season_pool(con, season, row["map_id"])
-
-def _extract_player_rows(match_id: str, rounds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
-    for idx, r in enumerate(rounds, start=1):
-        for t in (r.get("teams") or []):
-            tid = t.get("team_id") or t.get("id") or t.get("faction_id")
-            tname = (t.get("team_stats") or {}).get("Team") or t.get("name") or t.get("team")
-            for p in (t.get("players") or []):
-                ps = p.get("player_stats") or p.get("stats") or {}
-
-                # Multikill mapping (Faceit keys -> our columns)
-                mk_2k = safe_int(ps.get("Double Kills"), 0)
-                mk_3k = safe_int(ps.get("Triple Kills"), 0)
-                mk_4k = safe_int(ps.get("Quadro Kills"), 0)
-                mk_5k = safe_int(ps.get("Penta Kills"), 0)
-
-                rows.append({
-                    "match_id": match_id,
-                    "round_index": idx,
-                    "player_id": p.get("player_id") or p.get("id"),
-                    "nickname": p.get("nickname") or p.get("name"),
-                    "team_id": tid,
-                    "kills": safe_int(ps.get("Kills"), 0),
-                    "deaths": safe_int(ps.get("Deaths"), 0),
-                    "assists": safe_int(ps.get("Assists"), 0),
-                    "kd": safe_float(ps.get("K/D Ratio"), 0.0),
-                    "kr": safe_float(ps.get("K/R Ratio"), 0.0),
-                    "adr": safe_float(ps.get("ADR"), 0.0),
-                    "hs_pct": safe_float(ps.get("Headshots %") or ps.get("HS %"), 0.0),
-                    "mvps": safe_int(ps.get("MVPs"), 0),
-                    "sniper_kills": safe_int(ps.get("Sniper Kills"), 0),
-                    "utility_damage": safe_int(ps.get("Utility Damage"), 0),
-                    "enemies_flashed": safe_int(ps.get("Enemies Flashed"), 0),
-                    "flash_count": safe_int(ps.get("Flash Count") or ps.get("Flashbangs Thrown"), 0),
-                    "flash_successes": safe_int(ps.get("Flash Successes") or ps.get("Successful Flashes"), 0),
-                    "mk_2k": mk_2k,
-                    "mk_3k": mk_3k,
-                    "mk_4k": mk_4k,
-                    "mk_5k": mk_5k,
-                    "clutch_kills": safe_int(ps.get("Clutch Kills"), 0),
-                    "cl_1v1_attempts": safe_int(ps.get("1v1Count") or ps.get("1v1 Attempts"), 0),
-                    "cl_1v1_wins": safe_int(ps.get("1v1Wins") or ps.get("1v1 Wins"), 0),
-                    "cl_1v2_attempts": safe_int(ps.get("1v2Count") or ps.get("1v2 Attempts"), 0),
-                    "cl_1v2_wins": safe_int(ps.get("1v2Wins") or ps.get("1v2 Wins"), 0),
-                    "entry_count": safe_int(ps.get("Entry Count") or ps.get("Entry Duels"), 0),
-                    "entry_wins": safe_int(ps.get("Entry Wins"), 0),
-                    "pistol_kills": safe_int(ps.get("Pistol Kills"), 0),
-                    "damage": safe_int(ps.get("Damage"), 0),
-                })
-    return rows
+LOGGER = logging.getLogger("pappaliiga.sync")
+_DEFAULT_SYNC_LOG_DIR = Path(__file__).with_name("logs") / "sync"
+LOG_DIR = Path(os.environ.get("SYNC_LOG_DIR", _DEFAULT_SYNC_LOG_DIR))
 
 
-def _extract_map_rows_from_stats(match_id: str, rounds: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
-    for idx, r in enumerate(rounds, start=1):
-        rs = r.get("round_stats") or {}
-        name = rs.get("Map") or r.get("map") or r.get("map_name") or None
-
-        s1 = s2 = None
-        score = (rs.get("Score") or rs.get("score") or "").strip()
-        if score:
-            m = _SCORE_RE.match(score)
-            if m:
-                s1 = safe_int(m.group(1), None)
-                s2 = safe_int(m.group(2), None)
-
-        rows.append({
-            "match_id": match_id,
-            "round_index": idx,
-            "map_name": name,
-            "score_team1": s1,
-            "score_team2": s2,
-            "winner_team_id": rs.get("Winner") or rs.get("winner"),  # normalized later
-        })
-    return rows
-
-def _extract_map_rows_from_details(match_id: str, details: Dict[str, Any],
-                                   team1_id: Optional[str], team2_id: Optional[str]) -> List[Dict[str, Any]]:
-    """
-    Build placeholder map rows for forfeits when round stats are missing.
-    We convert Faceit `detailed_results` 1–0 / 0–1 map wins into 13–0 / 0–13,
-    and always set map_name to 'forfeit' so downstream aggregations can skip them.
-    If only `results.score` exists (e.g., 2–0), create that many 'forfeit' maps.
-    """
-    rows: List[Dict[str, Any]] = []
-
-    # Case A: detailed_results (preferred)
-    det = (details or {}).get("detailed_results")
-    if isinstance(det, list) and det:
-        for idx, item in enumerate(det, start=1):
-            factions = item.get("factions") or {}
-            s1 = safe_int((factions.get("faction1") or {}).get("score"))
-            s2 = safe_int((factions.get("faction2") or {}).get("score"))
-            w_raw = item.get("winner")
-
-            # Normalize 1–0 to 13–0
-            if s1 is not None and s2 is not None:
-                if {s1, s2} == {0, 1}:
-                    s1, s2 = (13, 0) if s1 == 1 else (0, 13)
-
-            rows.append({
-                "match_id": match_id,
-                "round_index": idx,
-                "map_name": "forfeit",
-                "score_team1": s1,
-                "score_team2": s2,
-                "winner_team_id": _normalize_team_ref(w_raw, team1_id, team2_id),
-            })
-        return rows
-
-    # Case B: only results.score (e.g., 2–0)
-    res = (details or {}).get("results") or {}
-    score = res.get("score") or {}
-    m1 = safe_int(score.get("faction1"), None)
-    m2 = safe_int(score.get("faction2"), None)
-    if m1 is not None and m2 is not None:
-        best = max(m1, m2)
-        if best > 0:
-            w_raw = res.get("winner") or res.get("winner_team_id")
-            w_team = _normalize_team_ref(w_raw, team1_id, team2_id)
-            # Direction 13–0 for the winner across all maps
-            s1, s2 = (13, 0) if (w_team == team1_id) else (0, 13)
-            for idx in range(1, best + 1):
-                rows.append({
-                    "match_id": match_id,
-                    "round_index": idx,
-                    "map_name": "forfeit",
-                    "score_team1": s1,
-                    "score_team2": s2,
-                    "winner_team_id": w_team,
-                })
-    return rows
-
-def _extract_rounds_from_stats(stats_json: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Accept non-dict safely; return [] if shape not recognized."""
-    if not isinstance(stats_json, dict):
-        return []
-    rounds = stats_json.get("rounds") or stats_json.get("roundsStats") or []
-    return rounds if isinstance(rounds, list) else []
-
-def _derive_team_ids(details: Dict[str, Any], rounds: List[Dict[str, Any]]) -> tuple[Optional[str], Optional[str]]:
-    """
-    Return (team1_id, team2_id) by checking, in order:
-      1) rounds[*].teams[*].team_id when stats are present
-      2) a name match against the team names in the rounds payload
-      3) FALLBACK: details.teams.faction*.faction_id to work without stats
-    """
-    f1_name = ((details.get("teams") or {}).get("faction1") or {}).get("name")
-    f2_name = ((details.get("teams") or {}).get("faction2") or {}).get("name")
-
-    seen_ids: list[str] = []
-    t1_id = None
-    t2_id = None
-
-    for r in rounds or []:
-        for t in (r.get("teams") or []):
-            tid = t.get("team_id") or t.get("id") or t.get("faction_id")
-            if tid and tid not in seen_ids:
-                seen_ids.append(tid)
-            tname = t.get("name") or t.get("team")
-            if f1_name and tname and tname == f1_name and not t1_id:
-                t1_id = tid
-            if f2_name and tname and tname == f2_name and not t2_id:
-                t2_id = tid
-
-    # If the name match failed but there are two teams in the rounds payload
-    if (t1_id is None or t2_id is None) and len(seen_ids) >= 2:
-        if t1_id is None:
-            t1_id = seen_ids[0]
-        if t2_id is None:
-            t2_id = next((x for x in seen_ids if x != t1_id), seen_ids[1])
-
-    # Final fallback: pull details.teams.faction*.faction_id directly when stats are missing
-    if t1_id is None or t2_id is None:
-        t1_fid = (((details.get("teams") or {}).get("faction1") or {}).get("faction_id")) or None
-        t2_fid = (((details.get("teams") or {}).get("faction2") or {}).get("faction_id")) or None
-        if t1_id is None and t1_fid:
-            t1_id = t1_fid
-        if t2_id is None and t2_fid:
-            t2_id = t2_fid
-
-    return t1_id, t2_id
-
-def _normalize_team_ref(ref: Any, team1_id: Optional[str], team2_id: Optional[str]) -> Optional[str]:
-    """
-    Convert 'faction1'/'faction2'/'1'/'2'/'team1'/'team2' into the real team_id.
-    If ref is already an ID, return it unchanged.
-    """
-    if ref is None:
-        return None
-    s = str(ref).lower()
-    if s in ("faction1", "1", "team1"):
-        return team1_id
-    if s in ("faction2", "2", "team2"):
-        return team2_id
-    return str(ref)
-
-# Skip matches already finished in the database (saves API quota)?
-# Can be overridden with --force flag
-SKIP_FINISHED_IN_DB = True  
-
-def _db_match_snapshot(con: sqlite3.Connection, match_id: str) -> dict:
-    """
-    Single snapshot for skip logic with fewer roundtrips:
-    - 1x SELECT from matches
-    - 1x SELECT over maps to get both "has_any_map" and "has_forfeit_map"
-    - 1x EXISTS for player_stats
-    """
-    row = con.execute(
-        """SELECT status, scheduled_at, started_at, finished_at, team1_id, team2_id
-           FROM matches WHERE match_id=?""",
-        (match_id,)
-    ).fetchone()
-    exists = bool(row)
-    status = (row["status"] or "").lower() if row else None
-    sched  = row["scheduled_at"] if row else None
-    start  = row["started_at"]   if row else None
-    finish = row["finished_at"]  if row else None
-    t1     = row["team1_id"]     if row else None
-    t2     = row["team2_id"]     if row else None
-
-    maps_row = con.execute(
-        "SELECT COUNT(*) AS c, MAX(CASE WHEN map_name='forfeit' THEN 1 ELSE 0 END) AS has_ff "
-        "FROM maps WHERE match_id=?",
-        (match_id,)
-    ).fetchone()
-    has_any_map = (maps_row["c"] or 0) > 0
-    has_ff_map  = bool(maps_row["has_ff"])
-
-    has_ps = bool(con.execute(
-        "SELECT 1 FROM player_stats WHERE match_id=? LIMIT 1", (match_id,)
-    ).fetchone())
-
-    return {
-        "exists": exists,
-        "status": status, "scheduled_at": sched, "started_at": start, "finished_at": finish,
-        "team1_id": t1, "team2_id": t2,
-        "has_any_map": has_any_map, "has_player_stats": has_ps, "has_forfeit_map": has_ff_map,
-    }
-
-
-def _target_kind_from_status(item: dict) -> str:
-    """
-    Map Faceit status values into handling buckets.
-      - 'finished' / 'closed' / 'played' → 'past' (fetch stats)
-      - everything else ('ongoing', 'live', 'upcoming', 'scheduled', etc.) → 'upcoming'
-    """
-    st = str(item.get("status") or "").lower()
-    past_statuses = {"finished", "closed", "played"}
-    return "past" if st in past_statuses else "upcoming"
-
-def _list_matches_all(championship_id: str) -> list[dict]:
-    """
-    Fetch every match in one call (type=all), set _target_kind, and pull the core fields.
-    """
-    items = list_championship_matches(championship_id, match_type="all") or []
-    out: list[dict] = []
-    for it in items:
-        teams = it.get("teams") or {}
-        f1 = teams.get("faction1") or {}
-        f2 = teams.get("faction2") or {}
-        out.append({
-            "_raw": it,  # keep the raw payload in case we need it later
-            "_target_kind": _target_kind_from_status(it),
-            "match_id": it.get("match_id") or it.get("id"),
-            "status": (it.get("status") or "").lower(),
-            "scheduled_at": safe_int(it.get("scheduled_at")),
-            "started_at": safe_int(it.get("started_at")),
-            "finished_at": safe_int(it.get("finished_at")),
-            "team1_id": f1.get("faction_id"),
-            "team1_name": f1.get("name"),
-            "team2_id": f2.get("faction_id"),
-            "team2_name": f2.get("name"),
-            "team1_avatar": f1.get("avatar"),
-            "team2_avatar": f2.get("avatar"),
-            "team1_roster": f1.get("roster") or [],
-            "team2_roster": f2.get("roster") or [],
-        })
-    return out
-
-def _sync_division_one_pass(con: sqlite3.Connection, champ_row: dict, force: bool = False) -> None:
-    """
-    One pass over all matches (type=all). Ongoing are handled like scheduled.
-    Optimized to:
-      - Use SAVEPOINT/RELEASE per match, commit once per division (reduces fsyncs)
-      - Throttle progress bar updates (<=1 Hz) to cut stdout overhead
-      - Use single DB snapshot query for skip logic
-    """
-    fetch_id = champ_row.get("_fetch_championship_id") or champ_row["championship_id"]
-    matches = _list_matches_all(fetch_id)
-    div_title = champ_row.get("name") or champ_row.get("slug") or f"Div{champ_row.get('division_num','?')}-S{champ_row.get('season','?')}"
-    title = f"{div_title} — All"
-    total = len(matches)
-    if total == 0:
-        _progress_bar(title, 0, 0, time.time(), skipped=0)
+def _configure_logging(verbose: bool) -> None:
+    level = logging.DEBUG if verbose else logging.INFO
+    root = logging.getLogger()
+    if getattr(_configure_logging, "_configured", False):
+        root.setLevel(level)
         return
 
-    seen: set[str] = set()
-    skipped = 0
-    start_ts = time.time()
-    last_print = 0.0  # throttle progress updates
+    log_path = build_timestamped_log_path(LOG_DIR, prefix="sync")
 
-    for i, m in enumerate(matches, start=1):
-        mid = m.get("match_id")
-        if not mid or mid in seen:
-            # Throttled progress update
-            if (i == total) or (time.time() - last_print > 1.0):
-                _progress_bar(title, i, total, start_ts, skipped)
-                last_print = time.time()
-            continue
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-        # Early skip: BYE
-        if _is_bye_match_summary(m):
-            logging.info("[skip] bye match %s (%s vs %s)", mid, m.get("team1_name"), m.get("team2_name"))
-            seen.add(mid); skipped += 1
-            if (i == total) or (time.time() - last_print > 1.0):
-                _progress_bar(title, i, total, start_ts, skipped)
-                last_print = time.time()
-            continue
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(level)
 
-        # Single DB snapshot for all skip checks
-        snap = _db_match_snapshot(con, mid)
+    # Use a plain file handler so we don't split the log file by size.
+    from logging import FileHandler
+    file_handler = FileHandler(log_path, mode="a", encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(level)
 
-        # Skip finished+complete (maps+either player_stats or a 'forfeit' map)
-        if not force and SKIP_FINISHED_IN_DB and (snap["status"] in {"finished", "played", "closed"}) and (
-            snap["has_player_stats"] or (snap["has_any_map"] and snap["has_forfeit_map"])
-        ):
-            seen.add(mid); skipped += 1
-            if (i == total) or (time.time() - last_print > 1.0):
-                _progress_bar(title, i, total, start_ts, skipped)
-                last_print = time.time()
-            continue
+    root.setLevel(level)
+    root.handlers.clear()
+    root.addHandler(console_handler)
+    root.addHandler(file_handler)
 
-        # Non-past summary unchanged vs DB header → skip
-        tgt = m.get("_target_kind") or "upcoming"
-        if tgt != "past" and snap["exists"] and not force:
-            unchanged = (
-                (snap["status"] or "") == (m.get("status") or "").lower() and
-                (snap["scheduled_at"] or None) == (m.get("scheduled_at") or None) and
-                (snap["started_at"]   or None) == (m.get("started_at")   or None) and
-                (snap["finished_at"]  or None) == (m.get("finished_at")  or None) and
-                (snap["team1_id"]     or None) == (m.get("team1_id")     or None) and
-                (snap["team2_id"]     or None) == (m.get("team2_id")     or None)
-            )
-            if unchanged:
-                seen.add(mid); skipped += 1
-                if (i == total) or (time.time() - last_print > 1.0):
-                    _progress_bar(title, i, total, start_ts, skipped)
-                    last_print = time.time()
-                continue
-
-        # Persist with per-match SAVEPOINT; commit will be done once per division
-        seen.add(mid)
-        try:
-            con.execute("SAVEPOINT match_tx")
-            summary = m if tgt != "past" else None
-            persist_match(con, champ_row, mid, kind=tgt, summary=summary)
-            con.execute("RELEASE SAVEPOINT match_tx")
-        except Exception as e:
-            logging.warning("sync (all) %s failed: %s", mid, e)
-            try:
-                con.execute("ROLLBACK TO SAVEPOINT match_tx")
-            except Exception:
-                pass  # ignore nested rollback errors
-
-        # Throttled progress update
-        if (i == total) or (time.time() - last_print > 1.0):
-            _progress_bar(title, i, total, start_ts, skipped)
-            last_print = time.time()
-
-    # Single commit per division pass
+    # Ensure pruning runs after the new log file exists so the active file is preserved.
     try:
-        con.commit()
-    except Exception as e:
-        logging.warning("division commit failed: %s", e)
-
-def persist_match(con: sqlite3.Connection, champ_row: Dict[str, Any], match_id: str, kind: str, summary: Optional[Dict[str, Any]] = None) -> None:
-    details: Dict[str, Any] = {}
-    f1: Dict[str, Any] = {}
-    f2: Dict[str, Any] = {}
-
-    if kind != "past" and isinstance(summary, dict) and _is_bye_match_summary(summary):
-        logging.info("[skip] bye (summary) %s", match_id)
-        return
-
-    if kind != "past" and isinstance(summary, dict):
-        details = summary.get("_raw") or {}
-        f1 = {"name": summary.get("team1_name"), "avatar": summary.get("team1_avatar"), "roster": summary.get("team1_roster") or []}
-        f2 = {"name": summary.get("team2_name"), "avatar": summary.get("team2_avatar"), "roster": summary.get("team2_roster") or []}
-    else:
-        details = get_match_details(match_id) or {}
-        if _is_bye_match_details(details):
-            logging.info("[skip] bye (details) %s", match_id)
-            return
-        teams_d = details.get("teams") or {}
-        f1 = teams_d.get("faction1") or {}
-        f2 = teams_d.get("faction2") or {}
-        _persist_map_catalog_from_details(con, details, season=champ_row["season"])
-
-    # STATS
-    stats = {}
-    rounds = []
-    forfeit_like = False
-    if kind == "past":
         try:
-            stats = get_match_stats(match_id) or {}
-        except Exception as e:
-            logging.info("[skip] stats %s -> %s", match_id, e)
-            stats = {}
-        rounds = _extract_rounds_from_stats(stats)
-
-    has_detailed = isinstance(details.get("detailed_results"), list) and len(details.get("detailed_results") or []) > 0
-    has_score    = bool(((details.get("results") or {}).get("score") or {}))
-    forfeit_like = (kind == "past" and not rounds and (has_detailed or has_score))
-
-    demo_json = {}
-    if kind == "past" and not forfeit_like:
-        try:
-            demo_json = get_democracy_history(match_id) or {}
-        except Exception:
-            demo_json = {}
-
-    if kind == "past" and not rounds and not (has_detailed or has_score):
-        upsert_match(con, {
-            "match_id": match_id,
-            "championship_id": champ_row["championship_id"],
-            "status": "not_found",
-            "is_forfeit": 0,
-        })
-        return
-
-    # Team IDs (fallback to details.teams.* if needed)
-    team1_id, team2_id = _derive_team_ids(details or {}, rounds)
-
-    # Winner normalization
-    winner_raw = None
-    try:
-        res = (details.get("results") or {})
-        winner_raw = res.get("winner") or res.get("winner_team_id")
-    except Exception:
-        pass
-    winner_team_id = _normalize_team_ref(winner_raw, team1_id, team2_id)
-
-    # Upsert teams by season (names & avatars stored only in team_seasons)
-    if team1_id or (summary and summary.get("team1_name")) or f1.get("name"):
-        t1_name = summary.get("team1_name") if summary else f1.get("name")
-        t1_avatar = summary.get("team1_avatar") if summary else f1.get("avatar")
-        if team1_id:  # Only if we have a valid team ID
-            upsert_team_season(con, team1_id, champ_row["season"], t1_name, t1_avatar)
-    if team2_id or (summary and summary.get("team2_name")) or f2.get("name"):
-        t2_name = summary.get("team2_name") if summary else f2.get("name")
-        t2_avatar = summary.get("team2_avatar") if summary else f2.get("avatar")
-        if team2_id:  # Only if we have a valid team ID
-            upsert_team_season(con, team2_id, champ_row["season"], t2_name, t2_avatar)
-
-    # Bulk upsert rosters (players)
-    roster_players = []
-    if kind != "past" and summary:
-        for pr in (summary.get("team1_roster") or []):
-            roster_players.append({"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
-        for pr in (summary.get("team2_roster") or []):
-            roster_players.append({"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
-    else:
-        for fac in (f1, f2):
-            for pr in (fac.get("roster") or []):
-                roster_players.append({"player_id": pr.get("player_id"), "nickname": pr.get("nickname") or "", "updated_at": None})
-    if roster_players:
-        uniq = {}
-        for p in roster_players:
-            pid = p.get("player_id")
-            if pid:
-                uniq[pid] = p
-        upsert_players_bulk(con, list(uniq.values()))
-
-    configured_at = safe_int(
-        (details.get("configured_at") if isinstance(details, dict) else None) \
-        or (summary.get("_raw", {}).get("configured_at") if summary else None)
-    , None)
-
-    m = {
-        "match_id": match_id,
-        "championship_id": champ_row["championship_id"],
-        "configured_at": configured_at,
-        "round": safe_int(details.get("round"), None),
-        "best_of": safe_int(details.get("best_of"), None),
-        "started_at":  safe_int(summary.get("started_at")  if summary else details.get("started_at"),  None),
-        "finished_at": safe_int(summary.get("finished_at") if summary else details.get("finished_at"), None),
-        "scheduled_at":safe_int(summary.get("scheduled_at")if summary else details.get("scheduled_at"),None),
-        "status": (summary.get("status") if summary else details.get("status") or "").lower() or None,
-        "last_seen_at": int(time.time()),
-        "team1_id":   team1_id or (summary.get("team1_id") if summary else None),
-        "team2_id":   team2_id or (summary.get("team2_id") if summary else None),
-        "winner_team_id": winner_team_id,
-        "is_forfeit": 1 if forfeit_like else 0,
-    }
-    upsert_match(con, m)
-
-    if kind != "past":
-        return
-
-    # MAPS
-    map_rows = _extract_map_rows_from_stats(match_id, rounds)
-    for r in map_rows:
-        r["winner_team_id"] = _normalize_team_ref(r.get("winner_team_id"), team1_id, team2_id)
-
-    # Democracy
-    if not forfeit_like:
-        votes, picks = [], []
-        try:
-            for ticket in _map_tickets_from_democracy(demo_json):
-                for ent in (ticket.get("entities") or []):
-                    if not isinstance(ent, dict):
-                        continue
-                    status = (ent.get("status") or "").lower()
-                    sel = ent.get("selected_by")
-                    name = ent.get("guid") or ent.get("game_map_id") or ent.get("class_name") or ent.get("name")
-                    rnd = ent.get("round")
-                    votes.append({
-                        "round_num": rnd,
-                        "map_name": name,
-                        "status": "pick" if status == "selected" else status,
-                        "selected_by_faction": sel,
-                        "selected_by_team_id": _normalize_team_ref(sel, team1_id, team2_id),
-                    })
-                    if status in ("pick", "selected", "decider") and name:
-                        order_key = rnd if isinstance(rnd, int) else 10**9
-                        picks.append((order_key, name))
-        except Exception:
-            votes, picks = [], []
-
-        if votes:
-            votes.sort(key=lambda x: (x.get("round_num") is None, x.get("round_num"), x.get("map_name") or ""))
-            pick_like = sum(1 for v in votes if (v.get("status") or "") in ("pick","selected","decider"))
-            last = votes[-1]
-            if pick_like >= 3:
-                last["status"] = "decider"
-            else:
-                last["status"] = "overflow"
-                last["selected_by_team_id"] = None
-                last["selected_by_faction"] = None
-            upsert_map_votes(con, match_id, votes)
-
-        if picks:
-            picks.sort(key=lambda x: x[0])
-            names_in_order = []
-            for _, nm in picks:
-                if nm and nm not in names_in_order:
-                    names_in_order.append(nm)
-            for idx, name in enumerate(names_in_order, start=1):
-                if idx - 1 < len(map_rows):
-                    if not map_rows[idx - 1].get("map_name"):
-                        map_rows[idx - 1]["map_name"] = name
-                else:
-                    map_rows.append({
-                        "match_id": match_id,
-                        "round_index": idx,
-                        "map_name": name,
-                        "score_team1": None,
-                        "score_team2": None,
-                        "winner_team_id": None,
-                    })
-
-        if not any(r.get("map_name") for r in map_rows):
-            try:
-                picks2 = ((details.get("voting") or {}).get("map") or {}).get("pick") or []
-            except Exception:
-                picks2 = []
-            for idx, name in enumerate(picks2, start=1):
-                if idx - 1 < len(map_rows):
-                    if not map_rows[idx - 1].get("map_name"):
-                        map_rows[idx - 1]["map_name"] = name
-                else:
-                    map_rows.append({
-                        "match_id": match_id,
-                        "round_index": idx,
-                        "map_name": name,
-                        "score_team1": None,
-                        "score_team2": None,
-                        "winner_team_id": None,
-                    })
-
-    if forfeit_like:
-        map_rows = _extract_map_rows_from_details(match_id, details, team1_id, team2_id)
-
-    if map_rows:
-        upsert_maps(con, match_id, map_rows)
-
-    # PLAYER STATS
-    player_rows = _extract_player_rows(match_id, rounds)
-    # Upsert any players referenced by the stats to avoid FK failures
-    if player_rows:
-        players_from_stats = []
-        for r in player_rows:
-            pid = r.get("player_id")
-            if pid:
-                players_from_stats.append({"player_id": pid, "nickname": r.get("nickname") or "", "updated_at": None})
-        if players_from_stats:
-            # Bulk upsert is idempotent and uses ON CONFLICT to avoid duplicates
-            upsert_players_bulk(con, players_from_stats)
-
-    for r in player_rows:
-        r.pop("nickname", None)  # varmistus
-        r["team_id"] = _normalize_team_ref(r.get("team_id"), team1_id, team2_id)
-    player_rows = [r for r in player_rows if r.get("team_id")]
-    if player_rows:
-        upsert_player_stats(con, match_id, player_rows)
-
-# ---- main sync --------------------------------------------------------------
-
-def main(db_path: str, division_num: int = None, season: int = None, all_seasons: bool = False, playoffs_only: bool = False, clean: bool = False, vacuum: bool = False, cleanup_orphans: bool = False, update_teams: bool = False) -> None:
-    con = get_conn(db_path)
-    try:
-        init_db(con)
-        
-        # If --update-teams, fetch and update all team names/avatars from Faceit for all seasons
-        if update_teams:
-            cur = con.execute("SELECT DISTINCT team_id FROM team_seasons WHERE team_id IS NOT NULL ORDER BY team_id")
-            team_ids = [row[0] for row in cur.fetchall()]
-            total = len(team_ids)
-            print(f">> [UPDATE-TEAMS] Updating {total} teams from Faceit API...")
-            start_ts = time.time()
-            updated = 0
-            not_found = 0
-            failed = 0
-            for i, team_id in enumerate(team_ids, start=1):
-                try:
-                    team_data = get_team_details(team_id)
-                    if team_data:
-                        team_name = team_data.get("name") or team_data.get("nickname")
-                        team_avatar = team_data.get("avatar")
-                        
-                        # Update season-specific names for all seasons this team appears in
-                        season_rows = con.execute(
-                            """SELECT DISTINCT c.season FROM matches m 
-                               JOIN championships c ON c.championship_id = m.championship_id 
-                               WHERE (m.team1_id = ? OR m.team2_id = ?)
-                               ORDER BY c.season""",
-                            (team_id, team_id)
-                        ).fetchall()
-                        
-                        for season_row in season_rows:
-                            season = season_row[0]
-                            upsert_team_season(con, team_id, season, team_name, team_avatar)
-                        
-                        updated += 1
-                    else:
-                        # 404 - team deleted/private on Faceit
-                        not_found += 1
-                except Exception as e:
-                    logging.warning(f"Failed to update team {team_id}: {e}")
-                    failed += 1
-                if i % 10 == 0 or i == total:
-                    elapsed = time.time() - start_ts
-                    rate = i / elapsed if elapsed > 0 else 0
-                    eta = (total - i) / rate if rate > 0 else 0
-                    print(f"\r>> [{i}/{total}] updated={updated}, not_found={not_found}, failed={failed}, elapsed={int(elapsed)}s, ETA={int(eta)}s", end="", flush=True)
-            con.commit()
-            print(f"\n>> [UPDATE-TEAMS] Complete! Updated {updated} teams, {not_found} not found (404), {failed} errors.")
-            return
-        
-        # If --cleanup-orphans, remove unused teams and players
-        if cleanup_orphans:
-            # Delete orphaned team_seasons
-            orphaned_teams = con.execute("""
-                DELETE FROM team_seasons WHERE (team_id, season) NOT IN (
-                    SELECT DISTINCT t.team_id, c.season
-                    FROM (
-                        SELECT team1_id as team_id, championship_id FROM matches WHERE team1_id IS NOT NULL
-                        UNION
-                        SELECT team2_id, championship_id FROM matches WHERE team2_id IS NOT NULL
-                    ) t
-                    JOIN championships c ON c.championship_id = t.championship_id
-                )
-            """)
-            teams_deleted = orphaned_teams.rowcount
-            
-            # Delete orphaned players
-            orphaned_players = con.execute("""
-                DELETE FROM players WHERE player_id NOT IN (
-                    SELECT DISTINCT player_id FROM player_stats WHERE player_id IS NOT NULL
-                )
-            """)
-            players_deleted = orphaned_players.rowcount
-            
-            # Delete old map pool data
-            map_pool_deleted = con.execute("""
-                DELETE FROM map_pool_seasons WHERE season NOT IN (
-                    SELECT DISTINCT season FROM championships
-                )
-            """)
-            pool_deleted = map_pool_deleted.rowcount
-            
-            con.commit()
-            print(f">> [CLEANUP] Removed {teams_deleted} orphaned teams, {players_deleted} orphaned players, {pool_deleted} old map pool entries")
-            return
-        
-        # If --vacuum, optimize database and exit
-        if vacuum:
-            db_path_obj = Path(db_path)
-            size_before = db_path_obj.stat().st_size if db_path_obj.exists() else 0
-            print(f">> [VACUUM] Starting optimization... (current size: {size_before / 1024 / 1024:.2f} MB)")
-            con.execute("VACUUM")
-            con.commit()
-            size_after = db_path_obj.stat().st_size
-            saved = size_before - size_after
-            print(f">> [VACUUM] Complete! New size: {size_after / 1024 / 1024:.2f} MB (saved {saved / 1024 / 1024:.2f} MB)")
-            return
-        
-        # If --clean, delete all championships not in divisions.json and exit
-        if clean:
-            valid_champ_ids = {d["championship_id"] for d in DIVISIONS}
-            cursor = con.execute("SELECT championship_id FROM championships WHERE championship_id NOT IN ({})".format(
-                ",".join("?" * len(valid_champ_ids)) if valid_champ_ids else "NULL"
-            ), list(valid_champ_ids) if valid_champ_ids else [])
-            to_delete = [row[0] for row in cursor.fetchall()]
-            if to_delete:
-                placeholders = ",".join("?" * len(to_delete))
-                con.execute(f"DELETE FROM championships WHERE championship_id IN ({placeholders})", to_delete)
-                con.commit()
-                print(f">> [CLEAN] Deleted {len(to_delete)} championship(s) not in divisions.json")
-            else:
-                print(f">> [CLEAN] Database already matches divisions.json")
-            return
-
-        # Upsert championships from faceit_config.DIVISIONS
-        champs = []
-        for d in DIVISIONS:
-            # Season filtering
-            d_season = int(d.get("season", 0))
-            if all_seasons:
-                pass  # include all seasons
-            elif season is not None:
-                if d_season != season:
-                    continue  # skip seasons not matching the filter
-            else:
-                if d_season < CURRENT_SEASON:
-                    continue  # skip older seasons (unless --season or --all-seasons is set)
-            
-            # Division filtering
-            if division_num is not None and d.get("division_num") != division_num:
-                continue  # skip divisions not matching the filter
-            
-            # Playoff filtering
-            if playoffs_only and not d.get("is_playoffs"):
-                continue  # skip regular divisions when only playoffs requested
-            
-            row = upsert_championship(con, {
-                "championship_id": d["championship_id"],
-                "season": d["season"],
-                "division_num": d["division_num"],
-                "name": d["name"],
-                "is_playoffs": d.get("is_playoffs", 0),
-                "slug": d["slug"],
-            })
-            # Always fetch matches from the division list ID (even if DB has a legacy ID)
-            row["_fetch_championship_id"] = d["championship_id"]
-            champs.append(row)
-
-        # Walk through every division in a single pass per division
-        for c in champs:
-            _sync_division_one_pass(con, c, force=args.force)
-
-        print(">> [OK] Sync valmis")
-    finally:
-        # Sulje yhteys aina lopuksi
-        try:
-            con.close()
+            log_path.touch(exist_ok=True)
         except Exception:
             pass
+        prune_log_files(
+            log_dir=LOG_DIR,
+            file_glob="sync-*.log",
+            active_log_path=log_path,
+            max_age_days=int(os.environ.get("SYNC_LOG_MAX_AGE_DAYS", DEFAULT_LOG_MAX_AGE_DAYS)),
+            max_total_bytes=int(os.environ.get("SYNC_LOG_MAX_TOTAL_BYTES", DEFAULT_LOG_MAX_TOTAL_BYTES)),
+            logger=logging.getLogger("pappaliiga.sync"),
+        )
+    except Exception:
+        logging.getLogger("pappaliiga.sync").exception("Log pruning failed")
+    _configure_logging._configured = True
+
+
+def build_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Pappaliiga Faceit sync (async MariaDB pipeline)")
+    parser.add_argument("--create-schema", action="store_true", help="Create database schema if missing")
+    parser.add_argument("--reset-db", action="store_true", help="Drop and recreate schema (dev only)")
+    parser.add_argument("--force-reset", action="store_true", help="Confirm destructive --reset-db")
+    parser.add_argument("--championship-id", default=None, help="Sync only the provided championship")
+    parser.add_argument("--match-id", default=None, help="Resync a single match")
+    parser.add_argument("--full", action="store_true", help="Force full resync for the selected championship")
+    parser.add_argument("--all-seasons", action="store_true", help="Sync all seasons (default: current season only)")
+    parser.add_argument("--season", type=int, default=None, help="Sync only the provided season number (overrides --all-seasons)")
+    parser.add_argument("--verify", action="store_true", help="Run post-sync verification queries")
+    parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
+    parser.add_argument("--refresh-divisions", action="store_true", help="Refresh divisions.json from Faceit before syncing")
+    parser.add_argument(
+        "--refresh-min-season",
+        type=int,
+        default=faceit_config.DEFAULT_CURRENT_SEASON,
+        help=f"Minimum season to include when refreshing divisions (default: {faceit_config.DEFAULT_CURRENT_SEASON})",
+    )
+    parser.add_argument("--refresh-dry-run", action="store_true", help="Run the division refresh without writing to disk")
+    parser.add_argument("--refresh-allow-empty", action="store_true", help="Allow new divisions with no registered teams")
+    parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=10,
+        help="Maximum number of divisions to sync concurrently (default: 10)",
+    )
+    parser.add_argument(
+        "--max-db-concurrency",
+        type=int,
+        default=getattr(faceit_config, "MAX_DB_WRITER_CONCURRENCY", 3),
+        help="Maximum number of concurrent DB writer tasks (default: MAX_DB_WRITER_CONCURRENCY)",
+    )
+    parser.add_argument(
+        "--max-match-concurrency",
+        type=int,
+        default=getattr(faceit_config, "MAX_MATCH_SYNC_CONCURRENCY", 4),
+        help="Maximum number of matches to sync concurrently within one championship",
+    )
+    parser.set_defaults(validate_avatars=False)
+    parser.add_argument(
+        "--validate-avatars",
+        dest="validate_avatars",
+        action="store_true",
+        help="Enable outbound avatar URL validation during sync (disabled by default for performance)",
+    )
+    parser.add_argument(
+        "--skip-avatar-validation",
+        dest="validate_avatars",
+        action="store_false",
+        help=argparse.SUPPRESS,
+    )
+    return parser
+
+
+def _is_refresh_only(args: argparse.Namespace) -> bool:
+    """Return True when caller only requested division refresh."""
+    if not args.refresh_divisions:
+        return False
+    has_sync_target = any(
+        [
+            args.match_id,
+            args.championship_id,
+            args.all_seasons,
+            args.season is not None,
+        ]
+    )
+    has_setup_task = any([args.create_schema, args.reset_db, args.verify])
+    return not has_sync_target and not has_setup_task
+
+
+async def _verify_counts() -> None:
+    tables = [
+        "matches",
+        "maps",
+        "player_stats",
+        "team_stats",
+        "player_season_totals",
+        "team_season_totals",
+    ]
+    for table in tables:
+        count = await fetch_val(f"SELECT COUNT(*) AS c FROM {table}", default=0)
+        LOGGER.info("%s rows: %s", table, count)
+
+    inconsistent_forfeits = await fetch_val(
+        """
+        SELECT COUNT(*)
+        FROM matches m
+        WHERE m.is_forfeit = 1
+          AND EXISTS (
+            SELECT 1 FROM maps mp
+            WHERE mp.match_id = m.match_id AND mp.is_forfeit = 0
+          )
+        """,
+        default=0,
+    )
+    if inconsistent_forfeits:
+        LOGGER.warning("%s forfeited matches contain non-forfeit maps", inconsistent_forfeits)
+
+    ignored_matches = await fetch_val(
+        "SELECT COUNT(*) FROM matches WHERE ignored_due_ban = 1",
+        default=0,
+    )
+    if ignored_matches:
+        LOGGER.info("%s matches flagged ignored_due_ban", ignored_matches)
+
+
+def _resolve_targets(championship_id: str | None, all_seasons: bool = False, season: int | None = None) -> Sequence[str]:
+    if championship_id:
+        return [championship_id]
+
+    # If explicit season provided, use that (overrides all_seasons)
+    if season is not None:
+        season_divisions = [item["championship_id"] for item in faceit_config.DIVISIONS if item.get("season") == season]
+        LOGGER.info("Syncing Season %s divisions (%d total)", season, len(season_divisions))
+        return season_divisions
+
+    if all_seasons:
+        # Return all championships from all seasons
+        LOGGER.info("All seasons requested - syncing all divisions from all seasons (%d total)", len(faceit_config.DIVISIONS))
+        return [item["championship_id"] for item in faceit_config.DIVISIONS]
+
+    # Default to current season only
+    current_season_divisions = [
+        item["championship_id"] for item in faceit_config.DIVISIONS 
+        if item.get("season") == faceit_config.CURRENT_SEASON
+    ]
+
+    LOGGER.info("No specific championship provided - syncing all Season %d divisions (%d total)", 
+                faceit_config.CURRENT_SEASON, len(current_season_divisions))
+    return current_season_divisions
+
+
+async def main_async(args: argparse.Namespace) -> int:
+    diagnostics = SyncDiagnostics()
+    await diagnostics.start()
+    try:
+        return await _main_async_impl(args, diagnostics)
+    finally:
+        await diagnostics.stop()
+
+
+async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostics) -> int:
+    if args.force_reset and not args.reset_db:
+        LOGGER.error("--force-reset must be used together with --reset-db")
+        return 2
+
+    max_db_concurrency = max(1, args.max_db_concurrency)
+    db_semaphore = asyncio.Semaphore(max_db_concurrency)
+    expected_conn_per_worker = max(1, getattr(faceit_config, "DB_CONNECTIONS_PER_WORKER", 3))
+    concurrency_budget = max(max_db_concurrency, max(1, args.max_concurrency))
+    recommended_pool = concurrency_budget * expected_conn_per_worker
+    configured_pool_max = getattr(faceit_config, "DB_POOL_MAX_SIZE", recommended_pool)
+    if configured_pool_max < recommended_pool:
+        LOGGER.warning(
+            "Configured DB pool max (%d) is lower than recommended (%d) for concurrency (workers=%d, conn/worker=%d). "
+            "Consider lowering --max-db-concurrency or increasing DB_POOL_MAX_SIZE.",
+            configured_pool_max,
+            recommended_pool,
+            concurrency_budget,
+            expected_conn_per_worker,
+        )
+
+    if args.reset_db:
+        if not args.force_reset:
+            LOGGER.error("--reset-db requires --force-reset to avoid accidental data loss")
+            return 2
+        LOGGER.warning("=" * 70)
+        LOGGER.warning("DROPPING ALL TABLES AND RECREATING SCHEMA")
+        LOGGER.warning("This will DELETE ALL DATA in the database")
+        LOGGER.warning("=" * 70)
+        await reset_db_async(confirm=True)
+        LOGGER.info("All tables dropped successfully")
+        await create_schema_async(force=True)
+        LOGGER.info("Schema recreated from %s", Path(__file__).with_name("mariadb_schema.sql"))
+        # Do not proceed to syncing when performing a reset. Optionally run verify, then exit.
+        if args.verify:
+            await _verify_counts()
+        LOGGER.info("Database reset complete. Run sync.py to populate data.")
+        await shutdown_clients()
+        return 0
+
+    await reset_rate_limit_stats()
+
+    if args.refresh_divisions:
+        min_season = args.refresh_min_season if args.refresh_min_season is not None else faceit_config.DEFAULT_CURRENT_SEASON
+        min_new_division_teams = 0 if args.refresh_allow_empty else 1
+        try:
+            refresh_result = await refresh_divisions(
+                min_season=min_season,
+                min_new_division_teams=min_new_division_teams,
+                dry_run=args.refresh_dry_run,
+            )
+        except Exception as exc:
+            LOGGER.exception("Failed to refresh divisions: %s", exc)
+            return 1
+
+        LOGGER.info(
+            "Division refresh complete: total=%d, new=%d, changed=%s",
+            refresh_result.total,
+            refresh_result.created,
+            refresh_result.changed,
+        )
+        if refresh_result.new_championship_ids:
+            LOGGER.info(
+                "New championships: %s",
+                ", ".join(refresh_result.new_championship_ids),
+            )
+        if refresh_result.skipped_championship_ids:
+            LOGGER.info(
+                "Skipped championships lacking teams: %s",
+                ", ".join(refresh_result.skipped_championship_ids),
+            )
+        if args.refresh_dry_run:
+            LOGGER.info("Dry run requested - divisions.json left unchanged.")
+        else:
+            LOGGER.info("Updated divisions written to %s", refresh_result.output_path)
+
+        if _is_refresh_only(args):
+            LOGGER.info("Refresh-only invocation detected; skipping sync pipeline.")
+            await shutdown_clients()
+            return 0
+
+    # Always use non-force schema ensure in normal sync flow. The migration helper
+    # still creates missing tables/columns/indexes without re-running the whole SQL script.
+    await create_schema_async(force=False)
+
+    overrides = load_division_overrides()
+    max_concurrency = max(1, args.max_concurrency)
+
+    if args.match_id:
+        LOGGER.info("Refreshing single match %s", args.match_id)
+        try:
+            championship_id = await update_single_match_async(
+                args.match_id,
+                validate_avatars=bool(args.validate_avatars),
+                diagnostics=diagnostics,
+            )
+            if championship_id:
+                LOGGER.info("Match %s refreshed (championship %s)", args.match_id, championship_id)
+        except Exception as exc:
+            LOGGER.exception("Failed to refresh match %s: %s", args.match_id, exc)
+            return 1
+    else:
+        targets = _resolve_targets(args.championship_id, args.all_seasons, season=args.season)
+        total_start_time = time.perf_counter()
+        total_synced_matches = 0
+        total_skipped_matches = 0
+
+        division_lookup = {str(item["championship_id"]): item for item in faceit_config.DIVISIONS}
+        championships_by_season: dict[int, list[dict[str, Any]]] = {}
+        championship_rows: list[dict[str, Any]] = []
+        seen_championships: set[str] = set()
+
+        for championship_id in targets:
+            if championship_id in seen_championships:
+                continue
+            seen_championships.add(championship_id)
+            division = division_lookup.get(championship_id)
+            if not division:
+                LOGGER.warning("Division metadata missing for championship %s - skipping", championship_id)
+                continue
+            season = division.get("season")
+            if season is None:
+                LOGGER.warning("Division %s missing season - skipping", championship_id)
+                continue
+            entry = {"championship_id": championship_id, "division": division}
+            championships_by_season.setdefault(season, []).append(entry)
+            division_num = division.get("division_num")
+            is_playoffs = division.get("is_playoffs")
+            fallback_slug = f"div{division_num}-s{season}"
+            division_name = build_division_name(season, division_num, is_playoffs)
+            championship_rows.append(
+                {
+                    "championship_id": championship_id,
+                    "season": season,
+                    "division_num": division_num,
+                    "name": division_name,
+                    "is_playoffs": 1 if is_playoffs else 0,
+                    "slug": division.get("slug") or fallback_slug,
+                }
+            )
+
+        LOGGER.info(
+            "Starting sync for %d championship(s) across %d season(s)",
+            len(championship_rows),
+            len(championships_by_season),
+        )
+
+        if championship_rows:
+            upsert_start = time.perf_counter()
+            try:
+                async with connection() as conn:
+                    await upsert_championships_async(conn, championship_rows)
+                upsert_elapsed = time.perf_counter() - upsert_start
+                log_stage(
+                    LOGGER,
+                    "upsert_championships",
+                    upsert_elapsed,
+                    counts={"championships": len(championship_rows)},
+                    prefix="bootstrap",
+                )
+            except Exception:
+                LOGGER.exception("Unexpected error while upserting championships - continuing with sync")
+
+        # Process each season
+        abort_exc: Exception | None = None
+
+        for season in sorted(championships_by_season.keys()):
+            season_start_time = time.perf_counter()
+            season_synced_matches = 0
+            season_skipped_matches = 0
+            season_championships = championships_by_season[season]
+
+            LOGGER.info("=== SEASON %d SYNC START ===", season)
+            LOGGER.info("Processing %d divisions for Season %d", len(season_championships), season)
+
+            sem = asyncio.Semaphore(max_concurrency)
+
+            async def sync_division(entry: dict[str, Any]) -> ChampionshipSyncResult:
+                async with sem:
+                    championship_id = entry["championship_id"]
+                    division = entry["division"]
+                    division_name = build_division_name(
+                        division.get("season"),
+                        division.get("division_num"),
+                        division.get("is_playoffs"),
+                    )
+                    LOGGER.info("Syncing championship %s (%s)", championship_id, division_name)
+                    try:
+                        result = await sync_championship_async(
+                            championship_id,
+                            full=args.full,
+                            overrides=overrides,
+                            division=division,
+                            end_on_error=True,
+                            db_semaphore=db_semaphore,
+                            max_match_concurrency=max(1, int(args.max_match_concurrency)),
+                            validate_avatars=bool(args.validate_avatars),
+                            diagnostics=diagnostics,
+                        )
+                        LOGGER.info(
+                            "Synced %s matches for %s (skipped %s)",
+                            len(result.synced_match_ids),
+                            division_name,
+                            result.skipped_matches,
+                        )
+                        return result
+                    except Exception as exc:
+                        LOGGER.exception("Championship sync failed for %s: %s", championship_id, exc)
+                        raise
+
+            try:
+                season_results = await asyncio.gather(
+                    *(sync_division(entry) for entry in season_championships)
+                )
+            except Exception as exc:
+                abort_exc = exc
+                LOGGER.error("Aborting remaining syncs after division failure (season %s)", season)
+                break
+
+            processed_championships = 0
+            for result in season_results:
+                processed_championships += 1
+                season_synced_matches += len(result.synced_match_ids)
+                season_skipped_matches += result.skipped_matches
+                total_synced_matches += len(result.synced_match_ids)
+                total_skipped_matches += result.skipped_matches
+
+            season_elapsed = time.perf_counter() - season_start_time
+            LOGGER.info("=== SEASON %d SYNC COMPLETED ===", season)
+            LOGGER.info(
+                "Season %d: %d divisions, %d synced matches, %d skipped matches in %s",
+                season,
+                len(season_championships),
+                season_synced_matches,
+                season_skipped_matches,
+                format_hms(season_elapsed),
+            )
+            if processed_championships:
+                LOGGER.info(
+                    "Season %d averages: %s/division, %s/synced match",
+                    season,
+                    format_hms(season_elapsed / processed_championships),
+                    format_hms(season_elapsed / max(season_synced_matches or 1, 1)),
+                )
+            LOGGER.info("")
+
+            if abort_exc:
+                break
+
+        total_elapsed = time.perf_counter() - total_start_time
+        if len(targets) > 1:
+            LOGGER.info("=== FULL SYNC COMPLETED ===")
+            LOGGER.info(
+                "Total: %d seasons, %d championships, %d synced matches (%d skipped) in %s",
+                len(championships_by_season),
+                len(targets),
+                total_synced_matches,
+                total_skipped_matches,
+                format_hms(total_elapsed),
+            )
+            LOGGER.info(
+                "Overall averages: %s/championship, %s/synced match",
+                format_hms(total_elapsed / max(len(targets), 1)),
+                format_hms(total_elapsed / max(total_synced_matches or 1, 1)),
+            )
+
+    rate_stats = await get_rate_limit_stats()
+    throttle_hits = int(rate_stats.get("throttle_hits", 0))
+    throttle_wait = float(rate_stats.get("throttle_wait_seconds", 0.0))
+    hourly_events = int(rate_stats.get("hourly_wait_events", 0))
+    hourly_wait = float(rate_stats.get("hourly_wait_seconds", 0.0))
+    pacer_events = int(rate_stats.get("pacer_wait_events", 0))
+    pacer_wait = float(rate_stats.get("pacer_wait_seconds", 0.0))
+    total_requests = int(rate_stats.get("request_count_total", 0))
+    avg_per_minute = float(rate_stats.get("average_requests_per_minute", 0.0))
+
+    if total_requests:
+        LOGGER.info(
+            "Faceit API requests this run: %d (avg %.1f/min)",
+            total_requests,
+            avg_per_minute,
+        )
+    if throttle_hits:
+        LOGGER.info(
+            "Faceit rate limits encountered %d time(s); cumulative enforced wait %s",
+            throttle_hits,
+            format_hms(throttle_wait),
+        )
+    else:
+        LOGGER.info("Faceit rate limits were not encountered during this run")
+
+    if hourly_events:
+        LOGGER.info(
+            "Hourly cap enforced %d time(s); cumulative scheduled wait %s",
+            hourly_events,
+            format_hms(hourly_wait),
+        )
+    if pacer_events:
+        LOGGER.info(
+            "Global request pacing delayed %d request(s); cumulative pacing wait %s",
+            pacer_events,
+            format_hms(pacer_wait),
+        )
+
+    if args.verify and not abort_exc:
+        await _verify_counts()
+
+    await shutdown_clients()
+    if abort_exc:
+        return 1
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_argument_parser()
+    args = parser.parse_args(argv)
+    _configure_logging(args.verbose)
+    defaults = {
+        action.dest: action.default
+        for action in parser._actions
+        if action.option_strings and action.default is not argparse.SUPPRESS
+    }
+    provided_args = {
+        key: value
+        for key, value in vars(args).items()
+        if key in defaults and value != defaults[key]
+    }
+    if provided_args:
+        LOGGER.info("Invocation parameters: %s", provided_args)
+    try:
+        return asyncio.run(main_async(args))
+    except KeyboardInterrupt:
+        LOGGER.warning("Interrupted by user")
+        return 130
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="Sync Pappaliiga data into SQLite (championship-centric).")
-    p.add_argument("--db", default=str(Path(__file__).with_name("pappaliiga.db")),
-                   help="SQLite path (default: pappaliiga.db next to this file)")
-    p.add_argument("--div", type=int, metavar="N",
-                   help="Sync only division N (e.g., --div 1 for Division 1)")
-    p.add_argument("--season", type=int, metavar="N",
-                   help="Sync only season N (e.g., --season 11); requires --div or --all-seasons to be useful")
-    p.add_argument("--all-seasons", action="store_true",
-                   help="Sync all seasons (default: only current season)")
-    p.add_argument("--force", action="store_true",
-                   help="Force re-sync all matches, bypassing optimization checks (slower but complete refresh)")
-    p.add_argument("--po", dest="playoffs_only", action="store_true",
-                   help="Sync only playoffs (use with --div to sync playoff division only)")
-    p.add_argument("--clean", action="store_true",
-                   help="Delete all championships from DB not in divisions.json before syncing")
-    p.add_argument("--cleanup-orphans", action="store_true",
-                   help="Remove orphaned teams, players, and old map pool data")
-    p.add_argument("--vacuum", action="store_true",
-                   help="Optimize database file size by reclaiming unused space (run after --clean)")
-    p.add_argument("--update-teams", action="store_true",
-                   help="Fetch and update all team avatars/names from Faceit Teams API")
-    args = p.parse_args()
-    main(args.db, args.div, args.season, args.all_seasons, args.playoffs_only, args.clean, args.vacuum, args.cleanup_orphans, args.update_teams)
+    sys.exit(main())

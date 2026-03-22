@@ -1,150 +1,109 @@
-# ⚠️ **DO NOT EDIT FILES IN `docs/` DIRECTLY**
+# Pappaliiga Stats – AI Agent Playbook
 
-All source changes to CSS/JS must be made in `web_static/` and copied to `docs/` using `copy_static.bat`. The `docs/` directory is auto-generated and will be overwritten. Manual edits to `docs/` will be lost and may break the site.
+## Overview
+- Data sync: async pipeline in `sync.py`/`sync_pipeline.py` pulls Faceit Open + Democracy APIs via `faceit_client_async.py`, writes to MariaDB through `db_async.py`, and refreshes divisions via `division_registry.py` → `divisions.json`.
+- API: FastAPI app in `api/main.py` (uvicorn serves SPA + API); routers in `api/routers/*` delegate to `api/services/*`; async DB ops end-to-end.
+- Frontend: Vue 3 SPA in `frontend/static`, Pinia stores, Vue Router history mode, no build step; served by uvicorn.
 
-# Pappaliiga Stats Generator - AI Agent Instructions
+## Runbook
+### Start dev server
+- Windows: `./scripts/dev_start_simple.ps1 -Port 8000 -VenvPath "./venv/Scripts/Activate.ps1"`
+- WSL/macOS/Linux: `./scripts/dev_start_simple.sh 8000 .venv/bin/activate`
+- Manual: `python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000`
 
-## Project Overview
-CS2 tournament statistics generator for Pappaliiga (Finnish esports league). Fetches data from Faceit API, stores in SQLite, generates static HTML pages for GitHub Pages hosting.
+### Sync data
+- Current season: `python sync.py`
+- Specific season: `python sync.py --season <n>`
+- Specific championship: `python sync.py --championship-id <cid>`
+- Specific match: `python sync.py --match-id <match>`
+- All seasons: `python sync.py --all-seasons`
+- Refresh divisions first: `--refresh-divisions [--refresh-min-season N --refresh-dry-run --refresh-allow-empty]`
+- Concurrency: `--max-concurrency` (fetch) and `--max-db-concurrency` (writers)
 
-## Architecture & Data Flow
-- **sync.py**: Fetches championship/match data from Faceit API → SQLite database (⚠️ **Future: migrate to async**)
-- **html_gen.py**: Reads SQLite → generates division HTML pages (fully async)
-- **Output**: Static HTML files in `docs/` for GitHub Pages deployment
-- **Database**: Single SQLite file (`pappaliiga.db`) with championship-centric schema
+### Diagnostics and DB utilities
+- Sync logs: `logs/` (rotation enabled)
+- Runtime diagnostics: `SYNC_DIAGNOSTICS` → `logs/runtime_diagnostics.jsonl`
+- Quick counts: `scripts/db_diag.py --season N`
+- DB utilities: `python tools/check_db_connection.py` | `python tools/apply_schema.py` | `python tools/recompute_totals.py --championship-id <cid>`
 
-## Key Components
+## Backend Conventions
+- Async-only; wrap DB work with `connection()` or `readonly_connection()` in `db_async.py`.
+- Use `db_async.py` bulk helpers (`upsert_*`, `replace_map_votes_async`, `clear_obsolete_maps_async`); guard custom writes with `_retry_on_deadlock(..., max_attempts=3)`.
+- Keep routers thin; business logic in `api/services/*`.
+- Cache expensive aggregates with `AsyncTTLCache` when reused.
+- Faceit access: `faceit_client_async.py` enforces 10k/hr + adaptive backoff (max 8 concurrent HTTP requests); avoid bypassing it.
+- Pool sizing: asyncmy defaults min 2 / max 30; sync workers expect `DB_CONNECTIONS_PER_WORKER` (default 3) and `MAX_DB_WRITER_CONCURRENCY` (default 6); `DB_POOL_DEBUG` enables pool tracing.
+- Standings: use `standings_utils.calculate_standings()` (official tiebreakers). `_calculate_h2h_stats()` in `teams_service.py` computes head-to-head stats.
 
-### Configuration System
-- `faceit_config.py`: API keys (env: `FACEIT_API_KEY`), season constants
-- `divisions.json`: Championship metadata (IDs, slugs, division numbers)
-- Schema: `championships` table is the core entity, matches/teams/players join to it
+## Data & Schema Notes
+- Championships include `is_playoffs`, `slug`, `parent_championship_id`, `winner_team_id`. Playoffs auto-link to regular-season parents by slug match in `sync_pipeline.py`.
+- `division_registry.py` discovers championships and writes `divisions.json`; `faceit_config` exposes `DIVISIONS` and `CURRENT_SEASON`.
+- `division_overrides.json` marks banned/quit teams; matches they touch set `ignored_due_ban=1` and are excluded from stats.
+- Match normalization in `sync_pipeline.py` merges Faceit `rounds`/`detailed_results`, detects forfeits, stores map votes, and writes map/team/player totals; pending matches are re-checked about every 15 minutes.
+- Schema: computed columns in `player_stats`/`team_stats` derive metrics; `maps_catalog` stores display metadata; `maps` rows flag `is_forfeit` per map.
 
-### Async Patterns (Critical)
-- **async_db.py**: Connection pooling, all DB operations have async equivalents
-- **html_gen.py**: Async file I/O with aiofiles, concurrent division processing
-- **Future Goal**: Migrate `sync.py` to async for consistency (currently sync DB ops)
-- Use async patterns for all new code and when refactoring existing components
+### Totals tables (performance-critical)
+- Regular season (`is_playoffs=0`): use `player_season_totals`, `team_season_totals`, `player_map_season_totals`, `team_map_season_totals` for summary/leaderboard/table data.
+- Playoffs (`is_playoffs=1`): totals tables are not reliable; use `matches`, `maps`, `player_stats`, `team_stats` scoped by `championship_id`.
+- Progression charts: use `*_prev` snapshot tables ordered by `snapshot_ts`.
 
-### Database Schema Patterns
-- Championship-centric: `championship_id` is primary foreign key
-- Slugs for stable URLs: `div1-s11`, `div1-s11-po` (playoffs)
-- Per-map stats: `map_team_stats`, `map_player_stats` tables
-- Map voting: `map_votes` tracks veto/pick sequences
+### Snapshot policy
+- On finished match for a division: create a `division_snapshots` row (with `match_id`) and insert snapshot rows into `*_prev` tables for affected teams/players/maps.
 
-## Development Workflows
+## Frontend (Vue SPA)
+- Routes (history mode): `/`, `/seasons`, `/division/:championshipId`, `/division/:championshipId/playoffs`, `/team/:teamId`, `/team/:championshipId/:teamId`, `/player/:playerId`.
+- Data flow: Pinia stores in `frontend/static/stores/*` (notably `useTeamStore`, `useSeasonsStore`, `useDivisionStore`).
+- `TeamDetail` component in `components/TeamDetail.js` uses `apiClient.getTeamPage(teamId, championshipId)` and mirrors the `championship` query for sharable links.
+- Season selector defaults to latest; use championship names to differentiate playoffs vs regular.
+- API base resolves at runtime (`window.PL_API_URL` or `window.__API_BASE__` or origin + `/api`).
 
-### Data Pipeline Commands
-```bash
-# Full refresh (daily in CI)
-python sync.py && python html_gen.py --force
+### SPA navigation & caching guardrails (important)
+- Never `return` early from route watchers right after route normalization (`router.replace`) if data fetch should still run.
+- When route params change quickly, guard async loaders with request tokens so stale responses cannot overwrite the latest view state.
+- Prefer remount safety for detail pages on param changes:
+	- app-level `router-view` keyed by route name + params (`frontend/static/app-main.js`)
+	- local `:key` on detail wrappers when needed (e.g. `TeamDetailView`).
+- In-flight keys must include route context (team/player + championship) so SPA transitions do not reuse wrong pending work.
+- Team store fetches should await active in-flight promise before deciding freshness; avoid returning stale `entry.page.data` while another championship is loading.
+- Demo links:
+	- probe results should be strict (do not treat 429 as “exists”)
+	- avoid aggressive duplicate probe retries that spike rate limits
+	- 2D replay links should open in a new tab without redirecting the current tab.
+- Hosted Linux/proxy deployments: persistent browser cache must be build-versioned (`PL_BUILD_ID`), and static responses should use no-store headers to avoid stale JS after deploy.
 
-# Quick local updates
-python html_gen.py                    # skips unchanged files
-python html_gen.py --div 1           # single division
+## Common Pitfalls
+1) Exceeding DB pool budget when raising `--max-concurrency`/`--max-db-concurrency` without bumping `DB_POOL_MAX_SIZE`.
+2) Skipping `_retry_on_deadlock` or bypassing `db_async.py` helpers for writes.
+3) Losing playoff linkage or `winner_team_id`; use nulls instead of bad IDs to satisfy FK constraints.
+4) Forgetting banned-team handling—set `ignored_due_ban` so stats exclude those matches.
+5) Bypassing `faceit_client_async.py` (ignores limiter) or running sync without diagnostics (`SYNC_DIAGNOSTICS`).
+6) Breaking SPA deep links—keep backend fallback in place and include `championship` query on team links inside a division.
+7) SPA stale-state regressions after internal navigation: route watcher early-returns, non-contextual in-flight keys, or missing request-token guards can make views require F5.
+8) Hosted env mismatch vs local: stale localStorage/API cache or proxy/static caching can hide fresh frontend fixes until hard refresh.
+
+## Key Files
+- Data sync: `sync.py`, `sync_pipeline.py`, `division_registry.py`, `faceit_client_async.py`, `division_overrides.json`.
+- DB layer: `db_async.py`, `mariadb_schema.sql`.
+- Standings: `standings_utils.py` (official tiebreaker logic with h2h support).
+- API: `api/main.py`, routers `api/routers/{seasons,season_view,divisions,championships,teams,players,matches,stats,maps_catalog,image_proxy}.py`, services `api/services/{seasons_service,season_view_service,season_aggregates,stats_service,teams_service,players_service,matches_service,divisions_service,player_counts}.py`.
+- Frontend: `frontend/static/app-main.js`, `frontend/static/api-client.js`, views `frontend/static/views/{HomeView.js,SeasonsView.js,DivisionView.js,TeamDetailView.js,PlayerView.js}`, stores `frontend/static/stores/{useHomeStore,useSeasonsStore,useDivisionStore,useTeamStore,usePlayerStore}.js`, components under `frontend/static/components/`.
+
+## Environment
+Required (`.env` in repo root):
 ```
-
-### Debugging Tools
-- `debug_raw.py --match MATCH_ID`: Raw Faceit API responses
-- `debug_match_players.py`: Player stats analysis for specific match
-- `serve_docs.bat`: Local HTTP server for testing generated HTML
-- `log_server.py`: Local HTTP server for collecting client-side debug logs
-- `copy_static.bat`: Utility to copy `web_static/` files to `docs/`
-
-### Windows Batch Helpers
-- `run_all.bat`: Complete sync + generate cycle
-- `serve_docs.bat`: Local development server (hardcoded IP binding)
-- `copy_static.bat`: Copy static assets from `web_static/` to `docs/`
-
-### Local Development & Testing
-- **LAN Testing**: Bind servers to LAN IP (192.168.0.13) for multi-device testing
-- **Client Logging**: `sendClientLog()` function posts debug events to `log_server.py`
-- **Log Events**: 'toggle-start', 'opening', 'closing', 'forced-collapse', 'class-removed'
-- **Static Asset Workflow**: Edit in `web_static/` → run `copy_static.bat` → test in `docs/`
-
-## Code Conventions
-
-### Error Handling Patterns
-- Faceit API: Graceful degradation, log warnings but continue processing
-- Database: Foreign key constraints enforced, upsert patterns everywhere
-- Async operations: Use connection pools, handle aiosqlite properly
-
-### HTML Generation
-- Template versioning: `HTML_TEMPLATE_VERSION` constant for cache busting
-- Content diffing: Compares generated vs existing files to skip unchanged
-- CSS/JS externalized: `styles.css`, `app.js` shared across all pages
-
-## File Organization
-- `docs/`: **AUTO-GENERATED** HTML output (GitHub Pages root) - **DO NOT EDIT MANUALLY**
-- `web_static/`: Source CSS/JS files - edit these, then copy to `docs/` when modified
-- All content in `docs/` is regenerated by `html_gen.py` and static assets are copied by `copy_static.bat`
-
-## External Dependencies
-- **Faceit Open Data API**: Match details, player stats
-- **Faceit Democracy API**: Map veto history
-- **GitHub Actions**: Daily scheduled sync (secrets: `FACEIT_API_KEY`)
-
-## Common Patterns
-- Function naming: `compute_*_async()` for async aggregations
-- Database queries: Use `query_async()` wrapper with proper connection handling
-- HTML escaping: Always escape user data with `html.escape()`
-- Timezone handling: UTC storage, Finnish display (`Europe/Helsinki`)
-
-## UI/UX Patterns
-
-### Visual Design System
-- **Dark theme**: CSS custom properties in `:root` define color palette (`--bg`, `--card`, `--accent`, etc.)
-- **Card-based layout**: `.stat-card`, `.hero-card`, `.card` classes with consistent styling
-- **Index page**: Dual hero cards (AFI + Pappaliiga), stats overview grid, season navigation
-- **Division pages**: Team navigation bar with logos, collapsible team/match sections
-
-### Interactive Elements
-- **Collapsible sections**: Use `<details>` with custom JavaScript animations
-  - Team sections: `.team-section` with `custom-expanded` class for state management
-  - Match details: `.match-row` within `.matches-mirror` containers
-  - All sections start collapsed, expand with smooth height/opacity transitions
-  - **Critical**: Remove resize listener (`window.addEventListener('resize', adaptDetails)`) to prevent mobile collapse issues
-- **Table sorting**: `sortTable()` function with visual indicators and persistent state
-- **Responsive filters**: Show/hide played-only matches with checkbox controls
-- **Progress bars**: Smooth shimmer animation with opacity transitions (avoid class toggling that resets animation)
-
-### JavaScript Patterns
-- **Custom animations**: Override default `<details>` behavior with `custom-expanded` class
-- **Mobile/PC compatibility**: Event handling works across devices with touch/click
-  - Use precise touch detection (max movement: 8px, max time: 400ms)
-  - Suppress synthetic click events after touch with `_isTouch` flag
-  - Single event handler per summary with `dataset.hasSummaryListener` guard
-- **Team navigation**: Auto-expand target sections when clicking team links (`#team-{id}`)
-- **State preservation**: Collapsible state managed through CSS classes, not `open` attribute
-- **Debug logging**: `sendClientLog()` posts events to local collector (LAN IP configurable)
-
-## Development Principles
-- **Async-First**: All new code should use async patterns; migrate sync code when touching it
-- **Generated Content**: Never manually edit files in `docs/` - they're auto-regenerated
-- **Source of Truth**: CSS/JS changes go in `web_static/`, then copied to `docs/`
-- **UI Consistency**: Follow existing card/section patterns and collapsible behavior
-- **Mobile-First UX**: Test expand/collapse on mobile devices; avoid resize listeners that force collapse
-- **Smooth Animations**: Use CSS opacity transitions for shimmer effects; avoid class toggling that resets animations
-
-## Performance Considerations
-- Async batch processing for division generation
-- SQLite connection pooling (max 5 connections)
-- Content comparison to avoid unnecessary file writes
-- GitHub Pages deployment: Static files only, no server-side processing
-
-## Common Issues & Solutions
-
-### Mobile Expand/Collapse Problems
-- **Symptom**: Team sections collapse immediately after expanding on mobile
-- **Cause**: `window.addEventListener('resize', adaptDetails)` fires frequently on mobile due to viewport changes
-- **Solution**: Remove resize listener; only run `adaptDetails()` on `DOMContentLoaded`
-
-### Progress Bar Glow Reset
-- **Symptom**: Shimmer animation resets/flashes when progress reaches 0% or 100%
-- **Cause**: Removing and re-adding CSS classes restarts pseudo-element animations
-- **Solution**: Use opacity transitions instead of class toggling; keep shimmer continuous
-
-### Touch vs Click Events
-- **Symptom**: Double toggles or unresponsive touch on mobile
-- **Cause**: Both touch and synthetic click events firing
-- **Solution**: Use `touchstart`/`touchend` with movement/time thresholds; suppress click with `_isTouch` flag
+FACEIT_API_KEY=your_faceit_api_key_here
+DATABASE_URL=mariadb://user:pass@host:3306/pappaliiga
+```
+Useful overrides:
+```
+DB_POOL_MIN_SIZE=2
+DB_POOL_MAX_SIZE=30
+DB_CONNECTIONS_PER_WORKER=3
+MAX_DB_WRITER_CONCURRENCY=6
+DB_POOL_DEBUG=1
+SYNC_DIAGNOSTICS=1
+SYNC_DIAGNOSTICS_INTERVAL=15
+SYNC_DIAGNOSTICS_PATH=logs/runtime_diagnostics.jsonl
+SYNC_LOG_DIR=logs
+SYNC_LOG_MAX_FILES=10
+```
