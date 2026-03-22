@@ -21,13 +21,13 @@ _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _DEMO_LIST_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
 _DEMO_PROBE_SEMAPHORE = asyncio.Semaphore(4)
-_DEMO_CACHE_VERSION = 3
+_DEMO_CACHE_VERSION = 4
 
 _UPCOMING_STATUSES = ("CONFIGURED", "PENDING", "READY", "SCHEDULED")
 
 
 def build_demo_url(championship_id: str, match_id: str, demo_index: int) -> str:
-    return f"https://pappa.aukko.net/demos/{championship_id}/{match_id}_{demo_index}.zst"
+    return f"https://pappa.aukko.net/demos/{championship_id}/{match_id}-{demo_index}.dem.zst"
 
 
 def _normalize_veto_action(status_value: Any) -> str | None:
@@ -541,7 +541,7 @@ def _build_demo_probe_indices(expected_count: int | None) -> list[int]:
     if base <= 0:
         base = 2
     limit = min(8, max(2, base))
-    return list(range(0, limit))
+    return list(range(1, limit + 1))
 
 
 async def _probe_demo_exists_once(client: httpx.AsyncClient, url: str) -> tuple[bool, int | None]:
@@ -600,6 +600,24 @@ async def get_match_demos(
         if cached is not None:
             return cached
 
+    # Build a mapping from 1-based demo index to map name using round_index (0-based).
+    map_name_by_demo_index: dict[int, str] = {}
+    map_rows = await query_async(
+        """
+        SELECT ma.round_index, COALESCE(mc.pretty_name, ma.map_name) AS map_name
+        FROM maps ma
+        LEFT JOIN maps_catalog mc ON LOWER(mc.map_id) = LOWER(ma.map_name)
+        WHERE ma.match_id = :match_id
+        ORDER BY ma.round_index
+        """,
+        {"match_id": match_id},
+    )
+    for row in map_rows:
+        round_idx = row.get("round_index")
+        if round_idx is not None:
+            demo_idx = int(round_idx) + 1
+            map_name_by_demo_index[demo_idx] = row.get("map_name") or ""
+
     probe_indices = _build_demo_probe_indices(normalized_expected)
     timeout = httpx.Timeout(10.0)
 
@@ -613,7 +631,11 @@ async def get_match_demos(
         results = await asyncio.gather(*(probe_index(idx) for idx in probe_indices))
 
     found_items = [
-        {"demo_index": int(demo_index), "url": str(url)}
+        {
+            "demo_index": int(demo_index),
+            "url": str(url),
+            "map_name": map_name_by_demo_index.get(int(demo_index)) or None,
+        }
         for demo_index, url, exists in results
         if exists
     ]
