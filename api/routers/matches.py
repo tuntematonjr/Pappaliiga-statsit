@@ -61,6 +61,7 @@ class UpcomingMatchListResponse(CamelModel):
 class DemoLinkItem(CamelModel):
     demo_index: int
     url: str
+    map_name: Optional[str] = None
 
 
 class DemoListResponse(CamelModel):
