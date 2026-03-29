@@ -93,7 +93,7 @@ window.TeamComparisonBoard = {
                 return [];
             }
 
-            return this.teams.map((team, idx) => {
+            const rows = this.teams.map((team, idx) => {
                 const wins = Number(team.maps_won ?? team.wins ?? 0);
                 const losses = Number(team.maps_lost ?? team.losses ?? 0);
                 const matches = Number(
@@ -125,6 +125,19 @@ window.TeamComparisonBoard = {
                     split: { wins, losses }
                 };
             });
+
+            // Keep default order deterministic for tied wins: prefer higher RD+, then name.
+            rows.sort((left, right) => {
+                if (left.wins !== right.wins) {
+                    return right.wins - left.wins;
+                }
+                if (left.round_diff !== right.round_diff) {
+                    return right.round_diff - left.round_diff;
+                }
+                return String(left.name || '').localeCompare(String(right.name || ''), 'fi', { sensitivity: 'base' });
+            });
+
+            return rows;
         }
     },
     methods: {
