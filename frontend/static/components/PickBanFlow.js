@@ -157,31 +157,32 @@ window.PickBanFlow = {
         <div class="pick-ban-flow">
             <div class="veto-panel-header">
                 <div class="veto-panel-heading">
-                    <h4 class="veto-panel-title">Pick/Ban</h4>
-                    <p class="veto-panel-subtitle">Ottelun veto-polku kartta kerrallaan</p>
+                    <h4 class="veto-panel-title titleUnderlineCard">Pick/Ban</h4>
                 </div>
-                <span v-if="formatLabel" class="veto-panel-format">{{ formatLabel }}</span>
             </div>
-            <div v-if="steps.length" class="veto-steps">
-                <div v-for="step in steps" :key="step.step + step.mapName" class="veto-step" :class="'veto-step--' + step.action">
-                    <div class="veto-step__top">
-                        <div class="veto-step__order">#{{ step.step }}</div>
-                        <div class="veto-step__title">{{ step.label }}</div>
-                    </div>
-                    <div class="veto-step__body">
-                        <div class="veto-step__thumb">
-                            <img v-if="resolveMapImage(step)" :src="resolveMapImage(step)" @error="onImageError(step.mapName)" alt="" />
-                            <div v-else class="map-thumb--placeholder">No image</div>
+            <div v-if="steps.length" class="veto-steps-shell">
+                <div class="veto-steps">
+                    <div v-for="step in steps" :key="step.step + step.mapName" class="veto-step" :class="'veto-step--' + step.action">
+                        <div class="veto-step__top">
+                            <div class="veto-step__order">#{{ step.step }}</div>
+                            <div class="veto-step__title">{{ step.label }}</div>
                         </div>
-                        <div class="veto-step__meta">
-                            <div class="veto-step__map">{{ beautifyMapName(step.mapName) }}</div>
-                            <div v-if="step.action !== 'overflow' && step.action !== 'decider'" class="veto-step__actor">
-                                <router-link
-                                    v-if="teamRoute(step.teamId, step.teamName)"
-                                    :to="teamRoute(step.teamId, step.teamName)"
-                                    class="team-link"
-                                >{{ step.teamName || 'Järjestelmä' }}</router-link>
-                                <span v-else>{{ step.teamName || 'Järjestelmä' }}</span>
+                        <div class="veto-step__body">
+                            <div class="veto-step__thumb">
+                                <img v-if="resolveMapImage(step)" :src="resolveMapImage(step)" @error="onImageError(step.mapName)" alt="" />
+                                <div v-else class="map-thumb--placeholder">No image</div>
+                            </div>
+                            <div class="veto-step__meta">
+                                <div class="veto-step__map">{{ beautifyMapName(step.mapName) }}</div>
+                                <div v-if="step.action !== 'overflow' && step.action !== 'decider'" class="veto-step__actor">
+                                    <router-link
+                                        v-if="teamRoute(step.teamId, step.teamName)"
+                                        :to="teamRoute(step.teamId, step.teamName)"
+                                        class="team-link"
+                                    >{{ step.teamName || 'Järjestelmä' }}</router-link>
+                                    <span v-else>{{ step.teamName || 'Järjestelmä' }}</span>
+                                </div>
+                                <div v-else-if="step.action === 'decider'" class="veto-step__actor veto-step__actor--muted">{{ step.teamName || 'Ratkeaa vetoissa' }}</div>
                             </div>
                         </div>
                     </div>
