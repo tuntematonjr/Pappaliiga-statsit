@@ -306,6 +306,7 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
 
     overrides = load_division_overrides()
     max_concurrency = max(1, args.max_concurrency)
+    abort_exc: Exception | None = None
 
     if args.match_id:
         LOGGER.info("Refreshing single match %s", args.match_id)
@@ -383,7 +384,6 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
                 LOGGER.exception("Unexpected error while upserting championships - continuing with sync")
 
         # Process each season
-        abort_exc: Exception | None = None
 
         for season in sorted(championships_by_season.keys()):
             season_start_time = time.perf_counter()

@@ -59,6 +59,17 @@ PENDING_REFRESH_INTERVAL_SECONDS = 15 * 60  # base interval for pending match re
 PENDING_UNCHANGED_REFRESH_INTERVAL_SECONDS = 60 * 60  # when pending state/activity is unchanged
 PENDING_FORCE_REFRESH_INTERVAL_SECONDS = 6 * 60 * 60  # always refresh eventually as a safety net
 TEAM_REFRESH_INTERVAL_SECONDS = 24 * 60 * 60  # throttle team refresh to once per day
+_FINAL_MATCH_STATUSES = {"finished", "closed", "over", "completed", "played"}
+_NON_FINAL_MATCH_STATUSES = {
+    "configured",
+    "pending",
+    "ready",
+    "scheduled",
+    "ongoing",
+    "live",
+    "in_progress",
+    "started",
+}
 
 __all__ = [
     "ChampionshipSyncResult",
@@ -180,7 +191,12 @@ def _is_retryable_db_error(exc: Exception) -> bool:
 
 
 def _is_played_match_state(status: str, finished_at: Optional[int]) -> bool:
-    return bool(finished_at) or status in {"finished", "closed", "over", "completed", "cancelled"}
+    normalized_status = str(status or "").strip().lower()
+    if normalized_status in _NON_FINAL_MATCH_STATUSES:
+        return False
+    if normalized_status in _FINAL_MATCH_STATUSES:
+        return True
+    return bool(finished_at)
 
 
 def _match_list_activity_ts(item: Mapping[str, Any] | None) -> int:
@@ -821,12 +837,18 @@ def _build_normalised_match(
     if not match_id:
         raise ValueError("Match payload missing match_id")
 
+    status = str((details or {}).get("status") or "").lower()
+    raw_finished_at = normalize_finished_at((details or {}).get("finished_at"))
+    has_played = _is_played_match_state(status, raw_finished_at)
+
     rounds = _extract_rounds(stats)
     team1_id, team2_id = _derive_team_ids(details, rounds)
 
-    map_rows = _extract_map_rows_from_stats(match_id, rounds, team1_id, team2_id)
-    if not map_rows:
-        map_rows = _extract_map_rows_from_details(match_id, details, team1_id, team2_id)
+    map_rows: List[Dict[str, Any]] = []
+    if has_played:
+        map_rows = _extract_map_rows_from_stats(match_id, rounds, team1_id, team2_id)
+        if not map_rows:
+            map_rows = _extract_map_rows_from_details(match_id, details, team1_id, team2_id)
 
     for map_row in map_rows:
         s1 = map_row.get("score_team1") or 0
@@ -861,10 +883,11 @@ def _build_normalised_match(
         if pid and nickname and pid not in payload_players:
             payload_players[pid] = {"player_id": pid, "nickname": nickname}
 
-    finish_ts = normalize_finished_at(details.get("finished_at"))
+    finish_ts = raw_finished_at if has_played else None
     winner_team_id = None
     res = (details or {}).get("results") or {}
-    winner_team_id = _normalize_team_ref(res.get("winner"), team1_id, team2_id)
+    if has_played:
+        winner_team_id = _normalize_team_ref(res.get("winner"), team1_id, team2_id)
     scheduled_at = safe_int(details.get("scheduled_at"))
     configured_at = safe_int(details.get("configured_at"))
     started_at = safe_int(details.get("started_at"))
@@ -946,7 +969,7 @@ async def sync_match_async(
 
     status = str(details.get("status") or "").lower()
     finish_ts = normalize_finished_at(details.get("finished_at"))
-    has_played = bool(finish_ts) or status in {"finished", "closed", "over", "completed"}
+    has_played = _is_played_match_state(status, finish_ts)
 
     # For unplayed matches: skip stats/votes to reduce API calls
     # For played matches: fetch full stats and map voting history
@@ -975,7 +998,7 @@ async def sync_match_async(
             map_count = len(normalised.map_rows)
             status = str(normalised.match_row.get("status") or "").lower()
             finished_at = normalize_finished_at(normalised.match_row.get("finished_at"))
-            is_played = bool(finished_at) or status in {"finished", "closed", "over", "completed"}
+            is_played = _is_played_match_state(status, finished_at)
             if is_played and map_count < expected_maps:
                 raise RuntimeError(
                     f"match_maps_incomplete: expected={expected_maps} got={map_count} match_id={match_id}"
@@ -997,12 +1020,7 @@ async def sync_match_async(
 
     persist_start = time.perf_counter()
     match_status = str(normalised.match_row.get("status") or "").lower()
-    match_is_played = bool(normalised.match_row.get("finished_at")) or match_status in {
-        "finished",
-        "closed",
-        "over",
-        "completed",
-    }
+    match_is_played = _is_played_match_state(match_status, normalize_finished_at(normalised.match_row.get("finished_at")))
 
     map_catalog_rows: list[dict[str, str]] = []
     try:
