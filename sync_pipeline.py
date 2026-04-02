@@ -59,6 +59,7 @@ PENDING_REFRESH_INTERVAL_SECONDS = 15 * 60  # base interval for pending match re
 PENDING_UNCHANGED_REFRESH_INTERVAL_SECONDS = 60 * 60  # when pending state/activity is unchanged
 PENDING_FORCE_REFRESH_INTERVAL_SECONDS = 6 * 60 * 60  # always refresh eventually as a safety net
 TEAM_REFRESH_INTERVAL_SECONDS = 24 * 60 * 60  # throttle team refresh to once per day
+FAR_FUTURE_MATCH_SKIP_THRESHOLD_SECONDS = 14 * 24 * 60 * 60  # skip already-known matches scheduled >2 weeks out
 _FINAL_MATCH_STATUSES = {"finished", "closed", "over", "completed", "played"}
 _NON_FINAL_MATCH_STATUSES = {
     "configured",
@@ -1575,6 +1576,7 @@ async def sync_championship_async(
 
     synced: List[str] = []
     skipped_matches = 0
+    skipped_far_future = 0
     pending_matches = 0
     deferred_pending = 0
     LOGGER.info(
@@ -1621,6 +1623,21 @@ async def sync_championship_async(
                     )
                     skipped_matches += 1
                     continue
+
+                # Skip already-known matches that are still more than 2 weeks in the future;
+                # --full bypasses this entire block so full syncs always process them.
+                summary_scheduled_at = safe_int(summary.get("scheduled_at"), 0)
+                if summary_scheduled_at and (summary_scheduled_at - now_ts) > FAR_FUTURE_MATCH_SKIP_THRESHOLD_SECONDS:
+                    LOGGER.debug(
+                        "Skipping far-future match %s (scheduled_at=%s, in %s)",
+                        match_id,
+                        summary_scheduled_at,
+                        format_hms(summary_scheduled_at - now_ts),
+                    )
+                    skipped_far_future += 1
+                    skipped_matches += 1
+                    continue
+
                 else:
                     last_seen_at = safe_int(existing.get("last_seen_at"))
                     if last_seen_at:
@@ -1736,6 +1753,12 @@ async def sync_championship_async(
         skipped_matches,
         pending_matches,
     )
+    if skipped_far_future:
+        LOGGER.info(
+            "Skipped %d far-future match(es) (scheduled >%s out; use --full to sync them)",
+            skipped_far_future,
+            format_hms(FAR_FUTURE_MATCH_SKIP_THRESHOLD_SECONDS),
+        )
     if deferred_pending:
         LOGGER.info(
             "Deferred %d pending match(es) refreshed within %s",
