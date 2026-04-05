@@ -4257,7 +4257,7 @@ window.TeamDetail = {
                         <div class="section-heading section-heading--split">
                             <div class="section-heading__main">
                                 <h3>Pelanneet lineupit</h3>
-                                <span class="section-sub">Uniikit 5 pelaajan kokoonpanot valitulla kaudella.</span>
+                                <span class="section-sub">Pelaaja kohtaiset statsit löytyy tooltipistä</span>
                             </div>
                             <span class="lineup-section__meta" v-if="matchPlayerStatsLoading">Ladataan lineuppeja…</span>
                             <span
