@@ -63,6 +63,28 @@ const PLAYER_GROUP_META = {
     weapons: { label: 'Aseet', className: 'group-weapons group-divider' }
 };
 
+const LINEUP_GROUP_META = {
+    identity: { label: 'Lineup', className: 'group-map group-divider' },
+    volume: { label: 'Määrä', className: 'group-usage group-divider' },
+    results: { label: 'Tulokset', className: 'group-results group-divider' },
+    core: { label: 'Ydin', className: 'group-performance group-divider' },
+    maps: { label: 'Kartat', className: 'group-map group-divider' }
+};
+
+const LINEUP_COLUMNS = [
+    { key: 'lineupLabel', label: 'Lineup', sortable: true, colClass: 'col-name', group: 'identity', tooltip: 'Uniikki 5 pelaajan kokoonpano valitulla kaudella.', mobilePinned: true, mobilePriority: 1 },
+    { key: 'matchesPlayed', label: 'Ott', sortable: true, numeric: true, group: 'volume', tooltip: 'Ottelut, joissa lineup pelasi vähintään yhden kartan.', mobilePriority: 2 },
+    { key: 'mapsPlayed', label: 'Kartat', sortable: true, numeric: true, group: 'volume', tooltip: 'Pelattujen karttojen määrä tällä lineupilla.', mobilePriority: 3 },
+    { key: 'recordLine', label: 'Tulokset', sortable: true, group: 'results', tooltip: 'Karttasaldo tällä lineupilla.', mobileHidden: true },
+    { key: 'winRate', label: 'Win %', sortable: true, numeric: true, decimals: 1, group: 'results', tooltip: 'Karttakohtainen voittoprosentti tällä lineupilla.', mobilePriority: 4 },
+    { key: 'roundDiff', label: 'RD', sortable: true, numeric: true, group: 'results', tooltip: 'Yhteenlaskettu eräero tällä lineupilla.', mobilePriority: 5 },
+    { key: 'adr', label: 'ADR', sortable: true, numeric: true, decimals: 1, colClass: 'col-adr', group: 'core', tooltip: 'Lineupin keskimääräinen ADR.', mobilePriority: 6 },
+    { key: 'udpr', label: 'UDPR', sortable: true, numeric: true, decimals: 2, group: 'core', tooltip: 'Lineupin utility damage per round.', mobilePriority: 7 },
+    { key: 'kd', label: 'K/D', sortable: true, numeric: true, decimals: 2, colClass: 'col-kd', group: 'core', tooltip: 'Lineupin yhteinen kill/death-suhde.', mobileHidden: true },
+    { key: 'hsPct', label: 'HS%', sortable: true, numeric: true, decimals: 1, group: 'core', tooltip: 'Headshot-osuus lineupin kaikista tapoista.', mobileHidden: true },
+    { key: 'mapBreakdownSummary', label: 'Karttajakauma', sortable: true, group: 'maps', tooltip: 'Millä kartoilla lineup on esiintynyt.', mobileHidden: true }
+];
+
 function buildColumnGroups(columns, groupMeta) {
     if (!Array.isArray(columns)) return [];
     const groups = [];
@@ -219,6 +241,19 @@ function formatSignedNumber(value, decimals = 0) {
     if (numeric > 0) return `+${formatted}`;
     if (numeric < 0) return `-${formatted}`;
     return decimals > 0 ? (0).toFixed(decimals) : '0';
+}
+
+function combinationCount(n, k = 5) {
+    const total = Math.floor(toNumber(n, 0));
+    const choose = Math.floor(toNumber(k, 0));
+    if (choose < 0 || total < choose) return 0;
+    if (choose === 0 || total === choose) return 1;
+    const span = Math.min(choose, total - choose);
+    let result = 1;
+    for (let i = 1; i <= span; i += 1) {
+        result = (result * (total - span + i)) / i;
+    }
+    return Math.round(result);
 }
 
 function clampValue(value, min, max) {
@@ -573,6 +608,333 @@ function normalizePlayer(player, idx = 0) {
     };
 }
 
+function readStatNumber(source, keys = [], fallback = 0) {
+    if (!source || typeof source !== 'object') return fallback;
+    for (const key of keys) {
+        if (!key) continue;
+        const value = source[key];
+        if (value !== null && value !== undefined && value !== '') {
+            return toNumber(value, fallback);
+        }
+    }
+    return fallback;
+}
+
+function pickBestLineupPlayer(players = [], metric = 'kd') {
+    const source = Array.isArray(players) ? players.filter(Boolean) : [];
+    if (!source.length) return null;
+    const sorted = [...source].sort((left, right) => {
+        const metricDiff = toNumber(right?.[metric], 0) - toNumber(left?.[metric], 0);
+        if (Math.abs(metricDiff) > 1e-9) return metricDiff;
+        const roundsDiff = toNumber(right?.roundsPlayed, 0) - toNumber(left?.roundsPlayed, 0);
+        if (roundsDiff !== 0) return roundsDiff;
+        const killsDiff = toNumber(right?.kills, 0) - toNumber(left?.kills, 0);
+        if (killsDiff !== 0) return killsDiff;
+        return String(left?.nickname || left?.playerId || '').localeCompare(String(right?.nickname || right?.playerId || ''), 'fi');
+    });
+    return sorted[0] || null;
+}
+
+function buildLineupRows(items = [], matches = [], teamId = null) {
+    if (!Array.isArray(items) || !items.length) return [];
+
+    const mapLookup = new Map();
+    (Array.isArray(matches) ? matches : []).forEach(match => {
+        const matchId = match?.matchId;
+        if (!matchId || !Array.isArray(match.maps)) return;
+        match.maps.forEach((mapEntry, idx) => {
+            const roundIndex = toNumber(mapEntry?.roundIndex ?? idx, idx);
+            mapLookup.set(`${matchId}::${roundIndex}`, {
+                mapName: mapEntry?.mapName || 'Kartta',
+                scoreFor: toNumber(mapEntry?.scoreFor, 0),
+                scoreAgainst: toNumber(mapEntry?.scoreAgainst, 0),
+                isForfeit: !!mapEntry?.isForfeit
+            });
+        });
+    });
+
+    const lineupMaps = new Map();
+    items.forEach((item, idx) => {
+        const matchId = item?.matchId || item?.match_id;
+        const roundIndex = toNumber(item?.roundIndex ?? item?.round_index, 0);
+        const rowTeamId = item?.teamId || item?.team_id || null;
+        const isForfeitMap = !!(item?.isForfeitMap ?? item?.is_forfeit_map);
+        if (!matchId || isForfeitMap) return;
+        if (teamId && rowTeamId && String(rowTeamId) !== String(teamId)) return;
+
+        const playerIdRaw = item?.playerId || item?.player_id;
+        if (!playerIdRaw) return;
+        const playerId = String(playerIdRaw);
+        const bucketKey = `${matchId}::${roundIndex}`;
+        if (!lineupMaps.has(bucketKey)) {
+            lineupMaps.set(bucketKey, {
+                matchId,
+                roundIndex,
+                mapName: beautifyMapName(item?.mapName || item?.map_name) || 'Kartta',
+                players: new Map(),
+                rows: []
+            });
+        }
+        const bucket = lineupMaps.get(bucketKey);
+        bucket.rows.push(item);
+        if (!bucket.players.has(playerId)) {
+            bucket.players.set(playerId, {
+                playerId,
+                nickname: item?.nickname || `Pelaaja ${idx + 1}`
+            });
+        }
+    });
+
+    const lineups = new Map();
+
+    lineupMaps.forEach((bucket, bucketKey) => {
+        const players = Array.from(bucket.players.values());
+        if (players.length !== 5) return;
+
+        const signaturePlayers = [...players].sort((left, right) => String(left.playerId).localeCompare(String(right.playerId)));
+        const signature = signaturePlayers.map(player => player.playerId).join('|');
+
+        if (!lineups.has(signature)) {
+            const lineupPlayers = [...players]
+                .sort((left, right) => String(left.nickname).localeCompare(String(right.nickname), 'fi'))
+                .map(player => ({
+                    ...player,
+                    kills: 0,
+                    deaths: 0,
+                    damage: 0,
+                    utilityDamage: 0,
+                    headshots: 0,
+                    roundsPlayed: 0,
+                    kd: 0,
+                    adr: 0,
+                    udpr: 0,
+                    hsPct: 0,
+                    mvpBadges: []
+                }));
+            const playersById = {};
+            lineupPlayers.forEach(player => {
+                playersById[String(player.playerId)] = player;
+            });
+            lineups.set(signature, {
+                signature,
+                players: lineupPlayers,
+                playersById,
+                matchIds: new Set(),
+                mapsPlayed: 0,
+                wins: 0,
+                losses: 0,
+                draws: 0,
+                roundsFor: 0,
+                roundsAgainst: 0,
+                kills: 0,
+                deaths: 0,
+                damage: 0,
+                headshots: 0,
+                playerRounds: 0,
+                mapBreakdown: {}
+            });
+        }
+
+        const aggregate = lineups.get(signature);
+        aggregate.matchIds.add(String(bucket.matchId));
+        aggregate.mapsPlayed += 1;
+
+        const mapMeta = mapLookup.get(bucketKey) || {};
+        const scoreFor = toNumber(mapMeta.scoreFor, 0);
+        const scoreAgainst = toNumber(mapMeta.scoreAgainst, 0);
+        const mapName = mapMeta.mapName || bucket.mapName || 'Kartta';
+
+        aggregate.roundsFor += scoreFor;
+        aggregate.roundsAgainst += scoreAgainst;
+
+        if (scoreFor > scoreAgainst) aggregate.wins += 1;
+        else if (scoreFor < scoreAgainst) aggregate.losses += 1;
+        else aggregate.draws += 1;
+
+        if (!aggregate.mapBreakdown[mapName]) {
+            aggregate.mapBreakdown[mapName] = { mapName, played: 0, wins: 0, losses: 0, draws: 0 };
+        }
+        const mapEntry = aggregate.mapBreakdown[mapName];
+        mapEntry.played += 1;
+        if (scoreFor > scoreAgainst) mapEntry.wins += 1;
+        else if (scoreFor < scoreAgainst) mapEntry.losses += 1;
+        else mapEntry.draws += 1;
+
+        const mapRounds = Math.max(0, scoreFor + scoreAgainst);
+        bucket.rows.forEach(row => {
+            const stats = row?.stats || {};
+            const kills = readStatNumber(stats, ['kills', 'Kills']);
+            const deaths = readStatNumber(stats, ['deaths', 'Deaths']);
+            const damage = readStatNumber(stats, ['damage', 'Damage']);
+            const utilityDamage = readStatNumber(stats, ['utility_damage', 'Utility Damage']);
+            let headshots = readStatNumber(stats, ['headshots', 'Headshots']);
+            if (!headshots && kills > 0) {
+                const rawHsPct = readStatNumber(stats, ['hs_pct', 'Headshots %', 'headshots_pct']);
+                const normalizedHsPct = Math.abs(rawHsPct) <= 1 ? rawHsPct * 100 : rawHsPct;
+                headshots = kills * (normalizedHsPct / 100);
+            }
+
+            aggregate.kills += kills;
+            aggregate.deaths += deaths;
+            aggregate.damage += damage;
+            aggregate.headshots += headshots;
+            aggregate.playerRounds += mapRounds;
+
+            const rowPlayerId = String(row?.playerId || row?.player_id || '');
+            const lineupPlayer = aggregate.playersById?.[rowPlayerId];
+            if (lineupPlayer) {
+                lineupPlayer.kills += kills;
+                lineupPlayer.deaths += deaths;
+                lineupPlayer.damage += damage;
+                lineupPlayer.utilityDamage += utilityDamage;
+                lineupPlayer.headshots += headshots;
+                lineupPlayer.roundsPlayed += mapRounds;
+            }
+        });
+    });
+
+    return Array.from(lineups.values())
+        .map(entry => {
+            const matchesPlayed = entry.matchIds.size;
+            const mapsPlayed = entry.mapsPlayed;
+            const roundDiff = entry.roundsFor - entry.roundsAgainst;
+            const winRate = mapsPlayed ? (entry.wins / mapsPlayed) * 100 : 0;
+            const kd = entry.deaths ? entry.kills / entry.deaths : entry.kills;
+            const adr = entry.playerRounds ? entry.damage / entry.playerRounds : 0;
+            const hsPct = entry.kills ? (entry.headshots / entry.kills) * 100 : 0;
+            const mapBreakdown = Object.values(entry.mapBreakdown)
+                .map(mapEntry => ({
+                    ...mapEntry,
+                    winRate: mapEntry.played ? (mapEntry.wins / mapEntry.played) * 100 : 0
+                }))
+                .sort((left, right) => {
+                    if (right.played !== left.played) return right.played - left.played;
+                    return String(left.mapName).localeCompare(String(right.mapName), 'fi');
+                });
+            const players = (Array.isArray(entry.players) ? entry.players : []).map(player => {
+                const kills = toNumber(player.kills, 0);
+                const deaths = toNumber(player.deaths, 0);
+                const damage = toNumber(player.damage, 0);
+                const utilityDamage = toNumber(player.utilityDamage, 0);
+                const headshots = toNumber(player.headshots, 0);
+                const roundsPlayed = toNumber(player.roundsPlayed, 0);
+                return {
+                    ...player,
+                    kills,
+                    deaths,
+                    damage,
+                    utilityDamage,
+                    headshots,
+                    roundsPlayed,
+                    kd: deaths ? kills / deaths : kills,
+                    adr: roundsPlayed ? damage / roundsPlayed : 0,
+                    udpr: roundsPlayed ? utilityDamage / roundsPlayed : 0,
+                    hsPct: kills ? (headshots / kills) * 100 : 0,
+                    mvpBadges: []
+                };
+            });
+            const kdLeader = pickBestLineupPlayer(players, 'kd');
+            const adrLeader = pickBestLineupPlayer(players, 'adr');
+            const udprLeader = pickBestLineupPlayer(players, 'udpr');
+            const leaderIds = [kdLeader?.playerId, adrLeader?.playerId, udprLeader?.playerId]
+                .filter(Boolean)
+                .map(value => String(value));
+            const allSharedLeader = leaderIds.length && leaderIds.every(value => value === leaderIds[0])
+                ? leaderIds[0]
+                : null;
+            const sharedKdAdrLeader = !allSharedLeader && kdLeader && adrLeader && String(kdLeader.playerId) === String(adrLeader.playerId)
+                ? String(kdLeader.playerId)
+                : null;
+            const playersWithBadges = players.map(player => {
+                const badges = [];
+                const playerId = String(player.playerId);
+                const isKdLeader = kdLeader && playerId === String(kdLeader.playerId);
+                const isAdrLeader = adrLeader && playerId === String(adrLeader.playerId);
+                const isUdprLeader = udprLeader && playerId === String(udprLeader.playerId);
+                if (allSharedLeader && playerId === allSharedLeader) {
+                    badges.push({
+                        label: 'MVP',
+                        tone: 'both',
+                        tooltip: `Johti lineupia K/D (${formatNumber(player.kd, 2)}), ADR (${formatNumber(player.adr, 1)}) ja UDPR (${formatNumber(player.udpr, 2)}) perusteella.`
+                    });
+                } else {
+                    if (sharedKdAdrLeader && playerId === sharedKdAdrLeader) {
+                        badges.push({
+                            label: 'MVP',
+                            tone: 'both',
+                            tooltip: `Johti lineupia sekä K/D (${formatNumber(player.kd, 2)}) että ADR (${formatNumber(player.adr, 1)}) perusteella.`
+                        });
+                    } else {
+                        if (isKdLeader) {
+                            badges.push({
+                                label: 'MVP K/D',
+                                tone: 'kd',
+                                tooltip: `Lineupin paras K/D: ${formatNumber(player.kd, 2)}`
+                            });
+                        }
+                        if (isAdrLeader) {
+                            badges.push({
+                                label: 'MVP ADR',
+                                tone: 'adr',
+                                tooltip: `Lineupin paras ADR: ${formatNumber(player.adr, 1)}`
+                            });
+                        }
+                    }
+                    if (isUdprLeader) {
+                        badges.push({
+                            label: 'MVP UDPR',
+                            tone: 'udpr',
+                            tooltip: `Lineupin paras UDPR: ${formatNumber(player.udpr, 2)}`
+                        });
+                    }
+                }
+                return {
+                    ...player,
+                    mvpBadges: badges
+                };
+            });
+            const formatMapRecord = mapEntry => {
+                const record = mapEntry.draws
+                    ? `${mapEntry.wins}-${mapEntry.losses}-${mapEntry.draws}`
+                    : `${mapEntry.wins}-${mapEntry.losses}`;
+                return `${mapEntry.mapName} ${record}`;
+            };
+            const preview = mapBreakdown.slice(0, 3).map(formatMapRecord);
+            const remainder = mapBreakdown.length > 3 ? ` +${mapBreakdown.length - 3}` : '';
+
+            return {
+                signature: entry.signature,
+                lineupLabel: playersWithBadges.map(player => player.nickname).join(', '),
+                players: playersWithBadges,
+                mvpKdPlayerId: kdLeader?.playerId || null,
+                mvpAdrPlayerId: adrLeader?.playerId || null,
+                matchesPlayed,
+                mapsPlayed,
+                wins: entry.wins,
+                losses: entry.losses,
+                draws: entry.draws,
+                recordLine: entry.draws ? `${entry.wins}-${entry.losses}-${entry.draws}` : `${entry.wins}-${entry.losses}`,
+                winRate,
+                roundDiff,
+                adr,
+                udpr: entry.playerRounds ? entry.players.reduce((sum, player) => sum + toNumber(player.utilityDamage, 0), 0) / entry.playerRounds : 0,
+                kd,
+                hsPct,
+                mapBreakdown,
+                mapBreakdownSummary: preview.length ? `${preview.join(' · ')}${remainder}` : '-',
+                mapBreakdownTitle: mapBreakdown.length
+                    ? mapBreakdown.map(mapEntry => `${mapEntry.mapName}: ${mapEntry.wins}-${mapEntry.losses}${mapEntry.draws ? `-${mapEntry.draws}` : ''} (${mapEntry.played} karttaa, ${formatPercent(mapEntry.winRate, 1)})`).join(' • ')
+                    : 'Ei karttajakaumaa'
+            };
+        })
+        .sort((left, right) => {
+            if (right.mapsPlayed !== left.mapsPlayed) return right.mapsPlayed - left.mapsPlayed;
+            if (right.winRate !== left.winRate) return right.winRate - left.winRate;
+            if (right.roundDiff !== left.roundDiff) return right.roundDiff - left.roundDiff;
+            return String(left.lineupLabel).localeCompare(String(right.lineupLabel), 'fi');
+        });
+}
+
 function normalizeMatch(match, teamId = null) {
     if (!match) return null;
     const matchId = match.matchId;
@@ -804,6 +1166,7 @@ window.TeamDetail = {
             SCOUT_MAP_COLUMNS,
             MAP_COLUMNS,
             PLAYER_COLUMNS,
+            LINEUP_COLUMNS,
             scoutTableKey: 0,
             detailedTableKey: 0,
             performanceTrendHover: {
@@ -1799,11 +2162,31 @@ window.TeamDetail = {
             const players = Array.isArray(this.seasonData?.playerStats) ? this.seasonData.playerStats : [];
             return players.map((p, idx) => normalizePlayer(p, idx)).filter(Boolean);
         },
+        lineupRows() {
+            return buildLineupRows(this.matchPlayerStatsCurrent.items || [], this.matchesList || [], this.teamId);
+        },
         playerHeaderGroups() {
             return buildColumnGroups(PLAYER_COLUMNS, PLAYER_GROUP_META);
         },
+        lineupHeaderGroups() {
+            return buildColumnGroups(LINEUP_COLUMNS, LINEUP_GROUP_META);
+        },
+        possibleLineupCount() {
+            return combinationCount(this.players.length, 5);
+        },
+        lineupCoverageLabel() {
+            const rosterSize = this.players.length;
+            const possible = this.possibleLineupCount;
+            if (rosterSize < 5) {
+                return `Pelaajia ${rosterSize} · ei 5 pelaajan lineupia`;
+            }
+            return `${this.lineupRows.length} pelattu / ${formatNumber(possible)} mahdollista`;
+        },
         playerDefaultSort() {
             return { column: 'adr', order: 'desc', numeric: true };
+        },
+        lineupDefaultSort() {
+            return { column: 'mapsPlayed', order: 'desc', numeric: true };
         },
         playerSummaryCards() {
             if (!this.players.length) return [];
@@ -1982,6 +2365,9 @@ window.TeamDetail = {
                 if (this.activeTab === 'matches') {
                     this.ensureMatchesTabData(this.currentChampionshipId);
                 }
+                if (this.activeTab === 'players') {
+                    this.ensureMatchPlayerStats(this.currentChampionshipId);
+                }
             }
         },
         mapStats: {
@@ -2011,6 +2397,11 @@ window.TeamDetail = {
                 this.$nextTick(() => {
                     this.setupMatchesChartObserver();
                     this.ensureMatchesTabData(this.currentChampionshipId);
+                });
+            }
+            if (newVal === 'players') {
+                this.$nextTick(() => {
+                    this.ensureMatchPlayerStats(this.currentChampionshipId);
                 });
             }
         },
@@ -2055,6 +2446,9 @@ window.TeamDetail = {
             }
             if (this.activeTab === 'matches') {
                 this.ensureMatchesTabData(this.currentChampionshipId);
+            }
+            if (this.activeTab === 'players') {
+                this.ensureMatchPlayerStats(this.currentChampionshipId);
             }
         });
     },
@@ -2178,11 +2572,13 @@ window.TeamDetail = {
                 if (metricKey === 'adr') return 'median_adr';
                 if (metricKey === 'kr') return 'median_kr';
                 if (metricKey === 'hsPct') return 'median_hs_pct';
+                if (metricKey === 'udpr') return 'median_udpr';
                 if (metricKey === 'flashSuccessLine') return 'median_flash_success_pct';
                 return null;
             }
             if (metricKey === 'kd') return 'avg_kd';
             if (metricKey === 'adr') return 'avg_adr';
+            if (metricKey === 'udpr') return 'avg_udpr';
             if (metricKey === 'kr') return 'avg_kr';
             if (metricKey === 'hsPct') return 'avg_hs_pct';
             if (metricKey === 'flashSuccessLine') return 'avg_flash_success_pct';
@@ -2198,6 +2594,14 @@ window.TeamDetail = {
             if (!row) return null;
             if (metricKey === 'hsPct') return toNumber(row.hsPct, null);
             if (metricKey === 'flashSuccessLine') return toNumber(row.flashSuccessLine, null);
+            if (metricKey === 'udpr') {
+                if (row.udpr !== undefined && row.udpr !== null) return toNumber(row.udpr, null);
+                const utilityDamage = toNumber(row.utilityDamage, null);
+                const roundsPlayed = toNumber(row.roundsPlayed, null);
+                if (Number.isFinite(utilityDamage) && Number.isFinite(roundsPlayed) && roundsPlayed > 0) {
+                    return utilityDamage / roundsPlayed;
+                }
+            }
             return toNumber(row[metricKey], null);
         },
         playerMetricClass(row, metricKey) {
@@ -2207,6 +2611,7 @@ window.TeamDetail = {
             const epsilonByMetric = {
                 kd: 0.01,
                 adr: 0.2,
+                udpr: 0.05,
                 kr: 0.005,
                 hsPct: 0.15,
                 flashSuccessLine: 0.15
@@ -2224,6 +2629,47 @@ window.TeamDetail = {
             const metricValue = asPercent ? formatPercent(value, 1) : formatNumber(value, decimals);
             const baselineValue = asPercent ? formatPercent(baseline, 1) : formatNumber(baseline, decimals);
             return `${label}: ${metricValue} · Div ${modeLabel}: ${baselineValue}`;
+        },
+        lineupPlayerStatLine(player) {
+            if (!player) return '';
+            const badges = Array.isArray(player?.mvpBadges) && player.mvpBadges.length
+                ? ` | ${player.mvpBadges.map(badge => badge.label).join(', ')}`
+                : '';
+            return `- ${player.nickname} | K/D ${formatNumber(player.kd, 2)} | ADR ${formatNumber(player.adr, 1)} | UDPR ${formatNumber(player.udpr, 2)} | HS% ${formatPercent(player.hsPct || 0, 1)}${badges}`;
+        },
+        lineupSummaryTooltip(row) {
+            if (!row) return '';
+            const lines = [
+                `Lineup: ${row.lineupLabel || '-'}`,
+                `Ottelut ${formatNumber(row.matchesPlayed)} · Kartat ${formatNumber(row.mapsPlayed)} · Win ${formatPercent(row.winRate, 1)} · RD ${formatSignedNumber(row.roundDiff, 0)}`
+            ];
+            const players = Array.isArray(row.players) ? row.players : [];
+            if (players.length) lines.push('');
+            players.forEach(player => {
+                const line = this.lineupPlayerStatLine(player);
+                if (line) lines.push(line);
+            });
+            return lines.join('\n');
+        },
+        lineupMetricTooltip(row, metricKey, label, decimals = 2, asPercent = false) {
+            if (!row) return '';
+            const baseTitle = this.playerMetricTitle(row, metricKey, label, decimals, asPercent);
+            const players = Array.isArray(row.players) ? [...row.players] : [];
+            if (!players.length) return baseTitle;
+            players.sort((left, right) => {
+                const rightValue = toNumber(this.playerMetricValue(right, metricKey), 0);
+                const leftValue = toNumber(this.playerMetricValue(left, metricKey), 0);
+                if (Math.abs(rightValue - leftValue) > 1e-9) return rightValue - leftValue;
+                const killDiff = toNumber(right?.kills, 0) - toNumber(left?.kills, 0);
+                if (killDiff !== 0) return killDiff;
+                return String(left?.nickname || '').localeCompare(String(right?.nickname || ''), 'fi');
+            });
+            const metricLines = players.map(player => {
+                const value = this.playerMetricValue(player, metricKey);
+                const formatted = asPercent ? formatPercent(value || 0, 1) : formatNumber(value, decimals);
+                return `- ${player.nickname} | ${label} ${formatted}`;
+            });
+            return [baseTitle, '', ...metricLines].filter(Boolean).join('\n');
         },
         buildDivisionPlayerBaselines(divisionAverages = {}, divisionDetails = {}) {
             const playerTotals = Array.isArray(divisionDetails?.player_totals) ? divisionDetails.player_totals : [];
@@ -2244,10 +2690,19 @@ window.TeamDetail = {
                     return (flashSuccesses / flashCount) * 100;
                 })
                 .filter(value => Number.isFinite(value));
+            const udprValues = sourceRows
+                .map(row => {
+                    const roundsPlayed = toNumber(row?.rounds_played, 0);
+                    const utilityDamage = toNumber(row?.utility_damage, 0);
+                    if (!roundsPlayed) return null;
+                    return utilityDamage / roundsPlayed;
+                })
+                .filter(value => Number.isFinite(value));
 
             const avg = {
                 avg_kd: toNumber(divisionAverages?.avg_kd, null),
                 avg_adr: toNumber(divisionAverages?.avg_adr, null),
+                avg_udpr: mean(udprValues),
                 avg_kr: toNumber(divisionAverages?.avg_kr, null),
                 avg_hs_pct: toNumber(divisionAverages?.avg_hs_pct, null),
                 avg_flash_success_pct: mean(flashSuccessPcts)
@@ -2260,6 +2715,7 @@ window.TeamDetail = {
             const median = {
                 median_kd: computeMedian(collect('kd')),
                 median_adr: computeMedian(collect('adr')),
+                median_udpr: computeMedian(udprValues),
                 median_kr: computeMedian(collect('kr')),
                 median_hs_pct: computeMedian(collect('hs_pct')),
                 median_flash_success_pct: computeMedian(flashSuccessPcts)
@@ -2868,6 +3324,7 @@ window.TeamDetail = {
         },
         formatPercent,
         formatNumber,
+        formatSignedNumber,
         getMatchResult,
         resolveAvatar(src) {
             const fallback = window.PAPPALIIGA_DEFAULT_LOGO || '';
@@ -3795,6 +4252,123 @@ window.TeamDetail = {
                                 </div>
                             </template>
                         </sortable-table>
+                    </div>
+                    <div v-if="players.length" class="glass-card lineup-section">
+                        <div class="section-heading section-heading--split">
+                            <div class="section-heading__main">
+                                <h3>Pelanneet lineupit</h3>
+                                <span class="section-sub">Uniikit 5 pelaajan kokoonpanot valitulla kaudella.</span>
+                            </div>
+                            <span class="lineup-section__meta" v-if="matchPlayerStatsLoading">Ladataan lineuppeja…</span>
+                            <span
+                                class="lineup-section__meta"
+                                v-else
+                                :title="'Rosterissa ' + players.length + ' pelaajaa → enintään ' + formatNumber(possibleLineupCount) + ' uniikkia 5 pelaajan lineupia.'"
+                            >{{ lineupCoverageLabel }}</span>
+                        </div>
+                        <div v-if="lineupRows.length" class="table-wrapper">
+                            <sortable-table
+                                class="players-sortable-table"
+                                :columns="LINEUP_COLUMNS"
+                                :header-groups="lineupHeaderGroups"
+                                :data="lineupRows"
+                                :default-sort="lineupDefaultSort"
+                                :colorize-columns="[]"
+                                :mobile-column-limit="5"
+                                :sticky-header="true"
+                                :compact="false"
+                            >
+                                <template #cell-lineupLabel="{ row }">
+                                    <div class="lineup-cell" :title="lineupSummaryTooltip(row)">
+                                        <div class="lineup-player-list">
+                                            <span
+                                                v-for="player in row.players"
+                                                :key="row.signature + '-' + player.playerId"
+                                                class="lineup-player-pill"
+                                                :title="lineupPlayerStatLine(player)"
+                                            >
+                                                <span class="lineup-player-pill__name">{{ player.nickname }}</span>
+                                                <span
+                                                    v-for="badge in player.mvpBadges || []"
+                                                    :key="player.playerId + '-' + badge.label"
+                                                    class="lineup-mvp-badge"
+                                                    :class="'lineup-mvp-badge--' + (badge.tone || 'both')"
+                                                    :title="badge.tooltip || ''"
+                                                >{{ badge.label }}</span>
+                                            </span>
+                                        </div>
+                                        <div class="player-sub">Ottelut {{ row.matchesPlayed }} · Kartat {{ row.mapsPlayed }}</div>
+                                    </div>
+                                </template>
+                                <template #cell-recordLine="{ row }">
+                                    <span
+                                        class="chip"
+                                        :class="row.winRate >= 60 ? 'chip--ok' : row.winRate >= 45 ? 'chip--accent' : 'chip--err'"
+                                        :title="lineupSummaryTooltip(row)"
+                                    >{{ row.recordLine }}</span>
+                                </template>
+                                <template #cell-winRate="{ row }">
+                                    <span class="stat-strong" :title="lineupSummaryTooltip(row)">{{ formatPercent(row.winRate, 1) }}</span>
+                                </template>
+                                <template #cell-roundDiff="{ row }">
+                                    <span class="stat-strong" :title="lineupSummaryTooltip(row)">{{ formatSignedNumber(row.roundDiff, 0) }}</span>
+                                </template>
+                                <template #cell-adr="{ row }">
+                                    <span
+                                        class="stat-strong"
+                                        :class="playerMetricClass(row, 'adr')"
+                                        :title="lineupMetricTooltip(row, 'adr', 'ADR', 1)"
+                                    >{{ formatNumber(row.adr, 1) }}</span>
+                                </template>
+                                <template #cell-udpr="{ row }">
+                                    <span
+                                        class="stat-strong"
+                                        :class="playerMetricClass(row, 'udpr')"
+                                        :title="lineupMetricTooltip(row, 'udpr', 'UDPR', 2)"
+                                    >{{ formatNumber(row.udpr, 2) }}</span>
+                                </template>
+                                <template #cell-kd="{ row }">
+                                    <span
+                                        class="stat-strong"
+                                        :class="playerMetricClass(row, 'kd')"
+                                        :title="lineupMetricTooltip(row, 'kd', 'K/D', 2)"
+                                    >{{ formatNumber(row.kd, 2) }}</span>
+                                </template>
+                                <template #cell-hsPct="{ row }">
+                                    <span
+                                        :class="playerMetricClass(row, 'hsPct')"
+                                        :title="lineupMetricTooltip(row, 'hsPct', 'HS%', 1, true)"
+                                    >{{ formatPercent(row.hsPct || 0, 1) }}</span>
+                                </template>
+                                <template #cell-mapBreakdownSummary="{ row }">
+                                    <div class="lineup-map-breakdown" :title="(row.mapBreakdownTitle || '') + (row.mapBreakdownTitle ? '\\n' : '') + lineupSummaryTooltip(row)">
+                                        <span
+                                            v-for="entry in row.mapBreakdown.slice(0, 3)"
+                                            :key="row.signature + '-' + entry.mapName"
+                                            class="lineup-map-chip"
+                                        >
+                                            <span>{{ entry.mapName }}</span>
+                                            <span class="lineup-map-chip__record">
+                                                <span class="lineup-map-chip__win">{{ entry.wins }}W</span>
+                                                <span class="lineup-map-chip__loss">{{ entry.losses }}L</span>
+                                                <span v-if="entry.draws" class="lineup-map-chip__draw">{{ entry.draws }}D</span>
+                                            </span>
+                                        </span>
+                                        <span v-if="row.mapBreakdown.length > 3" class="lineup-map-chip lineup-map-chip--muted">+{{ row.mapBreakdown.length - 3 }}</span>
+                                    </div>
+                                </template>
+                            </sortable-table>
+                        </div>
+                        <div v-else class="empty-state-container compact">
+                            <div class="empty-state-card">
+                                <h3 class="empty-state-title">{{ matchPlayerStatsLoading ? 'Ladataan lineuppeja' : 'Ei lineup-dataa' }}</h3>
+                                <p class="empty-state-description">
+                                    {{ matchPlayerStatsLoading
+                                        ? 'Kerätään pelattuja viisikoita valitulle kaudelle.'
+                                        : 'Tälle kaudelle ei löytynyt viiden pelaajan lineuppeja.' }}
+                                </p>
+                            </div>
+                        </div>
                     </div>
                     <div v-else class="empty-state-container">
                         <div class="empty-state-card">
