@@ -687,11 +687,6 @@ window.HomeView = {
                     this.loadSeason(season.key, { apiParam: season.apiParam });
                 }
             }
-            this.loadGlobalTeamCount();
-            if (this.selectedSeasonKey) {
-                const season = this.seasonsStore?.getSeasonByKey(this.selectedSeasonKey);
-                this.loadSeasonTeamCount(season?.apiParam ?? season?.id ?? this.selectedSeasonKey, this.seasonDivisions);
-            }
         },
         initializeSeasonSelection() {
             if (!this.sortedSeasons.length || !this.seasonsStore) {
@@ -806,8 +801,6 @@ window.HomeView = {
                 return inFlight;
             }
 
-            this.seasonTeamCount = null;
-            this.seasonTeamCountKey = null;
             const season = this.seasonsStore?.getSeasonByKey(key);
             const apiParam = options.apiParam ?? season?.apiParam ?? key;
             const request = (async () => {
@@ -816,7 +809,6 @@ window.HomeView = {
                         apiParam,
                         force: options.force === true
                     });
-                    this.loadSeasonTeamCount(apiParam, payload?.divisions);
                     return payload;
                 } catch (error) {
                     console.error('Season fetch failed', error);
@@ -884,11 +876,9 @@ window.HomeView = {
         },
         retrySummary() {
             if (!this.homeStore) return;
-            this.globalTeamCount = null;
             this.homeStore.fetchLifetimeSummary({ force: true }).catch(error => {
                 console.error('Summary refresh failed', error);
             });
-            this.loadGlobalTeamCount();
         },
         retrySeason() {
             if (!this.selectedSeasonKey) return;
