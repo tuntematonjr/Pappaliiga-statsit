@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, Literal, Optional
 
 from db_async import count_played_matches, count_played_matches_by_season_and_playoff, query_async
@@ -169,39 +170,39 @@ async def _compute_lifetime_summary_totals() -> dict[str, int]:
         map_round_rows,
         team_totals_rows,
         player_totals_rows,
-    ) = await query_async(
+        matches_played,
+        player_counts,
+    ) = await asyncio.gather(
         # Only count base championships so playoff-only brackets do not inflate the division total.
-        "SELECT COUNT(*) AS cnt FROM championships WHERE is_playoffs = 0"
-    ), await query_async(
-        "SELECT COUNT(DISTINCT team_id) AS cnt FROM teams"
-    ), await query_async(
-        "SELECT COUNT(*) AS cnt FROM maps"
-    ), await query_async(
-        """
+        query_async("SELECT COUNT(*) AS cnt FROM championships WHERE is_playoffs = 0"),
+        query_async("SELECT COUNT(DISTINCT team_id) AS cnt FROM teams"),
+        query_async("SELECT COUNT(*) AS cnt FROM maps"),
+        query_async(
+            """
         SELECT
           COALESCE(SUM(CASE WHEN is_forfeit = 0 THEN (COALESCE(score_team1,0) + COALESCE(score_team2,0)) ELSE 0 END),0) AS total_rounds
         FROM maps
         """
-    ), await query_async(
-        """
+        ),
+        query_async(
+            """
         SELECT
           COALESCE(SUM(maps_played), 0) AS maps_played_total,
           COALESCE(SUM(rounds_won + rounds_lost), 0) AS rounds_total
         FROM team_season_totals
         """
-    ), await query_async(
-        """
+        ),
+        query_async(
+            """
         SELECT
           COALESCE(SUM(kills), 0) AS total_kills,
           COALESCE(SUM(deaths), 0) AS total_deaths
         FROM player_season_totals
         """
+        ),
+        count_played_matches(include_forfeits=False, include_ignored=True),
+        get_player_counts(include_all_time=True),
     )
-    matches_played = await count_played_matches(
-        include_forfeits=False,
-        include_ignored=True,
-    )
-    player_counts = await get_player_counts(include_all_time=True)
     team_totals_row = team_totals_rows[0] if team_totals_rows else {}
     player_totals_row = player_totals_rows[0] if player_totals_rows else {}
 
