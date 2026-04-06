@@ -155,8 +155,10 @@ async def add_cache_control_headers(request: Request, call_next):
             for k, v in STATIC_CACHE_HEADERS_PROD.items():
                 response.headers[k] = v
             # Remove Pragma / Expires that an upstream proxy might have added.
-            response.headers.pop("Pragma", None)
-            response.headers.pop("Expires", None)
+            if "pragma" in response.headers:
+                del response.headers["pragma"]
+            if "expires" in response.headers:
+                del response.headers["expires"]
         else:
             for k, v in STATIC_NO_STORE_HEADERS.items():
                 response.headers[k] = v
