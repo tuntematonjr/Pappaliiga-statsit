@@ -33,7 +33,10 @@ _CACHE_LOCK = asyncio.Lock()
 WHITELISTED_HOSTS = {"distribution.faceit-cdn.net", "assets.faceit-cdn.net"}
 MAX_BYTES = 2 * 1024 * 1024  # 2 MB
 FETCH_TIMEOUT = 10  # seconds
-CACHE_TTL = 60 * 10  # 10 minutes
+CACHE_TTL = 60 * 10  # 10 minutes — server-side in-memory cache
+# Browser / CDN cache lifetime for proxied images. Avatars change very rarely
+# so a long TTL is safe. Can be overridden with PROXY_IMAGE_BROWSER_CACHE_TTL.
+BROWSER_CACHE_TTL = int(os.getenv("PROXY_IMAGE_BROWSER_CACHE_TTL", str(60 * 60 * 24)))  # 1 day
 MAX_CACHE_ENTRIES = max(32, int(os.getenv("PROXY_IMAGE_MAX_CACHE_ENTRIES", "512")))
 MAX_CACHE_KEY_LENGTH = max(256, int(os.getenv("PROXY_IMAGE_MAX_CACHE_KEY_LENGTH", "2048")))
 MAX_REDIRECTS = 3
@@ -162,7 +165,7 @@ def _parse_and_validate_url(raw_url: str, *, allow_first_party: bool = False) ->
 
 def _response_headers(source: str) -> dict[str, str]:
     return {
-        "Cache-Control": f"public, max-age={CACHE_TTL}",
+        "Cache-Control": f"public, max-age={BROWSER_CACHE_TTL}",
         "X-Content-Type-Options": "nosniff",
         "X-Proxy-Image-Source": source,
     }
