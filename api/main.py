@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import asyncio
 import logging
+import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,12 +54,28 @@ def _install_access_log_filters() -> None:
 
 _install_access_log_filters()
 
+_IS_PRODUCTION = os.environ.get("APP_ENV", "").lower() == "production"
+
 SPA_NO_STORE_HEADERS = {
     "Cache-Control": "no-cache, no-store, must-revalidate",
     "Pragma": "no-cache",
     "Expires": "0",
     "CDN-Cache-Control": "no-store",
     "Surrogate-Control": "no-store",
+}
+
+# Static assets (JS, CSS, images) use no-cache in production so browsers always
+# revalidate with If-None-Match / If-Modified-Since before serving from cache.
+# Unchanged files get a fast 304 (no body); updated files get the new content
+# immediately after a deploy, with no stale-window problem.
+# In development everything stays no-store so edits are visible without refreshing.
+STATIC_CACHE_HEADERS_PROD = {
+    "Cache-Control": "no-cache",
+}
+STATIC_NO_STORE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
 }
 
 
@@ -134,9 +151,15 @@ async def add_cache_control_headers(request: Request, call_next):
         return response
 
     if path.startswith("/static/"):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        if _IS_PRODUCTION:
+            for k, v in STATIC_CACHE_HEADERS_PROD.items():
+                response.headers[k] = v
+            # Remove Pragma / Expires that an upstream proxy might have added.
+            response.headers.pop("Pragma", None)
+            response.headers.pop("Expires", None)
+        else:
+            for k, v in STATIC_NO_STORE_HEADERS.items():
+                response.headers[k] = v
 
     return response
 

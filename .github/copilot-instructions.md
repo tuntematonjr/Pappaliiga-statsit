@@ -106,4 +106,6 @@ SYNC_DIAGNOSTICS_INTERVAL=15
 SYNC_DIAGNOSTICS_PATH=logs/runtime_diagnostics.jsonl
 SYNC_LOG_DIR=logs
 SYNC_LOG_MAX_FILES=10
+APP_ENV=production
 ```
+`APP_ENV=production` switches static files (`/static/*`) from `no-store` to `no-cache` so browsers always revalidate (ETag/Last-Modified → 304 if unchanged, fresh content if changed). `index.html` and SPA HTML routes always stay `no-store` so deploys are visible immediately.
