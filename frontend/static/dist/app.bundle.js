@@ -2190,7 +2190,7 @@ window.useCellColorization = function() {
 		getTextColorClass,
 		createLegend
 	};
-}
+};
 
 /**
  * Usage Example:
