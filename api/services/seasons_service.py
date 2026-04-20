@@ -262,7 +262,11 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
             c.slug,
             c.is_playoffs,
             c.parent_championship_id,
-            COUNT(DISTINCT CASE WHEN m.is_forfeit = 0 THEN ct.team_id END) AS teams_count,
+            COUNT(DISTINCT CASE
+                WHEN m.is_forfeit = 0
+                     AND (cts.status IS NULL OR cts.status NOT IN ('banned', 'quit'))
+                THEN ct.team_id
+            END) AS teams_count,
             MIN(m.started_at) AS first_started,
             MAX(NULLIF(m.finished_at, 0)) AS last_finished
         FROM championships c
@@ -272,6 +276,9 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
             UNION
             SELECT DISTINCT match_id, team2_id AS team_id FROM matches
         ) ct ON ct.match_id = m.match_id
+        LEFT JOIN championship_team_statuses cts
+            ON cts.championship_id = c.championship_id
+            AND cts.team_id = ct.team_id
         WHERE c.season = :season
         GROUP BY c.championship_id, c.season, c.division_num, c.name, c.slug, c.is_playoffs, c.parent_championship_id
         ORDER BY c.is_playoffs ASC, c.division_num ASC

@@ -672,7 +672,8 @@ window.DivisionView = {
             const players = Array.isArray(details.player_totals || details.playerTotals) ? (details.player_totals || details.playerTotals) : [];
             const maps = Array.isArray(this.mapStats) ? this.mapStats : [];
 
-            aggregates.team_count = aggregates.team_count ?? teams.length ?? details.team_count;
+            const activeTeamCount = teams.filter(t => !t.status || (t.status.toLowerCase() !== 'banned' && t.status.toLowerCase() !== 'quit')).length;
+            aggregates.team_count = aggregates.team_count ?? activeTeamCount ?? details.team_count;
             aggregates.player_count = aggregates.player_count ?? details.player_count ?? players.length;
             if (aggregates.matches_played == null) {
                 const playedMatches =

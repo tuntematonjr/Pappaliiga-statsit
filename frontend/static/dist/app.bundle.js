@@ -5677,6 +5677,7 @@ window.TeamComparisonBoard = {
                 const kd = this.parseNumber(team.kd ?? team.kd_ratio ?? 0);
                 const adr = this.parseNumber(team.adr ?? team.average_damage ?? 0);
                 const displayName = team.display_name || team.team_name || team.name || `Joukkue ${idx + 1}`;
+                const status = (team.status || '').toLowerCase();
 
                 return {
                     id: team.team_id || team.id || `team-${idx}`,
@@ -5690,7 +5691,9 @@ window.TeamComparisonBoard = {
                     win_rate: winRate,
                     kd,
                     adr,
-                    split: { wins, losses }
+                    split: { wins, losses },
+                    status,
+                    status_reason: team.status_reason || null,
                 };
             });
 
@@ -5814,13 +5817,15 @@ window.TeamComparisonBoard = {
                         :highlight-row-id="highlightTeamId"
                     >
                         <template #cell-team="{ row }">
-                            <div class="team-comparison-team">
+                            <div :class="['team-comparison-team', { 'team-comparison-team--excluded': row.status === 'banned' || row.status === 'quit' }]">
                                 <span v-if="showRank" class="team-rank">{{ row.rank }}</span>
                                 <img class="team-logo" :src="row.logo" :alt="row.name" loading="lazy" />
                                 <a :href="getTeamUrl(row.id, row.name)" class="team-name team-name--link" :title="'Avaa ' + row.name + ' joukkueen sivu'">
                                     <span class="team-name__label">{{ row.name }}</span>
                                     <span class="team-name__icon" aria-hidden="true">↗</span>
                                 </a>
+                                <span v-if="row.status === 'banned'" class="team-status-badge team-status-badge--banned" :title="row.status_reason || 'Bännatty'">BÄNNI</span>
+                                <span v-else-if="row.status === 'quit'" class="team-status-badge team-status-badge--quit" :title="row.status_reason || 'Lopettanut kesken kauden'">LOPETTI</span>
                             </div>
                         </template>
 
@@ -18603,7 +18608,8 @@ window.DivisionView = {
             const players = Array.isArray(details.player_totals || details.playerTotals) ? (details.player_totals || details.playerTotals) : [];
             const maps = Array.isArray(this.mapStats) ? this.mapStats : [];
 
-            aggregates.team_count = aggregates.team_count ?? teams.length ?? details.team_count;
+            const activeTeamCount = teams.filter(t => !t.status || (t.status.toLowerCase() !== 'banned' && t.status.toLowerCase() !== 'quit')).length;
+            aggregates.team_count = aggregates.team_count ?? activeTeamCount ?? details.team_count;
             aggregates.player_count = aggregates.player_count ?? details.player_count ?? players.length;
             if (aggregates.matches_played == null) {
                 const playedMatches =
