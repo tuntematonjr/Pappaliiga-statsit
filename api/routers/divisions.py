@@ -85,6 +85,7 @@ class DivisionAggregates(CamelModel):
     played_matches: int
     total_matches: int
     forfeits: int
+    team_count: int | None = None
 
 
 class DivisionPlayerTotals(CamelModel):

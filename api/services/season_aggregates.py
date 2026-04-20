@@ -50,7 +50,15 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
             COALESCE(SUM(tst.rounds_won), 0) AS rounds_won_total,
             COALESCE(SUM(tst.rounds_lost), 0) AS rounds_lost_total
         FROM team_season_totals tst
+        LEFT JOIN championships c
+            ON c.season = tst.season
+            AND c.division_num = tst.division_num
+            AND c.is_playoffs = 0
+        LEFT JOIN championship_team_statuses cts
+            ON cts.championship_id = c.championship_id
+            AND cts.team_id = tst.team_id
         WHERE tst.season = :season
+          AND (cts.status IS NULL OR cts.status NOT IN ('banned', 'quit'))
         """,
         {"season": season},
     ), await query_async(

@@ -595,6 +595,11 @@ async def _compute_division_details(championship_id: str, season: int, division_
         aggregates["matches_played"] = aggregates["played_matches"]
     if aggregates.get("total_matches") is None and aggregates.get("matches_played") is not None:
         aggregates["total_matches"] = aggregates["matches_played"]
+    # Active team count (excludes banned/quit) so the frontend card shows the correct number
+    aggregates["team_count"] = sum(
+        1 for t in teams
+        if (t.get("status") or "").lower() not in ("banned", "quit")
+    )
 
     return {
         "championship_id": championship_id,

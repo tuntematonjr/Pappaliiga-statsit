@@ -137,6 +137,7 @@ async def get_division_matches(
             LEFT JOIN team_championships tc2 ON tc2.team_id = m.team2_id AND tc2.championship_id = :champ_id
             LEFT JOIN maps mp ON mp.match_id = m.match_id
             WHERE m.championship_id = :champ_id
+              AND COALESCE(m.ignored_due_ban, 0) = 0
             GROUP BY
                 m.match_id,
                 m.championship_id,
@@ -157,7 +158,7 @@ async def get_division_matches(
         )
 
         count_rows = await query_async(
-            "SELECT COUNT(*) AS total FROM matches WHERE championship_id = :champ_id",
+            "SELECT COUNT(*) AS total FROM matches WHERE championship_id = :champ_id AND COALESCE(ignored_due_ban, 0) = 0",
             {"champ_id": championship_id},
         )
         total = int(count_rows[0].get("total") or 0) if count_rows else 0
