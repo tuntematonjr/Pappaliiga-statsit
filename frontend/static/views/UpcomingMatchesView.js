@@ -58,13 +58,40 @@ window.UpcomingMatchesView = {
         }
     },
     mounted() {
-        if (this.seasonsStore && !this.seasonsLoaded) {
-            this.seasonsStore.fetchSeasons().catch(err => {
-                console.error('[UpcomingMatchesView] seasons fetch failed', err);
-            });
-        }
+        // Load seasons + upcoming in a single bundle call
+        this._loadBundle().catch(err => {
+            console.error('[UpcomingMatchesView] bundle fetch failed', err);
+        });
     },
     methods: {
+        async _loadBundle() {
+            if (!window.apiClient || typeof window.apiClient.getSeasonsUpcoming !== 'function') {
+                // Fallback: let the store watchers handle individual fetches
+                if (this.seasonsStore && !this.seasonsLoaded) {
+                    this.seasonsStore.fetchSeasons().catch(() => {});
+                }
+                return;
+            }
+            try {
+                const bundle = await window.apiClient.getSeasonsUpcoming({
+                    includePlayoffs: true,
+                    limit: this.limit,
+                    offset: 0
+                });
+                if (this.seasonsStore && typeof this.seasonsStore.seedSeasons === 'function') {
+                    this.seasonsStore.seedSeasons(bundle.seasons);
+                }
+                if (this.upcomingStore && typeof this.upcomingStore.seedUpcoming === 'function') {
+                    const params = { ...this.upcomingParams };
+                    this.upcomingStore.seedUpcoming(params, bundle.upcoming);
+                }
+            } catch (err) {
+                console.warn('[UpcomingMatchesView] bundle fetch failed, falling back', err);
+                if (this.seasonsStore && !this.seasonsLoaded) {
+                    this.seasonsStore.fetchSeasons().catch(() => {});
+                }
+            }
+        },
         async loadUpcoming() {
             if (!this.upcomingStore || !this.currentSeasonId) return;
             try {

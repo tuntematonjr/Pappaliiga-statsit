@@ -11,6 +11,7 @@ from . import (
     share_preview,
     season_view,
     stats,
+    team_statuses,
     teams,
     webhook,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "share_preview",
     "season_view",
     "stats",
+    "team_statuses",
     "teams",
     "webhook",
 ]

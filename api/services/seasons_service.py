@@ -13,7 +13,7 @@ from db_async import (
     count_total_matches_by_championship_ids,
     query_async,
 )
-from division_overrides import combined_status_teams
+from api.services import team_status_service
 from division_naming import build_division_name
 from api.services.cache_helpers import (
     GLOBAL_CACHE,
@@ -63,7 +63,7 @@ async def _compute_seasons_list() -> List[Dict[str, Any]]:
     finished_map = await count_played_matches_by_season(
         seasons=season_ids,
         include_forfeits=True,
-        include_ignored=True,
+        include_ignored=False,
     )
     
     seasons = []
@@ -153,7 +153,7 @@ async def _compute_season_summary(season: int) -> Dict[str, Any]:
     played_map = await count_played_matches_by_season_and_playoff(
         seasons=[season],
         include_forfeits=True,
-        include_ignored=True,
+        include_ignored=False,
     )
     regular_played = int(played_map.get((season, 0), 0))
     playoff_played = int(played_map.get((season, 1), 0))
@@ -283,7 +283,7 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
     played_map = await count_played_matches_by_championship_ids(
         championship_ids=champ_ids,
         include_forfeits=True,
-        include_ignored=True,
+        include_ignored=False,
     )
     total_map = await count_total_matches_by_championship_ids(
         championship_ids=champ_ids,
@@ -571,7 +571,7 @@ async def _compute_division_detailed_stats(season: int, division_id: str) -> Dic
     division_num = int(div_data["division_num"])
     
     # Get excluded teams
-    excluded_teams = {team["team_id"] for team in combined_status_teams(division_id)}
+    excluded_teams = await team_status_service.get_excluded_team_ids(division_id)
     
     # Build exclusion clause
     exclusion_clause = ""
@@ -788,7 +788,7 @@ async def _compute_playoff_bracket(championship_id: str) -> Dict[str, Any]:
     played = await count_played_matches(
         championship_id=championship_id,
         include_forfeits=False,
-        include_ignored=True,
+        include_ignored=False,
     )
     for row in matches_rows:
         bracket.append({

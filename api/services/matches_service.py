@@ -439,6 +439,7 @@ async def get_upcoming_matches(
 
     statuses_sql = ", ".join([f"'{status}'" for status in _UPCOMING_STATUSES])
     where_clauses = [f"UPPER(COALESCE(m.status, '')) IN ({statuses_sql})"]
+    where_clauses.append("COALESCE(m.ignored_due_ban, 0) = 0")
     params: dict[str, Any] = {"limit": limit, "offset": offset}
 
     if championship_id:
@@ -473,6 +474,7 @@ async def get_upcoming_matches(
                 COALESCE(tc2.team_name, t2.name) AS team2_name,
                 t1.avatar AS team1_avatar,
                 t2.avatar AS team2_avatar,
+                m.ignored_due_ban,
                 NULLIF(m.scheduled_at, 0) AS scheduled_at,
                 NULLIF(m.configured_at, 0) AS configured_at,
                 NULLIF(m.started_at, 0) AS started_at,
@@ -513,6 +515,7 @@ async def get_upcoming_matches(
                 {
                     **row,
                     "is_playoffs": bool(row.get("is_playoffs")),
+                    "ignored_due_ban": bool(row.get("ignored_due_ban")),
                     "scheduled_ts": scheduled_ms,
                     "scheduled_at": _iso_from_epoch(scheduled_ms),
                     "faceit_url": f"https://www.faceit.com/cs2/room/{row.get('match_id')}" if row.get("match_id") else "",

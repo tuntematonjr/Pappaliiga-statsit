@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict, Literal, Optional
 
 from db_async import count_played_matches, count_played_matches_by_season_and_playoff, query_async
 
 from api.exceptions import BadRequestError, NotFoundError
+from api.services import team_status_service
 from api.services.cache_helpers import (
     GLOBAL_CACHE,
     get_championship_revision,
@@ -15,12 +15,10 @@ from api.services.cache_helpers import (
 )
 from api.services.player_counts import get_player_counts
 from api.services.season_aggregates import dedupe_team_total, get_season_summary_totals
-from division_overrides import combined_status_teams
 
 
-def _get_excluded_team_ids(championship_id: str) -> set[str]:
-    teams = combined_status_teams(str(championship_id))
-    return {team["team_id"] for team in teams}
+async def _get_excluded_team_ids(championship_id: str) -> set[str]:
+    return await team_status_service.get_excluded_team_ids(str(championship_id))
 
 
 def _build_empty_averages() -> dict[str, float]:
@@ -170,39 +168,39 @@ async def _compute_lifetime_summary_totals() -> dict[str, int]:
         map_round_rows,
         team_totals_rows,
         player_totals_rows,
-        matches_played,
-        player_counts,
-    ) = await asyncio.gather(
+    ) = await query_async(
         # Only count base championships so playoff-only brackets do not inflate the division total.
-        query_async("SELECT COUNT(*) AS cnt FROM championships WHERE is_playoffs = 0"),
-        query_async("SELECT COUNT(DISTINCT team_id) AS cnt FROM teams"),
-        query_async("SELECT COUNT(*) AS cnt FROM maps"),
-        query_async(
-            """
+        "SELECT COUNT(*) AS cnt FROM championships WHERE is_playoffs = 0"
+    ), await query_async(
+        "SELECT COUNT(DISTINCT team_id) AS cnt FROM teams"
+    ), await query_async(
+        "SELECT COUNT(*) AS cnt FROM maps"
+    ), await query_async(
+        """
         SELECT
           COALESCE(SUM(CASE WHEN is_forfeit = 0 THEN (COALESCE(score_team1,0) + COALESCE(score_team2,0)) ELSE 0 END),0) AS total_rounds
         FROM maps
         """
-        ),
-        query_async(
-            """
+    ), await query_async(
+        """
         SELECT
           COALESCE(SUM(maps_played), 0) AS maps_played_total,
           COALESCE(SUM(rounds_won + rounds_lost), 0) AS rounds_total
         FROM team_season_totals
         """
-        ),
-        query_async(
-            """
+    ), await query_async(
+        """
         SELECT
           COALESCE(SUM(kills), 0) AS total_kills,
           COALESCE(SUM(deaths), 0) AS total_deaths
         FROM player_season_totals
         """
-        ),
-        count_played_matches(include_forfeits=False, include_ignored=True),
-        get_player_counts(include_all_time=True),
     )
+    matches_played = await count_played_matches(
+        include_forfeits=False,
+        include_ignored=False,
+    )
+    player_counts = await get_player_counts(include_all_time=True)
     team_totals_row = team_totals_rows[0] if team_totals_rows else {}
     player_totals_row = player_totals_rows[0] if player_totals_rows else {}
 
@@ -380,7 +378,7 @@ async def _compute_division_averages(championship_id: str) -> dict[str, float]:
 
     season = champ_rows[0]["season"]
     division_num = champ_rows[0]["division_num"]
-    excluded = _get_excluded_team_ids(championship_id)
+    excluded = await _get_excluded_team_ids(championship_id)
 
     where_clause = "pst.season = :season AND pst.division_num = :division"
     params: Dict[str, Any] = {"season": season, "division": division_num}
@@ -433,7 +431,7 @@ async def _compute_season_averages(season: int) -> dict[str, float]:
     for row in champ_rows:
         champ_id = str(row.get("championship_id") or "")
         if champ_id:
-            excluded.update(_get_excluded_team_ids(champ_id))
+            excluded.update(await _get_excluded_team_ids(champ_id))
 
     where_clause = "pst.season = :season"
     params: Dict[str, Any] = {"season": season}
@@ -512,7 +510,7 @@ async def _compute_season_stats(season: int) -> dict[str, Any]:
     played_map = await count_played_matches_by_season_and_playoff(
         seasons=[season],
         include_forfeits=True,
-        include_ignored=True,
+        include_ignored=False,
     )
     regular_played = int(played_map.get((season, 0), 0))
     playoff_played = int(played_map.get((season, 1), 0))
@@ -645,7 +643,7 @@ async def _get_season_progress(season: int, summary_totals: dict[str, Any]) -> d
     played_map = await count_played_matches_by_season_and_playoff(
         seasons=[season],
         include_forfeits=True,
-        include_ignored=True,
+        include_ignored=False,
     )
     regular_played = int(played_map.get((season, 0), 0))
     playoff_played = int(played_map.get((season, 1), 0))

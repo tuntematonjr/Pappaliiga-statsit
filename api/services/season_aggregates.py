@@ -1,7 +1,6 @@
 """Shared helpers for computing season-level summary totals."""
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Dict
 
 from db_async import count_played_matches, query_async
@@ -40,9 +39,8 @@ async def get_season_summary_totals(season: int) -> Dict[str, Any]:
 
 async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
     """Compute season summary totals without caching."""
-    team_rows, player_rows, division_rows_primary, map_round_rows, matches_played = await asyncio.gather(
-        query_async(
-            """
+    team_rows, player_rows = await query_async(
+        """
         SELECT
             COUNT(DISTINCT tst.team_id) AS total_teams,
             COALESCE(SUM(tst.matches_played), 0) AS matches_played_total,
@@ -54,10 +52,9 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
         FROM team_season_totals tst
         WHERE tst.season = :season
         """,
-            {"season": season},
-        ),
-        query_async(
-            """
+        {"season": season},
+    ), await query_async(
+        """
         SELECT
             COUNT(DISTINCT pst.player_id) AS total_players,
             COALESCE(SUM(pst.kills), 0) AS total_kills,
@@ -69,32 +66,7 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
         FROM player_season_totals pst
         WHERE pst.season = :season
         """,
-            {"season": season},
-        ),
-        query_async(
-            """
-        SELECT COUNT(*) AS cnt
-        FROM championships
-        WHERE season = :season
-          AND is_playoffs = 0
-        """,
-            {"season": season},
-        ),
-        query_async(
-            """
-        SELECT
-            COUNT(*) AS total_maps,
-            COALESCE(SUM(CASE WHEN is_forfeit = 0 THEN (COALESCE(score_team1,0) + COALESCE(score_team2,0)) ELSE 0 END),0) AS total_rounds
-        FROM maps
-        WHERE season = :season
-        """,
-            {"season": season},
-        ),
-        count_played_matches(
-            season=season,
-            include_forfeits=False,
-            include_ignored=True,
-        ),
+        {"season": season},
     )
     team_totals_row = team_rows[0] if team_rows else {}
     player_totals_row = player_rows[0] if player_rows else {}
@@ -118,7 +90,16 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
         "total_entry_diff": int(player_totals_row.get("total_entry_diff") or 0),
     }
 
-    if not division_rows_primary or not division_rows_primary[0].get("cnt"):
+    division_rows = await query_async(
+        """
+        SELECT COUNT(*) AS cnt
+        FROM championships
+        WHERE season = :season
+          AND is_playoffs = 0
+        """,
+        {"season": season},
+    )
+    if not division_rows or not division_rows[0].get("cnt"):
         division_rows = await query_async(
             """
             SELECT COUNT(DISTINCT division_num) AS cnt
@@ -127,8 +108,28 @@ async def _compute_season_summary_totals(season: int) -> Dict[str, Any]:
             """,
             {"season": season},
         )
-    else:
-        division_rows = division_rows_primary
+
+    matches_played = await count_played_matches(
+        season=season,
+        include_forfeits=False,
+        include_ignored=False,
+    )
+    map_round_rows = await query_async(
+        """
+        SELECT
+            COUNT(*) AS total_maps,
+            COALESCE(SUM(CASE WHEN is_forfeit = 0 THEN (COALESCE(score_team1,0) + COALESCE(score_team2,0)) ELSE 0 END),0) AS total_rounds
+        FROM maps
+        WHERE season = :season
+                    AND match_id IN (
+                            SELECT match_id
+                            FROM matches
+                            WHERE season = :season
+                                AND COALESCE(ignored_due_ban, 0) = 0
+                    )
+        """,
+        {"season": season},
+    )
 
     map_round_row = map_round_rows[0] if map_round_rows else {}
 

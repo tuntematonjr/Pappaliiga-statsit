@@ -37,8 +37,7 @@ window.TeamsView = {
         }
     },
     async mounted() {
-        await this.loadSeasons();
-        await this.loadTeams();
+        await this.loadAll();
     },
     watch: {
         selectedSeasonId() {
@@ -46,14 +45,20 @@ window.TeamsView = {
         }
     },
     methods: {
-        async loadSeasons() {
+        async loadAll() {
+            this.loading = true;
+            this.error = null;
             try {
-                const rows = await window.apiClient.getSeasons();
-                const normalized = Array.isArray(rows) ? [...rows] : [];
-                this.seasons = normalized.sort((a, b) => Number(this.getSeasonId(b) || 0) - Number(this.getSeasonId(a) || 0));
+                const bundle = await window.apiClient.getSeasonsTeams({ limit: 5000 });
+                const rawSeasons = Array.isArray(bundle.seasons) ? [...bundle.seasons] : [];
+                this.seasons = rawSeasons.sort((a, b) => Number(this.getSeasonId(b) || 0) - Number(this.getSeasonId(a) || 0));
+                this.teams = Array.isArray(bundle.teams)
+                    ? [...bundle.teams].sort((a, b) => this.getTeamName(a).localeCompare(this.getTeamName(b), 'fi'))
+                    : [];
             } catch (error) {
-                console.warn('[TeamsView] seasons fetch failed', error);
-                this.seasons = [];
+                this.error = error?.message || 'Tietojen lataus epäonnistui';
+            } finally {
+                this.loading = false;
             }
         },
         async loadTeams() {

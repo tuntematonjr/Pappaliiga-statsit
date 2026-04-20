@@ -93,6 +93,15 @@
                 } finally {
                     entry.loading = false;
                 }
+            },
+            seedUpcoming(params, items, meta = null) {
+                const key = buildKey(params);
+                const entry = this.ensureEntry(key);
+                if (isFresh(entry)) return;
+                entry.data = Array.isArray(items) ? items : [];
+                entry.meta = meta;
+                entry.fetchedAt = now();
+                entry.params = params;
             }
         }
     });

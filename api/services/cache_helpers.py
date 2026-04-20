@@ -63,7 +63,13 @@ async def get_season_revision(season: int) -> Optional[str]:
                 COALESCE((SELECT MAX(updated_at) FROM player_season_totals WHERE season = :season), '1970-01-01 00:00:00'),
                 COALESCE((SELECT MAX(updated_at) FROM team_map_season_totals WHERE season = :season), '1970-01-01 00:00:00'),
                 COALESCE((SELECT MAX(updated_at) FROM player_map_season_totals WHERE season = :season), '1970-01-01 00:00:00'),
-                COALESCE((SELECT MAX(updated_at) FROM championships WHERE season = :season), '1970-01-01 00:00:00')
+                COALESCE((SELECT MAX(updated_at) FROM championships WHERE season = :season), '1970-01-01 00:00:00'),
+                COALESCE((
+                    SELECT MAX(cts.updated_at)
+                    FROM championship_team_statuses cts
+                    JOIN championships c ON c.championship_id = cts.championship_id
+                    WHERE c.season = :season
+                ), '1970-01-01 00:00:00')
             ) AS revision
             """,
             {"season": season},
@@ -89,6 +95,11 @@ async def get_championship_revision(championship_id: str) -> Optional[str]:
                     FROM maps mp
                     JOIN matches m ON m.match_id = mp.match_id
                     WHERE m.championship_id = :champ_id
+                ), '1970-01-01 00:00:00'),
+                COALESCE((
+                    SELECT MAX(updated_at)
+                    FROM championship_team_statuses
+                    WHERE championship_id = :champ_id
                 ), '1970-01-01 00:00:00')
             ) AS revision
             """,
@@ -117,7 +128,8 @@ async def get_global_revision() -> Optional[str]:
                 COALESCE((SELECT MAX(updated_at) FROM player_map_season_totals), '1970-01-01 00:00:00'),
                 COALESCE((SELECT MAX(updated_at) FROM championships), '1970-01-01 00:00:00'),
                 COALESCE((SELECT MAX(updated_at) FROM teams), '1970-01-01 00:00:00'),
-                COALESCE((SELECT MAX(updated_at) FROM players), '1970-01-01 00:00:00')
+                COALESCE((SELECT MAX(updated_at) FROM players), '1970-01-01 00:00:00'),
+                COALESCE((SELECT MAX(updated_at) FROM championship_team_statuses), '1970-01-01 00:00:00')
             ) AS revision
             """
         )

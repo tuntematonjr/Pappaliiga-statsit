@@ -17,7 +17,7 @@ import httpx
 from utils import format_hms, log_stage
 from runtime_diagnostics import SyncDiagnostics
 
-from division_overrides import combined_status_teams, load_division_overrides
+from division_overrides import load_division_overrides
 from faceit_client_async import (
     get_championship_matches_async,
     get_map_votes_async,
@@ -28,6 +28,7 @@ from faceit_client_async import (
 
 import faceit_config
 from division_naming import build_division_name
+from api.services import team_status_service
 
 from db_async import (
     DEFAULT_TEAM_AVATAR,
@@ -1443,7 +1444,7 @@ async def sync_championship_async(
     is_playoffs = bool(division_info.get("is_playoffs"))
 
     override_source = overrides if overrides is not None else _get_default_overrides()
-    status_entries = combined_status_teams(championship_id, override_source)
+    status_entries = await team_status_service.list_team_statuses(championship_id)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
     team_payloads = await _build_championship_team_payloads(
         championship_id,
@@ -1850,7 +1851,7 @@ async def update_single_match_async(
     is_playoffs = bool(division.get("is_playoffs"))
 
     override_source = overrides if overrides is not None else _get_default_overrides()
-    status_entries = combined_status_teams(championship_id, override_source)
+    status_entries = await team_status_service.list_team_statuses(championship_id)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
     team_payloads = await _build_championship_team_payloads(
         championship_id,

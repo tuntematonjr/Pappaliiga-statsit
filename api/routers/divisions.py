@@ -17,6 +17,10 @@ class TeamBasic(CamelModel):
     team_name: str
     display_name: Optional[str]
     avatar: Optional[str]
+    status: Optional[str] = None
+    status_reason: Optional[str] = None
+    status_note: Optional[str] = None
+    status_effective_at: Optional[int] = None
     matches_played: int = 0
     matches_won: int = 0
     matches_lost: int = 0
@@ -138,6 +142,7 @@ class DivisionDetails(CamelModel):
     parent_championship_id: Optional[str] = None
     teams: List[TeamBasic]
     excluded_team_ids: List[str]
+    excluded_teams: Optional[List[dict]] = None
     map_stats: Optional[List[MapVoteStats]] = None
     aggregates: Optional[DivisionAggregates] = None
     leaders: Optional[List[DivisionLeader]] = None

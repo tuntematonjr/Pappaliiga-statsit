@@ -50,6 +50,7 @@ class UpcomingMatchSummary(CamelModel):
     team2_name: Optional[str] = None
     team1_avatar: Optional[str] = None
     team2_avatar: Optional[str] = None
+    ignored_due_ban: bool = False
     faceit_url: Optional[str] = None
 
 

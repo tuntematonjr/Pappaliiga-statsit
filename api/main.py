@@ -10,7 +10,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 import asyncio
 import logging
-import os
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,10 +19,11 @@ from fastapi.staticfiles import StaticFiles
 from db_async import close_pool, get_pool
 from api.services.sync_event_queue import get_sync_event_queue
 
-from .routers import debug, divisions, matches, players, stats, teams, seasons
+from .routers import debug, divisions, matches, players, stats, team_statuses, teams, seasons
 from .routers import maps_catalog, image_proxy, season_view
 from .routers import share_preview
 from .routers import webhook
+from .routers import home_page, division_page, list_pages
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.cache_reheat import reheat_main_page
 
@@ -54,8 +54,6 @@ def _install_access_log_filters() -> None:
 
 _install_access_log_filters()
 
-_IS_PRODUCTION = os.environ.get("APP_ENV", "").lower() == "production"
-
 SPA_NO_STORE_HEADERS = {
     "Cache-Control": "no-cache, no-store, must-revalidate",
     "Pragma": "no-cache",
@@ -64,20 +62,8 @@ SPA_NO_STORE_HEADERS = {
     "Surrogate-Control": "no-store",
 }
 
-# Static assets (JS, CSS, images) use no-cache in production so browsers always
-# revalidate with If-None-Match / If-Modified-Since before serving from cache.
-# Unchanged files get a fast 304 (no body); updated files get the new content
-# immediately after a deploy, with no stale-window problem.
-# In development everything stays no-store so edits are visible without refreshing.
-STATIC_CACHE_HEADERS_PROD = {
-    "Cache-Control": "no-cache",
-}
-STATIC_NO_STORE_HEADERS = {
-    "Cache-Control": "no-cache, no-store, must-revalidate",
-    "Pragma": "no-cache",
-    "Expires": "0",
-}
 
+import os
 
 # Load environment variables from .env file if present
 env_path = Path(__file__).parent.parent / ".env"
@@ -151,17 +137,9 @@ async def add_cache_control_headers(request: Request, call_next):
         return response
 
     if path.startswith("/static/"):
-        if _IS_PRODUCTION:
-            for k, v in STATIC_CACHE_HEADERS_PROD.items():
-                response.headers[k] = v
-            # Remove Pragma / Expires that an upstream proxy might have added.
-            if "pragma" in response.headers:
-                del response.headers["pragma"]
-            if "expires" in response.headers:
-                del response.headers["expires"]
-        else:
-            for k, v in STATIC_NO_STORE_HEADERS.items():
-                response.headers[k] = v
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
 
     return response
 
@@ -179,19 +157,32 @@ app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
 app.include_router(players.router, prefix="/api/players", tags=["players"])
 app.include_router(matches.router, prefix="/api/matches", tags=["matches"])
 app.include_router(stats.router, prefix="/api/stats", tags=["stats"])
+app.include_router(team_statuses.router, prefix="/api/team-statuses", tags=["team-statuses"])
 app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 app.include_router(maps_catalog.router, prefix="/api/maps", tags=["maps"])
 app.include_router(image_proxy.router, prefix="/api", tags=["images"])
 app.include_router(season_view.router, prefix="/api", tags=["season-view"])
 app.include_router(webhook.router, tags=["webhook"])
 app.include_router(webhook.router, prefix="/api", tags=["webhook"])
+app.include_router(home_page.router, prefix="/api", tags=["home-page"])
+app.include_router(division_page.router, prefix="/api", tags=["division-page"])
+app.include_router(list_pages.router, prefix="/api", tags=["list-pages"])
+
+
+def _resolve_index_html(frontend_dir: Path) -> Path:
+    """Return index.prod.html when APP_ENV=production and the file exists, else index.html."""
+    if os.environ.get("APP_ENV") == "production":
+        prod_path = frontend_dir / "index.prod.html"
+        if prod_path.exists():
+            return prod_path
+    return frontend_dir / "index.html"
 
 
 @app.get("/")
 async def root(request: Request):
     """Serve the frontend index.html."""
     frontend_dir = Path(__file__).parent.parent / "frontend"
-    index_path = frontend_dir / "index.html"
+    index_path = _resolve_index_html(frontend_dir)
 
     if share_preview.is_preview_crawler_request(request):
         return await share_preview.build_preview_for_spa_path(request, "")
@@ -247,7 +238,7 @@ async def spa_fallback(full_path: str, request: Request):
         return await share_preview.build_preview_for_spa_path(request, full_path)
 
     frontend_dir = Path(__file__).parent.parent / "frontend"
-    index_path = frontend_dir / "index.html"
+    index_path = _resolve_index_html(frontend_dir)
 
     if index_path.exists():
         return FileResponse(str(index_path), headers=SPA_NO_STORE_HEADERS)

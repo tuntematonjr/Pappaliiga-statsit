@@ -54,6 +54,25 @@ CREATE TABLE IF NOT EXISTS team_championships (
         REFERENCES championships (championship_id) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS championship_team_statuses (
+    championship_id VARCHAR(64) NOT NULL,
+    team_id VARCHAR(64) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    effective_at BIGINT(20) NULL,
+    reason VARCHAR(255) NULL,
+    note TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (championship_id, team_id),
+    KEY idx_championship_team_statuses_team (team_id),
+    KEY idx_championship_team_statuses_status (status),
+    KEY idx_championship_team_statuses_effective (effective_at),
+    CONSTRAINT fk_championship_team_statuses_championship FOREIGN KEY (championship_id)
+        REFERENCES championships (championship_id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_championship_team_statuses_team FOREIGN KEY (team_id)
+        REFERENCES teams (team_id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Player championship history: stores player nickname as they appeared in each championship
 CREATE TABLE IF NOT EXISTS player_championships (
     player_id VARCHAR(64) NOT NULL,

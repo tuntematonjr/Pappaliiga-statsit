@@ -39,8 +39,7 @@ window.PlayersView = {
         }
     },
     async mounted() {
-        await this.loadSeasons();
-        await this.loadPlayers();
+        await this.loadAll();
     },
     watch: {
         selectedSeasonId() {
@@ -48,25 +47,26 @@ window.PlayersView = {
         }
     },
     methods: {
-        async loadSeasons() {
-            const requestToken = ++this.seasonsLoadToken;
+        async loadAll() {
+            const requestToken = ++this.playersLoadToken;
+            ++this.seasonsLoadToken;
+            this.loading = true;
+            this.error = null;
             try {
-                const rows = await window.apiClient.getSeasons({
-                    force: true,
-                    noCache: true,
-                    persistCache: false
-                });
-                const normalized = Array.isArray(rows) ? [...rows] : [];
-                if (requestToken !== this.seasonsLoadToken) {
-                    return;
-                }
-                this.seasons = normalized.sort((a, b) => Number(this.getSeasonId(b) || 0) - Number(this.getSeasonId(a) || 0));
+                const bundle = await window.apiClient.getSeasonsPlayers({ limit: 5000 });
+                if (requestToken !== this.playersLoadToken) return;
+                const rawSeasons = Array.isArray(bundle.seasons) ? [...bundle.seasons] : [];
+                this.seasons = rawSeasons.sort((a, b) => Number(this.getSeasonId(b) || 0) - Number(this.getSeasonId(a) || 0));
+                this.players = Array.isArray(bundle.players)
+                    ? [...bundle.players].sort((a, b) => this.getPlayerName(a).localeCompare(this.getPlayerName(b), 'fi'))
+                    : [];
             } catch (error) {
-                if (requestToken !== this.seasonsLoadToken) {
-                    return;
+                if (requestToken !== this.playersLoadToken) return;
+                this.error = error?.message || 'Tietojen lataus epäonnistui';
+            } finally {
+                if (requestToken === this.playersLoadToken) {
+                    this.loading = false;
                 }
-                console.warn('[PlayersView] seasons fetch failed', error);
-                this.seasons = [];
             }
         },
         async loadPlayers() {

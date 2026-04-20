@@ -26,7 +26,8 @@
             details: createSegment(),
             standings: createSegment(),
             maps: createSegment(),
-            highlights: createSegment()
+            highlights: createSegment(),
+            rawMatches: createSegment()
         };
     }
 
@@ -238,6 +239,45 @@
                     entry.details.loading = false;
                 }
             },
+            async fetchDivisionBundle(id, options = {}) {
+                if (!id || !window.apiClient || typeof window.apiClient.getDivisionPage !== 'function') {
+                    return this.fetchDivisionDetails(id, options);
+                }
+                const { force = false } = options;
+                const entry = this.ensureEntry(id);
+                if (!force && isFresh(entry.details) && isFresh(entry.rawMatches)) {
+                    return entry.details.data;
+                }
+                entry.details.loading = true;
+                entry.rawMatches.loading = true;
+                entry.details.error = null;
+                entry.rawMatches.error = null;
+                try {
+                    const bundle = await window.apiClient.getDivisionPage(id);
+                    const data = bundle.details || {};
+                    entry.details.data = data;
+                    entry.details.fetchedAt = now();
+                    entry.details.loading = false;
+                    entry.highlights.data = [];
+                    entry.highlights.fetchedAt = now();
+                    if (Array.isArray(data?.map_stats) && data.map_stats.length) {
+                        entry.maps.data = data.map_stats;
+                        entry.maps.fetchedAt = now();
+                    }
+                    const matches = Array.isArray(bundle.matches) ? bundle.matches : [];
+                    entry.rawMatches.data = matches;
+                    entry.rawMatches.fetchedAt = now();
+                    entry.rawMatches.loading = false;
+                    return data;
+                } catch (error) {
+                    entry.details.error = error?.message || 'Divisioonan lataus epäonnistui';
+                    entry.rawMatches.error = error?.message || 'Ottelijoiden lataus epäonnistui';
+                    throw error;
+                } finally {
+                    entry.details.loading = false;
+                    entry.rawMatches.loading = false;
+                }
+            },
             async fetchDivisionStandings(id, options = {}) {
                 if (!id) return [];
                 const { force = false } = options;
@@ -252,15 +292,21 @@
                 entry.standings.error = null;
                 try {
                     let standings = [];
-                    if (typeof window.apiClient.getDivisionMatches === 'function') {
-                        const matches = await window.apiClient.getDivisionMatches(id);
-                        const scopedMatches = Array.isArray(matches)
-                            ? matches.filter(match => String(match?.championship_id ?? match?.championshipId ?? '') === String(id))
-                            : [];
-                        if (scopedMatches.length) {
-                            const details = entry.details.data || (await this.fetchDivisionDetails(id));
-                            standings = deriveStandingsFromMatches(scopedMatches, details?.teams || [], id);
-                        }
+                    // Use pre-fetched raw matches from bundle if available, else fetch separately
+                    let matches;
+                    if (isFresh(entry.rawMatches) && Array.isArray(entry.rawMatches.data)) {
+                        matches = entry.rawMatches.data;
+                    } else if (typeof window.apiClient.getDivisionMatches === 'function') {
+                        matches = await window.apiClient.getDivisionMatches(id);
+                        entry.rawMatches.data = Array.isArray(matches) ? matches : [];
+                        entry.rawMatches.fetchedAt = now();
+                    }
+                    const scopedMatches = Array.isArray(matches)
+                        ? matches.filter(match => String(match?.championship_id ?? match?.championshipId ?? '') === String(id))
+                        : [];
+                    if (scopedMatches.length) {
+                        const details = entry.details.data || (await this.fetchDivisionDetails(id));
+                        standings = deriveStandingsFromMatches(scopedMatches, details?.teams || [], id);
                     }
                     entry.standings.data = standings;
                     entry.standings.fetchedAt = now();

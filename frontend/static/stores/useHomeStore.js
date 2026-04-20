@@ -469,43 +469,26 @@
                 };
 
                 try {
-                    const [healthResult, summaryResult, divisionsResult] = await Promise.allSettled([
-                        window.apiClient.healthCheck(identifier).catch(() => ({ ok: false })),
-                        window.apiClient.getSeasonSummary(identifier),
-                        window.apiClient.getDivisions(identifier)
-                    ]);
+                    const homeResult = await window.apiClient.getHomePage(identifier);
+                    const homeData = homeResult?.data ?? homeResult ?? {};
 
-                    const healthPayload = healthResult.status === 'fulfilled' ? healthResult.value || { ok: false } : { ok: false };
-                    const healthOk = Boolean(healthPayload?.ok);
+                    const healthOk = Boolean(homeData.ok !== false);
 
-                    let summaryData = null;
-                    let summaryMeta = null;
-                    if (summaryResult.status === 'fulfilled') {
-                        summaryData = summaryResult.value.data || summaryResult.value;
-                        summaryMeta = summaryResult.value.meta || {};
-                    } else {
-                        summaryData = {};
-                    }
+                    let summaryData = homeData.summary || {};
+                    let summaryMeta = homeResult?.meta || {};
                     const normalizedSummary = normalizeSummary(summaryData);
                     const normalizedStats = normalizedSummary.aggregates || {};
                     const normalizedRaw = normalizedSummary.raw;
 
-                    let divisionsData = [];
-                    let divisionsMeta = null;
-                    let apiValidationWarnings = [];
-                    if (divisionsResult.status === 'fulfilled') {
-                        divisionsData = Array.isArray(divisionsResult.value.data)
-                            ? divisionsResult.value.data
-                            : Array.isArray(divisionsResult.value)
-                                ? divisionsResult.value
-                                : [];
-                        divisionsMeta = divisionsResult.value.meta || {};
-                        apiValidationWarnings = (divisionsResult.value.errors || []).map(
-                            error => error?.message || 'Division validation error'
-                        );
-                    } else {
-                        divisionsData = [];
+                    // Populate lifetime summary from bundle so ensureSummary() skips a separate fetch
+                    if (homeData.lifetime_summary && !this.lifetimeSummary) {
+                        this.lifetimeSummary = normalizeSummary(homeData.lifetime_summary);
+                        this.summaryFetchedAt = Date.now();
                     }
+
+                    let divisionsData = Array.isArray(homeData.divisions) ? homeData.divisions : [];
+                    let divisionsMeta = homeResult?.meta || {};
+                    let apiValidationWarnings = [];
 
                     if (divisionsData.length === 0 && DEV_MODE) {
                         console.warn('[homeStore] Divisions API returned 0 items', {
@@ -551,7 +534,7 @@
                         warningMessage: finalDivisions.length ? '' : 'Division data missing or invalid.',
                         bannerMessage,
                         dataBadge,
-                        health: healthPayload
+                        health: { ok: healthOk, probableRoute: false, route: null }
                     };
 
                     this.seasonCache[key] = payload;

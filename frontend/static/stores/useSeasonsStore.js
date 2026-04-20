@@ -228,6 +228,26 @@
                 this.error = null;
                 this.fetchedAt = null;
                 this.selectedSeasonKey = null;
+            },
+            seedSeasons(rawArray) {
+                if (!Array.isArray(rawArray) || !rawArray.length || this.seasons.length) return;
+                const normalized = rawArray
+                    .map((season, index) => normalizeSeason(season, index))
+                    .filter(Boolean);
+                normalized.sort((a, b) => {
+                    const aId = Number.isFinite(a.id) ? a.id : Number.NEGATIVE_INFINITY;
+                    const bId = Number.isFinite(b.id) ? b.id : Number.NEGATIVE_INFINITY;
+                    if (aId !== bId) return bId - aId;
+                    const aVal = a.seasonNumber ?? Number.NEGATIVE_INFINITY;
+                    const bVal = b.seasonNumber ?? Number.NEGATIVE_INFINITY;
+                    if (Number.isFinite(aVal) && Number.isFinite(bVal) && aVal !== bVal) return bVal - aVal;
+                    return a.label.localeCompare(b.label, 'fi');
+                });
+                this.seasons = normalized;
+                this.fetchedAt = Date.now();
+                if (!this.selectedSeasonKey && normalized.length) {
+                    this.selectedSeasonKey = normalized[0].key;
+                }
             }
         }
     });

@@ -969,10 +969,15 @@ window.DivisionView = {
         async loadDivision(id, options = {}) {
             if (!id || !this.divisionStore) return;
             const requestToken = ++this.divisionLoadToken;
+            // Fetch details+matches bundle first so subsequent store actions find data fresh
+            if (typeof this.divisionStore.fetchDivisionBundle === 'function') {
+                await this.divisionStore.fetchDivisionBundle(id, { force: options.force === true });
+            }
+            if (requestToken !== this.divisionLoadToken) return;
             const requests = [
-                this.divisionStore.fetchDivisionDetails(id, { force: options.force === true }),
-                this.divisionStore.fetchDivisionStandings(id, { force: options.force === true }),
-                this.divisionStore.fetchDivisionMaps(id, { force: options.force === true })
+                this.divisionStore.fetchDivisionDetails(id, { force: false }),
+                this.divisionStore.fetchDivisionStandings(id, { force: false }),
+                this.divisionStore.fetchDivisionMaps(id, { force: false })
             ];
             await Promise.allSettled(requests);
             if (requestToken !== this.divisionLoadToken) {
@@ -996,7 +1001,7 @@ window.DivisionView = {
             }
         },
         async loadDivisionMatches(id, options = {}) {
-            if (!id || !window.apiClient || typeof window.apiClient.getDivisionMatches !== 'function') {
+            if (!id) {
                 this.divisionMatches = [];
                 this.divisionMatchesError = null;
                 this.divisionMatchesLoading = false;
@@ -1006,7 +1011,17 @@ window.DivisionView = {
             this.divisionMatchesLoading = true;
             this.divisionMatchesError = null;
             try {
-                const rows = await window.apiClient.getDivisionMatches(id, { force: options.force === true });
+                // Use rawMatches from bundle if already fresh
+                const storeEntry = this.divisionStore?.getDivisionState?.(id);
+                const cachedRaw = storeEntry?.rawMatches;
+                let rows;
+                if (!options.force && cachedRaw && cachedRaw.fetchedAt && (Date.now() - cachedRaw.fetchedAt < 5 * 60 * 1000) && Array.isArray(cachedRaw.data)) {
+                    rows = cachedRaw.data;
+                } else if (window.apiClient && typeof window.apiClient.getDivisionMatches === 'function') {
+                    rows = await window.apiClient.getDivisionMatches(id, { force: options.force === true });
+                } else {
+                    rows = [];
+                }
                 const activeChampionshipId = String(this.resolvedChampionshipId || this.championshipId || '');
                 if (requestToken !== this.matchesLoadToken || String(id) !== activeChampionshipId) {
                     return;

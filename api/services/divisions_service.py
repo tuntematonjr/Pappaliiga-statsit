@@ -10,10 +10,10 @@ from db_async import (
     count_total_matches_by_championship_ids,
     query_async,
 )
-from division_overrides import combined_status_teams
 from division_naming import build_division_name
 
 from api.exceptions import NotFoundError
+from api.services import team_status_service
 from api.services.player_counts import get_player_counts
 from api.services.season_aggregates import dedupe_team_total
 from api.services.cache_helpers import (
@@ -36,9 +36,8 @@ def _apply_division_name(row: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def get_excluded_team_ids(championship_id: str) -> set[str]:
-    teams = combined_status_teams(str(championship_id))
-    return {team["team_id"] for team in teams}
+async def get_excluded_team_ids(championship_id: str) -> set[str]:
+    return await team_status_service.get_excluded_team_ids(str(championship_id))
 
 
 async def fetch_seasons() -> List[dict[str, Any]]:
@@ -134,6 +133,7 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
             SUM(
                 CASE
                     WHEN UPPER(COALESCE(m.status, '')) IN ('CONFIGURED', 'PENDING', 'READY', 'SCHEDULED')
+                        AND COALESCE(m.ignored_due_ban, 0) = 0
                         THEN 1
                     ELSE 0
                 END
@@ -158,7 +158,7 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
         played_map = await count_played_matches_by_championship_ids(
             championship_ids=champ_ids,
             include_forfeits=True,
-            include_ignored=True,
+            include_ignored=False,
         )
         total_map = await count_total_matches_by_championship_ids(
             championship_ids=champ_ids,
@@ -229,19 +229,21 @@ async def _compute_division_details(championship_id: str, season: int, division_
     played_condition = build_played_match_condition(
         alias="dmt",
         include_forfeits=True,
-        include_ignored=True,
+        include_ignored=False,
     )
+    excluded = await get_excluded_team_ids(championship_id)
+    excluded_lookup = await team_status_service.get_excluded_team_lookup(championship_id)
     team_rows = await query_async(
         """
         WITH division_matches AS (
-            SELECT match_id, team1_id, team2_id, winner_team_id, finished_at
+            SELECT match_id, team1_id, team2_id, winner_team_id, finished_at, ignored_due_ban
             FROM matches
             WHERE championship_id = :champ_id
         ),
         division_match_teams AS (
-            SELECT match_id, team1_id AS team_id, winner_team_id, finished_at FROM division_matches
+            SELECT match_id, team1_id AS team_id, winner_team_id, finished_at, ignored_due_ban FROM division_matches
             UNION ALL
-            SELECT match_id, team2_id AS team_id, winner_team_id, finished_at FROM division_matches
+            SELECT match_id, team2_id AS team_id, winner_team_id, finished_at, ignored_due_ban FROM division_matches
         ),
         division_maps AS (
             SELECT
@@ -267,6 +269,8 @@ async def _compute_division_details(championship_id: str, season: int, division_
                 dm.score_team1 + dm.score_team2 AS rounds_played,
                 dm.team1_id AS team_id
             FROM division_maps dm
+            JOIN division_matches m ON m.match_id = dm.match_id
+            WHERE COALESCE(m.ignored_due_ban, 0) = 0
             UNION ALL
             SELECT
                 dm.match_id,
@@ -278,6 +282,8 @@ async def _compute_division_details(championship_id: str, season: int, division_
                 dm.score_team1 + dm.score_team2,
                 dm.team2_id
             FROM division_maps dm
+            JOIN division_matches m ON m.match_id = dm.match_id
+            WHERE COALESCE(m.ignored_due_ban, 0) = 0
         ),
         match_totals AS (
             SELECT
@@ -309,6 +315,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
                         FROM player_stats ps
                         JOIN matches m ON m.match_id = ps.match_id
                         WHERE m.championship_id = :champ_id
+                            AND COALESCE(m.ignored_due_ban, 0) = 0
                             AND COALESCE(ps.is_forfeit_map, 0) = 0
                             AND ps.team_id IS NOT NULL
                         GROUP BY ps.team_id
@@ -344,8 +351,6 @@ async def _compute_division_details(championship_id: str, season: int, division_
         {"champ_id": championship_id},
     )
 
-    excluded = get_excluded_team_ids(championship_id)
-
     player_rows = await query_async(
         """
         WITH division_maps AS (
@@ -356,6 +361,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
             FROM maps mp
             JOIN matches m ON m.match_id = mp.match_id
             WHERE m.championship_id = :champ_id
+                            AND COALESCE(m.ignored_due_ban, 0) = 0
               AND COALESCE(mp.is_forfeit, 0) = 0
         )
         SELECT
@@ -372,6 +378,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
         JOIN players p ON p.player_id = ps.player_id
         LEFT JOIN player_championships pc ON pc.player_id = ps.player_id AND pc.championship_id = :champ_id
         WHERE m.championship_id = :champ_id
+                    AND COALESCE(m.ignored_due_ban, 0) = 0
           AND COALESCE(ps.is_forfeit_map, 0) = 0
           AND ps.team_id IS NOT NULL
         GROUP BY ps.team_id, ps.player_id, COALESCE(pc.player_name, p.nickname)
@@ -518,6 +525,10 @@ async def _compute_division_details(championship_id: str, season: int, division_
                 "team_name": t["team_name"],
                 "display_name": t.get("display_name"),
                 "avatar": t.get("avatar") or DEFAULT_AVATAR,
+                "status": (excluded_lookup.get(t["team_id"]) or {}).get("status"),
+                "status_reason": (excluded_lookup.get(t["team_id"]) or {}).get("reason"),
+                "status_note": (excluded_lookup.get(t["team_id"]) or {}).get("note"),
+                "status_effective_at": (excluded_lookup.get(t["team_id"]) or {}).get("effective_at"),
                 "matches_played": matches_played,
                 "matches_won": matches_won,
                 "matches_lost": matches_lost,
@@ -580,6 +591,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
         "is_playoff": bool(champ["is_playoff"]),
         "teams": teams,
         "excluded_team_ids": list(excluded),
+        "excluded_teams": list(excluded_lookup.values()),
         "map_stats": map_stats,
         "aggregates": aggregates,
         "leaders": leaders,
@@ -869,6 +881,7 @@ async def _get_division_aggregates(
         FROM maps mp
         JOIN matches m ON m.match_id = mp.match_id
         WHERE m.championship_id = :champ_id
+                    AND COALESCE(m.ignored_due_ban, 0) = 0
           AND mp.map_name IS NOT NULL
           AND COALESCE(mp.is_forfeit, 0) = 0
         """,
@@ -926,7 +939,7 @@ async def _get_division_aggregates(
     played = await count_played_matches(
         championship_id=championship_id,
         include_forfeits=True,
-        include_ignored=True,
+        include_ignored=False,
     )
     played = int(played or 0)
     total = int(row.get("total_matches") or 0)

@@ -809,6 +809,28 @@ async def create_schema_async(force: bool = False) -> None:
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
                 """
             )
+            await cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS championship_team_statuses (
+                    championship_id VARCHAR(64) NOT NULL,
+                    team_id VARCHAR(64) NOT NULL,
+                    status VARCHAR(32) NOT NULL,
+                    effective_at BIGINT(20) NULL,
+                    reason VARCHAR(255) NULL,
+                    note TEXT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    PRIMARY KEY (championship_id, team_id),
+                    KEY idx_championship_team_statuses_team (team_id),
+                    KEY idx_championship_team_statuses_status (status),
+                    KEY idx_championship_team_statuses_effective (effective_at),
+                    CONSTRAINT fk_championship_team_statuses_championship FOREIGN KEY (championship_id)
+                        REFERENCES championships (championship_id) ON DELETE CASCADE ON UPDATE CASCADE,
+                    CONSTRAINT fk_championship_team_statuses_team FOREIGN KEY (team_id)
+                        REFERENCES teams (team_id) ON DELETE CASCADE ON UPDATE CASCADE
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """
+            )
         await conn.commit()
 
         player_totals_columns = {
@@ -1032,6 +1054,97 @@ def build_match_scope_clause(
         params[key] = team_id
 
     return " AND ".join(conditions), params
+
+
+async def list_championship_team_statuses(
+    championship_id: str,
+    *,
+    include_active: bool = False,
+) -> list[dict[str, Any]]:
+    where_clauses = ["cts.championship_id = :championship_id"]
+    params: dict[str, Any] = {"championship_id": championship_id}
+    if not include_active:
+        where_clauses.append("LOWER(COALESCE(cts.status, 'active')) <> 'active'")
+
+    return await fetch_all(
+        f"""
+        SELECT
+            cts.championship_id,
+            cts.team_id,
+            LOWER(COALESCE(cts.status, 'active')) AS status,
+            cts.effective_at,
+            cts.reason,
+            cts.note,
+            COALESCE(tc.team_name, t.name) AS team_name,
+            t.avatar,
+            cts.created_at,
+            cts.updated_at
+        FROM championship_team_statuses cts
+        LEFT JOIN teams t ON t.team_id = cts.team_id
+        LEFT JOIN team_championships tc
+            ON tc.team_id = cts.team_id
+           AND tc.championship_id = cts.championship_id
+        WHERE {' AND '.join(where_clauses)}
+        ORDER BY COALESCE(cts.effective_at, 0) DESC, cts.team_id ASC
+        """,
+        params,
+    )
+
+
+async def upsert_championship_team_status(
+    championship_id: str,
+    team_id: str,
+    *,
+    status: str,
+    effective_at: int | None = None,
+    reason: str | None = None,
+    note: str | None = None,
+) -> int:
+    normalized_status = (status or "active").strip().lower() or "active"
+    return await execute(
+        """
+        INSERT INTO championship_team_statuses (
+            championship_id,
+            team_id,
+            status,
+            effective_at,
+            reason,
+            note
+        )
+        VALUES (
+            :championship_id,
+            :team_id,
+            :status,
+            :effective_at,
+            :reason,
+            :note
+        )
+        ON DUPLICATE KEY UPDATE
+            status = VALUES(status),
+            effective_at = VALUES(effective_at),
+            reason = VALUES(reason),
+            note = VALUES(note)
+        """,
+        {
+            "championship_id": championship_id,
+            "team_id": team_id,
+            "status": normalized_status,
+            "effective_at": effective_at,
+            "reason": reason,
+            "note": note,
+        },
+    )
+
+
+async def delete_championship_team_status(championship_id: str, team_id: str) -> int:
+    return await execute(
+        """
+        DELETE FROM championship_team_statuses
+        WHERE championship_id = :championship_id
+          AND team_id = :team_id
+        """,
+        {"championship_id": championship_id, "team_id": team_id},
+    )
 
 
 async def count_played_matches(
@@ -2154,6 +2267,7 @@ async def upsert_team_season_totals_bulk_async(
                         AND m.team1_id IN ({placeholders})
                         AND c.is_playoffs = 0
                         AND NULLIF(m.finished_at, 0) IS NOT NULL
+                                                AND COALESCE(m.ignored_due_ban, 0) = 0
                       UNION ALL
                       SELECT m.match_id, m.winner_team_id, m.team2_id AS team_id, 2 AS team_slot
                       FROM matches m
@@ -2163,6 +2277,7 @@ async def upsert_team_season_totals_bulk_async(
                         AND m.team2_id IN ({placeholders})
                         AND c.is_playoffs = 0
                         AND NULLIF(m.finished_at, 0) IS NOT NULL
+                                                AND COALESCE(m.ignored_due_ban, 0) = 0
                     ) mt
                     LEFT JOIN maps mp ON mp.match_id = mt.match_id
                     GROUP BY mt.team_id

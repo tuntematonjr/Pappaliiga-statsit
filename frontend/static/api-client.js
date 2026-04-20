@@ -817,6 +817,72 @@
             return await fetchJson('/stats/summary/all');
         }
 
+        async getHomePage(seasonId) {
+            const identifier = encodeSeasonId(seasonId);
+            const result = await fetchJson(`/home-page/${identifier}`);
+            const payload = result?.data ?? result;
+            return { data: payload || {}, meta: result?.meta || {} };
+        }
+
+        async getDivisionPage(championshipId) {
+            if (!championshipId) throw new Error('championshipId is required');
+            const encId = encodeURIComponent(championshipId);
+            const result = await fetchJson(`/division-page/${encId}`);
+            const payload = result?.data ?? result ?? {};
+            return {
+                details: ensureSnakeCaseDeep(payload.details ?? payload.data?.details ?? {}),
+                matches: ensureSnakeCaseDeep(payload.matches ?? payload.data?.matches ?? []),
+            };
+        }
+
+        async getSeasonsTeams(params = {}) {
+            const queryParams = {
+                season: params.season ?? params.seasonId ?? null,
+                division: params.division ?? null,
+                limit: params.limit ?? null,
+            };
+            const query = buildQueryString(queryParams);
+            const result = await fetchJson(`/seasons-teams${query}`);
+            const payload = result?.data ?? result ?? {};
+            return {
+                seasons: ensureSnakeCaseDeep(payload.seasons ?? []),
+                teams: ensureSnakeCaseDeep(payload.teams ?? []),
+            };
+        }
+
+        async getSeasonsPlayers(params = {}) {
+            const queryParams = {
+                season: params.season ?? params.seasonId ?? null,
+                division: params.division ?? null,
+                limit: params.limit ?? null,
+            };
+            const query = buildQueryString(queryParams);
+            const result = await fetchJson(`/seasons-players${query}`);
+            const payload = result?.data ?? result ?? {};
+            return {
+                seasons: ensureSnakeCaseDeep(payload.seasons ?? []),
+                players: ensureSnakeCaseDeep(payload.players ?? []),
+            };
+        }
+
+        async getSeasonsUpcoming(params = {}) {
+            const queryParams = {
+                season: params.season ?? params.seasonId ?? null,
+                championship_id: params.championshipId ?? params.championship_id ?? null,
+                include_playoffs: params.includePlayoffs ?? params.include_playoffs ?? null,
+                limit: params.limit ?? null,
+                offset: params.offset ?? null,
+            };
+            const query = buildQueryString(queryParams);
+            const result = await fetchJson(`/seasons-upcoming${query}`);
+            const payload = result?.data ?? result ?? {};
+            return {
+                seasons: ensureSnakeCaseDeep(payload.seasons ?? []),
+                upcoming: ensureSnakeCaseDeep(payload.upcoming ?? []),
+                total: payload.total ?? 0,
+            };
+        }
+
         async getSeasons(options = {}) {
             const routes = buildRouteCandidates('seasons');
             const result = await fetchWithFallback(routes, options);
