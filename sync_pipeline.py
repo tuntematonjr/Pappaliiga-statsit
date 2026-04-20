@@ -17,7 +17,6 @@ import httpx
 from utils import format_hms, log_stage
 from runtime_diagnostics import SyncDiagnostics
 
-from division_overrides import load_division_overrides
 from faceit_client_async import (
     get_championship_matches_async,
     get_map_votes_async,
@@ -85,18 +84,9 @@ _DIVISION_BY_CHAMPIONSHIP: Dict[str, Dict[str, Any]] = {
     for item in faceit_config.DIVISIONS
     if item.get("championship_id")
 }
-_DEFAULT_OVERRIDES_CACHE: Mapping[str, dict[str, List[dict[str, str]]]] | None = None
-
 
 def _get_division_by_championship_id(championship_id: str) -> Dict[str, Any] | None:
     return _DIVISION_BY_CHAMPIONSHIP.get(str(championship_id))
-
-
-def _get_default_overrides() -> Mapping[str, dict[str, List[dict[str, str]]]]:
-    global _DEFAULT_OVERRIDES_CACHE
-    if _DEFAULT_OVERRIDES_CACHE is None:
-        _DEFAULT_OVERRIDES_CACHE = load_division_overrides()
-    return _DEFAULT_OVERRIDES_CACHE
 
 
 def _canonical_json_value(value: Any) -> Any:
@@ -1416,7 +1406,6 @@ async def sync_championship_async(
     *,
     division: Mapping[str, Any] | None = None,
     full: bool = False,
-    overrides: Mapping[str, dict[str, List[dict[str, str]]]] | None = None,
     end_on_error: bool = False,
     db_semaphore: asyncio.Semaphore | None = None,
     max_match_concurrency: int = 1,
@@ -1443,7 +1432,6 @@ async def sync_championship_async(
     slug = division_info.get("slug") or f"div{division_num}-s{season}"
     is_playoffs = bool(division_info.get("is_playoffs"))
 
-    override_source = overrides if overrides is not None else _get_default_overrides()
     status_entries = await team_status_service.list_team_statuses(championship_id)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
     team_payloads = await _build_championship_team_payloads(
@@ -1809,7 +1797,6 @@ async def sync_championship_async(
 async def update_single_match_async(
     match_id: str,
     *,
-    overrides: Mapping[str, dict[str, List[dict[str, str]]]] | None = None,
     validate_avatars: bool = False,
     require_complete_played_maps: bool = False,
     diagnostics: SyncDiagnostics | None = None,
@@ -1850,7 +1837,6 @@ async def update_single_match_async(
     slug = division.get("slug") or f"div{division_num}-s{season}"
     is_playoffs = bool(division.get("is_playoffs"))
 
-    override_source = overrides if overrides is not None else _get_default_overrides()
     status_entries = await team_status_service.list_team_statuses(championship_id)
     banned_lookup = {entry["team_id"]: entry for entry in status_entries}
     team_payloads = await _build_championship_team_payloads(

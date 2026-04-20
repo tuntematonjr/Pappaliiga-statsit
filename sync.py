@@ -12,7 +12,6 @@ import time
 from typing import Any, Sequence
 
 from db_async import create_schema_async, fetch_val, reset_db_async, connection, upsert_championships_async
-from division_overrides import load_division_overrides
 from division_naming import build_division_name
 from faceit_client_async import get_rate_limit_stats, reset_rate_limit_stats, shutdown_clients
 import faceit_config
@@ -304,7 +303,6 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
     # still creates missing tables/columns/indexes without re-running the whole SQL script.
     await create_schema_async(force=False)
 
-    overrides = load_division_overrides()
     max_concurrency = max(1, args.max_concurrency)
     abort_exc: Exception | None = None
 
@@ -410,7 +408,6 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
                         result = await sync_championship_async(
                             championship_id,
                             full=args.full,
-                            overrides=overrides,
                             division=division,
                             end_on_error=True,
                             db_semaphore=db_semaphore,

@@ -457,9 +457,10 @@ async def readonly_connection(*, label: str | None = None) -> AsyncIterator[asyn
 
 async def execute(sql: str, params: Sequence[Any] | Dict[str, Any] | None = None) -> int:
     """Execute a single statement and return the affected-row count."""
+    sql_conv, params_conv = _translate_sql(sql, params) if params is not None else (sql, params)
     async with connection() as conn:
         async with conn.cursor() as cur:
-            await cur.execute(sql, params)
+            await cur.execute(sql_conv, params_conv)
             return cur.rowcount
 
 

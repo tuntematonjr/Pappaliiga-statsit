@@ -11,7 +11,6 @@ from typing import Literal
 import faceit_config
 from api.services.cache_helpers import clear_api_response_caches
 from api.services.cache_reheat import reheat_main_page
-from division_overrides import load_division_overrides
 from sync_pipeline import sync_championship_async, update_single_match_async
 from utils.log_files import (
     DEFAULT_LOG_MAX_AGE_DAYS,
@@ -110,7 +109,6 @@ class SyncEventQueue:
             1,
             int(os.environ.get("SYNC_EVENT_MAX_MATCH_CONCURRENCY", str(faceit_config.MAX_MATCH_SYNC_CONCURRENCY))),
         )
-        self._overrides = load_division_overrides()
         self._db_semaphore = asyncio.Semaphore(
             max(
                 1,
@@ -248,7 +246,6 @@ class SyncEventQueue:
                 if job.kind == "match":
                     championship_id = await update_single_match_async(
                         job.target_id,
-                        overrides=self._overrides,
                         validate_avatars=self._validate_avatars,
                         require_complete_played_maps=True,
                     )
@@ -258,7 +255,6 @@ class SyncEventQueue:
                     await sync_championship_async(
                         job.target_id,
                         full=job.full,
-                        overrides=self._overrides,
                         end_on_error=True,
                         db_semaphore=self._db_semaphore,
                         max_match_concurrency=self._max_match_concurrency,
