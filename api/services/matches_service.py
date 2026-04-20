@@ -19,6 +19,7 @@ from api.utils.cache import AsyncTTLCache
 
 _MATCH_LIST_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
 _UPCOMING_MATCH_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=256)
+_MATCH_BUNDLE_CACHE = AsyncTTLCache(ttl_seconds=21600, maxsize=2048)
 _DEMO_LIST_CACHE = AsyncTTLCache(ttl_seconds=300, maxsize=4096)
 _DEMO_PROBE_SEMAPHORE = asyncio.Semaphore(4)
 _DEMO_CACHE_VERSION = 4
@@ -356,12 +357,22 @@ async def get_match_details(match_id: str) -> dict[str, Any]:
 
 
 async def get_match_bundle(match_id: str) -> dict[str, Any]:
-    details = await get_match_details(match_id)
-    player_stats = await get_match_player_stats(match_id)
-    return {
-        "details": details,
-        "player_stats": player_stats,
-    }
+    revision_rows = await query_async(
+        "SELECT MAX(updated_at) AS revision FROM matches WHERE match_id = :match_id",
+        {"match_id": match_id},
+    )
+    revision = revision_rows[0].get("revision") if revision_rows else None
+    cache_key = ("match_bundle", match_id, revision)
+
+    async def _compute() -> dict[str, Any]:
+        details, player_stats = await asyncio.gather(
+            get_match_details(match_id),
+            get_match_player_stats(match_id),
+        )
+        return {"details": details, "player_stats": player_stats}
+
+    cached_value, _ = await _MATCH_BUNDLE_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
 
 
 async def get_match_player_stats(match_id: str) -> list[dict[str, Any]]:

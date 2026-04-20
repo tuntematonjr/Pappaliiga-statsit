@@ -69,28 +69,42 @@ async def fetch_seasons() -> List[dict[str, Any]]:
 
 
 async def list_divisions(limit: int, offset: int) -> List[dict[str, Any]]:
-    rows = await query_async(
-        """
-        SELECT championship_id, slug, name, season, division_num,
-               is_playoffs AS is_playoff, parent_championship_id
-        FROM championships
-        ORDER BY season DESC, division_num, is_playoffs
-        LIMIT :limit OFFSET :offset
-        """,
-        {"limit": limit, "offset": offset},
-    )
-    return [_apply_division_name(row) for row in rows]
+    revision = await get_global_revision()
+    cache_key = ("list_divisions", limit, offset, revision)
+
+    async def _compute() -> List[dict[str, Any]]:
+        rows = await query_async(
+            """
+            SELECT championship_id, slug, name, season, division_num,
+                   is_playoffs AS is_playoff, parent_championship_id
+            FROM championships
+            ORDER BY season DESC, division_num, is_playoffs
+            LIMIT :limit OFFSET :offset
+            """,
+            {"limit": limit, "offset": offset},
+        )
+        return [_apply_division_name(row) for row in rows]
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
 
 
 async def count_divisions(season: Optional[int] = None) -> int:
-    if season is None:
-        rows = await query_async("SELECT COUNT(*) AS total FROM championships")
-    else:
-        rows = await query_async(
-            "SELECT COUNT(*) AS total FROM championships WHERE season = :season",
-            {"season": season},
-        )
-    return int(rows[0].get("total") or 0) if rows else 0
+    revision = await get_global_revision()
+    cache_key = ("count_divisions", season, revision)
+
+    async def _compute() -> int:
+        if season is None:
+            rows = await query_async("SELECT COUNT(*) AS total FROM championships")
+        else:
+            rows = await query_async(
+                "SELECT COUNT(*) AS total FROM championships WHERE season = :season",
+                {"season": season},
+            )
+        return int(rows[0].get("total") or 0) if rows else 0
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
 
 
 async def list_divisions_by_season(season: int, limit: int, offset: int) -> List[dict[str, Any]]:

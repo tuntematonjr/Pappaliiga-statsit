@@ -371,6 +371,17 @@ async def fetch_team_matches(team_id: str, championship_id: Optional[str] = None
 
 async def fetch_team_match_player_stats(team_id: str, championship_id: str) -> list[dict[str, Any]]:
     """Fetch player map stats for every match the team played in a championship."""
+    revision = await get_championship_revision(championship_id)
+    cache_key = ("fetch_team_match_player_stats", team_id, championship_id, revision)
+
+    async def _compute() -> list[dict[str, Any]]:
+        return await _fetch_team_match_player_stats_uncached(team_id, championship_id)
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
+
+
+async def _fetch_team_match_player_stats_uncached(team_id: str, championship_id: str) -> list[dict[str, Any]]:
     team_check = await query_async(
         "SELECT team_id FROM teams WHERE team_id = :team_id",
         {"team_id": team_id}
