@@ -21,6 +21,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    import rjsmin
+    _MINIFY_AVAILABLE = True
+except ImportError:
+    _MINIFY_AVAILABLE = False
+
 ROOT = Path(__file__).resolve().parent.parent
 INDEX_HTML = ROOT / "frontend" / "index.html"
 STATIC_DIR = ROOT / "frontend" / "static"
@@ -76,6 +82,10 @@ def build() -> int:
         parts.append("")
 
     bundle_content = "\n".join(parts)
+
+    if _MINIFY_AVAILABLE:
+        bundle_content = rjsmin.jsmin(bundle_content)
+
     content_hash = hashlib.md5(bundle_content.encode()).hexdigest()[:8]
 
     bundle_changed = True
