@@ -45,6 +45,16 @@ async def _compute_season_summary(season_id: int) -> Dict[str, Any]:
         return {}
 
     progress = summary.get("progress") or {}
+    summary_totals = {
+        "divisions": _as_int(summary.get("divisions")),
+        "teams": _as_int(summary.get("teams")),
+        "players": _as_int(summary.get("players")),
+        "matches": _as_int(summary.get("matches")),
+        "maps": _as_int(summary.get("maps")),
+        "rounds": _as_int(summary.get("rounds")),
+        "kills": _as_int(summary.get("kills")),
+        "deaths": _as_int(summary.get("deaths")),
+    }
 
     # Expose detailed progress for the frontend progress rings.
     progress_payload = {
@@ -62,14 +72,17 @@ async def _compute_season_summary(season_id: int) -> Dict[str, Any]:
 
     return {
         "season_id": _as_int(summary.get("season_id", season_id), season_id),
+        "divisions": summary_totals["divisions"],
         "divisions_total": _as_int(progress.get("divisions_total") or summary.get("divisions_total")),
         "divisions_finished": _as_int(progress.get("divisions_finished") or summary.get("divisions_finished")),
-        "teams": _as_int(summary.get("teams")),
-        "players": _as_int(summary.get("players")),
-        "matches": _as_int(summary.get("matches")),
-        "rounds": _as_int(summary.get("rounds")),
-        "kills": _as_int(summary.get("kills")),
-        "deaths": _as_int(summary.get("deaths")),
+        "teams": summary_totals["teams"],
+        "players": summary_totals["players"],
+        "matches": summary_totals["matches"],
+        "maps": summary_totals["maps"],
+        "rounds": summary_totals["rounds"],
+        "kills": summary_totals["kills"],
+        "deaths": summary_totals["deaths"],
+        "summary_totals": summary_totals,
         "adr_avg": _as_float(summary.get("adr_avg")),
         "kd_avg": _as_float(summary.get("kd_ratio") or summary.get("kd_avg")),
         "win_rate": _as_float(summary.get("win_rate")),
@@ -102,7 +115,8 @@ async def _compute_divisions(season_id: int) -> List[Dict[str, Any]]:
         season_stats = row.get("season") or {}
         playoff_stats = row.get("playoffs") or {}
         winners = row.get("winners") or []
-        winner_team = playoff_stats.get("winner") or (
+        playoff_winner_team = playoff_stats.get("winner")
+        meta_winner_team = row.get("mvp_team") or (
             winners[0].get("team_name") if winners and isinstance(winners[0], dict) else None
         )
 
@@ -122,11 +136,11 @@ async def _compute_divisions(season_id: int) -> List[Dict[str, Any]]:
                     "teams": _as_int(playoff_stats.get("teams"), 8),
                     "matches_played": _as_int(playoff_stats.get("matches_played")),
                     "matches_total": _as_int(playoff_stats.get("matches_total"), 7),
-                    "winner_team": winner_team,
+                    "winner_team": playoff_winner_team,
                     "playoff_championship_id": playoff_stats.get("playoff_championship_id"),
                 },
                 "meta": {
-                    "winner_team": winner_team,
+                    "winner_team": meta_winner_team,
                     "mvp_player": row.get("best_player"),
                 },
             }

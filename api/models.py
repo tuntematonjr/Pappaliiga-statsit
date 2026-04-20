@@ -45,11 +45,13 @@ class SeasonProgress(CamelModel):
 
 class SeasonSummary(CamelModel):
     season_id: int
+    divisions: int
     divisions_total: int
     divisions_finished: int
     teams: int
     players: int
     matches: int
+    maps: int
     rounds: int
     kills: int
     deaths: int

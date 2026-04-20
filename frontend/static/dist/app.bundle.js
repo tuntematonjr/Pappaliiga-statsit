@@ -8570,11 +8570,16 @@ window.SankariCard = {
         if (!Number.isFinite(playoffTeams) || playoffTeams < 0) {
             playoffTeams = 0;
         }
+        const playoffChampionshipId =
+            division.playoffs?.playoff_championship_id ??
+            division.playoffs?.playoffChampionshipId ??
+            null;
+        const playoffsWaiting = division.playoffs?.status === 'waiting';
         const playoffsConfigured = Boolean(
             playoffsMatchesTotal > 0 ||
             playoffTeams > 0 ||
-            division.playoffs?.winner ||
-            division.playoffs?.winner_team
+            playoffChampionshipId ||
+            playoffsWaiting
         );
         const combinedStatus = getDivisionStatus(
             seasonMatchesPlayed,
@@ -8822,6 +8827,9 @@ window.SankariCard = {
                 return this.playoffsPendingStart ? DivisionStatus.NOT_STARTED : this.division.state;
             },
             statusLabel() {
+                if (this.playoffsPendingStart) {
+                    return 'Odottaa playoffeja';
+                }
                 return STATUS_LABELS[this.displayStatusState] || STATUS_LABELS[DivisionStatus.NOT_STARTED];
             },
             statusIcon() {
@@ -8843,13 +8851,13 @@ window.SankariCard = {
                 }
                 if (this.division.playoffs?.hasChampionship) {
                     return Boolean(
-                        this.division.playoffs.winner ||
+                        this.division.playoffs.isFinished ||
                         (this.division.playoffs.matchesTotal > 0 &&
                             this.division.playoffs.matchesPlayed >= this.division.playoffs.matchesTotal)
                     );
                 }
                 return Boolean(
-                    this.division.season.winner ||
+                    this.division.season.isFinished ||
                     (this.division.season.matchesTotal > 0 &&
                         this.division.season.matchesPlayed >= this.division.season.matchesTotal)
                 );

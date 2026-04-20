@@ -104,7 +104,7 @@ async def discover_cs_divisions(
         if division_num is None and MESTAR_RX.search(name):
             division_num = 0
 
-        if season < min_season:
+        if season > 0 and season < min_season:
             continue
 
         status = (championship.get("status") or championship.get("state") or "").strip().lower()
