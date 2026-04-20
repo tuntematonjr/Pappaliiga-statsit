@@ -1,6 +1,7 @@
 """Team API endpoints."""
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -232,12 +233,15 @@ async def list_teams(
 
 async def _build_team_page_payload(team_id: str, championship_id: Optional[str]) -> dict[str, Any]:
     """Assemble team page response payload shared by multiple routes."""
-    team = await teams_service.fetch_team(team_id)
-
-    try:
-        seasons = await teams_service.fetch_team_season_stats(team_id)
-    except NotFoundError:
-        seasons = []
+    # fetch_team and fetch_team_season_stats are both cached — run in parallel.
+    team, seasons_or_exc = await asyncio.gather(
+        teams_service.fetch_team(team_id),
+        teams_service.fetch_team_season_stats(team_id),
+        return_exceptions=True,
+    )
+    if isinstance(team, Exception):
+        raise team
+    seasons = seasons_or_exc if not isinstance(seasons_or_exc, Exception) else []
 
     available_champs = {row.get("championship_id") for row in seasons if row.get("championship_id")}
     selected_champ = championship_id or None

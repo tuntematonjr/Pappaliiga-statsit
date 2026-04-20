@@ -1,6 +1,7 @@
 """Player API endpoints."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -156,9 +157,12 @@ async def get_player_bundle(
     player_id: str,
     championship_id: Optional[str] = Query(None, description="Optional selected championship id"),
 ):
+    # fetch_player and fetch_player_season_stats are both cached — run in parallel.
     try:
-        player_row = await players_service.fetch_player(player_id)
-        seasons_rows = await players_service.fetch_player_season_stats(player_id)
+        player_row, seasons_rows = await asyncio.gather(
+            players_service.fetch_player(player_id),
+            players_service.fetch_player_season_stats(player_id),
+        )
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -182,21 +186,27 @@ async def get_player_bundle(
     map_stats: List[PlayerMapStatsWithDelta] = []
     progression: List[PlayerSeasonProgressPoint] = []
     if selected_row is not None:
-        try:
-            map_rows = await players_service.fetch_player_map_stats(selected_row.championship_id, player_id)
-            map_stats = [PlayerMapStatsWithDelta(**row) for row in map_rows]
-        except NotFoundError:
-            map_stats = []
-        try:
-            progression_rows = await players_service.fetch_player_season_progression(
+        # map_stats and progression are independent — run in parallel.
+        map_result, prog_result = await asyncio.gather(
+            players_service.fetch_player_map_stats(selected_row.championship_id, player_id),
+            players_service.fetch_player_season_progression(
                 player_id,
                 selected_row.season,
                 selected_row.division_num,
                 championship_id=selected_row.championship_id,
-            )
-            progression = [PlayerSeasonProgressPoint(**row) for row in progression_rows]
-        except NotFoundError:
-            progression = []
+            ),
+            return_exceptions=True,
+        )
+        map_stats = (
+            [PlayerMapStatsWithDelta(**row) for row in map_result]
+            if not isinstance(map_result, Exception)
+            else []
+        )
+        progression = (
+            [PlayerSeasonProgressPoint(**row) for row in prog_result]
+            if not isinstance(prog_result, Exception)
+            else []
+        )
 
     return PlayerBundleResponse(
         player=PlayerInfo(**player_row),

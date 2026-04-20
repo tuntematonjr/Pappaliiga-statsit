@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Optional
 from datetime import datetime, timezone
 
@@ -14,7 +15,9 @@ from division_naming import build_division_name
 from api.services.player_stats_payload import build_player_stats_payload
 from api.services.cache_helpers import (
     GLOBAL_CACHE,
+    get_championship_revision,
     get_global_revision,
+    select_season_cache,
 )
 
 DEFAULT_AVATAR = "https://pappaliiga.fi/app/themes/pappaliiga/images/src/pappaliiga-logo-white-bg.png"
@@ -116,38 +119,50 @@ async def fetch_team_season_progression(
     season: int,
     division_num: int,
 ) -> list[dict[str, Any]]:
-    rows = await query_async(
-        """
-        SELECT
-            tst.snapshot_ts,
-            ds.created_at AS snapshot_time,
-            tst.matches_played,
-            tst.matches_won,
-            GREATEST(
-                CAST(tst.matches_played AS SIGNED) - CAST(tst.matches_won AS SIGNED),
-                0
-            ) AS losses,
-            CASE WHEN tst.matches_played > 0
-                 THEN (tst.matches_won / tst.matches_played)
-                 ELSE 0.0 END AS win_rate,
-            tst.maps_played,
-            tst.maps_won,
-            tst.rounds_won,
-            tst.rounds_lost
-        FROM team_season_totals_prev tst
-        LEFT JOIN division_snapshots ds ON ds.snapshot_ts = tst.snapshot_ts
-        WHERE tst.team_id = :team_id
-          AND tst.season = :season
-          AND tst.division_num = :division_num
-        ORDER BY tst.snapshot_ts ASC
-        """,
-        {"team_id": team_id, "season": season, "division_num": division_num},
-    )
-    if not rows:
-        raise NotFoundError(
-            f"No progression snapshots found for team '{team_id}' in season {season} division {division_num}"
+    from api.services.cache_helpers import get_season_revision
+
+    revision = await get_season_revision(season)
+    cache, ttl_seconds = select_season_cache(season)
+    cache_key = ("fetch_team_season_progression", team_id, season, division_num, revision)
+
+    async def _compute() -> list[dict[str, Any]]:
+        rows = await query_async(
+            """
+            SELECT
+                tst.snapshot_ts,
+                ds.created_at AS snapshot_time,
+                tst.matches_played,
+                tst.matches_won,
+                GREATEST(
+                    CAST(tst.matches_played AS SIGNED) - CAST(tst.matches_won AS SIGNED),
+                    0
+                ) AS losses,
+                CASE WHEN tst.matches_played > 0
+                     THEN (tst.matches_won / tst.matches_played)
+                     ELSE 0.0 END AS win_rate,
+                tst.maps_played,
+                tst.maps_won,
+                tst.rounds_won,
+                tst.rounds_lost
+            FROM team_season_totals_prev tst
+            LEFT JOIN division_snapshots ds ON ds.snapshot_ts = tst.snapshot_ts
+            WHERE tst.team_id = :team_id
+              AND tst.season = :season
+              AND tst.division_num = :division_num
+            ORDER BY tst.snapshot_ts ASC
+            """,
+            {"team_id": team_id, "season": season, "division_num": division_num},
         )
-    return rows
+        if not rows:
+            raise NotFoundError(
+                f"No progression snapshots found for team '{team_id}' in season {season} division {division_num}"
+            )
+        return rows
+
+    if cache is None:
+        return await _compute()
+    cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
+    return cached_value
 
 
 async def list_teams(
@@ -156,123 +171,130 @@ async def list_teams(
     division: Optional[int] = None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    if season is not None:
-        season_filter = ["c.season = :season"]
-        season_name_filter = ["c2.season = :season"]
-        params: dict[str, Any] = {"season": season, "limit": limit}
+    revision = await get_global_revision()
+    cache_key = ("list_teams", season, division, limit, revision)
 
-        if division is not None:
-            season_filter.append("c.division_num = :division")
-            season_name_filter.append("c2.division_num = :division")
-            params["division"] = division
+    async def _compute() -> list[dict[str, Any]]:
+        if season is not None:
+            season_filter = ["c.season = :season"]
+            season_name_filter = ["c2.season = :season"]
+            params: dict[str, Any] = {"season": season, "limit": limit}
 
-        season_where = " AND ".join(season_filter)
-        season_name_where = " AND ".join(season_name_filter)
-        rows = await query_async(
-            f"""
-            SELECT
-                t.team_id,
-                                COALESCE(
-                                        (
-                                                SELECT tc2.championship_id
-                                                FROM team_championships tc2
-                                                JOIN championships c2 ON c2.championship_id = tc2.championship_id
-                                                WHERE tc2.team_id = t.team_id
-                                                    AND {season_name_where}
-                                                ORDER BY tc2.updated_at DESC, tc2.created_at DESC
-                                                LIMIT 1
-                                        ),
-                                        (
-                                                SELECT c3.championship_id
-                                                FROM team_season_totals tst3
-                                                JOIN championships c3 ON c3.season = tst3.season AND c3.division_num = tst3.division_num
-                                                WHERE tst3.team_id = t.team_id
-                                                    AND tst3.season = :season
-                                                    {"AND tst3.division_num = :division" if division is not None else ""}
-                                                ORDER BY c3.is_playoffs ASC, c3.championship_id
-                                                LIMIT 1
-                                        )
-                                ) AS championship_id,
-                COALESCE(
-                    NULLIF((
-                        SELECT tc2.team_name
-                        FROM team_championships tc2
-                        JOIN championships c2 ON c2.championship_id = tc2.championship_id
-                        WHERE tc2.team_id = t.team_id
-                          AND {season_name_where}
-                          AND NULLIF(TRIM(tc2.team_name), '') IS NOT NULL
-                        ORDER BY tc2.updated_at DESC, tc2.created_at DESC
-                        LIMIT 1
-                    ), ''),
-                    t.name
-                ) AS team_name,
-                COALESCE(
-                    NULLIF((
-                        SELECT tc2.team_name
-                        FROM team_championships tc2
-                        JOIN championships c2 ON c2.championship_id = tc2.championship_id
-                        WHERE tc2.team_id = t.team_id
-                          AND {season_name_where}
-                          AND NULLIF(TRIM(tc2.team_name), '') IS NOT NULL
-                        ORDER BY tc2.updated_at DESC, tc2.created_at DESC
-                        LIMIT 1
-                    ), ''),
-                    t.name
-                ) AS display_name,
-                t.avatar
-            FROM teams t
-            JOIN (
-                SELECT DISTINCT tc.team_id
-                FROM team_championships tc
-                JOIN championships c ON c.championship_id = tc.championship_id
-                WHERE {season_where}
-                UNION
-                SELECT DISTINCT tst.team_id
-                FROM team_season_totals tst
-                WHERE tst.season = :season
-                  {"AND tst.division_num = :division" if division is not None else ""}
-            ) season_teams ON season_teams.team_id = t.team_id
-            ORDER BY display_name, t.team_id
-            LIMIT :limit
-            """,
-            params,
-        )
-    else:
-        rows = await query_async(
-            """
-            SELECT
-                t.team_id,
-                COALESCE(
-                    (
-                        SELECT tc.championship_id
-                        FROM team_championships tc
-                        JOIN championships c ON c.championship_id = tc.championship_id
-                        WHERE tc.team_id = t.team_id
-                        ORDER BY c.season DESC, c.is_playoffs ASC, tc.updated_at DESC, tc.created_at DESC
-                        LIMIT 1
-                    ),
-                    (
-                        SELECT c4.championship_id
-                        FROM team_season_totals tst4
-                        JOIN championships c4 ON c4.season = tst4.season AND c4.division_num = tst4.division_num
-                        WHERE tst4.team_id = t.team_id
-                        ORDER BY c4.season DESC, c4.is_playoffs ASC, c4.championship_id
-                        LIMIT 1
-                    )
-                ) AS championship_id,
-                t.name AS team_name,
-                t.name AS display_name,
-                t.avatar
-            FROM teams t
-            ORDER BY t.name, t.team_id
-            LIMIT :limit
-            """,
-            {"limit": limit},
-        )
-    for row in rows:
-        row.setdefault("avatar", DEFAULT_AVATAR)
-        row["faceit_url"] = None
-    return rows
+            if division is not None:
+                season_filter.append("c.division_num = :division")
+                season_name_filter.append("c2.division_num = :division")
+                params["division"] = division
+
+            season_where = " AND ".join(season_filter)
+            season_name_where = " AND ".join(season_name_filter)
+            rows = await query_async(
+                f"""
+                SELECT
+                    t.team_id,
+                                    COALESCE(
+                                            (
+                                                    SELECT tc2.championship_id
+                                                    FROM team_championships tc2
+                                                    JOIN championships c2 ON c2.championship_id = tc2.championship_id
+                                                    WHERE tc2.team_id = t.team_id
+                                                        AND {season_name_where}
+                                                    ORDER BY tc2.updated_at DESC, tc2.created_at DESC
+                                                    LIMIT 1
+                                            ),
+                                            (
+                                                    SELECT c3.championship_id
+                                                    FROM team_season_totals tst3
+                                                    JOIN championships c3 ON c3.season = tst3.season AND c3.division_num = tst3.division_num
+                                                    WHERE tst3.team_id = t.team_id
+                                                        AND tst3.season = :season
+                                                        {"AND tst3.division_num = :division" if division is not None else ""}
+                                                    ORDER BY c3.is_playoffs ASC, c3.championship_id
+                                                    LIMIT 1
+                                            )
+                                    ) AS championship_id,
+                    COALESCE(
+                        NULLIF((
+                            SELECT tc2.team_name
+                            FROM team_championships tc2
+                            JOIN championships c2 ON c2.championship_id = tc2.championship_id
+                            WHERE tc2.team_id = t.team_id
+                              AND {season_name_where}
+                              AND NULLIF(TRIM(tc2.team_name), '') IS NOT NULL
+                            ORDER BY tc2.updated_at DESC, tc2.created_at DESC
+                            LIMIT 1
+                        ), ''),
+                        t.name
+                    ) AS team_name,
+                    COALESCE(
+                        NULLIF((
+                            SELECT tc2.team_name
+                            FROM team_championships tc2
+                            JOIN championships c2 ON c2.championship_id = tc2.championship_id
+                            WHERE tc2.team_id = t.team_id
+                              AND {season_name_where}
+                              AND NULLIF(TRIM(tc2.team_name), '') IS NOT NULL
+                            ORDER BY tc2.updated_at DESC, tc2.created_at DESC
+                            LIMIT 1
+                        ), ''),
+                        t.name
+                    ) AS display_name,
+                    t.avatar
+                FROM teams t
+                JOIN (
+                    SELECT DISTINCT tc.team_id
+                    FROM team_championships tc
+                    JOIN championships c ON c.championship_id = tc.championship_id
+                    WHERE {season_where}
+                    UNION
+                    SELECT DISTINCT tst.team_id
+                    FROM team_season_totals tst
+                    WHERE tst.season = :season
+                      {"AND tst.division_num = :division" if division is not None else ""}
+                ) season_teams ON season_teams.team_id = t.team_id
+                ORDER BY display_name, t.team_id
+                LIMIT :limit
+                """,
+                params,
+            )
+        else:
+            rows = await query_async(
+                """
+                SELECT
+                    t.team_id,
+                    COALESCE(
+                        (
+                            SELECT tc.championship_id
+                            FROM team_championships tc
+                            JOIN championships c ON c.championship_id = tc.championship_id
+                            WHERE tc.team_id = t.team_id
+                            ORDER BY c.season DESC, c.is_playoffs ASC, tc.updated_at DESC, tc.created_at DESC
+                            LIMIT 1
+                        ),
+                        (
+                            SELECT c4.championship_id
+                            FROM team_season_totals tst4
+                            JOIN championships c4 ON c4.season = tst4.season AND c4.division_num = tst4.division_num
+                            WHERE tst4.team_id = t.team_id
+                            ORDER BY c4.season DESC, c4.is_playoffs ASC, c4.championship_id
+                            LIMIT 1
+                        )
+                    ) AS championship_id,
+                    t.name AS team_name,
+                    t.name AS display_name,
+                    t.avatar
+                FROM teams t
+                ORDER BY t.name, t.team_id
+                LIMIT :limit
+                """,
+                {"limit": limit},
+            )
+        for row in rows:
+            row.setdefault("avatar", DEFAULT_AVATAR)
+            row["faceit_url"] = None
+        return rows
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
 
 
 async def fetch_team_matches(team_id: str, championship_id: Optional[str] = None) -> list[dict[str, Any]]:
@@ -1156,93 +1178,126 @@ async def detect_player_roles(championship_id: str, team_id: str) -> list[dict[s
 
 
 async def fetch_comprehensive_team_season(team_id: str, championship_id: str) -> dict[str, Any]:
-    """Fetch all comprehensive team season data in one call."""
+    """Fetch all comprehensive team season data in one call (cached per championship revision)."""
+    revision = await get_championship_revision(championship_id)
+
+    # Lightweight metadata query to pick the right cache tier.
     champ_rows = await query_async(
         "SELECT season, division_num FROM championships WHERE championship_id = :champ_id",
         {"champ_id": championship_id},
     )
     if not champ_rows:
         raise NotFoundError(f"Championship {championship_id} not found")
-    
-    champ = champ_rows[0]
-    season = champ["season"]
-    division_num = champ["division_num"]
-    
-    # Verify team exists in this championship
-    team_check = await query_async(
-        """
-        SELECT tst.* FROM team_season_totals tst
-        WHERE tst.season = :season AND tst.division_num = :div AND tst.team_id = :team_id
-        """,
-        {"season": season, "div": division_num, "team_id": team_id}
-    )
-    if not team_check:
-        raise NotFoundError(f"Team '{team_id}' not found in championship {championship_id}")
-    
-    # Fetch all components
-    try:
-        team_stats = (await fetch_team_season_stats(team_id))
-        team_stats = next((s for s in team_stats if s.get("championship_id") == championship_id), None)
-    except NotFoundError:
-        team_stats = None
-    if team_stats:
-        team_stats = dict(team_stats)
-    
-    try:
-        map_stats_raw = await fetch_team_map_stats_comprehensive(championship_id, team_id)
-        map_stats = [dict(row) for row in map_stats_raw]
-    except NotFoundError:
-        map_stats = []
-    
-    try:
-        matches_raw = await fetch_team_matches(team_id, championship_id)
-        matches = _normalize_matches_for_page(matches_raw, team_id)
-    except NotFoundError:
-        matches = []
-    
-    try:
-        players_raw = await fetch_team_players_comprehensive(team_id, championship_id)
-        players = [dict(row) for row in players_raw]
-    except NotFoundError:
-        players = []
-    
-    try:
-        veto_history_raw = await fetch_team_veto_history(team_id, championship_id)
-        veto_history = [dict(row) for row in veto_history_raw]
-    except NotFoundError:
-        veto_history = []
-    
-    try:
-        veto_aggregates_raw = await fetch_team_veto_aggregates(team_id, championship_id)
-        veto_aggregates = [dict(row) for row in veto_aggregates_raw]
-    except NotFoundError:
-        veto_aggregates = []
-    
-    # Fetch Phase 1 enhancements (division averages and player roles)
-    try:
-        division_averages = await get_division_averages(championship_id)
-    except Exception as e:
-        print(f"Error fetching division averages: {e}")
-        division_averages = {}
-    
-    try:
-        player_roles = await detect_player_roles(championship_id, team_id)
-    except Exception as e:
-        print(f"Error fetching player roles: {e}")
-        player_roles = []
-    
-    return {
-        "championship_id": championship_id,
-        "season": season,
-        "division_num": division_num,
-        "team_stats": team_stats,
-        "map_stats": map_stats,
-        "match_history": matches,
-        "player_stats": players,
-        "veto_history": veto_history,
-        "veto_aggregates": veto_aggregates,
-        # Phase 1 enhancements
-        "division_averages": division_averages,
-        "player_roles": player_roles,
-    }
+
+    season = champ_rows[0]["season"]
+    division_num = champ_rows[0]["division_num"]
+    cache, ttl_seconds = select_season_cache(season)
+    cache_key = ("fetch_comprehensive_team_season", team_id, championship_id, revision)
+
+    async def _compute() -> dict[str, Any]:
+        # Verify team exists in this championship
+        team_check = await query_async(
+            """
+            SELECT tst.team_id FROM team_season_totals tst
+            WHERE tst.season = :season AND tst.division_num = :div AND tst.team_id = :team_id
+            """,
+            {"season": season, "div": division_num, "team_id": team_id},
+        )
+        if not team_check:
+            raise NotFoundError(f"Team '{team_id}' not found in championship {championship_id}")
+
+        # Fetch team_stats from already-cached call; run all heavy queries in parallel.
+        async def _team_stats():
+            try:
+                rows = await fetch_team_season_stats(team_id)
+                row = next((s for s in rows if s.get("championship_id") == championship_id), None)
+                return dict(row) if row else None
+            except NotFoundError:
+                return None
+
+        async def _map_stats():
+            try:
+                rows = await fetch_team_map_stats_comprehensive(championship_id, team_id)
+                return [dict(r) for r in rows]
+            except NotFoundError:
+                return []
+
+        async def _matches():
+            try:
+                rows = await fetch_team_matches(team_id, championship_id)
+                return _normalize_matches_for_page(rows, team_id)
+            except NotFoundError:
+                return []
+
+        async def _players():
+            try:
+                rows = await fetch_team_players_comprehensive(team_id, championship_id)
+                return [dict(r) for r in rows]
+            except NotFoundError:
+                return []
+
+        async def _veto_history():
+            try:
+                rows = await fetch_team_veto_history(team_id, championship_id)
+                return [dict(r) for r in rows]
+            except NotFoundError:
+                return []
+
+        async def _veto_aggregates():
+            try:
+                rows = await fetch_team_veto_aggregates(team_id, championship_id)
+                return [dict(r) for r in rows]
+            except NotFoundError:
+                return []
+
+        async def _division_averages():
+            try:
+                return await get_division_averages(championship_id)
+            except Exception:
+                return {}
+
+        async def _player_roles():
+            try:
+                return await detect_player_roles(championship_id, team_id)
+            except Exception:
+                return []
+
+        (
+            team_stats,
+            map_stats,
+            matches,
+            players,
+            veto_history,
+            veto_aggregates,
+            division_averages,
+            player_roles,
+        ) = await asyncio.gather(
+            _team_stats(),
+            _map_stats(),
+            _matches(),
+            _players(),
+            _veto_history(),
+            _veto_aggregates(),
+            _division_averages(),
+            _player_roles(),
+        )
+
+        return {
+            "championship_id": championship_id,
+            "season": season,
+            "division_num": division_num,
+            "team_stats": team_stats,
+            "map_stats": map_stats,
+            "match_history": matches,
+            "player_stats": players,
+            "veto_history": veto_history,
+            "veto_aggregates": veto_aggregates,
+            "division_averages": division_averages,
+            "player_roles": player_roles,
+        }
+
+    if cache is None:
+        return await _compute()
+    cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
+    return cached_value
 

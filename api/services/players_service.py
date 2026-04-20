@@ -200,248 +200,258 @@ async def fetch_player_season_progression(
     *,
     championship_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    query = """
-        SELECT
-            ps.match_id,
-            ps.round_index,
-            ps.team_id,
-            ps.opponent_team_id,
-            ps.kills,
-            ps.deaths,
-            ps.assists,
-            ps.mvps,
-            ps.headshots,
-            ps.sniper_kills,
-            ps.pistol_kills,
-            ps.knife_kills,
-            ps.zeus_kills,
-            ps.first_kills,
-            ps.enemies_flashed,
-            ps.flash_count,
-            ps.flash_successes,
-            ps.utility_damage,
-            ps.utility_count,
-            ps.utility_successes,
-            ps.utility_enemies,
-            ps.mk_2k,
-            ps.mk_3k,
-            ps.mk_4k,
-            ps.mk_5k,
-            ps.clutch_kills,
-            ps.cl_1v1_attempts,
-            ps.cl_1v1_wins,
-            ps.cl_1v2_attempts,
-            ps.cl_1v2_wins,
-            ps.entry_count,
-            ps.entry_wins,
-            ps.damage,
-            m.team1_id AS match_team1_id,
-            m.team2_id AS match_team2_id,
-            m.winner_team_id,
-            m.finished_at,
-            c.is_playoffs AS match_is_playoffs,
-            ds.created_at AS snapshot_time,
-            t_self.name AS team_name,
-            t_opp.name AS opponent_team_name,
-            t1.name AS team1_name,
-            t2.name AS team2_name,
-            mp.map_name,
-            mp.score_team1,
-            mp.score_team2
-        FROM player_stats ps
-        JOIN matches m ON m.match_id = ps.match_id
-        LEFT JOIN championships c ON c.championship_id = m.championship_id
-        LEFT JOIN division_snapshots ds
-          ON ds.match_id = ps.match_id
-         AND ds.season = m.season
-         AND ds.division_num = m.division_num
-        LEFT JOIN teams t_self ON t_self.team_id = ps.team_id
-        LEFT JOIN teams t_opp ON t_opp.team_id = ps.opponent_team_id
-        LEFT JOIN teams t1 ON t1.team_id = m.team1_id
-        LEFT JOIN teams t2 ON t2.team_id = m.team2_id
-        LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-        WHERE ps.player_id = :player_id
-          AND ps.season = :season
-          AND ps.division_num = :division_num
-          {championship_filter}
-          AND ps.is_forfeit_map = 0
-        ORDER BY
-          COALESCE(m.finished_at, ds.created_at) ASC,
-          ps.match_id ASC,
-          ps.round_index ASC
-        """
-    params: dict[str, Any] = {"player_id": player_id, "season": season, "division_num": division_num}
-    championship_filter = ""
-    if championship_id:
-        championship_filter = "AND m.championship_id = :championship_id"
-        params["championship_id"] = championship_id
-    map_rows = await query_async(
-        query.format(championship_filter=championship_filter),
-        params,
-    )
-    if not map_rows:
-        raise NotFoundError(
-            f"No progression snapshots found for player '{player_id}' in season {season} division {division_num}"
+    revision = await get_championship_revision(championship_id) if championship_id else None
+    cache, ttl_seconds = select_season_cache(season)
+    cache_key = ("fetch_player_season_progression", player_id, season, division_num, championship_id, revision)
+
+    async def _compute() -> list[dict[str, Any]]:
+        query = """
+            SELECT
+                ps.match_id,
+                ps.round_index,
+                ps.team_id,
+                ps.opponent_team_id,
+                ps.kills,
+                ps.deaths,
+                ps.assists,
+                ps.mvps,
+                ps.headshots,
+                ps.sniper_kills,
+                ps.pistol_kills,
+                ps.knife_kills,
+                ps.zeus_kills,
+                ps.first_kills,
+                ps.enemies_flashed,
+                ps.flash_count,
+                ps.flash_successes,
+                ps.utility_damage,
+                ps.utility_count,
+                ps.utility_successes,
+                ps.utility_enemies,
+                ps.mk_2k,
+                ps.mk_3k,
+                ps.mk_4k,
+                ps.mk_5k,
+                ps.clutch_kills,
+                ps.cl_1v1_attempts,
+                ps.cl_1v1_wins,
+                ps.cl_1v2_attempts,
+                ps.cl_1v2_wins,
+                ps.entry_count,
+                ps.entry_wins,
+                ps.damage,
+                m.team1_id AS match_team1_id,
+                m.team2_id AS match_team2_id,
+                m.winner_team_id,
+                m.finished_at,
+                c.is_playoffs AS match_is_playoffs,
+                ds.created_at AS snapshot_time,
+                t_self.name AS team_name,
+                t_opp.name AS opponent_team_name,
+                t1.name AS team1_name,
+                t2.name AS team2_name,
+                mp.map_name,
+                mp.score_team1,
+                mp.score_team2
+            FROM player_stats ps
+            JOIN matches m ON m.match_id = ps.match_id
+            LEFT JOIN championships c ON c.championship_id = m.championship_id
+            LEFT JOIN division_snapshots ds
+              ON ds.match_id = ps.match_id
+             AND ds.season = m.season
+             AND ds.division_num = m.division_num
+            LEFT JOIN teams t_self ON t_self.team_id = ps.team_id
+            LEFT JOIN teams t_opp ON t_opp.team_id = ps.opponent_team_id
+            LEFT JOIN teams t1 ON t1.team_id = m.team1_id
+            LEFT JOIN teams t2 ON t2.team_id = m.team2_id
+            LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
+            WHERE ps.player_id = :player_id
+              AND ps.season = :season
+              AND ps.division_num = :division_num
+              {championship_filter}
+              AND ps.is_forfeit_map = 0
+            ORDER BY
+              COALESCE(m.finished_at, ds.created_at) ASC,
+              ps.match_id ASC,
+              ps.round_index ASC
+            """
+        params: dict[str, Any] = {"player_id": player_id, "season": season, "division_num": division_num}
+        championship_filter = ""
+        if championship_id:
+            championship_filter = "AND m.championship_id = :championship_id"
+            params["championship_id"] = championship_id
+        map_rows = await query_async(
+            query.format(championship_filter=championship_filter),
+            params,
         )
-    # Diagnostics for investigating missing/duplicated progression points.
-    unique_keys: set[tuple[str, int]] = set()
-    duplicate_keys = 0
-    missing_map_meta = 0
-    missing_time = 0
-    for row in map_rows:
-        key = (str(row.get("match_id") or ""), int(row.get("round_index") or 0))
-        if key in unique_keys:
-            duplicate_keys += 1
+        if not map_rows:
+            raise NotFoundError(
+                f"No progression snapshots found for player '{player_id}' in season {season} division {division_num}"
+            )
+        # Diagnostics for investigating missing/duplicated progression points.
+        unique_keys: set[tuple[str, int]] = set()
+        duplicate_keys = 0
+        missing_map_meta = 0
+        missing_time = 0
+        for row in map_rows:
+            key = (str(row.get("match_id") or ""), int(row.get("round_index") or 0))
+            if key in unique_keys:
+                duplicate_keys += 1
+            else:
+                unique_keys.add(key)
+            if not row.get("map_name") or row.get("score_team1") is None or row.get("score_team2") is None:
+                missing_map_meta += 1
+            if not row.get("finished_at") and not row.get("snapshot_time"):
+                missing_time += 1
+        if duplicate_keys or missing_map_meta or missing_time:
+            LOGGER.warning(
+                "player progression anomalies player=%s season=%s division=%s championship=%s rows=%d unique=%d dup=%d missing_map_meta=%d missing_time=%d",
+                player_id,
+                season,
+                division_num,
+                championship_id,
+                len(map_rows),
+                len(unique_keys),
+                duplicate_keys,
+                missing_map_meta,
+                missing_time,
+            )
         else:
-            unique_keys.add(key)
-        if not row.get("map_name") or row.get("score_team1") is None or row.get("score_team2") is None:
-            missing_map_meta += 1
-        if not row.get("finished_at") and not row.get("snapshot_time"):
-            missing_time += 1
-    if duplicate_keys or missing_map_meta or missing_time:
-        LOGGER.warning(
-            "player progression anomalies player=%s season=%s division=%s championship=%s rows=%d unique=%d dup=%d missing_map_meta=%d missing_time=%d",
-            player_id,
-            season,
-            division_num,
-            championship_id,
-            len(map_rows),
-            len(unique_keys),
-            duplicate_keys,
-            missing_map_meta,
-            missing_time,
+            LOGGER.info(
+                "player progression source player=%s season=%s division=%s championship=%s rows=%d unique=%d",
+                player_id,
+                season,
+                division_num,
+                championship_id,
+                len(map_rows),
+                len(unique_keys),
+            )
+
+        fields = (
+            "kills", "deaths", "assists", "mvps", "headshots", "sniper_kills", "pistol_kills",
+            "knife_kills", "zeus_kills", "first_kills", "enemies_flashed", "flash_count",
+            "flash_successes", "utility_damage", "utility_count", "utility_successes",
+            "utility_enemies", "mk_2k", "mk_3k", "mk_4k", "mk_5k", "clutch_kills",
+            "cl_1v1_attempts", "cl_1v1_wins", "cl_1v2_attempts", "cl_1v2_wins",
+            "entry_count", "entry_wins", "damage",
         )
-    else:
-        LOGGER.info(
-            "player progression source player=%s season=%s division=%s championship=%s rows=%d unique=%d",
-            player_id,
-            season,
-            division_num,
-            championship_id,
-            len(map_rows),
-            len(unique_keys),
-        )
+        totals: dict[str, float] = {field: 0.0 for field in fields}
+        maps_played = 0
+        rounds_played = 0
+        out: list[dict[str, Any]] = []
 
-    fields = (
-        "kills", "deaths", "assists", "mvps", "headshots", "sniper_kills", "pistol_kills",
-        "knife_kills", "zeus_kills", "first_kills", "enemies_flashed", "flash_count",
-        "flash_successes", "utility_damage", "utility_count", "utility_successes",
-        "utility_enemies", "mk_2k", "mk_3k", "mk_4k", "mk_5k", "clutch_kills",
-        "cl_1v1_attempts", "cl_1v1_wins", "cl_1v2_attempts", "cl_1v2_wins",
-        "entry_count", "entry_wins", "damage",
-    )
-    totals: dict[str, float] = {field: 0.0 for field in fields}
-    maps_played = 0
-    rounds_played = 0
-    out: list[dict[str, Any]] = []
+        for idx, row in enumerate(map_rows, start=1):
+            maps_played += 1
+            rounds_played += int((row.get("score_team1") or 0) + (row.get("score_team2") or 0))
+            for field in fields:
+                totals[field] += float(row.get(field) or 0)
 
-    for idx, row in enumerate(map_rows, start=1):
-        maps_played += 1
-        rounds_played += int((row.get("score_team1") or 0) + (row.get("score_team2") or 0))
-        for field in fields:
-            totals[field] += float(row.get(field) or 0)
+            kills = float(totals["kills"])
+            deaths = float(totals["deaths"])
+            damage = float(totals["damage"])
+            headshots = float(totals["headshots"])
+            kd = kills / deaths if deaths > 0 else kills
+            kr = kills / rounds_played if rounds_played > 0 else 0.0
+            adr = damage / rounds_played if rounds_played > 0 else 0.0
+            hs_pct = (headshots / kills * 100.0) if kills > 0 else 0.0
 
-        kills = float(totals["kills"])
-        deaths = float(totals["deaths"])
-        damage = float(totals["damage"])
-        headshots = float(totals["headshots"])
-        kd = kills / deaths if deaths > 0 else kills
-        kr = kills / rounds_played if rounds_played > 0 else 0.0
-        adr = damage / rounds_played if rounds_played > 0 else 0.0
-        hs_pct = (headshots / kills * 100.0) if kills > 0 else 0.0
+            team_id = row.get("team_id")
+            winner_team_id = row.get("winner_team_id")
+            result = None
+            if winner_team_id is not None and team_id is not None:
+                result = "win" if str(winner_team_id) == str(team_id) else "loss"
 
-        team_id = row.get("team_id")
-        winner_team_id = row.get("winner_team_id")
-        result = None
-        if winner_team_id is not None and team_id is not None:
-            result = "win" if str(winner_team_id) == str(team_id) else "loss"
+            t1_name = row.get("team1_name")
+            t2_name = row.get("team2_name")
+            matchup = None
+            if t1_name and t2_name:
+                matchup = f"{t1_name} vs {t2_name}"
+            elif t1_name or t2_name:
+                matchup = t1_name or t2_name
 
-        t1_name = row.get("team1_name")
-        t2_name = row.get("team2_name")
-        matchup = None
-        if t1_name and t2_name:
-            matchup = f"{t1_name} vs {t2_name}"
-        elif t1_name or t2_name:
-            matchup = t1_name or t2_name
+            map_name = row.get("map_name") or f"Map {int(row.get('round_index') or idx)}"
+            map_score = f"{int(row.get('score_team1') or 0)}:{int(row.get('score_team2') or 0)}"
 
-        map_name = row.get("map_name") or f"Map {int(row.get('round_index') or idx)}"
-        map_score = f"{int(row.get('score_team1') or 0)}:{int(row.get('score_team2') or 0)}"
+            out.append(
+                {
+                    "snapshot_ts": idx,
+                    "snapshot_time": row.get("snapshot_time") or row.get("finished_at"),
+                    "match_played_at": row.get("finished_at"),
+                    "round_index": int(row.get("round_index") or 0),
+                    "match_id": row.get("match_id"),
+                    "match_team1_id": row.get("match_team1_id"),
+                    "match_team2_id": row.get("match_team2_id"),
+                    "team_id": team_id,
+                    "team_name": row.get("team_name"),
+                    "opponent_team_id": row.get("opponent_team_id"),
+                    "opponent_team_name": row.get("opponent_team_name"),
+                    "matchup": matchup,
+                    "result": result,
+                    "match_is_playoffs": bool(row.get("match_is_playoffs")) if row.get("match_is_playoffs") is not None else None,
+                    "map_names_csv": str(map_name),
+                    "map_scores_csv": map_score,
+                    "maps_played": maps_played,
+                    "rounds_played": rounds_played,
+                    "kills": int(round(totals["kills"])),
+                    "deaths": int(round(totals["deaths"])),
+                    "assists": int(round(totals["assists"])),
+                    "mvps": int(round(totals["mvps"])),
+                    "headshots": int(round(totals["headshots"])),
+                    "sniper_kills": int(round(totals["sniper_kills"])),
+                    "pistol_kills": int(round(totals["pistol_kills"])),
+                    "knife_kills": int(round(totals["knife_kills"])),
+                    "zeus_kills": int(round(totals["zeus_kills"])),
+                    "first_kills": int(round(totals["first_kills"])),
+                    "enemies_flashed": int(round(totals["enemies_flashed"])),
+                    "flash_count": int(round(totals["flash_count"])),
+                    "flash_successes": int(round(totals["flash_successes"])),
+                    "utility_damage": int(round(totals["utility_damage"])),
+                    "utility_count": int(round(totals["utility_count"])),
+                    "utility_successes": int(round(totals["utility_successes"])),
+                    "utility_enemies": int(round(totals["utility_enemies"])),
+                    "mk_2k": int(round(totals["mk_2k"])),
+                    "mk_3k": int(round(totals["mk_3k"])),
+                    "mk_4k": int(round(totals["mk_4k"])),
+                    "mk_5k": int(round(totals["mk_5k"])),
+                    "clutch_kills": int(round(totals["clutch_kills"])),
+                    "cl_1v1_attempts": int(round(totals["cl_1v1_attempts"])),
+                    "cl_1v1_wins": int(round(totals["cl_1v1_wins"])),
+                    "cl_1v2_attempts": int(round(totals["cl_1v2_attempts"])),
+                    "cl_1v2_wins": int(round(totals["cl_1v2_wins"])),
+                    "entry_count": int(round(totals["entry_count"])),
+                    "entry_wins": int(round(totals["entry_wins"])),
+                    "kd": float(kd),
+                    "adr": float(adr),
+                    "kr": float(kr),
+                    "hs_pct": float(hs_pct),
+                    "damage": int(round(totals["damage"])),
+                }
+            )
+        if out:
+            last = out[-1]
+            LOGGER.info(
+                "player progression built player=%s season=%s division=%s championship=%s points=%d maps=%s rounds=%s kills=%s deaths=%s assists=%s mk2=%s mk3=%s mk4=%s mk5=%s",
+                player_id,
+                season,
+                division_num,
+                championship_id,
+                len(out),
+                last.get("maps_played"),
+                last.get("rounds_played"),
+                last.get("kills"),
+                last.get("deaths"),
+                last.get("assists"),
+                last.get("mk_2k"),
+                last.get("mk_3k"),
+                last.get("mk_4k"),
+                last.get("mk_5k"),
+            )
+        return out
 
-        out.append(
-            {
-                "snapshot_ts": idx,
-                "snapshot_time": row.get("snapshot_time") or row.get("finished_at"),
-                "match_played_at": row.get("finished_at"),
-                "round_index": int(row.get("round_index") or 0),
-                "match_id": row.get("match_id"),
-                "match_team1_id": row.get("match_team1_id"),
-                "match_team2_id": row.get("match_team2_id"),
-                "team_id": team_id,
-                "team_name": row.get("team_name"),
-                "opponent_team_id": row.get("opponent_team_id"),
-                "opponent_team_name": row.get("opponent_team_name"),
-                "matchup": matchup,
-                "result": result,
-                "match_is_playoffs": bool(row.get("match_is_playoffs")) if row.get("match_is_playoffs") is not None else None,
-                "map_names_csv": str(map_name),
-                "map_scores_csv": map_score,
-                "maps_played": maps_played,
-                "rounds_played": rounds_played,
-                "kills": int(round(totals["kills"])),
-                "deaths": int(round(totals["deaths"])),
-                "assists": int(round(totals["assists"])),
-                "mvps": int(round(totals["mvps"])),
-                "headshots": int(round(totals["headshots"])),
-                "sniper_kills": int(round(totals["sniper_kills"])),
-                "pistol_kills": int(round(totals["pistol_kills"])),
-                "knife_kills": int(round(totals["knife_kills"])),
-                "zeus_kills": int(round(totals["zeus_kills"])),
-                "first_kills": int(round(totals["first_kills"])),
-                "enemies_flashed": int(round(totals["enemies_flashed"])),
-                "flash_count": int(round(totals["flash_count"])),
-                "flash_successes": int(round(totals["flash_successes"])),
-                "utility_damage": int(round(totals["utility_damage"])),
-                "utility_count": int(round(totals["utility_count"])),
-                "utility_successes": int(round(totals["utility_successes"])),
-                "utility_enemies": int(round(totals["utility_enemies"])),
-                "mk_2k": int(round(totals["mk_2k"])),
-                "mk_3k": int(round(totals["mk_3k"])),
-                "mk_4k": int(round(totals["mk_4k"])),
-                "mk_5k": int(round(totals["mk_5k"])),
-                "clutch_kills": int(round(totals["clutch_kills"])),
-                "cl_1v1_attempts": int(round(totals["cl_1v1_attempts"])),
-                "cl_1v1_wins": int(round(totals["cl_1v1_wins"])),
-                "cl_1v2_attempts": int(round(totals["cl_1v2_attempts"])),
-                "cl_1v2_wins": int(round(totals["cl_1v2_wins"])),
-                "entry_count": int(round(totals["entry_count"])),
-                "entry_wins": int(round(totals["entry_wins"])),
-                "kd": float(kd),
-                "adr": float(adr),
-                "kr": float(kr),
-                "hs_pct": float(hs_pct),
-                "damage": int(round(totals["damage"])),
-            }
-        )
-    if out:
-        last = out[-1]
-        LOGGER.info(
-            "player progression built player=%s season=%s division=%s championship=%s points=%d maps=%s rounds=%s kills=%s deaths=%s assists=%s mk2=%s mk3=%s mk4=%s mk5=%s",
-            player_id,
-            season,
-            division_num,
-            championship_id,
-            len(out),
-            last.get("maps_played"),
-            last.get("rounds_played"),
-            last.get("kills"),
-            last.get("deaths"),
-            last.get("assists"),
-            last.get("mk_2k"),
-            last.get("mk_3k"),
-            last.get("mk_4k"),
-            last.get("mk_5k"),
-        )
-    return out
+    if cache is None:
+        return await _compute()
+    cached_value, _ = await cache.get_or_set(cache_key, _compute, ttl_seconds=ttl_seconds)
+    return cached_value
 
 
 async def list_players(
@@ -451,52 +461,13 @@ async def list_players(
     team_id: Optional[str] = None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    if season is not None:
-        filters = ["pst.season = :season"]
-        query = """
-            SELECT DISTINCT
-                p.player_id,
-                (
-                    SELECT pcx.championship_id
-                    FROM player_championships pcx
-                    JOIN championships cx ON cx.championship_id = pcx.championship_id
-                    WHERE pcx.player_id = p.player_id
-                      AND cx.season = :season
-                      {division_filter_subquery}
-                    ORDER BY pcx.updated_at DESC, pcx.created_at DESC
-                    LIMIT 1
-                ) AS championship_id,
-                COALESCE(pc.player_name, p.nickname) AS nickname,
-                p.avatar,
-                p.faceit_url
-            FROM players p
-            JOIN player_season_totals pst ON pst.player_id = p.player_id
-            LEFT JOIN championships c
-                ON c.season = pst.season
-               AND c.division_num = pst.division_num
-               AND COALESCE(c.is_playoffs, 0) = 0
-            LEFT JOIN player_championships pc
-                ON pc.player_id = p.player_id
-               AND pc.championship_id = c.championship_id
-            WHERE {where_clause}
-        """
-        params: Dict[str, Any] = {"season": season, "limit": limit}
-        if division is not None:
-            filters.append("pst.division_num = :division")
-            params["division"] = division
-        if team_id:
-            filters.append("pst.team_id = :team_id")
-            params["team_id"] = team_id
-        division_filter_subquery = "AND cx.division_num = :division" if division is not None else ""
-        query = query.format(
-            where_clause=" AND ".join(filters),
-            division_filter_subquery=division_filter_subquery,
-        )
-        query += " ORDER BY nickname LIMIT :limit"
-        try:
-            rows = await query_async(query, params)
-        except Exception:
-            fallback_query = """
+    revision = await get_global_revision()
+    cache_key = ("list_players", season, division, team_id, limit, revision)
+
+    async def _compute() -> list[dict[str, Any]]:
+        if season is not None:
+            filters = ["pst.season = :season"]
+            query = """
                 SELECT DISTINCT
                     p.player_id,
                     (
@@ -509,7 +480,9 @@ async def list_players(
                         ORDER BY pcx.updated_at DESC, pcx.created_at DESC
                         LIMIT 1
                     ) AS championship_id,
-                    COALESCE(pc.player_name, p.nickname) AS nickname
+                    COALESCE(pc.player_name, p.nickname) AS nickname,
+                    p.avatar,
+                    p.faceit_url
                 FROM players p
                 JOIN player_season_totals pst ON pst.player_id = p.player_id
                 LEFT JOIN championships c
@@ -521,59 +494,103 @@ async def list_players(
                    AND pc.championship_id = c.championship_id
                 WHERE {where_clause}
             """
-            fallback_query = fallback_query.format(
+            params: Dict[str, Any] = {"season": season, "limit": limit}
+            if division is not None:
+                filters.append("pst.division_num = :division")
+                params["division"] = division
+            if team_id:
+                filters.append("pst.team_id = :team_id")
+                params["team_id"] = team_id
+            division_filter_subquery = "AND cx.division_num = :division" if division is not None else ""
+            query = query.format(
                 where_clause=" AND ".join(filters),
                 division_filter_subquery=division_filter_subquery,
             )
-            fallback_query += " ORDER BY nickname LIMIT :limit"
-            rows = await query_async(fallback_query, params)
-    else:
-        try:
-            rows = await query_async(
+            query += " ORDER BY nickname LIMIT :limit"
+            try:
+                rows = await query_async(query, params)
+            except Exception:
+                fallback_query = """
+                    SELECT DISTINCT
+                        p.player_id,
+                        (
+                            SELECT pcx.championship_id
+                            FROM player_championships pcx
+                            JOIN championships cx ON cx.championship_id = pcx.championship_id
+                            WHERE pcx.player_id = p.player_id
+                              AND cx.season = :season
+                              {division_filter_subquery}
+                            ORDER BY pcx.updated_at DESC, pcx.created_at DESC
+                            LIMIT 1
+                        ) AS championship_id,
+                        COALESCE(pc.player_name, p.nickname) AS nickname
+                    FROM players p
+                    JOIN player_season_totals pst ON pst.player_id = p.player_id
+                    LEFT JOIN championships c
+                        ON c.season = pst.season
+                       AND c.division_num = pst.division_num
+                       AND COALESCE(c.is_playoffs, 0) = 0
+                    LEFT JOIN player_championships pc
+                        ON pc.player_id = p.player_id
+                       AND pc.championship_id = c.championship_id
+                    WHERE {where_clause}
                 """
-                SELECT
-                    p.player_id,
-                    (
-                        SELECT pc.championship_id
-                        FROM player_championships pc
-                        JOIN championships c ON c.championship_id = pc.championship_id
-                        WHERE pc.player_id = p.player_id
-                        ORDER BY c.season DESC, c.is_playoffs ASC, pc.updated_at DESC, pc.created_at DESC
-                        LIMIT 1
-                    ) AS championship_id,
-                    p.nickname,
-                    p.avatar,
-                    p.faceit_url
-                FROM players p
-                ORDER BY nickname
-                LIMIT :limit
-                """,
-                {"limit": limit},
-            )
-        except Exception:
-            rows = await query_async(
-                """
-                SELECT
-                    p.player_id,
-                    (
-                        SELECT pc.championship_id
-                        FROM player_championships pc
-                        JOIN championships c ON c.championship_id = pc.championship_id
-                        WHERE pc.player_id = p.player_id
-                        ORDER BY c.season DESC, c.is_playoffs ASC, pc.updated_at DESC, pc.created_at DESC
-                        LIMIT 1
-                    ) AS championship_id,
-                    p.nickname
-                FROM players p
-                ORDER BY nickname
-                LIMIT :limit
-                """,
-                {"limit": limit},
-            )
+                fallback_query = fallback_query.format(
+                    where_clause=" AND ".join(filters),
+                    division_filter_subquery=division_filter_subquery,
+                )
+                fallback_query += " ORDER BY nickname LIMIT :limit"
+                rows = await query_async(fallback_query, params)
+        else:
+            try:
+                rows = await query_async(
+                    """
+                    SELECT
+                        p.player_id,
+                        (
+                            SELECT pc.championship_id
+                            FROM player_championships pc
+                            JOIN championships c ON c.championship_id = pc.championship_id
+                            WHERE pc.player_id = p.player_id
+                            ORDER BY c.season DESC, c.is_playoffs ASC, pc.updated_at DESC, pc.created_at DESC
+                            LIMIT 1
+                        ) AS championship_id,
+                        p.nickname,
+                        p.avatar,
+                        p.faceit_url
+                    FROM players p
+                    ORDER BY nickname
+                    LIMIT :limit
+                    """,
+                    {"limit": limit},
+                )
+            except Exception:
+                rows = await query_async(
+                    """
+                    SELECT
+                        p.player_id,
+                        (
+                            SELECT pc.championship_id
+                            FROM player_championships pc
+                            JOIN championships c ON c.championship_id = pc.championship_id
+                            WHERE pc.player_id = p.player_id
+                            ORDER BY c.season DESC, c.is_playoffs ASC, pc.updated_at DESC, pc.created_at DESC
+                            LIMIT 1
+                        ) AS championship_id,
+                        p.nickname
+                    FROM players p
+                    ORDER BY nickname
+                    LIMIT :limit
+                    """,
+                    {"limit": limit},
+                )
 
-    for row in rows:
-        row.setdefault("avatar", DEFAULT_AVATAR)
-        row.setdefault("faceit_url", None)
-        if not row.get("nickname"):
-            row["nickname"] = str(row.get("player_id") or "")
-    return rows
+        for row in rows:
+            row.setdefault("avatar", DEFAULT_AVATAR)
+            row.setdefault("faceit_url", None)
+            if not row.get("nickname"):
+                row["nickname"] = str(row.get("player_id") or "")
+        return rows
+
+    cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)
+    return cached_value
