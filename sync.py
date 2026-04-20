@@ -23,7 +23,7 @@ from utils.log_files import (
     build_timestamped_log_path,
     prune_log_files,
 )
-from division_registry import refresh_divisions
+from division_registry import refresh_divisions, load_divisions_from_db
 from runtime_diagnostics import SyncDiagnostics
 
 LOGGER = logging.getLogger("pappaliiga.sync")
@@ -88,7 +88,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--season", type=int, default=None, help="Sync only the provided season number (overrides --all-seasons)")
     parser.add_argument("--verify", action="store_true", help="Run post-sync verification queries")
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
-    parser.add_argument("--refresh-divisions", action="store_true", help="Refresh divisions.json from Faceit before syncing")
+    parser.add_argument("--refresh-divisions", action="store_true", help="Refresh divisions from Faceit and upsert to DB before syncing")
     parser.add_argument(
         "--refresh-min-season",
         type=int,
@@ -290,9 +290,9 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
                 ", ".join(refresh_result.skipped_championship_ids),
             )
         if args.refresh_dry_run:
-            LOGGER.info("Dry run requested - divisions.json left unchanged.")
+            LOGGER.info("Dry run requested - DB not updated.")
         else:
-            LOGGER.info("Updated divisions written to %s", refresh_result.output_path)
+            LOGGER.info("Updated divisions written to DB (championships table).")
 
         if _is_refresh_only(args):
             LOGGER.info("Refresh-only invocation detected; skipping sync pipeline.")
@@ -302,6 +302,8 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
     # Always use non-force schema ensure in normal sync flow. The migration helper
     # still creates missing tables/columns/indexes without re-running the whole SQL script.
     await create_schema_async(force=False)
+    # Populate in-memory DIVISIONS cache from the DB (with JSON seed fallback).
+    await load_divisions_from_db()
 
     max_concurrency = max(1, args.max_concurrency)
     abort_exc: Exception | None = None

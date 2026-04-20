@@ -1,21 +1,21 @@
-"""Helpers for keeping ``divisions.json`` in sync with Faceit championships.
+"""Helpers for keeping the division registry in sync with Faceit championships.
 
 This module implements discovery, merge, and persistence logic so both
 CLI tools and webhooks can refresh the division registry without
-duplicating code. It updates the JSON file on disk and, when possible,
-refreshes the in-memory copy exposed via :mod:`faceit_config`.
+duplicating code. Divisions are persisted in the DB ``championships`` table
+and the in-memory copy is exposed via :mod:`faceit_config`.
 """
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
+import db_async
 import faceit_config
-from faceit_config import DIVISIONS_JSON, PAPPALIIGA_ORG_ID
+from faceit_config import PAPPALIIGA_ORG_ID
 from faceit_client_async import (
     get_championship_matches_async,
     get_championship_teams_async,
@@ -29,6 +29,49 @@ POFF_RX = re.compile(r"playoff", re.IGNORECASE)
 MESTAR_RX = re.compile(r"mestaruussarja", re.IGNORECASE)
 
 CS_TAGS = {"cs2"}
+
+
+# ---------------------------------------------------------------------------
+# Season-from-date inference
+# ---------------------------------------------------------------------------
+# Two seasons per year:
+#   Even seasons (8, 10, 12, …) start in February  (H1 – after year start)
+#   Odd  seasons (7,  9, 11, …) start in August    (H2 – after summer)
+#
+# Observed anchors:
+#   Season  7 → 2023-08-27   Season  8 → 2024-02-11
+#   Season  9 → 2024-08-11   Season 10 → 2025-02-09
+#   Season 11 → 2025-08-10   Season 12 → 2026-02-08
+#
+# Derivation:
+#   If month in [8..12] or month == 1 (still H2 of the same calendar half-year):
+#       Use August half-year → odd season
+#   If month in [2..7]:
+#       Use February half-year → even season
+
+
+def _date_to_season(year: int, month: int) -> int:
+    """Return the season number for a given year/month based on the biannual calendar."""
+    if month >= 8:
+        # H2: August start; odd season
+        return 2 * (year - 2020) + 1
+    elif month >= 2:
+        # H1: February start; even season
+        return 2 * (year - 2021) + 2
+    else:
+        # January still belongs to the preceding H2 season
+        return 2 * ((year - 1) - 2020) + 1
+
+
+def _infer_season_from_ts(championship_start_ms: int | None) -> int:
+    """Return season inferred from ``championship_start`` (ms epoch), or 0 on failure."""
+    if not championship_start_ms:
+        return 0
+    try:
+        dt = datetime.fromtimestamp(championship_start_ms / 1000, tz=timezone.utc)
+        return _date_to_season(dt.year, dt.month)
+    except Exception:
+        return 0
 
 
 def _parse_leading_divnum(name: str) -> int | None:
@@ -99,6 +142,9 @@ async def discover_cs_divisions(
         division_num = _parse_leading_divnum(name)
         description = (championship.get("description") or "").strip()
         season = _parse_season(name) or _parse_season(description)
+        # Fallback: infer from championship_start when name and description give nothing
+        if not season:
+            season = _infer_season_from_ts(championship.get("championship_start"))
         is_po = _is_playoffs(name)
 
         if division_num is None and MESTAR_RX.search(name):
@@ -139,63 +185,43 @@ async def discover_cs_divisions(
     return output, stats
 
 
-def load_existing(path: Path) -> List[Dict[str, Any]]:
-    """Load existing divisions from disk with tolerant encoding handling.
+async def _load_existing_from_db() -> List[Dict[str, Any]]:
+    """Load existing divisions from the DB ``championships`` table."""
+    rows = await db_async.fetch_all(
+        """
+        SELECT championship_id, season, division_num, name, is_playoffs, slug,
+               parent_championship_id
+        FROM championships
+        ORDER BY season DESC, division_num ASC
+        """
+    )
+    return [
+        {
+            "championship_id": str(r["championship_id"]),
+            "name": r["name"] or "",
+            "season": int(r["season"]),
+            "division_num": int(r["division_num"]),
+            "slug": r["slug"] or "",
+            "is_playoffs": int(r["is_playoffs"]),
+            "parent_championship_id": r.get("parent_championship_id"),
+        }
+        for r in rows
+    ]
 
-    The file may be saved with various encodings (UTF-8 with BOM, UTF-16, etc.).
-    Try a few decodings and fall back to a tolerant cleanup approach similar to
-    the prior implementation. Return an empty list when the file cannot be
-    decoded or parsed.
+
+async def load_existing() -> List[Dict[str, Any]]:
+    """Return existing divisions from the DB."""
+    return await _load_existing_from_db()
+
+
+async def load_divisions_from_db() -> List[Dict[str, Any]]:
+    """Load all championships from DB and refresh the in-memory ``faceit_config.DIVISIONS`` cache.
+
+    Call this at application/sync startup after the DB pool is ready.
     """
-    if not path.exists():
-        return []
-
-    try:
-        raw_bytes = path.read_bytes()
-    except Exception as exc:
-        print(f"Warning: failed to read {path}: {exc}. Proceeding with empty DIVISIONS.")
-        return []
-
-    text: str | None = None
-    # Try common encodings in a sensible order
-    for enc in ("utf-8", "utf-8-sig", "utf-16", "latin-1"):
-        try:
-            text = raw_bytes.decode(enc)
-            if enc != "utf-8":
-                # Lightweight notice for unusual encodings; preserve prior print-based warnings
-                print(f"Note: decoded {path} using encoding {enc}.")
-            break
-        except Exception:
-            continue
-
-    if text is None:
-        print(f"Warning: could not decode {path} with known encodings. Proceeding with empty DIVISIONS.")
-        return []
-
-    try:
-        data = json.loads(text)
-    except Exception:
-        # Fallback: perform the same tolerant cleanup previously used but operate on the decoded text
-        raw_clean = re.sub(r"/\*.*?\*/", "", text, flags=re.DOTALL)
-        lines = [
-            line
-            for line in raw_clean.splitlines()
-            if not line.strip().startswith("...") and "Lines" not in line
-        ]
-        raw_clean = "\n".join(lines)
-        try:
-            data = json.loads(raw_clean)
-        except Exception as exc:
-            print(
-                "Warning: divisions.json exists but could not be parsed after tolerant cleanup:"
-                f" {exc}. Proceeding with empty existing list."
-            )
-            return []
-
-    if isinstance(data, list):
-        return data
-    print("Warning: divisions.json parsed but top-level is not a JSON array. Proceeding with empty list.")
-    return []
+    rows = await _load_existing_from_db()
+    faceit_config.update_divisions(rows)
+    return rows
 
 
 def non_destructive_merge(existing: List[Dict[str, Any]], discovered: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -261,7 +287,6 @@ def non_destructive_merge(existing: List[Dict[str, Any]], discovered: List[Dict[
 class DivisionRefreshResult:
     """Return metadata from :func:`refresh_divisions`."""
 
-    output_path: Path
     total: int
     created: int
     changed: bool
@@ -272,7 +297,6 @@ class DivisionRefreshResult:
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to plain dict for JSON responses."""
         return {
-            "output_path": str(self.output_path),
             "total": self.total,
             "created": self.created,
             "changed": self.changed,
@@ -308,17 +332,15 @@ async def _has_registered_teams(championship_id: str, min_teams: int = 1) -> boo
 
 async def refresh_divisions(
     *,
-    out_path: Path | None = None,
     min_season: int = faceit_config.DEFAULT_CURRENT_SEASON,
     require_matches: bool = False,
     min_matches: int = 0,
     min_new_division_teams: int = 0,
     dry_run: bool = False,
 ) -> DivisionRefreshResult:
-    """Discover new championships and update ``divisions.json``.
+    """Discover new championships and upsert them into the DB ``championships`` table.
 
     Args:
-        out_path: Optional override for the output JSON file.
         min_season: Ignore championships with ``season`` lower than this.
         require_matches: When ``True`` also fetch match lists and filter out
             championships with fewer matches than ``min_matches``.
@@ -326,15 +348,14 @@ async def refresh_divisions(
             ``require_matches`` is enabled.
         min_new_division_teams: When greater than zero, new championships must
             have at least this many registered teams to be added.
-        dry_run: When ``True`` do not write to disk; still return the merged
-            payload so callers can inspect changes.
+        dry_run: When ``True`` do not persist; still return the merged payload
+            so callers can inspect changes.
 
     Returns:
         :class:`DivisionRefreshResult` describing the outcome.
     """
 
-    target = Path(out_path) if out_path is not None else DIVISIONS_JSON
-    existing = load_existing(target)
+    existing = await load_existing()
     existing_ids = {
         str(entry.get("championship_id"))
         for entry in existing
@@ -379,13 +400,13 @@ async def refresh_divisions(
     changed = merged != existing
 
     if not dry_run:
-        if changed:
-            target.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+        if changed or new_ids:
+            async with db_async.connection(label="refresh_divisions") as conn:
+                await db_async.upsert_championships_async(conn, merged)
         # Always refresh the in-memory cache so the current process sees updates.
         faceit_config.update_divisions(merged)
 
     return DivisionRefreshResult(
-        output_path=target,
         total=len(merged),
         created=len(new_ids),
         changed=changed,
@@ -397,7 +418,6 @@ async def refresh_divisions(
 
 async def refresh_divisions_dry_run(
     *,
-    out_path: Path | None = None,
     min_season: int = faceit_config.DEFAULT_CURRENT_SEASON,
     require_matches: bool = False,
     min_matches: int = 0,
@@ -406,7 +426,6 @@ async def refresh_divisions_dry_run(
     """Convenience wrapper for :func:`refresh_divisions` with ``dry_run=True``."""
 
     return await refresh_divisions(
-        out_path=out_path,
         min_season=min_season,
         require_matches=require_matches,
         min_matches=min_matches,

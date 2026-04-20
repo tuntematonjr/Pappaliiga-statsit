@@ -4,7 +4,6 @@
 # Keep things simple and explicit.
 
 import os
-import json
 from pathlib import Path
 from typing import Any, List
 
@@ -44,7 +43,6 @@ DEMOCRACY_BASE = "https://www.faceit.com/api/democracy/v1"
 # Organizer ID for Pappaliiga (fixed, no need to search every time)
 PAPPALIIGA_ORG_ID = "1bfc69fa-5a21-4ed9-9ef3-37edbd7210d8"
 
-DIVISIONS_JSON = Path(__file__).with_name("divisions.json")
 DIVISIONS: List[dict[str, Any]] = []
 
 
@@ -79,30 +77,3 @@ def update_divisions(divisions: List[dict[str, Any]]) -> List[dict[str, Any]]:
     DIVISIONS = list(divisions)
     CURRENT_SEASON = _compute_current_season(DIVISIONS)
     return DIVISIONS
-
-
-def reload_divisions(path: Path | None = None) -> List[dict[str, Any]]:
-    """Reload ``divisions.json`` from disk, tolerating parse errors."""
-
-    target = Path(path) if path is not None else DIVISIONS_JSON
-    if not target.exists():
-        return update_divisions([])
-
-    try:
-        with open(target, "r", encoding="utf-8") as fh:
-            payload = json.load(fh)
-    except Exception as exc:
-        # Be tolerant: if divisions.json is temporarily malformed (comments/omitted sections),
-        # warn and continue with an empty list so tools (generator) can run.
-        print(f"Warning: failed to parse {target}: {exc}. Continuing with empty DIVISIONS.")
-        return update_divisions([])
-
-    if not isinstance(payload, list):
-        print(f"Warning: expected list in {target}, found {type(payload).__name__}. Continuing with empty DIVISIONS.")
-        return update_divisions([])
-
-    return update_divisions(payload)
-
-
-# Initialize cache on import.
-reload_divisions()

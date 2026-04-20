@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from db_async import close_pool, get_pool
 from api.services.sync_event_queue import get_sync_event_queue
+from division_registry import load_divisions_from_db
 
 from .routers import debug, divisions, matches, players, stats, team_statuses, teams, seasons
 from .routers import maps_catalog, image_proxy, season_view
@@ -89,6 +90,7 @@ async def lifespan(app: FastAPI):
     """Initialize and cleanup database pool."""
     # Startup: ensure pool is ready
     await get_pool()
+    await load_divisions_from_db()
     print("[info] Database pool initialized")
     sync_queue = get_sync_event_queue()
     await sync_queue.start()
