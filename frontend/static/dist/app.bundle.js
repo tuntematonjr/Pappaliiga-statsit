@@ -8574,7 +8574,8 @@ window.SankariCard = {
             division.playoffs?.playoff_championship_id ??
             division.playoffs?.playoffChampionshipId ??
             null;
-        const playoffsWaiting = division.playoffs?.status === 'waiting';
+        const playoffsStatusRaw = String(division.playoffs?.status || 'waiting').toLowerCase();
+        const playoffsWaiting = playoffsStatusRaw === 'waiting';
         const playoffsConfigured = Boolean(
             playoffsMatchesTotal > 0 ||
             playoffTeams > 0 ||
@@ -8630,6 +8631,7 @@ window.SankariCard = {
                 matchesPlayed: playoffsMatchesPlayed,
                 matchesTotal: playoffsMatchesTotal,
                 percent: playoffCopy.percent,
+                status: playoffsStatusRaw,
                 hasChampionship: playoffsConfigured,
                 progressState: getProgressState(playoffsMatchesPlayed, playoffsMatchesTotal),
                 isFinished:
@@ -8816,11 +8818,16 @@ window.SankariCard = {
         emits: ['remember'],
         computed: {
             playoffsPendingStart() {
+                // Only show "Odottaa playoffeja" when no championship has been set up yet.
+                // Once a playoff championship exists (status === 'active' or 'finished'),
+                // treat it as started even if no matches have been played yet.
                 return Boolean(
                     this.division.playoffs?.hasChampionship &&
                     this.division.season?.isFinished &&
                     this.division.playoffs.matchesPlayed === 0 &&
-                    !this.division.playoffs.isFinished
+                    !this.division.playoffs.isFinished &&
+                    this.division.playoffs.status !== 'active' &&
+                    this.division.playoffs.status !== 'finished'
                 );
             },
             displayStatusState() {
@@ -8908,7 +8915,13 @@ window.SankariCard = {
                 if (!this.division.playoffs.href) {
                     return false;
                 }
-                return this.playoffsHasStarted;
+                // Show button as soon as the playoff championship is set up (active/finished),
+                // not only after the first match has been played.
+                return (
+                    this.playoffsHasStarted ||
+                    this.division.playoffs.status === 'active' ||
+                    this.division.playoffs.status === 'finished'
+                );
             },
             seasonRows() {
                 const rows = [];

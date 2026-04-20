@@ -371,10 +371,9 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
             playoff_total = int(total_map.get(playoff_champ_id, 0))
             playoff_teams = int(playoff_row.get("teams_count") or 0)
             
-            playoff_status = "waiting"
-            if playoff_played > 0 and playoff_played < playoff_total:
-                playoff_status = "active"
-            elif playoff_played == playoff_total and playoff_total > 0:
+            # Championship exists in DB = it has been set up on Faceit → at least "active"
+            playoff_status = "active"
+            if playoff_played == playoff_total and playoff_total > 0:
                 playoff_status = "finished"
             
             playoff_winners = winners_map.get(playoff_champ_id, [])
