@@ -2356,7 +2356,7 @@ async def _render_single_match_async(pool: AsyncConnectionPool, html: list[str],
     total_kills = 0
     total_deaths = 0
     for map_data in maps:
-        await _render_single_map_async(pool, html, map_data, team_id)
+        await _render_single_map_async(pool, html, map_data, team_id, match_id=match.get("match_id", ""), played=match.get("played", 0))
         rf, ra = map_data.get("rf", 0), map_data.get("ra", 0)
         if rf > ra:
             total_w += 1
@@ -2379,7 +2379,7 @@ async def _render_single_match_async(pool: AsyncConnectionPool, html: list[str],
     html.append(f'    </div>')
     html.append(f'  </details>')
 
-async def _render_single_map_async(pool: AsyncConnectionPool, html: list[str], map_data: dict, team_id: str) -> None:
+async def _render_single_map_async(pool: AsyncConnectionPool, html: list[str], map_data: dict, team_id: str, match_id: str = "", played: int = 0) -> None:
     """Render a single map within a match"""
     from html import escape
     
@@ -2423,12 +2423,22 @@ async def _render_single_map_async(pool: AsyncConnectionPool, html: list[str], m
     if right_pick:
         right_chips.append('<span class="chip stat pick">Pick</span>')
 
+    # Build replay link for played maps
+    replay_link = ""
+    if played and match_id:
+        round_index = map_data.get("round_index", 0)
+        if round_index:
+            replay_url = f"https://replay2.pappa.aukko.net/player?faceit_match_id={match_id}&amp;map_id={round_index}"
+            replay_link = f'<a class="replay-link" href="{replay_url}" target="_blank" rel="noopener">2D Replay</a>'
+
     # Render map row with inline chips (legacy format)
     html.append('        <div class="map-row">')
     html.append(f'          <div class="map-side side-left">{" ".join(left_chips)}</div>')
     html.append(f'          <div class="map-name">{escape(pretty_name)}')
     if img_src:
         html.append(f'            <img class="map-img" src="{img_src}" alt="{escape(pretty_name)}" onerror="this.style.display=\'none\'">')
+    if replay_link:
+        html.append(f'            {replay_link}')
     html.append('          </div>')
     html.append(f'          <div class="map-side side-right">{" ".join(right_chips)}</div>')
     html.append('        </div>')
