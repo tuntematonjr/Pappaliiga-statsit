@@ -11,13 +11,6 @@
         return `https://www.faceit.com/cs2/room/${matchId}`;
     }
 
-    function getReplay2DUrl(demoUrl) {
-        if (demoUrl === null || demoUrl === undefined || demoUrl === '') return '';
-        const normalized = String(demoUrl).trim();
-        if (!normalized) return '';
-        return `https://replay.pappa.aukko.net/player?demourl=${encodeURIComponent(normalized)}`;
-    }
-
     function collectInlineDemoUrls(match) {
         if (!match || typeof match !== 'object') return [];
         const urls = [];
@@ -188,7 +181,6 @@
     window.MatchLinksUtils = {
         resolveMatchId,
         getFaceitRoomUrl,
-        getReplay2DUrl,
         extractInlineDemoLinks,
         extractAvailableDemoLinks,
         buildDemoMatchRequests,

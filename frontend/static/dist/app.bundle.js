@@ -2899,13 +2899,6 @@ if (document.readyState === 'loading') {
         return `https://www.faceit.com/cs2/room/${matchId}`;
     }
 
-    function getReplay2DUrl(demoUrl) {
-        if (demoUrl === null || demoUrl === undefined || demoUrl === '') return '';
-        const normalized = String(demoUrl).trim();
-        if (!normalized) return '';
-        return `https://replay.pappa.aukko.net/player?demourl=${encodeURIComponent(normalized)}`;
-    }
-
     function collectInlineDemoUrls(match) {
         if (!match || typeof match !== 'object') return [];
         const urls = [];
@@ -3076,7 +3069,6 @@ if (document.readyState === 'loading') {
     window.MatchLinksUtils = {
         resolveMatchId,
         getFaceitRoomUrl,
-        getReplay2DUrl,
         extractInlineDemoLinks,
         extractAvailableDemoLinks,
         buildDemoMatchRequests,
@@ -12717,7 +12709,7 @@ window.TeamDetail = {
             matchesChartHeight: 140,
             expandedMatches: {},
             matchPlayerStatsState: {},
-            demoAvailabilityState: {},
+            replay2StatusByMatch: {},
             mapCatalog: [],
             mapCatalogLoading: false,
             mapCatalogLoaded: false,
@@ -13846,15 +13838,10 @@ window.TeamDetail = {
         matchPlayerStatsLoading() {
             return !!this.matchPlayerStatsCurrent.loading;
         },
-        demoAvailabilityCurrent() {
-            const champId = this.currentChampionshipId;
-            const fallback = { loading: false, error: null, signature: '', byMatch: {} };
-            if (!champId) return fallback;
-            const scopedKey = this.scopedSeasonKey(champId);
-            return this.demoAvailabilityState[scopedKey] || fallback;
-        },
         isDemoAvailabilityLoading() {
-            return !!this.demoAvailabilityCurrent.loading;
+            return Object.values(this.replay2StatusByMatch).some(statusMap =>
+                Object.values(statusMap).some(s => s === 'loading')
+            );
         },
         // Phase 1: Division averages for comparison
         divisionAverages() {
@@ -14038,7 +14025,7 @@ window.TeamDetail = {
                     await this.$nextTick();
                 }
                 this.ensureMatchPlayerStats(championshipId);
-                this.ensureDemoAvailability(championshipId);
+                this.loadReplay2StatusForAllMatches();
                 this.ensureMapCatalog();
             });
         },
@@ -14531,37 +14518,81 @@ window.TeamDetail = {
                 params: { championshipId, teamId: String(opponentId) }
             };
         },
-        availableDemoLinks(match) {
-            const utils = window.MatchLinksUtils;
-            if (!utils || typeof utils.extractAvailableDemoLinks !== 'function') return [];
-            return utils.extractAvailableDemoLinks(this.demoAvailabilityCurrent.byMatch || {}, match);
-        },
-        teamMatchReplay2DUrl(demoUrl) {
-            const utils = window.MatchLinksUtils;
-            if (!utils || typeof utils.getReplay2DUrl !== 'function') return '';
-            return utils.getReplay2DUrl(demoUrl);
-        },
-        openTeamReplay2D(demoUrl) {
-            const targetUrl = this.teamMatchReplay2DUrl(demoUrl);
-            if (!targetUrl) return;
-            const popup = window.open('about:blank', '_blank');
-            if (!popup) return;
-            try {
-                popup.opener = null;
-            } catch (_error) {
-            }
-            window.setTimeout(() => {
-                try {
-                    popup.location.replace(targetUrl);
-                } catch (_error) {
-                    try {
-                        popup.location.href = targetUrl;
-                    } catch (_error2) {
-                    }
+        replay2Links(match) {
+            const matchId = String(match?.matchId || match?.match_id || '');
+            if (!matchId) return [];
+            const statusMap = this.replay2StatusByMatch[matchId] || {};
+            const links = [];
+            for (const [mapIdStr, status] of Object.entries(statusMap)) {
+                const mapId = Number(mapIdStr);
+                if (!Number.isFinite(mapId) || mapId <= 0) continue;
+                if (status === 'queued' || status === 'parsing' || status === 'ready') {
+                    links.push({ mapId, status, matchId });
                 }
-            }, 180);
+            }
+            links.sort((a, b) => a.mapId - b.mapId);
+            return links;
         },
-        async ensureDemoAvailability(championshipId) {
+        replay2PlayerUrl(matchId, mapId) {
+            return `https://replay2.pappa.aukko.net/player?faceit_match_id=${encodeURIComponent(matchId)}&map_id=${mapId}`;
+        },
+        async loadReplay2StatusForMatch(matchId, mapsCount) {
+            if (!matchId || mapsCount <= 0) return;
+            const loadingMap = {};
+            for (let mapId = 1; mapId <= mapsCount; mapId++) {
+                loadingMap[mapId] = 'loading';
+            }
+            this.replay2StatusByMatch = {
+                ...this.replay2StatusByMatch,
+                [matchId]: { ...(this.replay2StatusByMatch[matchId] || {}), ...loadingMap }
+            };
+            await Promise.all(
+                Array.from({ length: mapsCount }, (_, i) => i + 1).map(async (mapId) => {
+                    let status = 'hidden';
+                    try {
+                        const resp = await fetch(
+                            `https://replay2.pappa.aukko.net/replays/${encodeURIComponent(matchId)}/status?map_id=${mapId}`
+                        );
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const state = data?.state;
+                            if (state === 'queued') status = 'queued';
+                            else if (state === 'parsing') status = 'parsing';
+                            else if (state === 'ready') status = 'ready';
+                        }
+                    } catch (_error) {
+                        // network error → hidden
+                    }
+                    this.replay2StatusByMatch = {
+                        ...this.replay2StatusByMatch,
+                        [matchId]: { ...(this.replay2StatusByMatch[matchId] || {}), [mapId]: status }
+                    };
+                })
+            );
+        },
+        async loadReplay2StatusForAllMatches() {
+            const matches = Array.isArray(this.matchesList) ? this.matchesList : [];
+            const played = matches.filter(m => m && m.played);
+            if (!played.length) return;
+            const maxConcurrency = 4;
+            const queue = [...played];
+            const workers = Array.from({ length: Math.min(maxConcurrency, queue.length) }, async () => {
+                while (queue.length) {
+                    const match = queue.shift();
+                    if (!match) continue;
+                    const matchId = String(match.matchId || match.match_id || '');
+                    if (!matchId) continue;
+                    const mapsCount = Math.max(
+                        Array.isArray(match.maps) ? match.maps.length : 0,
+                        Number(match.bestOf ?? match.best_of ?? 0),
+                        2
+                    );
+                    await this.loadReplay2StatusForMatch(matchId, mapsCount);
+                }
+            });
+            await Promise.allSettled(workers);
+        },
+        async _legacyEnsureDemoAvailability_unused(championshipId) {
             if (!championshipId || !window.apiClient) return;
             const key = this.scopedSeasonKey(championshipId);
             if (!key) return;
@@ -15603,24 +15634,17 @@ window.TeamDetail = {
                                                 <span v-else class="cell-muted">-</span>
                                             </td>
                                             <td>
-                                                <div class="micro-stack" v-if="match.faceitUrl || availableDemoLinks(match).length">
+                                                <div class="micro-stack" v-if="match.faceitUrl || replay2Links(match).length">
                                                     <a v-if="match.faceitUrl" :href="match.faceitUrl" target="_blank" rel="noopener" class="chip chip--link">Faceit Lobbys</a>
                                                     <a
-                                                        v-for="(demo, demoPos) in availableDemoLinks(match)"
-                                                        :key="'demo-' + match.matchId + '-' + demo.demoIndex"
-                                                        :href="demo.url"
+                                                        v-for="link in replay2Links(match)"
+                                                        :key="'replay2d-' + link.matchId + '-' + link.mapId"
+                                                        :href="replay2PlayerUrl(link.matchId, link.mapId)"
                                                         target="_blank"
                                                         rel="noopener"
-                                                        title="Demojen latausmäärä per tunti on rajoitettu."
-                                                        class="chip chip--link"
-                                                    >Demo {{ demoPos + 1 }}</a>
-                                                    <a
-                                                        v-for="(demo, demoPos) in availableDemoLinks(match)"
-                                                        :key="'demo2d-' + match.matchId + '-' + demo.demoIndex"
-                                                        href="#"
-                                                        @click.prevent="openTeamReplay2D(demo.url)"
-                                                        class="chip chip--link"
-                                                    >2D Demo {{ demoPos + 1 }}</a>
+                                                        :class="['chip', 'chip--link', ['queued', 'parsing'].includes(link.status) ? 'chip--warn' : '']"
+                                                        :title="['queued', 'parsing'].includes(link.status) ? 'Demo käsittelyssä, valmistuu pian.' : ''"
+                                                    >2D Demo {{ link.mapId }}</a>
                                                 </div>
                                                 <span v-else-if="isDemoAvailabilityLoading && match.played && match.maps && match.maps.length" class="cell-muted">Tarkistetaan…</span>
                                                 <span v-else class="cell-muted">-</span>
@@ -18347,8 +18371,7 @@ window.DivisionView = {
             expandedPlayedMatches: {},
             playedMatchBundles: {},
             playedMatchBundleLoading: {},
-            demoAvailabilityByMatch: {},
-            demoAvailabilityLoading: {},
+            replay2StatusByMatch: {},
             playedRowsPrefetching: false,
             playedRowsPrefetchKey: '',
             mapCatalog: [],
@@ -18850,8 +18873,7 @@ window.DivisionView = {
                 this.expandedPlayedMatches = {};
                 this.playedMatchBundles = {};
                 this.playedMatchBundleLoading = {};
-                this.demoAvailabilityByMatch = {};
-                this.demoAvailabilityLoading = {};
+                this.replay2StatusByMatch = {};
                 this.playedRowsPrefetching = false;
                 this.playedRowsPrefetchKey = '';
                 await this.loadDivision(normalizedId);
@@ -19179,91 +19201,63 @@ window.DivisionView = {
             if (!matchId) return false;
             return !!this.playedMatchBundleLoading[String(matchId)];
         },
-        availableDemoLinks(match) {
-            const utils = window.MatchLinksUtils;
-            if (!utils || typeof utils.extractAvailableDemoLinks !== 'function') return [];
-            const resolved = utils.extractAvailableDemoLinks(this.demoAvailabilityByMatch, match);
-            if (Array.isArray(resolved) && resolved.length) {
-                return resolved;
-            }
+        replay2Links(match) {
             const matchId = String(match?.match_id || match?.matchId || '');
-            const bundle = matchId ? this.playedMatchBundles[matchId] : null;
-            const details = bundle?.details || null;
-            if (!details) {
-                return resolved;
+            if (!matchId) return [];
+            const statusMap = this.replay2StatusByMatch[matchId] || {};
+            const links = [];
+            for (const [mapIdStr, status] of Object.entries(statusMap)) {
+                const mapId = Number(mapIdStr);
+                if (!Number.isFinite(mapId) || mapId <= 0) continue;
+                if (status === 'queued' || status === 'parsing' || status === 'ready') {
+                    links.push({ mapId, status, matchId });
+                }
             }
-            const fallbackMatch = {
-                ...(match || {}),
-                maps: Array.isArray(details.maps) ? details.maps : (Array.isArray(match?.maps) ? match.maps : []),
-                demo_urls: details.demo_urls || details.demoUrls || match?.demo_urls || match?.demoUrls || []
-            };
-            if (typeof utils.extractInlineDemoLinks === 'function') {
-                return utils.extractInlineDemoLinks(fallbackMatch);
-            }
-            return resolved;
+            links.sort((a, b) => a.mapId - b.mapId);
+            return links;
         },
         isDemoAvailabilityLoading(match) {
             const matchId = String(match?.match_id || match?.matchId || '');
             if (!matchId) return false;
-            return !!this.demoAvailabilityLoading[matchId];
+            const statusMap = this.replay2StatusByMatch[matchId] || {};
+            return Object.values(statusMap).some(s => s === 'loading');
         },
-        async ensureDemoAvailabilityForMatch(match, mapsCount = 0) {
-            const utils = window.MatchLinksUtils;
-            const matchId = String(match?.match_id || match?.matchId || '');
-            if (!matchId || !this.championshipId || !window.apiClient || typeof window.apiClient.getMatchDemos !== 'function') {
-                return;
-            }
-            const targetCount = Math.max(0, Number(mapsCount) || 0);
-            if (!targetCount) return;
+        async loadReplay2StatusForMatch(matchId, mapsCount) {
+            if (!matchId || mapsCount <= 0) return;
 
-            const existing = this.demoAvailabilityByMatch[matchId] || {};
-            const existingKeys = Object.keys(existing);
-            const hasFalseWithinTarget = Array.from({ length: targetCount }).some((_unused, idx) => {
-                const payload = existing[idx];
-                return payload && payload.exists === false;
-            });
-            if (existingKeys.length >= targetCount && !hasFalseWithinTarget) {
-                return;
+            // Mark all map slots as loading
+            const loadingMap = {};
+            for (let mapId = 1; mapId <= mapsCount; mapId++) {
+                loadingMap[mapId] = 'loading';
             }
-            if (this.demoAvailabilityLoading[matchId]) {
-                return;
-            }
-
-            this.demoAvailabilityLoading = {
-                ...this.demoAvailabilityLoading,
-                [matchId]: true
+            this.replay2StatusByMatch = {
+                ...this.replay2StatusByMatch,
+                [matchId]: { ...(this.replay2StatusByMatch[matchId] || {}), ...loadingMap }
             };
 
-            try {
-                const next = (utils && typeof utils.fetchDemoAvailabilityForMatch === 'function')
-                    ? await utils.fetchDemoAvailabilityForMatch({
-                        apiClient: window.apiClient,
-                        championshipId: this.championshipId,
-                        matchId,
-                        mapsCount: targetCount,
-                        existingByIndex: existing,
-                        refreshFalse: true,
-                        forceRefresh: false,
-                        persistCache: false,
-                        onBackgroundResult: (delayedMapped) => {
-                            if (!delayedMapped || !Object.keys(delayedMapped).length) return;
-                            this.demoAvailabilityByMatch = {
-                                ...this.demoAvailabilityByMatch,
-                                [matchId]: delayedMapped
-                            };
+            await Promise.all(
+                Array.from({ length: mapsCount }, (_, i) => i + 1).map(async (mapId) => {
+                    let status = 'hidden';
+                    try {
+                        const resp = await fetch(
+                            `https://replay2.pappa.aukko.net/replays/${encodeURIComponent(matchId)}/status?map_id=${mapId}`
+                        );
+                        if (resp.ok) {
+                            const data = await resp.json();
+                            const state = data?.state;
+                            if (state === 'queued') status = 'queued';
+                            else if (state === 'parsing') status = 'parsing';
+                            else if (state === 'ready') status = 'ready';
                         }
-                    })
-                    : { ...existing };
-                this.demoAvailabilityByMatch = {
-                    ...this.demoAvailabilityByMatch,
-                    [matchId]: next
-                };
-            } finally {
-                this.demoAvailabilityLoading = {
-                    ...this.demoAvailabilityLoading,
-                    [matchId]: false
-                };
-            }
+                    } catch (_error) {
+                        // network error → hidden
+                    }
+                    this.replay2StatusByMatch = {
+                        ...this.replay2StatusByMatch,
+                        [matchId]: { ...(this.replay2StatusByMatch[matchId] || {}), [mapId]: status }
+                    };
+                })
+            );
         },
         async ensureMatchBundle(match) {
             const matchId = String(match?.match_id || match?.matchId || '');
@@ -19285,7 +19279,7 @@ window.DivisionView = {
                     0
                 );
                 const mapsCount = Math.max(mapsCountFromPayload, bestOf, 2);
-                this.ensureDemoAvailabilityForMatch(match, mapsCount);
+                this.loadReplay2StatusForMatch(matchId, mapsCount);
             } catch (error) {
                 // Keep previous successful bundle if any; do not lock this match to empty payload.
             } finally {
@@ -19334,30 +19328,8 @@ window.DivisionView = {
             const matchId = match?.match_id ?? match?.matchId;
             return utils.getFaceitRoomUrl(matchId);
         },
-        divisionMatchReplay2DUrl(demoUrl) {
-            const utils = window.MatchLinksUtils;
-            if (!utils || typeof utils.getReplay2DUrl !== 'function') return '';
-            return utils.getReplay2DUrl(demoUrl);
-        },
-        openReplay2D(demoUrl) {
-            const targetUrl = this.divisionMatchReplay2DUrl(demoUrl);
-            if (!targetUrl) return;
-            const popup = window.open('about:blank', '_blank');
-            if (!popup) return;
-            try {
-                popup.opener = null;
-            } catch (_error) {
-            }
-            window.setTimeout(() => {
-                try {
-                    popup.location.replace(targetUrl);
-                } catch (_error) {
-                    try {
-                        popup.location.href = targetUrl;
-                    } catch (_error2) {
-                    }
-                }
-            }, 180);
+        replay2PlayerUrl(matchId, mapId) {
+            return `https://replay2.pappa.aukko.net/player?faceit_match_id=${encodeURIComponent(matchId)}&map_id=${mapId}`;
         },
         divisionTeamRoute(teamId) {
             if (!teamId || !this.championshipId) return null;
@@ -19951,7 +19923,7 @@ window.DivisionView = {
                                                     <span v-else class="cell-muted">-</span>
                                                 </td>
                                                 <td>
-                                                    <div class="micro-stack" v-if="divisionMatchFaceitUrl(match) || availableDemoLinks(match).length">
+                                                    <div class="micro-stack" v-if="divisionMatchFaceitUrl(match) || replay2Links(match).length">
                                                         <a
                                                             v-if="divisionMatchFaceitUrl(match)"
                                                             :href="divisionMatchFaceitUrl(match)"
@@ -19960,21 +19932,14 @@ window.DivisionView = {
                                                             class="chip chip--link"
                                                         >Faceit</a>
                                                         <a
-                                                            v-for="(demo, demoPos) in availableDemoLinks(match)"
-                                                            :key="'demo-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
-                                                            :href="demo.url"
+                                                            v-for="link in replay2Links(match)"
+                                                            :key="'replay2d-' + (match.match_id || match.matchId) + '-' + link.mapId"
+                                                            :href="replay2PlayerUrl(link.matchId, link.mapId)"
                                                             target="_blank"
                                                             rel="noopener"
-                                                            title="Demojen latausmäärä per tunti on rajoitettu."
-                                                            class="chip chip--link"
-                                                        >Demo {{ demoPos + 1 }}</a>
-                                                        <a
-                                                            v-for="(demo, demoPos) in availableDemoLinks(match)"
-                                                            :key="'demo2d-' + (match.match_id || match.matchId) + '-' + demo.demoIndex"
-                                                            href="#"
-                                                            @click.prevent="openReplay2D(demo.url)"
-                                                            class="chip chip--link"
-                                                        >2D Demo {{ demoPos + 1 }}</a>
+                                                            :class="['chip', 'chip--link', ['queued', 'parsing'].includes(link.status) ? 'chip--warn' : '']"
+                                                            :title="['queued', 'parsing'].includes(link.status) ? 'Demo käsittelyssä, valmistuu pian.' : ''"
+                                                        >2D Demo {{ link.mapId }}</a>
                                                     </div>
                                                     <span v-else-if="isDemoAvailabilityLoading(match)" class="cell-muted">Tarkistetaan…</span>
                                                     <span v-else class="cell-muted">-</span>
