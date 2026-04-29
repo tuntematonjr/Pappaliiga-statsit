@@ -374,7 +374,8 @@ window.DivisionView = {
         get SummaryStatCard() { return window.SummaryStatCard; },
         get SankariCard() { return window.SankariCard; },
         get UpcomingMatchesList() { return window.UpcomingMatchesList; },
-        get MatchExpandedDetails() { return window.MatchExpandedDetails; }
+        get MatchExpandedDetails() { return window.MatchExpandedDetails; },
+        get DivisionPlayersTable() { return window.DivisionPlayersTable; }
     },
     data() {
         const divisionStore = typeof window.useDivisionStore === 'function' ? window.useDivisionStore() : null;
@@ -399,6 +400,7 @@ window.DivisionView = {
                 { id: 'upcoming', label: 'Tulevat ottelut' },
                 { id: 'summary', label: 'Tilastot' },
                 { id: 'standings', label: 'Joukkuavertailu' },
+                { id: 'players', label: 'Pelaajat' },
                 { id: 'maps', label: 'Karttatilastot' },
                 { id: 'heroes', label: 'Sankarit' }
             ],
@@ -2123,6 +2125,18 @@ window.DivisionView = {
                                 :championship-season="divisionDetails?.season"
                             ></team-comparison-board>
                         </div>
+                    </div>
+                </section>
+
+                <section v-if="divisionDetails" id="players" class="division-section">
+                    <div class="division-surface glass-card division-section-card">
+                        <header class="division-section__heading">
+                            <h2 class="title-accent titleUnderlineSection">Pelaajatilastot</h2>
+                            <p class="division-section__lede">Divisioonan kaikki pelaajat yhdessä vertailutaulukossa. Valitse joukkueet ja pelaajat sekä haluamasi tilastosarakkeet.</p>
+                        </header>
+                        <division-players-table
+                            :players="divisionDetails.player_totals || []"
+                        ></division-players-table>
                     </div>
                 </section>
 

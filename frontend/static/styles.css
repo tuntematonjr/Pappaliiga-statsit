@@ -4652,6 +4652,200 @@ html, body {
 
 
 
+/* ─── Division Players Table ───────────────────────────────────────────── */
+
+.div-players-table {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Team toggle chips row */
+.div-players-teams {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.div-players-team-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+}
+.div-players-team-chip:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--fg);
+}
+.div-players-team-chip.is-all {
+    background: rgba(57,217,138,0.10);
+    border-color: rgba(57,217,138,0.30);
+    color: var(--ok);
+}
+.div-players-team-chip.is-partial {
+    background: rgba(244,191,79,0.08);
+    border-color: rgba(244,191,79,0.28);
+    color: var(--warn);
+}
+.div-players-team-chip.is-none {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.30);
+}
+.team-chip-icon {
+    font-size: 0.80rem;
+    line-height: 1;
+}
+
+/* Controls row */
+.div-players-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Stat dropdown aligns to the right of the controls row */
+.dp-columns-dropdown {
+    margin-left: auto;
+}
+
+/* Player multi-select dropdown */
+.dp-dropdown {
+    position: relative;
+}
+.dp-dropdown__trigger {
+    cursor: pointer;
+    gap: 6px;
+    font-size: 0.88rem;
+}
+.dp-dropdown__arrow {
+    font-size: 0.72rem;
+    opacity: 0.7;
+}
+.dp-dropdown__panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 50;
+    min-width: 260px;
+    max-width: 320px;
+    padding: 8px 0 4px;
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 10px;
+    background: rgba(10,15,30,0.97);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.dp-dropdown__panel--right {
+    left: auto;
+    right: 0;
+}
+.dp-dropdown__header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.dp-dropdown__search {
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    color: var(--fg);
+    outline: none;
+}
+.dp-dropdown__search::placeholder { color: var(--muted); }
+.dp-dropdown__search:focus { border-color: rgba(58,163,255,0.40); }
+.dp-dropdown__select-all {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--accent-2);
+    font-size: 0.78rem;
+    white-space: nowrap;
+    padding: 0;
+}
+.dp-dropdown__select-all:hover { text-decoration: underline; }
+.dp-dropdown__list {
+    display: flex;
+    flex-direction: column;
+    max-height: 280px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.dp-dropdown__item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.86rem;
+    color: var(--fg);
+    transition: background 0.1s;
+    background: none;
+    border: none;
+    border-radius: 0;
+    width: 100%;
+    text-align: left;
+}
+.dp-dropdown__item:hover { background: rgba(255,255,255,0.05); }
+.dp-dropdown__item.is-selected { color: #d5f3ff; }
+.dp-dropdown__check {
+    width: 14px;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--ok);
+    flex-shrink: 0;
+}
+.dp-dropdown__name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dp-dropdown__team {
+    font-size: 0.75rem;
+    color: var(--muted);
+    flex-shrink: 0;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dp-dropdown__empty {
+    padding: 10px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 600px) {
+    .dp-columns-dropdown { margin-left: 0; }
+    .dp-dropdown__panel {
+        min-width: 220px;
+        max-width: 90vw;
+    }
+    .dp-dropdown__panel--right {
+        right: auto;
+        left: 0;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+
 /* Team logos: different size for index vs division */
 img.logo.nav-logo {
 	width: 48px;
