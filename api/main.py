@@ -128,22 +128,29 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 
+def _apply_no_store_headers(response) -> None:
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+
 @app.middleware("http")
 async def add_cache_control_headers(request: Request, call_next):
-    """Ensure clients revalidate SPA assets so deploys become visible without hard refresh."""
+    """Disable client-side caching for SPA routes and API responses."""
     response = await call_next(request)
     path = request.url.path
 
+    if path.startswith("/api/"):
+        if path != "/api/proxy-image":
+            _apply_no_store_headers(response)
+        return response
+
     if path == "/" or (not path.startswith("/api/") and not path.startswith("/static/")):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        _apply_no_store_headers(response)
         return response
 
     if path.startswith("/static/"):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        _apply_no_store_headers(response)
 
     return response
 
