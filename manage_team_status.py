@@ -3,16 +3,16 @@
 Usage examples (run from repo root with venv active):
 
   # List all banned/quit teams for a season
-  python scripts/manage_team_status.py list --season 4
+  python manage_team_status.py list --season 4
 
   # Mark a team as banned (championship resolved automatically from team + season)
-  python scripts/manage_team_status.py add --team-id <id> --season 4 --status banned --reason "Sääntörikkomus 1.16.5"
+  python manage_team_status.py add --team-id <id> --season 4 --status banned --reason "Sääntörikkomus 1.16.5"
 
   # Mark a team as having quit
-  python scripts/manage_team_status.py add --team-id <id> --season 4 --status quit
+  python manage_team_status.py add --team-id <id> --season 4 --status quit
 
   # Remove a team's status
-  python scripts/manage_team_status.py remove --team-id <id> --season 4
+  python manage_team_status.py remove --team-id <id> --season 4
 
 Effect of add:
   - Inserts/updates a row in championship_team_statuses
@@ -83,7 +83,7 @@ async def _resolve_championship_id(team_id: str, season: int) -> str:
         for r in candidates:
             print(f"  {r['championship_id']}  div {r['division_num']}  {r['name']}")
         raise SystemExit(
-            "Ambiguous — use 'python scripts/manage_team_status.py add-by-id' "
+            "Ambiguous — use 'python manage_team_status.py add-by-id' "
             "with --championship-id instead."
         )
 
