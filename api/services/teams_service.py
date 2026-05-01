@@ -426,6 +426,8 @@ async def _fetch_team_match_player_stats_uncached(team_id: str, championship_id:
         LEFT JOIN maps_catalog mc ON LOWER(mc.map_id) = LOWER(mp.map_name)
         WHERE m.championship_id = :champ_id
           AND (m.team1_id = :team_id OR m.team2_id = :team_id)
+                    AND COALESCE(m.is_forfeit, 0) = 0
+                    AND COALESCE(ps.is_forfeit_map, 0) = 0
         ORDER BY ps.match_id, ps.round_index, ps.player_id
         """,
         {"champ_id": championship_id, "team_id": team_id}

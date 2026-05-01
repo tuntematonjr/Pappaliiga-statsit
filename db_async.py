@@ -2838,6 +2838,7 @@ async def compute_map_stats_table_data_until_async(
             FROM matches m
             WHERE m.championship_id = :champ
               AND (:team = m.team1_id OR :team = m.team2_id)
+              AND COALESCE(m.is_forfeit, 0) = 0
               AND { _TS_EXPR } <= :cutoff
               {excl_clause}
         ),
@@ -2871,6 +2872,7 @@ async def compute_map_stats_table_data_until_async(
             JOIN maps mp
               ON mp.match_id = m.match_id
              AND mp.round_index IS NOT NULL
+                         AND COALESCE(mp.is_forfeit, 0) = 0
         ),
         team_drops AS (
             SELECT
@@ -2919,7 +2921,9 @@ async def compute_map_stats_table_data_until_async(
             JOIN maps mp
               ON mp.match_id   = ps.match_id
              AND mp.round_index = ps.round_index
+                         AND COALESCE(mp.is_forfeit, 0) = 0
             WHERE ps.team_id = :team
+                            AND COALESCE(ps.is_forfeit_map, 0) = 0
             GROUP BY mp.map_name
         ),
         decov AS (
@@ -3085,7 +3089,11 @@ async def compute_player_map_deltas_async(
         FROM player_stats ps
         JOIN matches m ON m.match_id = ps.match_id
         LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
-        WHERE m.championship_id = :champ AND ps.player_id = :player AND COALESCE(ps.is_forfeit_map, 0) = 0
+                WHERE m.championship_id = :champ
+                    AND ps.player_id = :player
+                    AND COALESCE(m.is_forfeit, 0) = 0
+                    AND COALESCE(ps.is_forfeit_map, 0) = 0
+                    AND COALESCE(mp.is_forfeit, 0) = 0
         GROUP BY map_label
         ORDER BY map_label
         """,

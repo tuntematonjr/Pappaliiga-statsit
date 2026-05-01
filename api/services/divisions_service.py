@@ -271,6 +271,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
                 m.team2_id
             FROM maps mp
             JOIN division_matches m ON m.match_id = mp.match_id
+            WHERE COALESCE(mp.is_forfeit, 0) = 0
         ),
         team_map_rows AS (
             SELECT
@@ -708,6 +709,9 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
                 ) AS decov
             FROM map_votes v
             JOIN division_matches dm ON dm.match_id = v.match_id
+                        JOIN division_maps dmp
+                            ON dmp.match_id = v.match_id
+                         AND dmp.map_key = REPLACE(LOWER(v.map_name), 'de_', '')
             WHERE v.map_name IS NOT NULL
               AND LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto','decider','overflow')
             GROUP BY REPLACE(LOWER(v.map_name), 'de_', '')
@@ -734,6 +738,9 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
                 ) AS pick_team_id
             FROM map_votes v
             JOIN division_matches dm ON dm.match_id = v.match_id
+                        JOIN division_maps dmp
+                            ON dmp.match_id = v.match_id
+                         AND dmp.map_key = REPLACE(LOWER(v.map_name), 'de_', '')
             WHERE v.map_name IS NOT NULL
               AND LOWER(v.status) IN ('picked','pick')
         ),
