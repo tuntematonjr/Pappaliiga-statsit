@@ -18,6 +18,7 @@ from utils import format_hms, log_stage
 from runtime_diagnostics import SyncDiagnostics
 
 from faceit_client_async import (
+    RateLimitError,
     get_championship_matches_async,
     get_map_votes_async,
     get_match_details_async,
@@ -1567,6 +1568,7 @@ async def sync_championship_async(
     synced: List[str] = []
     skipped_matches = 0
     skipped_far_future = 0
+    skipped_rate_limited = 0
     pending_matches = 0
     deferred_pending = 0
     LOGGER.info(
@@ -1664,7 +1666,7 @@ async def sync_championship_async(
     match_concurrency = max(1, int(max_match_concurrency))
     match_sem = asyncio.Semaphore(match_concurrency)
 
-    async def _sync_one(match_id: str) -> str:
+    async def _sync_one(match_id: str) -> str | None:
         max_match_attempts = 5
         for attempt in range(1, max_match_attempts + 1):
             try:
@@ -1680,6 +1682,12 @@ async def sync_championship_async(
                         diagnostics=diagnostics,
                     )
                 return match_id
+            except RateLimitError:
+                LOGGER.warning(
+                    "Deferring match %s after repeated Faceit rate limits; will retry on a later sync run",
+                    match_id,
+                )
+                return None
             except Exception as exc:
                 if attempt < max_match_attempts and _is_retryable_db_error(exc):
                     delay = 0.25 * (2 ** (attempt - 1)) + random.uniform(0, 0.25)
@@ -1711,7 +1719,7 @@ async def sync_championship_async(
                 return match_id
 
         async def _worker() -> None:
-            nonlocal first_exc
+            nonlocal first_exc, skipped_rate_limited
             while True:
                 if end_on_error and first_exc is not None:
                     return
@@ -1720,7 +1728,10 @@ async def sync_championship_async(
                     return
                 try:
                     synced_id = await _sync_one(next_match)
-                    synced.append(synced_id)
+                    if synced_id:
+                        synced.append(synced_id)
+                    else:
+                        skipped_rate_limited += 1
                 except Exception as exc:
                     if end_on_error:
                         if first_exc is None:
@@ -1740,9 +1751,14 @@ async def sync_championship_async(
         division_name,
         total_matches,
         len(synced),
-        skipped_matches,
+        skipped_matches + skipped_rate_limited,
         pending_matches,
     )
+    if skipped_rate_limited:
+        LOGGER.info(
+            "Deferred %d match(es) due to Faceit rate limits after retries",
+            skipped_rate_limited,
+        )
     if skipped_far_future:
         LOGGER.info(
             "Skipped %d far-future match(es) (scheduled >%s out; use --full to sync them)",
@@ -1768,8 +1784,9 @@ async def sync_championship_async(
         process_elapsed,
         counts={
             "synced_matches": len(synced),
-            "skipped_matches": skipped_matches,
+            "skipped_matches": skipped_matches + skipped_rate_limited,
             "pending_matches": pending_matches,
+            "rate_limited_deferred": skipped_rate_limited,
         },
         prefix=f"championship {championship_id}",
     )
@@ -1787,7 +1804,7 @@ async def sync_championship_async(
         division_num=division_num,
         total_matches=total_matches,
         synced_match_ids=synced,
-        skipped_matches=skipped_matches,
+        skipped_matches=skipped_matches + skipped_rate_limited,
         pending_matches=pending_matches,
         fetch_elapsed=fetch_elapsed,
         process_elapsed=process_elapsed,
