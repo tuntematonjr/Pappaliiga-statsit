@@ -848,6 +848,7 @@ async def create_schema_async(force: bool = False) -> None:
             "faceit_url": "VARCHAR(512) NULL",
         }
         match_columns = {
+            "round_number": "TINYINT NULL",
             "payload_hash": "CHAR(64) NULL",
         }
         await _ensure_table_columns_async(conn, "matches", match_columns)
