@@ -375,6 +375,7 @@ window.DivisionView = {
         get SankariCard() { return window.SankariCard; },
         get UpcomingMatchesList() { return window.UpcomingMatchesList; },
         get MatchExpandedDetails() { return window.MatchExpandedDetails; },
+        get PlayoffBracket() { return window.PlayoffBracket; },
         get DivisionPlayersTable() { return window.DivisionPlayersTable; }
     },
     data() {
@@ -593,6 +594,12 @@ window.DivisionView = {
         divisionTitle() {
             if (!this.divisionDetails) return 'Divisioona';
             return this.divisionDetails.name || `Divisioona ${this.divisionDetails.division_num}`;
+        },
+        isPlayoff() {
+            return !!this.divisionDetails?.is_playoff;
+        },
+        playoffBracket() {
+            return this.divisionDetails?.bracket || null;
         },
         nextUpcomingMatch() {
             return Array.isArray(this.upcomingMatches) && this.upcomingMatches.length
@@ -1260,8 +1267,9 @@ window.DivisionView = {
                 Array.from({ length: mapsCount }, (_, i) => i + 1).map(async (mapId) => {
                     let status = 'hidden';
                     try {
+                        const apiBase = window.PL_API_URL || window.__API_BASE__ || '/api';
                         const resp = await fetch(
-                            `https://replay2.pappa.aukko.net/replays/${encodeURIComponent(matchId)}/status?map_id=${mapId}`
+                            `${apiBase}/replay2/replays/${encodeURIComponent(matchId)}/status?map_id=${mapId}`
                         );
                         if (resp.ok) {
                             const data = await resp.json();
@@ -1805,14 +1813,16 @@ window.DivisionView = {
             ></error-message>
 
             <template v-else>
-                <section id="upcoming" class="division-section" v-if="matchSectionLoading || divisionMatchesLoading || hasAnyMatchData">
+                <section id="upcoming" class="division-section" v-if="matchSectionLoading || divisionMatchesLoading || hasAnyMatchData || (isPlayoff && !divisionLoading)">
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading division-section__heading--matches">
                             <div class="division-section__heading-copy">
                                 <h2 class="title-accent titleUnderlineSection">Ottelut</h2>
-                                <p class="division-section__lede">Tulevat kohtaamiset ja pelattujen otteluiden tarkempi ottelupaketti samassa näkymässä.</p>
+                                <p class="division-section__lede" v-if="isPlayoff">Playoff-bracket</p>
+                                <p class="division-section__lede" v-else>Tulevat kohtaamiset ja pelattujen otteluiden tarkempi ottelupaketti samassa näkymässä.</p>
                             </div>
-                            <div class="trend-toggles trend-toggles--mode">
+                            <!-- Toggle only shown for non-playoff divisions -->
+                            <div v-if="!isPlayoff" class="trend-toggles trend-toggles--mode">
                                 <button
                                     type="button"
                                     class="trend-toggle"
@@ -1828,6 +1838,34 @@ window.DivisionView = {
                             </div>
                         </header>
 
+                        <!-- Playoff bracket view -->
+                        <template v-if="isPlayoff">
+                            <loading-spinner
+                                v-if="divisionLoading && !playoffBracket"
+                                message="Brackettia ladataan..."
+                            ></loading-spinner>
+                            <playoff-bracket
+                                v-else
+                                :bracket="playoffBracket"
+                                :map-catalog="mapCatalog"
+                                :is-expanded-fn="isPlayedMatchExpanded"
+                                :toggle-expand-fn="togglePlayedMatchExpand"
+                                :match-summary-fn="playedMatchSummary"
+                                :match-details-fn="playedMatchDetails"
+                                :match-veto-fn="playedMatchVetoEntry"
+                                :match-player-stats-fn="playedMatchPlayerStats"
+                                :match-bundle-busy-fn="playedMatchBundleBusy"
+                                :resolve-avatar-fn="resolveAvatar"
+                                :team-route-fn="divisionTeamRoute"
+                                :faceit-url-fn="divisionMatchFaceitUrl"
+                                :replay2-links-fn="replay2Links"
+                                :replay2-player-url-fn="replay2PlayerUrl"
+                                :demo-availability-loading-fn="isDemoAvailabilityLoading"
+                            ></playoff-bracket>
+                        </template>
+
+                        <!-- Regular division: upcoming/played toggle -->
+                        <template v-else>
                         <upcoming-matches-list
                             v-if="matchViewMode === 'upcoming'"
                             :items="upcomingMatches"
@@ -2080,6 +2118,7 @@ window.DivisionView = {
                             </div>
                             <p v-else class="division-section__empty">Ei pelattuja otteluita tälle divisioonalle.</p>
                         </div>
+                        </template><!-- end v-else (regular division) -->
                     </div>
                 </section>
 
@@ -2087,7 +2126,6 @@ window.DivisionView = {
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading">
                             <h2 class="title-accent titleUnderlineSection">Divisioonan tilastot</h2>
-                            <p class="division-section__lede">Nopea kooste kauden volyymista, tempoista ja tehokkuusluvuista.</p>
                         </header>
                         <div class="summary-card-grid division-summary-grid" role="list">
                             <summary-stat-card
@@ -2106,7 +2144,6 @@ window.DivisionView = {
                     <div class="division-team-module">
                         <header class="division-section__heading division-section__heading--standings">
                             <h2 class="title-accent titleUnderlineSection">Joukkuevertailu</h2>
-                            <p class="division-section__lede">Sarjataulukko, voittorakenne ja kierrospohjainen suoritus samassa taulukossa.</p>
                         </header>
                         <div class="division-team-panels">
                             <team-comparison-board
@@ -2123,6 +2160,8 @@ window.DivisionView = {
                                 :championship-id="championshipId"
                                 :championship-name="divisionDetails?.name"
                                 :championship-season="divisionDetails?.season"
+                                :is-playoff="isPlayoff"
+                                :bracket="playoffBracket"
                             ></team-comparison-board>
                         </div>
                     </div>
@@ -2132,7 +2171,7 @@ window.DivisionView = {
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading">
                             <h2 class="title-accent titleUnderlineSection">Pelaajatilastot</h2>
-                            <p class="division-section__lede">Divisioonan kaikki pelaajat yhdessä vertailutaulukossa. Valitse joukkueet ja pelaajat sekä haluamasi tilastosarakkeet.</p>
+                            <p class="division-section__lede">Valitse joukkueet ja pelaajat sekä haluamasi tilastosarakkeet.</p>
                         </header>
                         <division-players-table
                             :players="divisionDetails.player_totals || []"

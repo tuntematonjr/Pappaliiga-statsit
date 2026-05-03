@@ -832,6 +832,7 @@
             return {
                 details: ensureSnakeCaseDeep(payload.details ?? payload.data?.details ?? {}),
                 matches: ensureSnakeCaseDeep(payload.matches ?? payload.data?.matches ?? []),
+                bracket: ensureSnakeCaseDeep(payload.bracket ?? payload.data?.bracket ?? null),
             };
         }
 

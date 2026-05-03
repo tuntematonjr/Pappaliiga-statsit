@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS matches (
     season SMALLINT NOT NULL,
     division_num SMALLINT NOT NULL,
     best_of TINYINT(3) NULL,
+    round_number TINYINT NULL,
     configured_at BIGINT(20) NULL,
     started_at BIGINT(20) NULL,
     finished_at BIGINT(20) NULL,

@@ -984,6 +984,7 @@ var Pinia=function(t,e){"use strict";let n;const i=t=>n=t,s=Symbol();function o(
             return {
                 details: ensureSnakeCaseDeep(payload.details ?? payload.data?.details ?? {}),
                 matches: ensureSnakeCaseDeep(payload.matches ?? payload.data?.matches ?? []),
+                bracket: ensureSnakeCaseDeep(payload.bracket ?? payload.data?.bracket ?? null),
             };
         }
 
@@ -4162,6 +4163,9 @@ if (document.readyState === 'loading') {
                 try {
                     const bundle = await window.apiClient.getDivisionPage(id);
                     const data = bundle.details || {};
+                    if (bundle.bracket != null) {
+                        data.bracket = bundle.bracket;
+                    }
                     entry.details.data = data;
                     entry.details.fetchedAt = now();
                     entry.details.loading = false;
@@ -5630,24 +5634,55 @@ window.TeamComparisonBoard = {
         championshipSeason: {
             type: [String, Number],
             default: null
+        },
+        isPlayoff: {
+            type: Boolean,
+            default: false
+        },
+        bracket: {
+            type: Object,
+            default: null
         }
     },
-    data() {
-        return {
-            columns: [
+    computed: {
+        columns() {
+            const statusCol = this.isPlayoff
+                ? { key: 'playoff_status', label: 'Tila', sortable: false, colClass: 'col-playoff-status', width: '180px', mobileLabel: 'Tila', mobilePriority: 3 }
+                : { key: 'split', label: 'Voittojakauma', sortable: false, colClass: 'col-bar', mobileLabel: 'W-L', mobilePriority: 3 };
+            return [
                 { key: 'team', label: 'Joukkue', sortable: true, align: 'left', colClass: 'col-team col-name', width: '260px', mobilePinned: true, mobilePriority: 1 },
                 { key: 'matches', label: 'Ottelut', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '90px', mobileLabel: 'Ott.', mobilePriority: 2 },
                 { key: 'wins', label: 'Voitot', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px', mobileHidden: true },
-                { key: 'losses', label: 'Tappiot', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px', mobileHidden: true },
-                { key: 'split', label: 'Voittojakauma', sortable: false, colClass: 'col-bar', mobileLabel: 'W-L', mobilePriority: 3 },
+                { key: 'losses', label: 'Häviöt', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px', mobileHidden: true },
+                statusCol,
                 { key: 'win_rate', label: 'Voittoprosentti', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-b', width: '120px', mobileLabel: 'WR%', mobilePriority: 4 },
                 { key: 'round_diff', label: 'Erä-ero', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-b', width: '110px', mobileLabel: 'Eraero', mobilePriority: 5 },
                 { key: 'kd', label: 'K/D', sortable: true, numeric: true, align: 'center', decimals: 2, colClass: 'col-stat col-group-c', width: '90px', mobileHidden: true },
                 { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'center', decimals: 1, colClass: 'col-stat col-group-c', width: '100px', mobileHidden: true }
-            ]
-        };
-    },
-    computed: {
+            ];
+        },
+        teamPlayoffStatusMap() {
+            const map = {};
+            if (!this.isPlayoff || !Array.isArray(this.bracket?.rounds)) return map;
+            const rounds = this.bracket.rounds;
+            const finalRound = rounds[rounds.length - 1];
+            for (const round of rounds) {
+                for (const match of (round.matches || [])) {
+                    const winnerId = String(match.winner_team_id || match.winnerTeamId || '');
+                    const t1Id = String(match.team1_id || match.team1Id || '');
+                    const t2Id = String(match.team2_id || match.team2Id || '');
+                    if (!winnerId || (!t1Id && !t2Id)) continue;
+                    const loserId = t1Id === winnerId ? t2Id : t1Id;
+                    if (loserId) {
+                        map[loserId] = { eliminated: true, roundLabel: round.label };
+                        if (round === finalRound) {
+                            map[winnerId] = { eliminated: false, winner: true, roundLabel: round.label };
+                        }
+                    }
+                }
+            }
+            return map;
+        },
         rows() {
             if (!Array.isArray(this.teams)) {
                 return [];
@@ -5684,6 +5719,7 @@ window.TeamComparisonBoard = {
                     kd,
                     adr,
                     split: { wins, losses },
+                    playoff_status: this.isPlayoff ? (this.teamPlayoffStatusMap[String(team.team_id || team.id || `team-${idx}`)] || null) : null,
                     status,
                     status_reason: team.status_reason || null,
                 };
@@ -5852,6 +5888,12 @@ window.TeamComparisonBoard = {
                                 :right-text="formatInteger(row.losses) + ' tappiota'"
                                 :show-percent="true"
                             ></split-bar>
+                        </template>
+
+                        <template #cell-playoff_status="{ row }">
+                            <span v-if="row.playoff_status?.winner" class="playoff-status playoff-status--winner" title="Turnauksen voittaja">Voittaja</span>
+                            <span v-else-if="row.playoff_status?.eliminated" class="playoff-status playoff-status--eliminated">Pudonnut: {{ row.playoff_status.roundLabel }}</span>
+                            <span v-else class="playoff-status playoff-status--active">Mukana</span>
                         </template>
                     </sortable-table>
 
@@ -11582,6 +11624,345 @@ window.MatchExpandedDetails = {
 };
 
 
+/* === /static/components/PlayoffBracket.js === */
+﻿/* PlayoffBracket — Faceit-style bracket columns for a playoff championship. */
+window.PlayoffBracket = {
+    name: 'PlayoffBracket',
+    components: {
+        get MatchExpandedDetails() { return window.MatchExpandedDetails; }
+    },
+    props: {
+        bracket: { type: Object, default: null },
+        mapCatalog: { type: Array, default: () => [] },
+        isExpandedFn: { type: Function, default: () => false },
+        toggleExpandFn: { type: Function, default: () => {} },
+        matchSummaryFn: { type: Function, default: () => ({}) },
+        matchDetailsFn: { type: Function, default: () => ({}) },
+        matchVetoFn: { type: Function, default: () => null },
+        matchPlayerStatsFn: { type: Function, default: () => [] },
+        matchBundleBusyFn: { type: Function, default: () => false },
+        resolveAvatarFn: { type: Function, default: (u) => u },
+        teamRouteFn: { type: Function, default: () => null },
+        faceitUrlFn: { type: Function, default: () => null },
+        replay2LinksFn: { type: Function, default: () => [] },
+        replay2PlayerUrlFn: { type: Function, default: () => null },
+        demoAvailabilityLoadingFn: { type: Function, default: () => false },
+    },
+    data() {
+        return {
+            openMatchId: null,
+            openMatch: null,
+        };
+    },
+    computed: {
+        rounds() {
+            return Array.isArray(this.bracket?.rounds) ? this.bracket.rounds : [];
+        },
+    },
+    mounted() {
+        this.$nextTick(() => { this._layout(); });
+    },
+    updated() {
+        this.$nextTick(() => { this._layout(); });
+    },
+    beforeUnmount() {
+        if (this._ro) { this._ro.disconnect(); this._ro = null; }
+    },
+    methods: {
+        matchId(m) { return String(m?.match_id || m?.matchId || ''); },
+        team1Name(m) { return m?.team1_name || m?.team1Name || null; },
+        team2Name(m) { return m?.team2_name || m?.team2Name || null; },
+        team1Id(m) { return m?.team1_id || m?.team1Id || null; },
+        team2Id(m) { return m?.team2_id || m?.team2Id || null; },
+        team1Avatar(m) { return m?.team1_avatar || m?.team1Avatar || null; },
+        team2Avatar(m) { return m?.team2_avatar || m?.team2Avatar || null; },
+        winnerId(m) { return m?.winner_team_id || m?.winnerTeamId || null; },
+        team1Score(m) { return Number(m?.team1_score ?? m?.team1Score ?? 0); },
+        team2Score(m) { return Number(m?.team2_score ?? m?.team2Score ?? 0); },
+        isFinished(m) {
+            const fa = Number(m?.finished_at ?? m?.finishedAt ?? 0);
+            return fa > 0 || !!m?.is_forfeit || (this.team1Score(m) + this.team2Score(m)) > 0;
+        },
+        isOngoing(m) {
+            const s = String(m?.status || '').toLowerCase();
+            return s === 'ongoing' || s === 'voting' || s === 'running';
+        },
+        scheduledDate(m) {
+            const ts = Number(m?.scheduled_at ?? m?.scheduledAt ?? m?.started_at ?? m?.startedAt ?? 0);
+            if (!ts) return null;
+            const d = new Date(ts * 1000);
+            return d.toLocaleDateString('fi-FI', { day: 'numeric', month: 'numeric' }) +
+                ' · ' + d.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+        },
+        cardStateClass(m) {
+            if (this.isOngoing(m)) return 'bk-card--ongoing';
+            if (this.isFinished(m)) return 'bk-card--finished';
+            return 'bk-card--scheduled';
+        },
+        teamWon(m, side) {
+            const wid = this.winnerId(m);
+            if (!wid) return false;
+            return wid === (side === 'team1' ? this.team1Id(m) : this.team2Id(m));
+        },
+        teamLost(m, side) {
+            return this.isFinished(m) && !!this.winnerId(m) && !this.teamWon(m, side);
+        },
+        faceitUrl(m) { return this.faceitUrlFn(m); },
+        replay2Links(m) { return m ? this.replay2LinksFn(m) : []; },
+        replay2PlayerUrl(mid, mapId) { return this.replay2PlayerUrlFn(mid, mapId); },
+        globalMatchNum(roundIdx, matchIdx) {
+            let base = 0;
+            for (let ri = 0; ri < roundIdx; ri++) {
+                base += (this.rounds[ri]?.match_count_expected || 1);
+            }
+            return base + matchIdx + 1;
+        },
+        tbdCount(round) {
+            const exp = round.match_count_expected || 1;
+            return Math.max(0, exp - (round.matches?.length || 0));
+        },
+        openPanel(match) {
+            const mid = this.matchId(match);
+            if (this.openMatchId === mid) {
+                this.openMatchId = null;
+                this.openMatch = null;
+                return;
+            }
+            this.openMatchId = mid;
+            this.openMatch = match;
+            // Trigger data loading via parent delegate
+            this.toggleExpandFn(match);
+            this.$nextTick(() => {
+                const panel = this.$refs.detailPanel;
+                if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        },
+        closePanel() {
+            this.openMatchId = null;
+            this.openMatch = null;
+        },
+        openMatchLabel() {
+            if (!this.openMatch) return '';
+            const n1 = this.team1Name(this.openMatch) || 'TBD';
+            const n2 = this.team2Name(this.openMatch) || 'TBD';
+            return `${n1} vs ${n2}`;
+        },
+        _layout() {
+            const el = this.$refs.bracketEl;
+            if (!el) return;
+            // Measure the tallest card in round 1 to set SLOT_H
+            const cols = Array.from(el.querySelectorAll(':scope > .bracket-col'));
+            if (!cols.length) return;
+            const firstMc = cols[0].querySelector('.bk-matches');
+            if (!firstMc) return;
+            const totalSlots = parseInt(firstMc.dataset.slotCount) || 1;
+            // Measure max card height in first column + padding
+            const firstCards = Array.from(firstMc.querySelectorAll(':scope > .bk-card'));
+            let maxH = 0;
+            firstCards.forEach(c => { const h = c.getBoundingClientRect().height; if (h > maxH) maxH = h; });
+            const SLOT_H = Math.max(140, maxH + 24); // 24px gap between cards
+            const totalH = totalSlots * SLOT_H;
+            cols.forEach((col) => {
+                const mc = col.querySelector('.bk-matches');
+                if (!mc) return;
+                const slotCount = parseInt(mc.dataset.slotCount) || 1;
+                const slotsPerCard = totalSlots / slotCount;
+                mc.style.position = 'relative';
+                mc.style.height = totalH + 'px';
+                const cards = Array.from(mc.querySelectorAll(':scope > .bk-card'));
+                cards.forEach((card, j) => {
+                    const cardH = card.getBoundingClientRect().height || 100;
+                    const centerY = (j + 0.5) * slotsPerCard * SLOT_H;
+                    card.style.position = 'absolute';
+                    card.style.top = Math.round(centerY - cardH / 2) + 'px';
+                    card.style.left = '0';
+                    card.style.right = '0';
+                    card.style.width = '100%';
+                });
+            });
+            this._drawConnectors();
+        },
+        _drawConnectors() {
+            const el = this.$refs.bracketEl;
+            if (!el) return;
+            el.querySelectorAll('.bk-connectors').forEach(s => s.remove());
+            const cols = Array.from(el.querySelectorAll(':scope > .bracket-col'));
+            if (cols.length < 2) return;
+            const cRect = el.getBoundingClientRect();
+            const scrollL = el.scrollLeft;
+            const scrollT = el.scrollTop;
+            const absRect = (domEl) => {
+                const r = domEl.getBoundingClientRect();
+                return {
+                    left:  r.left  - cRect.left + scrollL,
+                    right: r.right - cRect.left + scrollL,
+                    midY:  (r.top + r.bottom) / 2 - cRect.top + scrollT,
+                };
+            };
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.classList.add('bk-connectors');
+            svg.setAttribute('width', el.scrollWidth);
+            svg.setAttribute('height', el.scrollHeight);
+            svg.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;overflow:visible;z-index:0;';
+            el.insertBefore(svg, el.firstChild);
+            const line = (d) => {
+                const p = document.createElementNS(svgNS, 'path');
+                p.setAttribute('d', d);
+                p.setAttribute('stroke', 'rgba(255,255,255,0.13)');
+                p.setAttribute('stroke-width', '1.5');
+                p.setAttribute('fill', 'none');
+                p.setAttribute('stroke-linecap', 'round');
+                svg.appendChild(p);
+            };
+            // Y of the winner row in a source card (or card center if match not finished)
+            const srcY = (card) => {
+                const won = card.querySelector('.bk-team--won');
+                return won ? absRect(won).midY : absRect(card).midY;
+            };
+            for (let ri = 0; ri < cols.length - 1; ri++) {
+                const curCards  = Array.from(cols[ri].querySelectorAll('.bk-card'));
+                const nextCards = Array.from(cols[ri + 1].querySelectorAll('.bk-card'));
+                if (!curCards.length || !nextCards.length) continue;
+                for (let ci = 0; ci < nextCards.length; ci++) {
+                    const srcA = curCards[ci * 2];
+                    const srcB = curCards[ci * 2 + 1];
+                    const dst  = nextCards[ci];
+                    if (!srcA || !dst) continue;
+                    const xA  = absRect(srcA).right;
+                    const yA  = srcY(srcA);
+                    const tX  = absRect(dst).left;
+                    // Land on each specific team row in the destination card
+                    const dstTeams = dst.querySelectorAll('.bk-team');
+                    const dstYA = dstTeams[0] ? absRect(dstTeams[0]).midY : absRect(dst).midY;
+                    const cpX = (xA + tX) / 2;
+                    // Bezier from source winner row → destination team1 row
+                    line(`M ${xA} ${yA} C ${cpX} ${yA} ${cpX} ${dstYA} ${tX} ${dstYA}`);
+                    if (srcB) {
+                        const xB  = absRect(srcB).right;
+                        const yB  = srcY(srcB);
+                        const dstYB = dstTeams[1] ? absRect(dstTeams[1]).midY : absRect(dst).midY;
+                        const cpX2 = (xB + tX) / 2;
+                        // Bezier from source winner row → destination team2 row
+                        line(`M ${xB} ${yB} C ${cpX2} ${yB} ${cpX2} ${dstYB} ${tX} ${dstYB}`);
+                    }
+                }
+            }
+        },
+    },
+    template: `
+        <div v-if="rounds.length" class="playoff-bracket-wrapper">
+
+            <!-- ── Bracket ── -->
+            <div class="playoff-bracket" ref="bracketEl">
+                <div
+                    v-for="(round, ri) in rounds"
+                    :key="round.round_number ?? 'r'+ri"
+                    class="bracket-col"
+                >
+                    <div class="bk-round-hdr">
+                        <span class="bk-round-hdr__title">{{ round.label }}</span>
+                        <span class="bk-round-hdr__meta">
+                            {{ round.match_count_expected || round.matches.length }} {{ (round.match_count_expected || round.matches.length) === 1 ? 'ottelu' : 'ottelua' }}<template v-if="round.best_of">&nbsp;&middot; Best of {{ round.best_of }}</template>
+                        </span>
+                    </div>
+
+                    <div class="bk-matches" :data-slot-count="round.match_count_expected || round.matches.length">
+
+                        <!-- Real match cards -->
+                        <div
+                            v-for="(match, mi) in round.matches"
+                            :key="matchId(match)"
+                            class="bk-card"
+                            :class="[cardStateClass(match), { 'bk-card--open': openMatchId === matchId(match) }]"
+                        >
+                            <div class="bk-card__hdr">
+                                <span class="bk-card__num">MATCH {{ globalMatchNum(ri, mi) }}</span>
+                                <span v-if="isOngoing(match)" class="bk-badge bk-badge--live">KÄYNNISSÄ</span>
+                                <span v-else-if="scheduledDate(match)" class="bk-card__date">{{ scheduledDate(match) }}</span>
+                            </div>
+
+                            <div class="bk-team" :class="{ 'bk-team--won': teamWon(match,'team1'), 'bk-team--lost': teamLost(match,'team1') }">
+                                <img v-if="resolveAvatarFn(team1Avatar(match))" :src="resolveAvatarFn(team1Avatar(match))" :alt="team1Name(match)" class="bk-team__logo" loading="lazy" decoding="async" />
+                                <span v-else class="bk-team__logo bk-team__logo--ph"></span>
+                                <router-link v-if="team1Name(match) && teamRouteFn(team1Id(match))" :to="teamRouteFn(team1Id(match))" class="bk-team__name">{{ team1Name(match) }}</router-link>
+                                <span v-else class="bk-team__name" :class="{ 'bk-team__name--tbd': !team1Name(match) }">{{ team1Name(match) || 'TBD' }}</span>
+                                <span class="bk-team__score" :class="{ 'bk-team__score--win': teamWon(match,'team1') }">{{ isFinished(match) ? team1Score(match) : '' }}</span>
+                                <span v-if="teamWon(match,'team1')" class="bk-win-bar"></span>
+                            </div>
+
+                            <div class="bk-team-divider"></div>
+
+                            <div class="bk-team" :class="{ 'bk-team--won': teamWon(match,'team2'), 'bk-team--lost': teamLost(match,'team2') }">
+                                <img v-if="resolveAvatarFn(team2Avatar(match))" :src="resolveAvatarFn(team2Avatar(match))" :alt="team2Name(match)" class="bk-team__logo" loading="lazy" decoding="async" />
+                                <span v-else class="bk-team__logo bk-team__logo--ph"></span>
+                                <router-link v-if="team2Name(match) && teamRouteFn(team2Id(match))" :to="teamRouteFn(team2Id(match))" class="bk-team__name">{{ team2Name(match) }}</router-link>
+                                <span v-else class="bk-team__name" :class="{ 'bk-team__name--tbd': !team2Name(match) }">{{ team2Name(match) || 'TBD' }}</span>
+                                <span class="bk-team__score" :class="{ 'bk-team__score--win': teamWon(match,'team2') }">{{ isFinished(match) ? team2Score(match) : '' }}</span>
+                                <span v-if="teamWon(match,'team2')" class="bk-win-bar"></span>
+                            </div>
+
+                            <div class="bk-card__footer">
+                                <div class="bk-card__links">
+                                    <a v-if="faceitUrl(match)" :href="faceitUrl(match)" target="_blank" rel="noopener" class="chip chip--link chip--sm">Faceit</a>
+                                    <a v-for="link in replay2Links(match)" :key="'r2-'+matchId(match)+'-'+link.mapId" :href="replay2PlayerUrl(link.matchId, link.mapId)" target="_blank" rel="noopener" :class="['chip','chip--link','chip--sm',['queued','parsing'].includes(link.status)?'chip--warn':'']">2D {{ link.mapId }}</a>
+                                    <span v-if="demoAvailabilityLoadingFn(match)" class="cell-muted" style="font-size:.72rem">Tark…</span>
+                                </div>
+                                <button v-if="isFinished(match)" type="button" class="expand-button bk-expand-btn" :class="{ 'expand-button--open': openMatchId === matchId(match) }" aria-label="Tilastot" @click.stop="openPanel(match)"><span class="chevron">›</span></button>
+                            </div>
+                        </div>
+
+                        <!-- TBD placeholder slots -->
+                        <div v-for="n in tbdCount(round)" :key="'tbd-'+ri+'-'+n" class="bk-card bk-card--tbd">
+                            <div class="bk-card__hdr">
+                                <span class="bk-card__num">MATCH {{ globalMatchNum(ri, round.matches.length + n - 1) }}</span>
+                            </div>
+                            <div class="bk-team bk-team--tbd">
+                                <span class="bk-team__logo bk-team__logo--ph"></span>
+                                <span class="bk-team__name bk-team__name--tbd">TBD</span>
+                            </div>
+                            <div class="bk-team-divider"></div>
+                            <div class="bk-team bk-team--tbd">
+                                <span class="bk-team__logo bk-team__logo--ph"></span>
+                                <span class="bk-team__name bk-team__name--tbd">TBD</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Detail panel below bracket ── -->
+            <div v-if="openMatchId && openMatch" class="bk-detail-panel" ref="detailPanel">
+                <div class="bk-detail-panel__hdr">
+                    <div class="bk-detail-panel__title">
+                        <span class="bk-detail-panel__vs">{{ openMatchLabel() }}</span>
+                        <span v-if="scheduledDate(openMatch)" class="bk-detail-panel__date">{{ scheduledDate(openMatch) }}</span>
+                    </div>
+                    <div class="bk-detail-panel__links">
+                        <a v-if="faceitUrl(openMatch)" :href="faceitUrl(openMatch)" target="_blank" rel="noopener" class="chip chip--link chip--sm">Faceit</a>
+                        <a v-for="link in replay2Links(openMatch)" :key="'dp-r2-'+link.mapId" :href="replay2PlayerUrl(link.matchId, link.mapId)" target="_blank" rel="noopener" :class="['chip','chip--link','chip--sm',['queued','parsing'].includes(link.status)?'chip--warn':'']">2D {{ link.mapId }}</a>
+                        <span v-if="demoAvailabilityLoadingFn(openMatch)" class="cell-muted" style="font-size:.75rem">Tark…</span>
+                    </div>
+                    <button type="button" class="bk-detail-panel__close" aria-label="Sulje" @click="closePanel()">✕</button>
+                </div>
+                <div class="match-expand-content">
+                    <match-expanded-details
+                        :summary="matchSummaryFn(openMatch)"
+                        :details="matchDetailsFn(openMatch)"
+                        :veto-entry="matchVetoFn(openMatch)"
+                        :player-stats="matchPlayerStatsFn(openMatch)"
+                        :map-catalog="mapCatalog"
+                        :loading="matchBundleBusyFn(openMatchId)"
+                    ></match-expanded-details>
+                </div>
+            </div>
+
+        </div>
+        <p v-else class="division-section__empty">Bracket-tietoja ei saatavilla.</p>
+    `
+};
+
+
 /* === /static/components/UpcomingMatchesList.js === */
 (function () {
     const DEFAULT_TEAM_LOGO = window.PAPPALIIGA_DEFAULT_LOGO;
@@ -12385,6 +12766,7 @@ function beautifyMapName(raw) {
     const lower = value.toLowerCase();
     if (lower === 'forfeit') return null; // never display forfeit as a map
     const core = lower.startsWith('de_') ? lower.slice(3) : lower;
+    if (core === 'forfeit') return null; // also catch de_forfeit
     const parts = core.split(/[_-]/).filter(Boolean);
     if (!parts.length) return value;
     return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
@@ -13639,11 +14021,10 @@ window.TeamDetail = {
             const pickLookup = {};
             const playedLookup = {};
             this.mapStats.forEach(row => {
+                if (!row.mapName || row.mapName.toLowerCase() === 'forfeit') return;
                 pickLookup[mapKey(row.mapName)] = normalizePercent(row.pickRate) || 0;
                 playedLookup[mapKey(row.mapName)] = toNumber(row.games || row.played || 0);
-                if (row.mapName) {
-                    pool.set(mapKey(row.mapName), { mapName: row.mapName });
-                }
+                pool.set(mapKey(row.mapName), { mapName: row.mapName });
             });
             this.matchesList.forEach(match => {
                 (match.maps || []).forEach(map => {
@@ -13656,7 +14037,8 @@ window.TeamDetail = {
             });
             this.vetoByMatch.forEach(entry => {
                 entry.steps.forEach(step => {
-                    if (!step.mapName) return;
+                    const stepLower = (step.mapName || '').toLowerCase();
+                    if (!step.mapName || stepLower === 'forfeit' || stepLower === 'kartta') return;
                     const key = mapKey(step.mapName);
                     if (!pool.has(key)) pool.set(key, { mapName: step.mapName });
                 });
@@ -14287,15 +14669,17 @@ window.TeamDetail = {
         // Veto history: match_id/map_name/status/selected_by_team_id/_name/round_num/order -> rendered as BO2/BO3 step timeline
         vetoHistory() {
             const raw = Array.isArray(this.seasonData?.vetoHistory) ? this.seasonData.vetoHistory : [];
-            return raw.map(entry => ({
-                matchId: entry.matchId,
-                mapName: beautifyMapName(entry.mapName) || 'Kartta',
-                status: (entry.status || '').toLowerCase(),
-                selectedByTeamId: entry.selectedByTeamId,
-                selectedByTeamName: entry.selectedByTeamName,
-                roundNum: toNumber(entry.roundNum ?? entry.order),
-                order: toNumber(entry.order ?? entry.roundNum)
-            }));
+            return raw
+                .filter(entry => (entry.mapName || '').trim().toLowerCase() !== 'forfeit')
+                .map(entry => ({
+                    matchId: entry.matchId,
+                    mapName: beautifyMapName(entry.mapName) || 'Kartta',
+                    status: (entry.status || '').toLowerCase(),
+                    selectedByTeamId: entry.selectedByTeamId,
+                    selectedByTeamName: entry.selectedByTeamName,
+                    roundNum: toNumber(entry.roundNum ?? entry.order),
+                    order: toNumber(entry.order ?? entry.roundNum)
+                }));
         },
         vetoByMatch() {
             if (!this.vetoHistory.length) return [];
@@ -18860,6 +19244,7 @@ window.DivisionView = {
         get SankariCard() { return window.SankariCard; },
         get UpcomingMatchesList() { return window.UpcomingMatchesList; },
         get MatchExpandedDetails() { return window.MatchExpandedDetails; },
+        get PlayoffBracket() { return window.PlayoffBracket; },
         get DivisionPlayersTable() { return window.DivisionPlayersTable; }
     },
     data() {
@@ -19078,6 +19463,12 @@ window.DivisionView = {
         divisionTitle() {
             if (!this.divisionDetails) return 'Divisioona';
             return this.divisionDetails.name || `Divisioona ${this.divisionDetails.division_num}`;
+        },
+        isPlayoff() {
+            return !!this.divisionDetails?.is_playoff;
+        },
+        playoffBracket() {
+            return this.divisionDetails?.bracket || null;
         },
         nextUpcomingMatch() {
             return Array.isArray(this.upcomingMatches) && this.upcomingMatches.length
@@ -19745,8 +20136,9 @@ window.DivisionView = {
                 Array.from({ length: mapsCount }, (_, i) => i + 1).map(async (mapId) => {
                     let status = 'hidden';
                     try {
+                        const apiBase = window.PL_API_URL || window.__API_BASE__ || '/api';
                         const resp = await fetch(
-                            `https://replay2.pappa.aukko.net/replays/${encodeURIComponent(matchId)}/status?map_id=${mapId}`
+                            `${apiBase}/replay2/replays/${encodeURIComponent(matchId)}/status?map_id=${mapId}`
                         );
                         if (resp.ok) {
                             const data = await resp.json();
@@ -20290,14 +20682,16 @@ window.DivisionView = {
             ></error-message>
 
             <template v-else>
-                <section id="upcoming" class="division-section" v-if="matchSectionLoading || divisionMatchesLoading || hasAnyMatchData">
+                <section id="upcoming" class="division-section" v-if="matchSectionLoading || divisionMatchesLoading || hasAnyMatchData || (isPlayoff && !divisionLoading)">
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading division-section__heading--matches">
                             <div class="division-section__heading-copy">
                                 <h2 class="title-accent titleUnderlineSection">Ottelut</h2>
-                                <p class="division-section__lede">Tulevat kohtaamiset ja pelattujen otteluiden tarkempi ottelupaketti samassa näkymässä.</p>
+                                <p class="division-section__lede" v-if="isPlayoff">Playoff-bracket</p>
+                                <p class="division-section__lede" v-else>Tulevat kohtaamiset ja pelattujen otteluiden tarkempi ottelupaketti samassa näkymässä.</p>
                             </div>
-                            <div class="trend-toggles trend-toggles--mode">
+                            <!-- Toggle only shown for non-playoff divisions -->
+                            <div v-if="!isPlayoff" class="trend-toggles trend-toggles--mode">
                                 <button
                                     type="button"
                                     class="trend-toggle"
@@ -20313,6 +20707,34 @@ window.DivisionView = {
                             </div>
                         </header>
 
+                        <!-- Playoff bracket view -->
+                        <template v-if="isPlayoff">
+                            <loading-spinner
+                                v-if="divisionLoading && !playoffBracket"
+                                message="Brackettia ladataan..."
+                            ></loading-spinner>
+                            <playoff-bracket
+                                v-else
+                                :bracket="playoffBracket"
+                                :map-catalog="mapCatalog"
+                                :is-expanded-fn="isPlayedMatchExpanded"
+                                :toggle-expand-fn="togglePlayedMatchExpand"
+                                :match-summary-fn="playedMatchSummary"
+                                :match-details-fn="playedMatchDetails"
+                                :match-veto-fn="playedMatchVetoEntry"
+                                :match-player-stats-fn="playedMatchPlayerStats"
+                                :match-bundle-busy-fn="playedMatchBundleBusy"
+                                :resolve-avatar-fn="resolveAvatar"
+                                :team-route-fn="divisionTeamRoute"
+                                :faceit-url-fn="divisionMatchFaceitUrl"
+                                :replay2-links-fn="replay2Links"
+                                :replay2-player-url-fn="replay2PlayerUrl"
+                                :demo-availability-loading-fn="isDemoAvailabilityLoading"
+                            ></playoff-bracket>
+                        </template>
+
+                        <!-- Regular division: upcoming/played toggle -->
+                        <template v-else>
                         <upcoming-matches-list
                             v-if="matchViewMode === 'upcoming'"
                             :items="upcomingMatches"
@@ -20565,6 +20987,7 @@ window.DivisionView = {
                             </div>
                             <p v-else class="division-section__empty">Ei pelattuja otteluita tälle divisioonalle.</p>
                         </div>
+                        </template><!-- end v-else (regular division) -->
                     </div>
                 </section>
 
@@ -20572,7 +20995,6 @@ window.DivisionView = {
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading">
                             <h2 class="title-accent titleUnderlineSection">Divisioonan tilastot</h2>
-                            <p class="division-section__lede">Nopea kooste kauden volyymista, tempoista ja tehokkuusluvuista.</p>
                         </header>
                         <div class="summary-card-grid division-summary-grid" role="list">
                             <summary-stat-card
@@ -20591,7 +21013,6 @@ window.DivisionView = {
                     <div class="division-team-module">
                         <header class="division-section__heading division-section__heading--standings">
                             <h2 class="title-accent titleUnderlineSection">Joukkuevertailu</h2>
-                            <p class="division-section__lede">Sarjataulukko, voittorakenne ja kierrospohjainen suoritus samassa taulukossa.</p>
                         </header>
                         <div class="division-team-panels">
                             <team-comparison-board
@@ -20608,6 +21029,8 @@ window.DivisionView = {
                                 :championship-id="championshipId"
                                 :championship-name="divisionDetails?.name"
                                 :championship-season="divisionDetails?.season"
+                                :is-playoff="isPlayoff"
+                                :bracket="playoffBracket"
                             ></team-comparison-board>
                         </div>
                     </div>
@@ -20617,7 +21040,7 @@ window.DivisionView = {
                     <div class="division-surface glass-card division-section-card">
                         <header class="division-section__heading">
                             <h2 class="title-accent titleUnderlineSection">Pelaajatilastot</h2>
-                            <p class="division-section__lede">Divisioonan kaikki pelaajat yhdessä vertailutaulukossa. Valitse joukkueet ja pelaajat sekä haluamasi tilastosarakkeet.</p>
+                            <p class="division-section__lede">Valitse joukkueet ja pelaajat sekä haluamasi tilastosarakkeet.</p>
                         </header>
                         <division-players-table
                             :players="divisionDetails.player_totals || []"

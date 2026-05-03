@@ -424,94 +424,200 @@ async def _compute_division_details(championship_id: str, season: int, division_
     for plist in players_by_team.values():
         plist.sort(key=lambda p: (p.get("nickname") or "").lower())
 
-    player_totals_params: dict[str, Any] = {"season": season, "division": division_num}
-    exclusion_clause = ""
-    if excluded:
-        placeholders = ", ".join(f":ex{i}" for i in range(len(excluded)))
-        exclusion_clause = f" AND (pst.team_id IS NULL OR pst.team_id NOT IN ({placeholders}))"
-        for i, team_id in enumerate(excluded):
-            player_totals_params[f"ex{i}"] = team_id
+    is_playoff = bool(champ.get("is_playoff"))
 
-    player_totals_rows = await query_async(
-        f"""
-        SELECT
-            pst.player_id,
-            pst.team_id,
-            pst.maps_played,
-            pst.rounds_played,
-            pst.kills,
-            pst.deaths,
-            pst.assists,
-            pst.mvps,
-            pst.sniper_kills,
-            pst.utility_damage,
-            pst.enemies_flashed,
-            pst.flash_count,
-            pst.flash_successes,
-            pst.clutch_kills,
-            pst.cl_1v1_attempts,
-            pst.cl_1v1_wins,
-            pst.cl_1v2_attempts,
-            pst.cl_1v2_wins,
-            pst.pistol_kills,
-            pst.knife_kills,
-            pst.zeus_kills,
-            pst.adr,
-            pst.kr,
-            pst.kd,
-            pst.hs_pct,
-            pst.damage,
-            COALESCE(pc.player_name, p.nickname) AS nickname,
-            t.name AS team_name
-        FROM player_season_totals pst
-        LEFT JOIN players p ON p.player_id = pst.player_id
-        LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :champ_id
-        LEFT JOIN teams t ON t.team_id = pst.team_id
-        WHERE pst.season = :season
-          AND pst.division_num = :division
-          {exclusion_clause}
-        """,
-        {**player_totals_params, "champ_id": championship_id},
-    )
+    if is_playoff:
+        # For playoffs, totals tables are not reliable — aggregate directly from player_stats
+        # scoped by championship_id so only players from participating playoff teams are included.
+        playoff_excl_clause = ""
+        playoff_params: dict[str, Any] = {"champ_id": championship_id}
+        if excluded:
+            placeholders = ", ".join(f":ex{i}" for i in range(len(excluded)))
+            playoff_excl_clause = f" AND (pst.team_id IS NULL OR pst.team_id NOT IN ({placeholders}))"
+            for i, team_id in enumerate(excluded):
+                playoff_params[f"ex{i}"] = team_id
 
-    player_totals: list[dict[str, Any]] = []
-    for row in player_totals_rows:
-        player_id = row.get("player_id")
-        if player_id:
-            unique_player_ids.add(str(player_id))
-        player_totals.append(
-            {
-                "player_id": row.get("player_id"),
-                "team_id": row.get("team_id"),
-                "team_name": row.get("team_name"),
-                "nickname": row.get("nickname"),
-                "avatar": DEFAULT_AVATAR,
-                "maps_played": int(row.get("maps_played") or 0),
-                "rounds_played": int(row.get("rounds_played") or 0),
-                "kills": int(row.get("kills") or 0),
-                "deaths": int(row.get("deaths") or 0),
-                "assists": int(row.get("assists") or 0),
-                "mvps": int(row.get("mvps") or 0),
-                "sniper_kills": int(row.get("sniper_kills") or 0),
-                "knife_kills": int(row.get("knife_kills") or 0),
-                "zeus_kills": int(row.get("zeus_kills") or 0),
-                "utility_damage": int(row.get("utility_damage") or 0),
-                "enemies_flashed": int(row.get("enemies_flashed") or 0),
-                "flash_count": int(row.get("flash_count") or 0),
-                "flash_successes": int(row.get("flash_successes") or 0),
-                "clutch_kills": int(row.get("clutch_kills") or 0),
-                "cl_1v1_attempts": int(row.get("cl_1v1_attempts") or 0),
-                "cl_1v1_wins": int(row.get("cl_1v1_wins") or 0),
-                "cl_1v2_attempts": int(row.get("cl_1v2_attempts") or 0),
-                "cl_1v2_wins": int(row.get("cl_1v2_wins") or 0),
-                "pistol_kills": int(row.get("pistol_kills") or 0),
-                "adr": float(row.get("adr") or 0.0),
-                "kr": float(row.get("kr") or 0.0),
-                "kd": float(row.get("kd") or 0.0),
-                "hs_pct": float(row.get("hs_pct") or 0.0),
-                "damage": int(row.get("damage") or 0),
-            }
+        player_totals_rows = await query_async(
+            f"""
+            SELECT
+                pst.player_id,
+                pst.team_id,
+                COUNT(DISTINCT CONCAT(pst.match_id, ':', pst.round_index)) AS maps_played,
+                SUM(COALESCE(mp.score_team1, 0) + COALESCE(mp.score_team2, 0)) AS rounds_played,
+                SUM(pst.kills) AS kills,
+                SUM(pst.deaths) AS deaths,
+                SUM(pst.assists) AS assists,
+                SUM(pst.mvps) AS mvps,
+                SUM(pst.sniper_kills) AS sniper_kills,
+                SUM(pst.utility_damage) AS utility_damage,
+                SUM(pst.enemies_flashed) AS enemies_flashed,
+                SUM(pst.flash_count) AS flash_count,
+                SUM(pst.flash_successes) AS flash_successes,
+                SUM(pst.clutch_kills) AS clutch_kills,
+                SUM(pst.cl_1v1_attempts) AS cl_1v1_attempts,
+                SUM(pst.cl_1v1_wins) AS cl_1v1_wins,
+                SUM(pst.cl_1v2_attempts) AS cl_1v2_attempts,
+                SUM(pst.cl_1v2_wins) AS cl_1v2_wins,
+                SUM(pst.pistol_kills) AS pistol_kills,
+                SUM(pst.knife_kills) AS knife_kills,
+                SUM(pst.zeus_kills) AS zeus_kills,
+                SUM(pst.damage) AS damage,
+                SUM(pst.headshots) AS headshots,
+                COALESCE(pc.player_name, p.nickname) AS nickname,
+                t.name AS team_name
+            FROM player_stats pst
+            JOIN matches m ON m.match_id = pst.match_id
+            LEFT JOIN maps mp ON mp.match_id = pst.match_id AND mp.round_index = pst.round_index
+                AND COALESCE(mp.is_forfeit, 0) = 0
+            LEFT JOIN players p ON p.player_id = pst.player_id
+            LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :champ_id
+            LEFT JOIN teams t ON t.team_id = pst.team_id
+            WHERE m.championship_id = :champ_id
+              AND COALESCE(m.ignored_due_ban, 0) = 0
+              AND COALESCE(pst.is_forfeit_map, 0) = 0
+              AND pst.team_id IS NOT NULL
+              {playoff_excl_clause}
+            GROUP BY pst.player_id, pst.team_id, COALESCE(pc.player_name, p.nickname), t.name
+            """,
+            playoff_params,
         )
+
+        player_totals: list[dict[str, Any]] = []
+        for row in player_totals_rows:
+            player_id = row.get("player_id")
+            if player_id:
+                unique_player_ids.add(str(player_id))
+            kills = int(row.get("kills") or 0)
+            deaths = int(row.get("deaths") or 0)
+            damage = int(row.get("damage") or 0)
+            headshots = int(row.get("headshots") or 0)
+            rounds_played = int(row.get("rounds_played") or 0)
+            kd = kills / deaths if deaths else float(kills)
+            kr = kills / rounds_played if rounds_played else 0.0
+            adr = damage / rounds_played if rounds_played else 0.0
+            hs_pct = (headshots / kills * 100) if kills else 0.0
+            player_totals.append(
+                {
+                    "player_id": player_id,
+                    "team_id": row.get("team_id"),
+                    "team_name": row.get("team_name"),
+                    "nickname": row.get("nickname"),
+                    "avatar": DEFAULT_AVATAR,
+                    "maps_played": int(row.get("maps_played") or 0),
+                    "rounds_played": rounds_played,
+                    "kills": kills,
+                    "deaths": deaths,
+                    "assists": int(row.get("assists") or 0),
+                    "mvps": int(row.get("mvps") or 0),
+                    "sniper_kills": int(row.get("sniper_kills") or 0),
+                    "knife_kills": int(row.get("knife_kills") or 0),
+                    "zeus_kills": int(row.get("zeus_kills") or 0),
+                    "utility_damage": int(row.get("utility_damage") or 0),
+                    "enemies_flashed": int(row.get("enemies_flashed") or 0),
+                    "flash_count": int(row.get("flash_count") or 0),
+                    "flash_successes": int(row.get("flash_successes") or 0),
+                    "clutch_kills": int(row.get("clutch_kills") or 0),
+                    "cl_1v1_attempts": int(row.get("cl_1v1_attempts") or 0),
+                    "cl_1v1_wins": int(row.get("cl_1v1_wins") or 0),
+                    "cl_1v2_attempts": int(row.get("cl_1v2_attempts") or 0),
+                    "cl_1v2_wins": int(row.get("cl_1v2_wins") or 0),
+                    "pistol_kills": int(row.get("pistol_kills") or 0),
+                    "adr": round(adr, 1),
+                    "kr": round(kr, 3),
+                    "kd": round(kd, 2),
+                    "hs_pct": round(hs_pct, 1),
+                    "damage": damage,
+                }
+            )
+    else:
+        player_totals_params: dict[str, Any] = {"season": season, "division": division_num}
+        exclusion_clause = ""
+        if excluded:
+            placeholders = ", ".join(f":ex{i}" for i in range(len(excluded)))
+            exclusion_clause = f" AND (pst.team_id IS NULL OR pst.team_id NOT IN ({placeholders}))"
+            for i, team_id in enumerate(excluded):
+                player_totals_params[f"ex{i}"] = team_id
+
+        player_totals_rows = await query_async(
+            f"""
+            SELECT
+                pst.player_id,
+                pst.team_id,
+                pst.maps_played,
+                pst.rounds_played,
+                pst.kills,
+                pst.deaths,
+                pst.assists,
+                pst.mvps,
+                pst.sniper_kills,
+                pst.utility_damage,
+                pst.enemies_flashed,
+                pst.flash_count,
+                pst.flash_successes,
+                pst.clutch_kills,
+                pst.cl_1v1_attempts,
+                pst.cl_1v1_wins,
+                pst.cl_1v2_attempts,
+                pst.cl_1v2_wins,
+                pst.pistol_kills,
+                pst.knife_kills,
+                pst.zeus_kills,
+                pst.adr,
+                pst.kr,
+                pst.kd,
+                pst.hs_pct,
+                pst.damage,
+                COALESCE(pc.player_name, p.nickname) AS nickname,
+                t.name AS team_name
+            FROM player_season_totals pst
+            LEFT JOIN players p ON p.player_id = pst.player_id
+            LEFT JOIN player_championships pc ON pc.player_id = pst.player_id AND pc.championship_id = :champ_id
+            LEFT JOIN teams t ON t.team_id = pst.team_id
+            WHERE pst.season = :season
+              AND pst.division_num = :division
+              {exclusion_clause}
+            """,
+            {**player_totals_params, "champ_id": championship_id},
+        )
+
+        player_totals: list[dict[str, Any]] = []
+        for row in player_totals_rows:
+            player_id = row.get("player_id")
+            if player_id:
+                unique_player_ids.add(str(player_id))
+            player_totals.append(
+                {
+                    "player_id": row.get("player_id"),
+                    "team_id": row.get("team_id"),
+                    "team_name": row.get("team_name"),
+                    "nickname": row.get("nickname"),
+                    "avatar": DEFAULT_AVATAR,
+                    "maps_played": int(row.get("maps_played") or 0),
+                    "rounds_played": int(row.get("rounds_played") or 0),
+                    "kills": int(row.get("kills") or 0),
+                    "deaths": int(row.get("deaths") or 0),
+                    "assists": int(row.get("assists") or 0),
+                    "mvps": int(row.get("mvps") or 0),
+                    "sniper_kills": int(row.get("sniper_kills") or 0),
+                    "knife_kills": int(row.get("knife_kills") or 0),
+                    "zeus_kills": int(row.get("zeus_kills") or 0),
+                    "utility_damage": int(row.get("utility_damage") or 0),
+                    "enemies_flashed": int(row.get("enemies_flashed") or 0),
+                    "flash_count": int(row.get("flash_count") or 0),
+                    "flash_successes": int(row.get("flash_successes") or 0),
+                    "clutch_kills": int(row.get("clutch_kills") or 0),
+                    "cl_1v1_attempts": int(row.get("cl_1v1_attempts") or 0),
+                    "cl_1v1_wins": int(row.get("cl_1v1_wins") or 0),
+                    "cl_1v2_attempts": int(row.get("cl_1v2_attempts") or 0),
+                    "cl_1v2_wins": int(row.get("cl_1v2_wins") or 0),
+                    "pistol_kills": int(row.get("pistol_kills") or 0),
+                    "adr": float(row.get("adr") or 0.0),
+                    "kr": float(row.get("kr") or 0.0),
+                    "kd": float(row.get("kd") or 0.0),
+                    "hs_pct": float(row.get("hs_pct") or 0.0),
+                    "damage": int(row.get("damage") or 0),
+                }
+            )
 
     teams: list[dict[str, Any]] = []
     for t in team_rows:

@@ -255,6 +255,9 @@
                 try {
                     const bundle = await window.apiClient.getDivisionPage(id);
                     const data = bundle.details || {};
+                    if (bundle.bracket != null) {
+                        data.bracket = bundle.bracket;
+                    }
                     entry.details.data = data;
                     entry.details.fetchedAt = now();
                     entry.details.loading = false;

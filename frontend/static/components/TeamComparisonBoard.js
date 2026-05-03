@@ -70,24 +70,55 @@ window.TeamComparisonBoard = {
         championshipSeason: {
             type: [String, Number],
             default: null
+        },
+        isPlayoff: {
+            type: Boolean,
+            default: false
+        },
+        bracket: {
+            type: Object,
+            default: null
         }
     },
-    data() {
-        return {
-            columns: [
+    computed: {
+        columns() {
+            const statusCol = this.isPlayoff
+                ? { key: 'playoff_status', label: 'Tila', sortable: false, colClass: 'col-playoff-status', width: '180px', mobileLabel: 'Tila', mobilePriority: 3 }
+                : { key: 'split', label: 'Voittojakauma', sortable: false, colClass: 'col-bar', mobileLabel: 'W-L', mobilePriority: 3 };
+            return [
                 { key: 'team', label: 'Joukkue', sortable: true, align: 'left', colClass: 'col-team col-name', width: '260px', mobilePinned: true, mobilePriority: 1 },
                 { key: 'matches', label: 'Ottelut', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '90px', mobileLabel: 'Ott.', mobilePriority: 2 },
                 { key: 'wins', label: 'Voitot', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px', mobileHidden: true },
-                { key: 'losses', label: 'Tappiot', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px', mobileHidden: true },
-                { key: 'split', label: 'Voittojakauma', sortable: false, colClass: 'col-bar', mobileLabel: 'W-L', mobilePriority: 3 },
+                { key: 'losses', label: 'Häviöt', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-a', width: '88px', mobileHidden: true },
+                statusCol,
                 { key: 'win_rate', label: 'Voittoprosentti', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-b', width: '120px', mobileLabel: 'WR%', mobilePriority: 4 },
                 { key: 'round_diff', label: 'Erä-ero', sortable: true, numeric: true, align: 'center', colClass: 'col-stat col-group-b', width: '110px', mobileLabel: 'Eraero', mobilePriority: 5 },
                 { key: 'kd', label: 'K/D', sortable: true, numeric: true, align: 'center', decimals: 2, colClass: 'col-stat col-group-c', width: '90px', mobileHidden: true },
                 { key: 'adr', label: 'ADR', sortable: true, numeric: true, align: 'center', decimals: 1, colClass: 'col-stat col-group-c', width: '100px', mobileHidden: true }
-            ]
-        };
-    },
-    computed: {
+            ];
+        },
+        teamPlayoffStatusMap() {
+            const map = {};
+            if (!this.isPlayoff || !Array.isArray(this.bracket?.rounds)) return map;
+            const rounds = this.bracket.rounds;
+            const finalRound = rounds[rounds.length - 1];
+            for (const round of rounds) {
+                for (const match of (round.matches || [])) {
+                    const winnerId = String(match.winner_team_id || match.winnerTeamId || '');
+                    const t1Id = String(match.team1_id || match.team1Id || '');
+                    const t2Id = String(match.team2_id || match.team2Id || '');
+                    if (!winnerId || (!t1Id && !t2Id)) continue;
+                    const loserId = t1Id === winnerId ? t2Id : t1Id;
+                    if (loserId) {
+                        map[loserId] = { eliminated: true, roundLabel: round.label };
+                        if (round === finalRound) {
+                            map[winnerId] = { eliminated: false, winner: true, roundLabel: round.label };
+                        }
+                    }
+                }
+            }
+            return map;
+        },
         rows() {
             if (!Array.isArray(this.teams)) {
                 return [];
@@ -124,6 +155,7 @@ window.TeamComparisonBoard = {
                     kd,
                     adr,
                     split: { wins, losses },
+                    playoff_status: this.isPlayoff ? (this.teamPlayoffStatusMap[String(team.team_id || team.id || `team-${idx}`)] || null) : null,
                     status,
                     status_reason: team.status_reason || null,
                 };
@@ -292,6 +324,12 @@ window.TeamComparisonBoard = {
                                 :right-text="formatInteger(row.losses) + ' tappiota'"
                                 :show-percent="true"
                             ></split-bar>
+                        </template>
+
+                        <template #cell-playoff_status="{ row }">
+                            <span v-if="row.playoff_status?.winner" class="playoff-status playoff-status--winner" title="Turnauksen voittaja">Voittaja</span>
+                            <span v-else-if="row.playoff_status?.eliminated" class="playoff-status playoff-status--eliminated">Pudonnut: {{ row.playoff_status.roundLabel }}</span>
+                            <span v-else class="playoff-status playoff-status--active">Mukana</span>
                         </template>
                     </sortable-table>
 

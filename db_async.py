@@ -1664,13 +1664,13 @@ async def upsert_match_async(
         await cur.execute(
             """
             INSERT INTO matches (
-              match_id, championship_id, season, division_num, best_of,
+              match_id, championship_id, season, division_num, best_of, round_number,
               configured_at, started_at, finished_at, scheduled_at, status,
               last_seen_at, activity_ts, team1_id, team2_id, winner_team_id,
               is_forfeit, ignored_due_ban, payload_hash
             )
             VALUES (
-              %(match_id)s, %(championship_id)s, %(season)s, %(division_num)s, %(best_of)s,
+              %(match_id)s, %(championship_id)s, %(season)s, %(division_num)s, %(best_of)s, %(round_number)s,
               %(configured_at)s, %(started_at)s, %(finished_at)s, %(scheduled_at)s, %(status)s,
               %(last_seen_at)s, %(activity_ts)s, %(team1_id)s, %(team2_id)s, %(winner_team_id)s,
               %(is_forfeit)s, %(ignored_due_ban)s, %(payload_hash)s
@@ -1680,6 +1680,7 @@ async def upsert_match_async(
               season = VALUES(season),
               division_num = VALUES(division_num),
               best_of = VALUES(best_of),
+              round_number = COALESCE(VALUES(round_number), matches.round_number),
               configured_at = VALUES(configured_at),
               started_at = VALUES(started_at),
               finished_at = VALUES(finished_at),

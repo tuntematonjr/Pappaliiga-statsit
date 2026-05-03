@@ -896,6 +896,7 @@ def _build_normalised_match(
         "season": ctx.season,
         "division_num": ctx.division_num,
         "best_of": safe_int(details.get("best_of")),
+        "round_number": safe_int(details.get("round")),
         "configured_at": configured_at,
         "started_at": started_at,
         "finished_at": finish_ts,

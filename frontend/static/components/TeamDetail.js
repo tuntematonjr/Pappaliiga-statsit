@@ -356,6 +356,7 @@ function beautifyMapName(raw) {
     const lower = value.toLowerCase();
     if (lower === 'forfeit') return null; // never display forfeit as a map
     const core = lower.startsWith('de_') ? lower.slice(3) : lower;
+    if (core === 'forfeit') return null; // also catch de_forfeit
     const parts = core.split(/[_-]/).filter(Boolean);
     if (!parts.length) return value;
     return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
@@ -1610,11 +1611,10 @@ window.TeamDetail = {
             const pickLookup = {};
             const playedLookup = {};
             this.mapStats.forEach(row => {
+                if (!row.mapName || row.mapName.toLowerCase() === 'forfeit') return;
                 pickLookup[mapKey(row.mapName)] = normalizePercent(row.pickRate) || 0;
                 playedLookup[mapKey(row.mapName)] = toNumber(row.games || row.played || 0);
-                if (row.mapName) {
-                    pool.set(mapKey(row.mapName), { mapName: row.mapName });
-                }
+                pool.set(mapKey(row.mapName), { mapName: row.mapName });
             });
             this.matchesList.forEach(match => {
                 (match.maps || []).forEach(map => {
@@ -1627,7 +1627,8 @@ window.TeamDetail = {
             });
             this.vetoByMatch.forEach(entry => {
                 entry.steps.forEach(step => {
-                    if (!step.mapName) return;
+                    const stepLower = (step.mapName || '').toLowerCase();
+                    if (!step.mapName || stepLower === 'forfeit' || stepLower === 'kartta') return;
                     const key = mapKey(step.mapName);
                     if (!pool.has(key)) pool.set(key, { mapName: step.mapName });
                 });
@@ -2258,15 +2259,17 @@ window.TeamDetail = {
         // Veto history: match_id/map_name/status/selected_by_team_id/_name/round_num/order -> rendered as BO2/BO3 step timeline
         vetoHistory() {
             const raw = Array.isArray(this.seasonData?.vetoHistory) ? this.seasonData.vetoHistory : [];
-            return raw.map(entry => ({
-                matchId: entry.matchId,
-                mapName: beautifyMapName(entry.mapName) || 'Kartta',
-                status: (entry.status || '').toLowerCase(),
-                selectedByTeamId: entry.selectedByTeamId,
-                selectedByTeamName: entry.selectedByTeamName,
-                roundNum: toNumber(entry.roundNum ?? entry.order),
-                order: toNumber(entry.order ?? entry.roundNum)
-            }));
+            return raw
+                .filter(entry => (entry.mapName || '').trim().toLowerCase() !== 'forfeit')
+                .map(entry => ({
+                    matchId: entry.matchId,
+                    mapName: beautifyMapName(entry.mapName) || 'Kartta',
+                    status: (entry.status || '').toLowerCase(),
+                    selectedByTeamId: entry.selectedByTeamId,
+                    selectedByTeamName: entry.selectedByTeamName,
+                    roundNum: toNumber(entry.roundNum ?? entry.order),
+                    order: toNumber(entry.order ?? entry.roundNum)
+                }));
         },
         vetoByMatch() {
             if (!this.vetoHistory.length) return [];

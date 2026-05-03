@@ -26,6 +26,7 @@ from .routers import maps_catalog, image_proxy, season_view
 from .routers import share_preview
 from .routers import webhook
 from .routers import home_page, division_page, list_pages
+from .routers import replay2_proxy
 from api.exceptions import BadRequestError, NotFoundError
 from api.services.cache_reheat import reheat_main_page
 
@@ -178,6 +179,7 @@ app.include_router(webhook.router, prefix="/api", tags=["webhook"])
 app.include_router(home_page.router, prefix="/api", tags=["home-page"])
 app.include_router(division_page.router, prefix="/api", tags=["division-page"])
 app.include_router(list_pages.router, prefix="/api", tags=["list-pages"])
+app.include_router(replay2_proxy.router, prefix="/api", tags=["replay2-proxy"])
 
 
 def _resolve_index_html(frontend_dir: Path) -> Path:
