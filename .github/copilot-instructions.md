@@ -106,7 +106,7 @@ The target page-load model is: **1 HTML → 1 CSS → 1 JS → 1 API call**.
 - Data sync: `sync.py`, `sync_pipeline.py`, `division_registry.py`, `faceit_client_async.py`, `division_overrides.json`.
 - DB layer: `db_async.py`, `mariadb_schema.sql`.
 - Standings: ranking + h2h tiebreaker logic in `api/services/divisions_service.py`.
-- API: `api/main.py`, routers `api/routers/{seasons,season_view,divisions,teams,players,matches,stats,maps_catalog,image_proxy,share_preview,webhook}.py`, services `api/services/{seasons_service,season_view_service,season_aggregates,stats_service,teams_service,players_service,matches_service,divisions_service,player_counts}.py`.
+- API: `api/main.py`, routers `api/routers/{seasons,season_view,divisions,division_page,home_page,teams,players,matches,stats,maps_catalog,image_proxy,share_preview,webhook,debug,list_pages,replay2_proxy,team_statuses}.py`, services `api/services/{seasons_service,season_view_service,season_aggregates,stats_service,teams_service,players_service,matches_service,divisions_service,player_counts,player_stats_payload,team_status_service,cache_helpers,cache_reheat,sync_event_queue}.py`.
 - Frontend: `frontend/static/app-main.js`, `frontend/static/api-client.js`, views `frontend/static/views/{HomeView.js,SeasonsView.js,DivisionView.js,TeamDetailView.js,PlayerView.js,TeamsView.js,PlayersView.js,UpcomingMatchesView.js,DebugView.js}`, stores `frontend/static/stores/{useHomeStore,useSeasonsStore,useDivisionStore,useTeamStore,usePlayerStore,useUpcomingStore}.js`, components under `frontend/static/components/`.
 
 ## Coding Rules
