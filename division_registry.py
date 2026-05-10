@@ -18,7 +18,6 @@ import faceit_config
 from faceit_config import PAPPALIIGA_ORG_ID
 from faceit_client_async import (
     get_championship_matches_async,
-    get_championship_teams_async,
     list_championships_for_organizer_async,
 )
 
@@ -306,30 +305,6 @@ class DivisionRefreshResult:
         }
 
 
-async def _has_registered_teams(championship_id: str, min_teams: int = 1) -> bool:
-    """
-    Return ``True`` when a championship has at least ``min_teams`` registered teams.
-    Falls back to ``True`` if the API call fails so we don't accidentally drop
-    valid championships due to transient errors.
-    """
-    try:
-        teams = await get_championship_teams_async(championship_id, limit=max(10, min_teams))
-    except Exception:
-        # On failure be permissive; caller can retry later.
-        return True
-    if teams is None:
-        return True
-    count = 0
-    for team in teams or []:
-        # Some responses include placeholders without team_id; ignore them.
-        tid = team.get("team_id") or team.get("id")
-        if tid:
-            count += 1
-        if count >= min_teams:
-            return True
-    return False
-
-
 async def refresh_divisions(
     *,
     min_season: int = faceit_config.DEFAULT_CURRENT_SEASON,
@@ -346,8 +321,7 @@ async def refresh_divisions(
             championships with fewer matches than ``min_matches``.
         min_matches: Minimum number of matches required when
             ``require_matches`` is enabled.
-        min_new_division_teams: When greater than zero, new championships must
-            have at least this many registered teams to be added.
+        min_new_division_teams: Deprecated no-op kept for backwards compatibility.
         dry_run: When ``True`` do not persist; still return the merged payload
             so callers can inspect changes.
 
@@ -369,25 +343,6 @@ async def refresh_divisions(
         min_matches=min_matches,
     )
     skipped_new: List[str] = []
-    if min_new_division_teams > 0:
-        candidate_new = [
-            entry for entry in discovered
-            if str(entry.get("championship_id")) not in existing_ids
-        ]
-        for entry in candidate_new:
-            cid = entry.get("championship_id")
-            if not cid:
-                continue
-            ok = await _has_registered_teams(str(cid), min_teams=min_new_division_teams)
-            if ok:
-                continue
-            else:
-                skipped_new.append(str(cid))
-        if skipped_new:
-            discovered = [
-                entry for entry in discovered
-                if str(entry.get("championship_id")) not in skipped_new
-            ]
 
     merged = non_destructive_merge(existing, discovered)
 

@@ -515,7 +515,9 @@ async def get_championship_teams_async(championship_id: str, limit: int = 100) -
             expected_status={200},
         )
         if payload is None:
-            LOGGER.warning("Failed to fetch teams for championship %s", championship_id)
+            # Some Faceit championships return 404/403 for /teams even when the championship exists.
+            # Treat this as a non-fatal condition to avoid noisy warning spam during refresh.
+            LOGGER.debug("Could not fetch teams for championship %s", championship_id)
             failed = True
             break
         items = payload.get("items") or []

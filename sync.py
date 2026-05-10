@@ -96,7 +96,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help=f"Minimum season to include when refreshing divisions (default: {faceit_config.DEFAULT_CURRENT_SEASON})",
     )
     parser.add_argument("--refresh-dry-run", action="store_true", help="Run the division refresh without writing to disk")
-    parser.add_argument("--refresh-allow-empty", action="store_true", help="Allow new divisions with no registered teams")
+    parser.add_argument(
+        "--refresh-allow-empty",
+        action="store_true",
+        help="Deprecated no-op kept for backward compatibility",
+    )
     parser.add_argument(
         "--max-concurrency",
         type=int,
@@ -262,11 +266,9 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
 
     if args.refresh_divisions:
         min_season = args.refresh_min_season if args.refresh_min_season is not None else faceit_config.DEFAULT_CURRENT_SEASON
-        min_new_division_teams = 0 if args.refresh_allow_empty else 1
         try:
             refresh_result = await refresh_divisions(
                 min_season=min_season,
-                min_new_division_teams=min_new_division_teams,
                 dry_run=args.refresh_dry_run,
             )
         except Exception as exc:
