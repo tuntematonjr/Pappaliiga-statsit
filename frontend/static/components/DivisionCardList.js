@@ -815,28 +815,40 @@
             seasonRows() {
                 const rows = [];
                 const hasBestPlayer = Boolean(this.division.bestPlayer);
-                const hasMvpTeam = Boolean(this.division.mvpTeam);
                 if (hasBestPlayer) {
                     rows.push({ key: 'bestPlayer', label: 'Paras pelaaja', value: `${this.division.bestPlayer.name} (K/D ${this.division.bestPlayer.kd})` });
                 }
-                if (hasMvpTeam) {
-                    rows.push({ key: 'mvpTeam', label: 'MVP-joukkue', value: this.division.mvpTeam });
-                }
                 return rows;
             },
-            showWinnerStrip() {
-                const seasonWinner = this.division.season.winner;
-                const playoffsWinner = this.division.playoffs.winner;
-                if (!this.division.season.isFinished || !seasonWinner) {
-                    return false;
+            winnerRows() {
+                const rows = [];
+                const regularSeasonWinner = this.division.season.winner || this.division.mvpTeam || null;
+                const playoffWinner = this.division.playoffs.winner || null;
+                const playoffsFinished = Boolean(
+                    this.division.playoffs?.isFinished ||
+                    (
+                        this.division.playoffs?.matchesTotal > 0 &&
+                        this.division.playoffs?.matchesPlayed >= this.division.playoffs?.matchesTotal
+                    )
+                );
+
+                if (regularSeasonWinner) {
+                    rows.push({
+                        key: 'regularSeasonWinner',
+                        label: 'Runkosarja-voittaja',
+                        value: regularSeasonWinner
+                    });
                 }
-                if (!this.division.playoffs.hasChampionship) {
-                    return true;
+
+                if (playoffWinner && playoffsFinished) {
+                    rows.push({
+                        key: 'playoffWinner',
+                        label: 'Playoff-voittaja',
+                        value: playoffWinner
+                    });
                 }
-                if (!this.division.playoffs.isFinished) {
-                    return true;
-                }
-                return playoffsWinner === seasonWinner;
+
+                return rows;
             }
         },
         methods: {
@@ -861,9 +873,6 @@
                             <span class="division-card__title-text">{{ division.title }}</span>
                         </h3>
                     </div>
-                    <p v-if="showWinnerStrip" class="division-card__winner-banner division-card__winner-banner--centered">
-                        Voittaja: {{ division.season.winner }}
-                    </p>
                 </header>
                 <div class="division-card__body">
                     <section class="division-card__block division-card__block--regular">
@@ -903,9 +912,17 @@
                                 <span class="status-pill__label">{{ statusLabel }}</span>
                             </span>
                         </div>
-                        <p v-if="division.playoffs.isFinished && division.playoffs.winner" class="division-card__note division-card__note--centered">
-                            Playoff-voittaja: {{ division.playoffs.winner }}
-                        </p>
+                        <ul
+                            v-if="winnerRows.length"
+                            class="division-card__facts division-card__facts--centered division-card__facts--winners"
+                            :class="{ 'division-card__facts--winners-single': winnerRows.length === 1 }"
+                            role="list"
+                        >
+                            <li v-for="row in winnerRows" :key="row.key" class="division-card__fact-card">
+                                <span class="division-card__fact-label">{{ row.label }}</span>
+                                <span class="division-card__fact-value">{{ row.value }}</span>
+                            </li>
+                        </ul>
                         <ul v-if="seasonRows.length" class="division-card__facts division-card__facts--centered" role="list">
                             <li v-for="row in seasonRows" :key="row.key">
                                 <span class="division-card__fact-label">{{ row.label }}</span>
