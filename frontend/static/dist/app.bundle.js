@@ -11656,7 +11656,8 @@ window.PlayoffBracket = {
     },
     computed: {
         rounds() {
-            return Array.isArray(this.bracket?.rounds) ? this.bracket.rounds : [];
+            const rawRounds = Array.isArray(this.bracket?.rounds) ? this.bracket.rounds : [];
+            return this._normalizeRounds(rawRounds);
         },
     },
     mounted() {
@@ -11747,6 +11748,37 @@ window.PlayoffBracket = {
             const n2 = this.team2Name(this.openMatch) || 'TBD';
             return `${n1} vs ${n2}`;
         },
+        _normalizeRounds(rawRounds) {
+            if (!Array.isArray(rawRounds) || !rawRounds.length) return [];
+            const normalized = rawRounds.map((round) => ({
+                ...round,
+                matches: Array.isArray(round?.matches) ? [...round.matches] : [],
+            }));
+            for (let ri = 1; ri < normalized.length; ri++) {
+                const prevMatches = normalized[ri - 1]?.matches || [];
+                const curMatches = normalized[ri]?.matches || [];
+                if (curMatches.length <= 1 || prevMatches.length < 2) continue;
+                const decorated = curMatches.map((match, curIdx) => {
+                    const t1 = this.team1Id(match);
+                    const t2 = this.team2Id(match);
+                    const curTeams = new Set([t1, t2].filter(Boolean).map(String));
+                    const srcIdxs = [];
+                    prevMatches.forEach((prev, prevIdx) => {
+                        const candidates = [
+                            this.winnerId(prev),
+                            this.team1Id(prev),
+                            this.team2Id(prev),
+                        ].filter(Boolean).map(String);
+                        if (candidates.some((id) => curTeams.has(id))) srcIdxs.push(prevIdx);
+                    });
+                    const slot = srcIdxs.length ? Math.floor(Math.min(...srcIdxs) / 2) : Number.POSITIVE_INFINITY;
+                    return { match, curIdx, slot };
+                });
+                decorated.sort((a, b) => (a.slot - b.slot) || (a.curIdx - b.curIdx));
+                normalized[ri].matches = decorated.map((x) => x.match);
+            }
+            return normalized;
+        },
         _layout() {
             const el = this.$refs.bracketEl;
             if (!el) return;
@@ -11833,15 +11865,39 @@ window.PlayoffBracket = {
                     const yA  = srcY(srcA);
                     const tX  = absRect(dst).left;
                     // Land on each specific team row in the destination card
-                    const dstTeams = dst.querySelectorAll('.bk-team');
-                    const dstYA = dstTeams[0] ? absRect(dstTeams[0]).midY : absRect(dst).midY;
+                    const dstTeams = Array.from(dst.querySelectorAll('.bk-team'));
+                    const usedDstIndexes = new Set();
+                    const resolveDstIndex = (srcCard, fallbackIndex) => {
+                        const wid = String(srcCard?.dataset?.winnerId || '');
+                        if (wid) {
+                            const matched = dstTeams.findIndex((teamRow) => String(teamRow?.dataset?.teamId || '') === wid);
+                            if (matched >= 0 && !usedDstIndexes.has(matched)) {
+                                usedDstIndexes.add(matched);
+                                return matched;
+                            }
+                        }
+                        const safeFallback = (fallbackIndex === 0 || fallbackIndex === 1) ? fallbackIndex : 0;
+                        if (!usedDstIndexes.has(safeFallback)) {
+                            usedDstIndexes.add(safeFallback);
+                            return safeFallback;
+                        }
+                        const alt = safeFallback === 0 ? 1 : 0;
+                        if (!usedDstIndexes.has(alt)) {
+                            usedDstIndexes.add(alt);
+                            return alt;
+                        }
+                        return safeFallback;
+                    };
+                    const dstAIndex = resolveDstIndex(srcA, 0);
+                    const dstYA = dstTeams[dstAIndex] ? absRect(dstTeams[dstAIndex]).midY : absRect(dst).midY;
                     const cpX = (xA + tX) / 2;
                     // Bezier from source winner row → destination team1 row
                     line(`M ${xA} ${yA} C ${cpX} ${yA} ${cpX} ${dstYA} ${tX} ${dstYA}`);
                     if (srcB) {
                         const xB  = absRect(srcB).right;
                         const yB  = srcY(srcB);
-                        const dstYB = dstTeams[1] ? absRect(dstTeams[1]).midY : absRect(dst).midY;
+                        const dstBIndex = resolveDstIndex(srcB, 1);
+                        const dstYB = dstTeams[dstBIndex] ? absRect(dstTeams[dstBIndex]).midY : absRect(dst).midY;
                         const cpX2 = (xB + tX) / 2;
                         // Bezier from source winner row → destination team2 row
                         line(`M ${xB} ${yB} C ${cpX2} ${yB} ${cpX2} ${dstYB} ${tX} ${dstYB}`);
@@ -11874,6 +11930,7 @@ window.PlayoffBracket = {
                             v-for="(match, mi) in round.matches"
                             :key="matchId(match)"
                             class="bk-card"
+                            :data-winner-id="winnerId(match) || ''"
                             :class="[cardStateClass(match), { 'bk-card--open': openMatchId === matchId(match) }]"
                         >
                             <div class="bk-card__hdr">
@@ -11882,7 +11939,7 @@ window.PlayoffBracket = {
                                 <span v-else-if="scheduledDate(match)" class="bk-card__date">{{ scheduledDate(match) }}</span>
                             </div>
 
-                            <div class="bk-team" :class="{ 'bk-team--won': teamWon(match,'team1'), 'bk-team--lost': teamLost(match,'team1') }">
+                            <div class="bk-team" :data-team-id="team1Id(match) || ''" :class="{ 'bk-team--won': teamWon(match,'team1'), 'bk-team--lost': teamLost(match,'team1') }">
                                 <img v-if="resolveAvatarFn(team1Avatar(match))" :src="resolveAvatarFn(team1Avatar(match))" :alt="team1Name(match)" class="bk-team__logo" loading="lazy" decoding="async" />
                                 <span v-else class="bk-team__logo bk-team__logo--ph"></span>
                                 <router-link v-if="team1Name(match) && teamRouteFn(team1Id(match))" :to="teamRouteFn(team1Id(match))" class="bk-team__name">{{ team1Name(match) }}</router-link>
@@ -11893,7 +11950,7 @@ window.PlayoffBracket = {
 
                             <div class="bk-team-divider"></div>
 
-                            <div class="bk-team" :class="{ 'bk-team--won': teamWon(match,'team2'), 'bk-team--lost': teamLost(match,'team2') }">
+                            <div class="bk-team" :data-team-id="team2Id(match) || ''" :class="{ 'bk-team--won': teamWon(match,'team2'), 'bk-team--lost': teamLost(match,'team2') }">
                                 <img v-if="resolveAvatarFn(team2Avatar(match))" :src="resolveAvatarFn(team2Avatar(match))" :alt="team2Name(match)" class="bk-team__logo" loading="lazy" decoding="async" />
                                 <span v-else class="bk-team__logo bk-team__logo--ph"></span>
                                 <router-link v-if="team2Name(match) && teamRouteFn(team2Id(match))" :to="teamRouteFn(team2Id(match))" class="bk-team__name">{{ team2Name(match) }}</router-link>
