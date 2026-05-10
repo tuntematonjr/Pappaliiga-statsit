@@ -127,27 +127,31 @@ window.PlayoffBracket = {
                 ...round,
                 matches: Array.isArray(round?.matches) ? [...round.matches] : [],
             }));
-            for (let ri = 1; ri < normalized.length; ri++) {
-                const prevMatches = normalized[ri - 1]?.matches || [];
-                const curMatches = normalized[ri]?.matches || [];
-                if (curMatches.length <= 1 || prevMatches.length < 2) continue;
-                const decorated = curMatches.map((match, curIdx) => {
-                    const t1 = this.team1Id(match);
-                    const t2 = this.team2Id(match);
-                    const curTeams = new Set([t1, t2].filter(Boolean).map(String));
-                    const srcIdxs = [];
-                    prevMatches.forEach((prev, prevIdx) => {
-                        const candidates = [
-                            this.winnerId(prev),
-                            this.team1Id(prev),
-                            this.team2Id(prev),
-                        ].filter(Boolean).map(String);
-                        if (candidates.some((id) => curTeams.has(id))) srcIdxs.push(prevIdx);
-                    });
-                    const slot = srcIdxs.length ? Math.floor(Math.min(...srcIdxs) / 2) : Number.POSITIVE_INFINITY;
-                    return { match, curIdx, slot };
+            for (let ri = normalized.length - 2; ri >= 0; ri--) {
+                const srcMatches = normalized[ri]?.matches || [];
+                const dstMatches = normalized[ri + 1]?.matches || [];
+                if (srcMatches.length < 2 || !dstMatches.length) continue;
+                const decorated = srcMatches.map((match, srcIdx) => {
+                    const candidates = [
+                        this.winnerId(match),
+                        this.team1Id(match),
+                        this.team2Id(match),
+                    ].filter(Boolean).map(String);
+                    let targetRoundIdx = Number.POSITIVE_INFINITY;
+                    for (let dIdx = 0; dIdx < dstMatches.length; dIdx++) {
+                        const dst = dstMatches[dIdx];
+                        const dstTeams = new Set([
+                            this.team1Id(dst),
+                            this.team2Id(dst),
+                        ].filter(Boolean).map(String));
+                        if (candidates.some((id) => dstTeams.has(id))) {
+                            targetRoundIdx = dIdx;
+                            break;
+                        }
+                    }
+                    return { match, srcIdx, targetRoundIdx };
                 });
-                decorated.sort((a, b) => (a.slot - b.slot) || (a.curIdx - b.curIdx));
+                decorated.sort((a, b) => (a.targetRoundIdx - b.targetRoundIdx) || (a.srcIdx - b.srcIdx));
                 normalized[ri].matches = decorated.map((x) => x.match);
             }
             return normalized;
