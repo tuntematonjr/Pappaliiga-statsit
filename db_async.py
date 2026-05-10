@@ -850,8 +850,13 @@ async def create_schema_async(force: bool = False) -> None:
         match_columns = {
             "round_number": "TINYINT NULL",
             "payload_hash": "CHAR(64) NULL",
+            "bracket_round_position": "TINYINT(2) UNSIGNED NULL",
+        }
+        team_championships_columns = {
+            "team_seed": "TINYINT(2) UNSIGNED NULL",
         }
         await _ensure_table_columns_async(conn, "matches", match_columns)
+        await _ensure_table_columns_async(conn, "team_championships", team_championships_columns)
         try:
             await _ensure_table_columns_async(conn, "players", player_columns)
         except asyncmy_errors.OperationalError as exc:
@@ -867,6 +872,10 @@ async def create_schema_async(force: bool = False) -> None:
         match_indexes = {
             "idx_matches_season_division_team1_finished": "(season, division_num, team1_id, finished_at)",
             "idx_matches_season_division_team2_finished": "(season, division_num, team2_id, finished_at)",
+            "idx_matches_bracket_position": "(championship_id, bracket_round_position)",
+        }
+        team_championships_indexes = {
+            "idx_team_championships_seed": "(championship_id, team_seed)",
         }
         player_stats_indexes = {
             "idx_player_stats_player_match_round": "(player_id, match_id, round_index)",
@@ -875,6 +884,7 @@ async def create_schema_async(force: bool = False) -> None:
             "idx_team_stats_team_match_round": "(team_id, match_id, round_index)",
         }
         await _ensure_table_indexes_async(conn, "matches", match_indexes)
+        await _ensure_table_indexes_async(conn, "team_championships", team_championships_indexes)
         await _ensure_table_indexes_async(conn, "player_stats", player_stats_indexes)
         await _ensure_table_indexes_async(conn, "team_stats", team_stats_indexes)
 
@@ -1760,6 +1770,82 @@ async def upsert_team_championships_bulk_async(
             await owned_conn.commit()
 
     await _retry_on_deadlock(_owned_op, label=f"upsert-{label}")
+
+
+async def upsert_team_seeds_async(
+    rows: Sequence[Row],
+    *,
+    conn: asyncmy.Connection | None = None,
+    label: str = "team_seeds",
+) -> None:
+    """Upsert team seeds for playoff bracket ordering (PO divisions only).
+    
+    PLAYOFF-ONLY: This function should only be called during sync of is_playoffs=True championships.
+    Each row should contain: {team_id, championship_id, team_seed} where team_seed is 1-8.
+    Regular season (runkosarja) divisions will have team_seed=NULL.
+    """
+    if not rows:
+        return
+
+    sql = """
+    INSERT INTO team_championships (team_id, championship_id, team_seed)
+    VALUES (%(team_id)s, %(championship_id)s, %(team_seed)s)
+    ON DUPLICATE KEY UPDATE
+      team_seed = VALUES(team_seed)
+    """
+
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            await cur.executemany(sql, rows)
+
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=f"upsert-{label}") as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=f"upsert-{label}")
+
+
+async def update_match_bracket_positions_async(
+    positions: Dict[str, int],
+    *,
+    conn: asyncmy.Connection | None = None,
+    label: str = "match_bracket_positions",
+) -> None:
+    """Update bracket_round_position for playoff matches (PO divisions only).
+    
+    PLAYOFF-ONLY: This function should only be called during sync of is_playoffs=True championships.
+    Stores visual bracket slot numbers for round 1 matches in 8-team playoff brackets.
+    Regular season (runkosarja) matches will have bracket_round_position=NULL.
+    
+    Args:
+        positions: Dict mapping match_id → bracket_round_position (0-3 for round 1 in 8-team bracket)
+    """
+    if not positions:
+        return
+
+    async def _op(target_conn: asyncmy.Connection):
+        async with target_conn.cursor() as cur:
+            for match_id, position in positions.items():
+                await cur.execute(
+                    "UPDATE matches SET bracket_round_position = %s WHERE match_id = %s",
+                    (position, match_id),
+                )
+
+    if conn is not None:
+        await _op(conn)
+        return
+
+    async def _owned_op():
+        async with connection(label=f"update-{label}") as owned_conn:
+            await _op(owned_conn)
+            await owned_conn.commit()
+
+    await _retry_on_deadlock(_owned_op, label=f"update-{label}")
 
 
 async def upsert_players_bulk_async(

@@ -20,6 +20,7 @@ from runtime_diagnostics import SyncDiagnostics
 from faceit_client_async import (
     RateLimitError,
     get_championship_matches_async,
+    get_championship_subscriptions_async,
     get_map_votes_async,
     get_match_details_async,
     get_match_stats_async,
@@ -39,6 +40,7 @@ from db_async import (
     create_snapshot_ts_async,
     get_map_id_lookup_async,
     replace_map_votes_async,
+    update_match_bracket_positions_async,
     upsert_championship_async,
     upsert_map_catalog_async,
     upsert_maps_bulk_async,
@@ -50,6 +52,7 @@ from db_async import (
     upsert_players_bulk_async,
     upsert_team_championships_bulk_async,
     upsert_team_map_season_totals_bulk_async,
+    upsert_team_seeds_async,
     upsert_team_season_totals_bulk_async,
     upsert_team_stats_bulk_async,
     upsert_teams_bulk_async,
@@ -1418,6 +1421,108 @@ async def sync_match_async(
     return normalised
 
 
+def _calculate_bracket_positions(
+    subscriptions: List[Dict[str, Any]],
+    matches: List[Dict[str, Any]],
+) -> Dict[str, int]:
+    """
+    Calculate visual bracket positions for playoff matches using FACEIT's seed-based 8-team bracket.
+    
+    PLAYOFF-ONLY: This function is called only for is_playoffs=True championships during sync.
+    Returns empty dict for runkosarja (regular season) divisions.
+    
+    Standard 8-team bracket visual order top-to-bottom (FACEIT actual):
+    - Position 0: Seed 1 vs Seed 8
+    - Position 1: Seed 4 vs Seed 5
+    - Position 2: Seed 2 vs Seed 7
+    - Position 3: Seed 3 vs Seed 6
+    
+    Note: FACEIT /subscriptions does not return a seed field; subscription order IS the seeding.
+    
+    Args:
+        subscriptions: List of {team: {team_id, name, ...}, seed, ...} from /subscriptions endpoint
+        matches: List of match dicts from /matches endpoint
+        
+    Returns:
+        Dict mapping match_id -> bracket_round_position (0-3 for round 1)
+    """
+    # Build seed -> team_id lookup
+    # FACEIT /subscriptions does not return a seed field; subscription ORDER is the seeding (index 0 = seed 1).
+    seed_to_team_id: Dict[int, str] = {}
+    for i, item in enumerate(subscriptions):
+        team_info = item.get("team") or {}
+        team_id = team_info.get("team_id")
+        seed_val = item.get("seed")
+        seed_num = int(seed_val) if seed_val is not None else (i + 1)
+        if team_id and 1 <= seed_num <= 8:
+            seed_to_team_id[seed_num] = team_id
+    
+    # Map seeds to bracket positions for 8-team bracket round 1
+    # FACEIT visual top-to-bottom order: (1v8), (4v5), (2v7), (3v6) = positions 0,1,2,3
+    seed_pairs_by_position = [
+        (1, 8),  # Position 0
+        (4, 5),  # Position 1
+        (2, 7),  # Position 2
+        (3, 6),  # Position 3
+    ]
+    
+    # Build team_id -> position lookup
+    team_to_position: Dict[str, int] = {}
+    for position, (seed_a, seed_b) in enumerate(seed_pairs_by_position):
+        team_a = seed_to_team_id.get(seed_a)
+        team_b = seed_to_team_id.get(seed_b)
+        if team_a:
+            team_to_position[team_a] = position
+        if team_b:
+            team_to_position[team_b] = position
+    
+    # Match each FACEIT match to its bracket position
+    # by finding the team_ids in the match data
+    bracket_positions: Dict[str, int] = {}
+    for match_data in matches:
+        match_id = match_data.get("match_id")
+        if not match_id:
+            continue
+            
+        # Skip non-round-1 matches
+        round_num = match_data.get("round_number") or match_data.get("round")
+        if round_num and int(round_num) != 1:
+            continue
+        
+        # Extract team IDs from match
+        teams_section = match_data.get("teams") or {}
+        f1 = teams_section.get("faction1") or {}
+        f2 = teams_section.get("faction2") or {}
+        team1_id = f1.get("faction_id") or f1.get("team_id")
+        team2_id = f2.get("faction_id") or f2.get("team_id")
+        
+        # Find position for this matchup
+        pos1 = team_to_position.get(str(team1_id)) if team1_id else None
+        pos2 = team_to_position.get(str(team2_id)) if team2_id else None
+        
+        # Both teams should map to same position (they're the matchup pair)
+        if pos1 is not None and pos1 == pos2:
+            bracket_positions[str(match_id)] = pos1
+            LOGGER.debug(
+                "Round 1 match %s: teams %s/%s -> position %d",
+                match_id, team1_id, team2_id, pos1,
+            )
+        elif pos1 is not None:
+            bracket_positions[str(match_id)] = pos1
+            LOGGER.debug(
+                "Round 1 match %s: team1 %s -> position %d (team2 %s not seeded)",
+                match_id, team1_id, pos1, team2_id,
+            )
+        elif pos2 is not None:
+            bracket_positions[str(match_id)] = pos2
+            LOGGER.debug(
+                "Round 1 match %s: team2 %s -> position %d (team1 %s not seeded)",
+                match_id, team2_id, pos2, team1_id,
+            )
+    
+    return bracket_positions
+
+
 async def sync_championship_async(
     championship_id: str,
     *,
@@ -1579,6 +1684,46 @@ async def sync_championship_async(
                 row.get("finished_at"),
                 row.get("status"),
             )
+
+    # Phase 3: Handle playoff seeding for bracket visualization (PLAYOFF DIVISIONS ONLY)
+    # For regular season (runkosarja) divisions, team_seed and bracket_round_position remain NULL.
+    # This ensures only PO (playoff) divisions get seed-based bracket ordering.
+    if is_playoffs:
+        LOGGER.info("Championship %s is a playoff; fetching subscriptions for seeding", championship_id)
+        subscriptions = await get_championship_subscriptions_async(championship_id)
+        if subscriptions:
+            # Extract and store team seeds
+            seed_rows = []
+            for i, item in enumerate(subscriptions):
+                team_info = item.get("team") or {}
+                team_id = team_info.get("team_id")
+                seed_val = item.get("seed")
+                # FACEIT does not return a seed field; subscription order is the seeding
+                seed_num = int(seed_val) if seed_val is not None else (i + 1)
+                if team_id and 1 <= seed_num <= 8:
+                    seed_rows.append({
+                        "team_id": team_id,
+                        "championship_id": championship_id,
+                        "team_seed": seed_num,
+                    })
+            
+            if seed_rows:
+                LOGGER.info("Upserting %d team seeds for playoff championship %s", len(seed_rows), championship_id)
+                await upsert_team_seeds_async(seed_rows, label=f"champ:{championship_id}:seeds")
+            
+            # Calculate bracket positions for round 1 matches
+            bracket_positions = _calculate_bracket_positions(subscriptions, filtered_matches)
+            if bracket_positions:
+                LOGGER.info(
+                    "Calculated bracket positions for %d playoff matches in championship %s",
+                    len(bracket_positions),
+                    championship_id,
+                )
+                await update_match_bracket_positions_async(bracket_positions, label=f"champ:{championship_id}:positions")
+        else:
+            LOGGER.warning("Could not fetch subscriptions for playoff championship %s", championship_id)
+    else:
+        LOGGER.debug("Championship %s is not a playoff; skipping seed-based ordering", championship_id)
 
     synced: List[str] = []
     skipped_matches = 0

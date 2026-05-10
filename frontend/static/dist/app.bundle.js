@@ -11765,47 +11765,104 @@ window.PlayoffBracket = {
             const n2 = this.team2Name(this.openMatch) || 'TBD';
             return `${n1} vs ${n2}`;
         },
+        _swapMatchSides(match) {
+            if (!match || typeof match !== 'object') return match;
+            const swapped = { ...match };
+            const pairs = [
+                ['team1_id', 'team2_id'],
+                ['team1Id', 'team2Id'],
+                ['team1_name', 'team2_name'],
+                ['team1Name', 'team2Name'],
+                ['team1_avatar', 'team2_avatar'],
+                ['team1Avatar', 'team2Avatar'],
+                ['team1_score', 'team2_score'],
+                ['team1Score', 'team2Score'],
+            ];
+            for (const [leftKey, rightKey] of pairs) {
+                const leftVal = swapped[leftKey];
+                const rightVal = swapped[rightKey];
+                if (leftVal !== undefined || rightVal !== undefined) {
+                    swapped[leftKey] = rightVal;
+                    swapped[rightKey] = leftVal;
+                }
+            }
+            return swapped;
+        },
         _normalizeRounds(rawRounds) {
             if (!Array.isArray(rawRounds) || !rawRounds.length) return [];
             const normalized = rawRounds.map((round) => ({
                 ...round,
                 matches: Array.isArray(round?.matches) ? [...round.matches] : [],
             }));
-            for (let ri = normalized.length - 2; ri >= 0; ri--) {
+            // Preserve incoming order for each round (especially round 1 seed order).
+            // Reorder downstream rounds so they follow bracket feed from previous round:
+            // (1,2)->5, (3,4)->6, and top feeder appears as team1 in destination match.
+            for (let ri = 0; ri < normalized.length - 1; ri++) {
                 const srcMatches = normalized[ri]?.matches || [];
                 const dstMatches = normalized[ri + 1]?.matches || [];
                 if (srcMatches.length < 2 || !dstMatches.length) continue;
-                const decorated = srcMatches.map((match, srcIdx) => {
-                    const candidates = [
-                        this.winnerId(match),
-                        this.team1Id(match),
-                        this.team2Id(match),
+
+                const srcCandidates = srcMatches.map((src) => (
+                    [this.winnerId(src), this.team1Id(src), this.team2Id(src)]
+                        .filter(Boolean)
+                        .map(String)
+                ));
+
+                const decoratedDst = dstMatches.map((dst, dstIdx) => {
+                    const dstCandidates = [
+                        this.team1Id(dst),
+                        this.team2Id(dst),
+                        this.winnerId(dst),
                     ].filter(Boolean).map(String);
-                    let targetRoundIdx = Number.POSITIVE_INFINITY;
-                    let targetSide = Number.POSITIVE_INFINITY;
-                    for (let dIdx = 0; dIdx < dstMatches.length; dIdx++) {
-                        const dst = dstMatches[dIdx];
-                        const dstT1 = String(this.team1Id(dst) || '');
-                        const dstT2 = String(this.team2Id(dst) || '');
-                        if (dstT1 && candidates.includes(dstT1)) {
-                            targetRoundIdx = dIdx;
-                            targetSide = 0;
-                            break;
-                        }
-                        if (dstT2 && candidates.includes(dstT2)) {
-                            targetRoundIdx = dIdx;
-                            targetSide = 1;
-                            break;
+
+                    let targetDstIdx = Number.POSITIVE_INFINITY;
+                    for (let sIdx = 0; sIdx < srcCandidates.length; sIdx++) {
+                        const candidates = srcCandidates[sIdx];
+                        if (candidates.some((id) => dstCandidates.includes(id))) {
+                            targetDstIdx = Math.min(targetDstIdx, Math.floor(sIdx / 2));
                         }
                     }
-                    return { match, srcIdx, targetRoundIdx, targetSide };
+
+                    return { match: dst, dstIdx, targetDstIdx };
                 });
-                decorated.sort((a, b) =>
-                    (a.targetRoundIdx - b.targetRoundIdx)
-                    || (a.targetSide - b.targetSide)
-                    || (a.srcIdx - b.srcIdx)
+
+                decoratedDst.sort((a, b) =>
+                    (a.targetDstIdx - b.targetDstIdx)
+                    || (a.dstIdx - b.dstIdx)
                 );
-                normalized[ri].matches = decorated.map((x) => x.match);
+
+                normalized[ri + 1].matches = decoratedDst.map((x, newDstIdx) => {
+                    const dstMatch = x.match;
+                    const topSrc = srcMatches[newDstIdx * 2];
+                    const bottomSrc = srcMatches[newDstIdx * 2 + 1];
+                    if (!topSrc || !bottomSrc) return dstMatch;
+
+                    const topCandidates = [
+                        this.winnerId(topSrc),
+                        this.team1Id(topSrc),
+                        this.team2Id(topSrc),
+                    ].filter(Boolean).map(String);
+                    const bottomCandidates = [
+                        this.winnerId(bottomSrc),
+                        this.team1Id(bottomSrc),
+                        this.team2Id(bottomSrc),
+                    ].filter(Boolean).map(String);
+
+                    const dstTeam1 = String(this.team1Id(dstMatch) || '');
+                    const dstTeam2 = String(this.team2Id(dstMatch) || '');
+                    const team1IsTopFeed = dstTeam1 && topCandidates.includes(dstTeam1);
+                    const team2IsTopFeed = dstTeam2 && topCandidates.includes(dstTeam2);
+                    const team1IsBottomFeed = dstTeam1 && bottomCandidates.includes(dstTeam1);
+                    const team2IsBottomFeed = dstTeam2 && bottomCandidates.includes(dstTeam2);
+
+                    if (!team1IsTopFeed && team2IsTopFeed) {
+                        return this._swapMatchSides(dstMatch);
+                    }
+                    if (team1IsBottomFeed && !team2IsBottomFeed) {
+                        return this._swapMatchSides(dstMatch);
+                    }
+                    return dstMatch;
+                });
             }
             return normalized;
         },

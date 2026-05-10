@@ -533,6 +533,48 @@ async def get_championship_teams_async(championship_id: str, limit: int = 100) -
     return results
 
 
+async def get_championship_subscriptions_async(championship_id: str, limit: int = 100) -> Optional[List[Dict[str, Any]]]:
+    """
+    List team subscriptions (registrations with seeds) for a championship.
+    
+    This endpoint provides the seeding information needed for playoff bracket visualization.
+    Each subscription item contains team info and the team's seed number.
+    
+    Args:
+        championship_id: Faceit championship identifier.
+        limit: Page size (Faceit allows up to 100).
+    Returns:
+        List of subscription dictionaries with structure {team, seed, ...}, or None on error.
+    """
+    open_client, _ = await _get_clients()
+    results: List[Dict[str, Any]] = []
+    offset = 0
+    failed = False
+    while True:
+        payload = await _request_json(
+            open_client,
+            "GET",
+            f"/championships/{championship_id}/subscriptions",
+            params={"offset": offset, "limit": limit},
+            expected_status={200},
+        )
+        if payload is None:
+            LOGGER.debug("Could not fetch subscriptions for championship %s", championship_id)
+            failed = True
+            break
+        items = payload.get("items") or []
+        if not items:
+            break
+        results.extend(items)
+        if len(items) < limit:
+            break
+        offset += limit
+        await asyncio.sleep(0.05)
+    if failed:
+        return None
+    return results
+
+
 async def list_championships_for_organizer_async(organizer_id: str, limit: int = 100) -> List[Dict[str, Any]]:
     """
     List all championships for a given organizer (async).

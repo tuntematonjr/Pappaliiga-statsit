@@ -71,24 +71,44 @@ def _to_int(value: Any) -> int | None:
         return None
 
 
-def _match_sort_key(match_row: dict[str, Any]) -> tuple:
+def _match_sort_key(match_row: dict[str, Any], round_number: int | None = None) -> tuple:
+    """Sort key for playoff matches.
+    
+    For round 1 matches in 8-team brackets, prioritizes bracket_round_position (0-3).
+    For other rounds or when bracket_round_position is missing, falls back to scheduled_at/match_id.
+    """
     match_id = str(match_row.get("match_id") or "")
+    bracket_pos = match_row.get("bracket_round_position")
     scheduled = _to_int(match_row.get("scheduled_at"))
+    
+    # If round 1 and bracket position is available, use it as primary sort key
+    if round_number == 1 and bracket_pos is not None:
+        try:
+            return (0, int(bracket_pos), match_id)
+        except (ValueError, TypeError):
+            pass
+    
+    # Fallback: sort by scheduled_at, then match_id
     if scheduled is not None and scheduled > 0:
-        return (0, scheduled, match_id)
-    return (1, match_id)
+        return (1, scheduled, match_id)
+    return (2, match_id)
 
 
 def _build_bracket(matches: list[dict]) -> dict:
-    """Group playoff matches into bracket rounds, padding empty TBD rounds at the end."""
+    """Group playoff matches into bracket rounds, padding empty TBD rounds at the end.
+    
+    Uses bracket_round_position for round 1 ordering when available (seed-based seeding).
+    Falls back to scheduled_at/match_id ordering for rounds without position data or non-round-1.
+    """
     rounds_map: dict[int, list] = {}
     for m in matches:
         rn = m.get("round_number") or m.get("roundNumber")
         key = int(rn) if rn is not None else 0
         rounds_map.setdefault(key, []).append(m)
 
-    for ms in rounds_map.values():
-        ms.sort(key=_match_sort_key)
+    # Sort matches within each round
+    for round_key, ms in rounds_map.items():
+        ms.sort(key=lambda m: _match_sort_key(m, round_number=round_key))
 
     sorted_keys = sorted(k for k in rounds_map if k > 0) + ([0] if 0 in rounds_map else [])
     existing_real: list[int] = [k for k in sorted_keys if k > 0]
