@@ -141,69 +141,27 @@ window.PlayoffBracket = {
                     let targetSide = Number.POSITIVE_INFINITY;
                     for (let dIdx = 0; dIdx < dstMatches.length; dIdx++) {
                         const dst = dstMatches[dIdx];
-                        const dstTeams = new Set([
-                            this.team1Id(dst),
-                            this.team2Id(dst),
-                        ].filter(Boolean).map(String));
-                        if (candidates.some((id) => dstTeams.has(id))) {
+                        const dstT1 = String(this.team1Id(dst) || '');
+                        const dstT2 = String(this.team2Id(dst) || '');
+                        if (dstT1 && candidates.includes(dstT1)) {
                             targetRoundIdx = dIdx;
-                            const dstT1 = String(this.team1Id(dst) || '');
-                            const dstT2 = String(this.team2Id(dst) || '');
-                            if (dstT1 && candidates.includes(dstT1)) targetSide = 0;
-                            else if (dstT2 && candidates.includes(dstT2)) targetSide = 1;
+                            targetSide = 0;
+                            break;
+                        }
+                        if (dstT2 && candidates.includes(dstT2)) {
+                            targetRoundIdx = dIdx;
+                            targetSide = 1;
                             break;
                         }
                     }
                     return { match, srcIdx, targetRoundIdx, targetSide };
                 });
-                decorated.sort((a, b) => (a.targetRoundIdx - b.targetRoundIdx) || (a.targetSide - b.targetSide) || (a.srcIdx - b.srcIdx));
+                decorated.sort((a, b) =>
+                    (a.targetRoundIdx - b.targetRoundIdx)
+                    || (a.targetSide - b.targetSide)
+                    || (a.srcIdx - b.srcIdx)
+                );
                 normalized[ri].matches = decorated.map((x) => x.match);
-            }
-            for (let ri = 1; ri < normalized.length; ri++) {
-                const prevMatches = normalized[ri - 1]?.matches || [];
-                const curMatches = normalized[ri]?.matches || [];
-                if (!prevMatches.length || !curMatches.length) continue;
-                normalized[ri].matches = curMatches.map((dstMatch, ci) => {
-                    const srcA = prevMatches[ci * 2];
-                    const srcB = prevMatches[ci * 2 + 1];
-                    if (!srcA || !srcB) return dstMatch;
-                    const topIds = new Set([
-                        this.winnerId(srcA),
-                        this.team1Id(srcA),
-                        this.team2Id(srcA),
-                    ].filter(Boolean).map(String));
-                    const bottomIds = new Set([
-                        this.winnerId(srcB),
-                        this.team1Id(srcB),
-                        this.team2Id(srcB),
-                    ].filter(Boolean).map(String));
-                    if (!topIds.size || !bottomIds.size) return dstMatch;
-                    const t1 = String(this.team1Id(dstMatch) || '');
-                    const t2 = String(this.team2Id(dstMatch) || '');
-                    if (!t1 || !t2) return dstMatch;
-                    const directScore = (topIds.has(t1) ? 1 : 0) + (bottomIds.has(t2) ? 1 : 0);
-                    const swappedScore = (topIds.has(t2) ? 1 : 0) + (bottomIds.has(t1) ? 1 : 0);
-                    if (swappedScore <= directScore) return dstMatch;
-                    return {
-                        ...dstMatch,
-                        team1_id: this.team2Id(dstMatch),
-                        team2_id: this.team1Id(dstMatch),
-                        team1_name: this.team2Name(dstMatch),
-                        team2_name: this.team1Name(dstMatch),
-                        team1_avatar: this.team2Avatar(dstMatch),
-                        team2_avatar: this.team1Avatar(dstMatch),
-                        team1_score: this.team2Score(dstMatch),
-                        team2_score: this.team1Score(dstMatch),
-                        team1Id: this.team2Id(dstMatch),
-                        team2Id: this.team1Id(dstMatch),
-                        team1Name: this.team2Name(dstMatch),
-                        team2Name: this.team1Name(dstMatch),
-                        team1Avatar: this.team2Avatar(dstMatch),
-                        team2Avatar: this.team1Avatar(dstMatch),
-                        team1Score: this.team2Score(dstMatch),
-                        team2Score: this.team1Score(dstMatch),
-                    };
-                });
             }
             return normalized;
         },

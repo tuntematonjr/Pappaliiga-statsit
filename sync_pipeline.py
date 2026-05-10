@@ -898,6 +898,7 @@ def _build_normalised_match(
     scheduled_at = safe_int(details.get("scheduled_at"))
     configured_at = safe_int(details.get("configured_at"))
     started_at = safe_int(details.get("started_at"))
+    round_number = safe_int(details.get("round"), None)
 
     match_is_forfeit = all(row.get("is_forfeit") for row in map_rows) if map_rows else False
     ignored_due_ban = 1 if (team1_id in ctx.banned_team_ids or team2_id in ctx.banned_team_ids) else 0
@@ -911,7 +912,7 @@ def _build_normalised_match(
         "season": ctx.season,
         "division_num": ctx.division_num,
         "best_of": safe_int(details.get("best_of")),
-        "round_number": safe_int(details.get("round")),
+        "round_number": round_number,
         "configured_at": configured_at,
         "started_at": started_at,
         "finished_at": finish_ts,
