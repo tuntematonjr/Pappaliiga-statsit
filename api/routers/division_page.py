@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from api.exceptions import NotFoundError
 from api.services import divisions_service, matches_service
 from db_async import query_async
+from faceit_client_async import get_tournament_brackets_async
 
 router = APIRouter()
 
@@ -45,7 +46,12 @@ async def get_division_page(championship_id: str) -> Dict[str, Any]:
 
     bracket = None
     if details and details.get("is_playoff"):
-        bracket = _build_bracket(matches_items)
+        faceit_bracket = None
+        try:
+            faceit_bracket = await get_tournament_brackets_async(championship_id)
+        except Exception:
+            faceit_bracket = None
+        bracket = _build_bracket(matches_items, faceit_bracket)
 
     return {
         "ok": True,
@@ -55,13 +61,56 @@ async def get_division_page(championship_id: str) -> Dict[str, Any]:
     }
 
 
-def _build_bracket(matches: list[dict]) -> dict:
+def _to_int(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _faceit_position_map(faceit_bracket: dict[str, Any] | None) -> dict[str, tuple[int | None, int | None]]:
+    by_match: dict[str, tuple[int | None, int | None]] = {}
+    if not isinstance(faceit_bracket, dict):
+        return by_match
+    for item in (faceit_bracket.get("matches") or []):
+        if not isinstance(item, dict):
+            continue
+        match_id = str(item.get("match_id") or "").strip()
+        if not match_id:
+            continue
+        by_match[match_id] = (_to_int(item.get("round")), _to_int(item.get("position")))
+    return by_match
+
+
+def _match_sort_key(
+    match_row: dict[str, Any],
+    *,
+    round_key: int,
+    pos_map: dict[str, tuple[int | None, int | None]],
+) -> tuple:
+    match_id = str(match_row.get("match_id") or "")
+    fr, fp = pos_map.get(match_id, (None, None))
+    if fp is not None and (fr is None or fr == round_key):
+        return (0, fp, match_id)
+    scheduled = _to_int(match_row.get("scheduled_at"))
+    if scheduled is not None and scheduled > 0:
+        return (1, scheduled, match_id)
+    return (2, match_id)
+
+
+def _build_bracket(matches: list[dict], faceit_bracket: dict[str, Any] | None = None) -> dict:
     """Group playoff matches into bracket rounds, padding empty TBD rounds at the end."""
+    pos_map = _faceit_position_map(faceit_bracket)
     rounds_map: dict[int, list] = {}
     for m in matches:
         rn = m.get("round_number") or m.get("roundNumber")
         key = int(rn) if rn is not None else 0
         rounds_map.setdefault(key, []).append(m)
+
+    for rk, ms in rounds_map.items():
+        ms.sort(key=lambda row: _match_sort_key(row, round_key=rk, pos_map=pos_map))
 
     sorted_keys = sorted(k for k in rounds_map if k > 0) + ([0] if 0 in rounds_map else [])
     existing_real: list[int] = [k for k in sorted_keys if k > 0]

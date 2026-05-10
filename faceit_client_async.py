@@ -460,6 +460,12 @@ async def get_match_details_async(match_id: str) -> Optional[Dict[str, Any]]:
     open_client, _ = await _get_clients()
     return await _request_json(open_client, "GET", f"/matches/{match_id}")
 
+
+async def get_tournament_brackets_async(tournament_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieve tournament brackets containing round + position metadata for matches."""
+    open_client, _ = await _get_clients()
+    return await _request_json(open_client, "GET", f"/tournaments/{tournament_id}/brackets")
+
 async def get_championship_details_async(championship_id: str, *, expanded: List[str] | None = None, silent: bool = False) -> Optional[Dict[str, Any]]:
     """Retrieve championship details from Faceit.
 
