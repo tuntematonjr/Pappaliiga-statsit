@@ -85,6 +85,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--match-id", default=None, help="Resync a single match")
     parser.add_argument("--full", action="store_true", help="Force full resync for the selected championship")
     parser.add_argument("--all-seasons", action="store_true", help="Sync all seasons (default: current season only)")
+    parser.add_argument(
+        "--playoffs-only",
+        action="store_true",
+        help="Sync only playoff (PO) divisions",
+    )
     parser.add_argument("--season", type=int, default=None, help="Sync only the provided season number (overrides --all-seasons)")
     parser.add_argument("--verify", action="store_true", help="Run post-sync verification queries")
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
@@ -187,29 +192,68 @@ async def _verify_counts() -> None:
         LOGGER.info("%s matches flagged ignored_due_ban", ignored_matches)
 
 
-def _resolve_targets(championship_id: str | None, all_seasons: bool = False, season: int | None = None) -> Sequence[str]:
+def _resolve_targets(
+    championship_id: str | None,
+    all_seasons: bool = False,
+    season: int | None = None,
+    playoffs_only: bool = False,
+) -> Sequence[str]:
+    def _filter_playoffs(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if not playoffs_only:
+            return items
+        return [item for item in items if bool(item.get("is_playoffs"))]
+
     if championship_id:
+        if playoffs_only:
+            selected = next((d for d in faceit_config.DIVISIONS if d.get("championship_id") == championship_id), None)
+            if selected and not bool(selected.get("is_playoffs")):
+                LOGGER.warning(
+                    "--playoffs-only set and selected championship %s is not a playoff division; skipping",
+                    championship_id,
+                )
+                return []
         return [championship_id]
 
     # If explicit season provided, use that (overrides all_seasons)
     if season is not None:
-        season_divisions = [item["championship_id"] for item in faceit_config.DIVISIONS if item.get("season") == season]
-        LOGGER.info("Syncing Season %s divisions (%d total)", season, len(season_divisions))
+        season_items = [item for item in faceit_config.DIVISIONS if item.get("season") == season]
+        season_items = _filter_playoffs(season_items)
+        season_divisions = [item["championship_id"] for item in season_items]
+        if playoffs_only:
+            LOGGER.info("Syncing Season %s playoff divisions (%d total)", season, len(season_divisions))
+        else:
+            LOGGER.info("Syncing Season %s divisions (%d total)", season, len(season_divisions))
         return season_divisions
 
     if all_seasons:
         # Return all championships from all seasons
-        LOGGER.info("All seasons requested - syncing all divisions from all seasons (%d total)", len(faceit_config.DIVISIONS))
-        return [item["championship_id"] for item in faceit_config.DIVISIONS]
+        all_items = _filter_playoffs(list(faceit_config.DIVISIONS))
+        if playoffs_only:
+            LOGGER.info("All seasons requested - syncing playoff divisions from all seasons (%d total)", len(all_items))
+        else:
+            LOGGER.info("All seasons requested - syncing all divisions from all seasons (%d total)", len(all_items))
+        return [item["championship_id"] for item in all_items]
 
     # Default to current season only
-    current_season_divisions = [
-        item["championship_id"] for item in faceit_config.DIVISIONS 
+    current_season_items = [
+        item for item in faceit_config.DIVISIONS
         if item.get("season") == faceit_config.CURRENT_SEASON
     ]
+    current_season_items = _filter_playoffs(current_season_items)
+    current_season_divisions = [item["championship_id"] for item in current_season_items]
 
-    LOGGER.info("No specific championship provided - syncing all Season %d divisions (%d total)", 
-                faceit_config.CURRENT_SEASON, len(current_season_divisions))
+    if playoffs_only:
+        LOGGER.info(
+            "No specific championship provided - syncing Season %d playoff divisions (%d total)",
+            faceit_config.CURRENT_SEASON,
+            len(current_season_divisions),
+        )
+    else:
+        LOGGER.info(
+            "No specific championship provided - syncing all Season %d divisions (%d total)",
+            faceit_config.CURRENT_SEASON,
+            len(current_season_divisions),
+        )
     return current_season_divisions
 
 
@@ -324,7 +368,12 @@ async def _main_async_impl(args: argparse.Namespace, diagnostics: SyncDiagnostic
             LOGGER.exception("Failed to refresh match %s: %s", args.match_id, exc)
             return 1
     else:
-        targets = _resolve_targets(args.championship_id, args.all_seasons, season=args.season)
+        targets = _resolve_targets(
+            args.championship_id,
+            args.all_seasons,
+            season=args.season,
+            playoffs_only=bool(args.playoffs_only),
+        )
         total_start_time = time.perf_counter()
         total_synced_matches = 0
         total_skipped_matches = 0
