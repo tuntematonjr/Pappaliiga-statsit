@@ -11,7 +11,7 @@ from typing import Literal
 import faceit_config
 from api.services.cache_helpers import clear_api_response_caches
 from api.services.cache_reheat import reheat_main_page
-from sync_pipeline import sync_championship_async, update_single_match_async
+from sync_pipeline import ChampionshipNotConfiguredError, sync_championship_async, update_single_match_async
 from utils.log_files import (
     DEFAULT_LOG_MAX_AGE_DAYS,
     DEFAULT_LOG_MAX_TOTAL_BYTES,
@@ -261,6 +261,14 @@ class SyncEventQueue:
                         validate_avatars=self._validate_avatars,
                     )
                 await self._refresh_caches_after_sync(key)
+            except ChampionshipNotConfiguredError as exc:
+                job_error = f"{type(exc).__name__}: {exc}"
+                job_status = "skipped"
+                LOGGER.warning(
+                    "Dropping sync event %s permanently: %s",
+                    key,
+                    job_error,
+                )
             except Exception as exc:
                 job_error = f"{type(exc).__name__}: {exc}"
                 if self._should_retry(job):

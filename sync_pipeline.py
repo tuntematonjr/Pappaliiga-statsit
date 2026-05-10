@@ -35,6 +35,7 @@ from db_async import (
     connection,
     delete_stats_for_match_async,
     fetch_all,
+    fetch_one,
     create_snapshot_ts_async,
     get_map_id_lookup_async,
     replace_map_votes_async,
@@ -74,20 +75,33 @@ _NON_FINAL_MATCH_STATUSES = {
 }
 
 __all__ = [
+    "ChampionshipNotConfiguredError",
     "ChampionshipSyncResult",
     "sync_championship_async",
     "sync_match_async",
     "update_single_match_async",
 ]
 
-_DIVISION_BY_CHAMPIONSHIP: Dict[str, Dict[str, Any]] = {
-    str(item.get("championship_id")): dict(item)
-    for item in faceit_config.DIVISIONS
-    if item.get("championship_id")
-}
+class ChampionshipNotConfiguredError(Exception):
+    """Raised when a match belongs to a championship unknown to this instance."""
 
-def _get_division_by_championship_id(championship_id: str) -> Dict[str, Any] | None:
-    return _DIVISION_BY_CHAMPIONSHIP.get(str(championship_id))
+
+async def _lookup_championship_from_db(championship_id: str) -> Dict[str, Any] | None:
+    """Look up championship info from the DB championships table."""
+    row = await fetch_one(
+        "SELECT championship_id, season, division_num, slug, is_playoffs "
+        "FROM championships WHERE championship_id = %s",
+        (championship_id,),
+    )
+    if not row:
+        return None
+    return {
+        "championship_id": row["championship_id"],
+        "season": row["season"],
+        "division_num": row["division_num"],
+        "slug": row["slug"],
+        "is_playoffs": bool(row["is_playoffs"]),
+    }
 
 
 def _canonical_json_value(value: Any) -> Any:
@@ -1416,9 +1430,9 @@ async def sync_championship_async(
 ) -> ChampionshipSyncResult:
     start_time = time.perf_counter()
     force_all_matches = full
-    division_info = division or _get_division_by_championship_id(championship_id)
+    division_info = division or await _lookup_championship_from_db(championship_id)
     if not division_info:
-        raise ValueError(f"Championship {championship_id} not found in DIVISIONS")
+        raise ChampionshipNotConfiguredError(f"Championship {championship_id} not found in DB")
 
     season = division_info["season"]
     division_num = division_info["division_num"]
@@ -1819,8 +1833,9 @@ async def update_single_match_async(
     require_complete_played_maps: bool = False,
     diagnostics: SyncDiagnostics | None = None,
 ) -> Optional[str]:
-    division = _get_division_by_championship_id(match_id)
-    if division:
+    # Match IDs have the form "<game_id>-<uuid>" where game_id is a short integer (e.g. "1-abc...").
+    # Championship IDs are plain UUIDs (hex prefix, no leading digit-only segment).
+    if not match_id.split("-", 1)[0].isdigit():
         raise ValueError("update_single_match_async expects a match_id, not a championship_id")
 
     details = await get_match_details_async(match_id)
@@ -1846,9 +1861,11 @@ async def update_single_match_async(
     if not championship_id:
         raise RuntimeError(f"Match {match_id} lacks competition id")
 
-    division = _get_division_by_championship_id(str(championship_id))
+    division = await _lookup_championship_from_db(str(championship_id))
     if not division:
-        raise RuntimeError(f"Championship {championship_id} not configured")
+        raise ChampionshipNotConfiguredError(
+            f"Championship {championship_id} is not configured and not in DB — skipping match {match_id}"
+        )
 
     season = division["season"]
     division_num = division["division_num"]
