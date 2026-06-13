@@ -2483,9 +2483,11 @@ async def upsert_player_season_totals_bulk_async(
                       SUM(ps.damage) AS damage
                     FROM player_stats ps
                     JOIN matches m ON m.match_id = ps.match_id
+                    JOIN championships c ON c.championship_id = m.championship_id
                     LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
                     WHERE m.season = %s
                       AND m.division_num = %s
+                      AND c.is_playoffs = 0
                       AND ps.player_id IN ({placeholders})
                       AND COALESCE(ps.is_forfeit_map, 0) = 0
                       AND COALESCE(mp.is_forfeit, 0) = 0
@@ -2705,9 +2707,11 @@ async def upsert_player_map_season_totals_bulk_async(
                       SUM(ps.damage) AS damage
                     FROM player_stats ps
                     JOIN matches m ON m.match_id = ps.match_id
+                    JOIN championships c ON c.championship_id = m.championship_id
                     LEFT JOIN maps mp ON mp.match_id = ps.match_id AND mp.round_index = ps.round_index
                     WHERE m.season = %s
                       AND m.division_num = %s
+                      AND c.is_playoffs = 0
                       AND ps.player_id IN ({placeholders})
                       AND COALESCE(ps.is_forfeit_map, 0) = 0
                       AND COALESCE(mp.is_forfeit, 0) = 0
