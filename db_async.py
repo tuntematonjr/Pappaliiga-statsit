@@ -1308,8 +1308,9 @@ async def count_played_matches_by_championship_ids(
 async def count_total_matches_by_championship_ids(
     *,
     championship_ids: Sequence[str],
+    include_ignored: bool = True,
 ) -> dict[str, int]:
-    """Return total match counts per championship ID (includes all matches)."""
+    """Return total match counts per championship ID."""
     ids: list[str] = []
     seen: set[str] = set()
     for cid in championship_ids or []:
@@ -1326,10 +1327,13 @@ async def count_total_matches_by_championship_ids(
 
     placeholders = ", ".join(f":cid{i}" for i in range(len(ids)))
     params = {f"cid{i}": cid for i, cid in enumerate(ids)}
+    conditions = [f"m.championship_id IN ({placeholders})"]
+    if not include_ignored:
+        conditions.append("COALESCE(m.ignored_due_ban, 0) = 0")
     sql = (
         "SELECT m.championship_id, COUNT(*) AS matches_total "
         "FROM matches m "
-        f"WHERE m.championship_id IN ({placeholders}) "
+        f"WHERE {' AND '.join(conditions)} "
         "GROUP BY m.championship_id"
     )
     rows = await query_async(sql, params)

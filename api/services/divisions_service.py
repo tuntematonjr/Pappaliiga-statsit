@@ -176,6 +176,7 @@ async def list_divisions_by_season(season: int, limit: int, offset: int) -> List
         )
         total_map = await count_total_matches_by_championship_ids(
             championship_ids=champ_ids,
+            include_ignored=False,
         )
         result: list[dict[str, Any]] = []
         for row in rows:

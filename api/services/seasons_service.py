@@ -142,8 +142,14 @@ async def _compute_season_summary(season: int) -> Dict[str, Any]:
     match_progress_rows = await query_async(
         """
         SELECT
-            COUNT(DISTINCT CASE WHEN c.is_playoffs = 0 THEN m.match_id END) AS regular_total,
-            COUNT(DISTINCT CASE WHEN c.is_playoffs = 1 THEN m.match_id END) AS playoff_total
+            COUNT(DISTINCT CASE
+                WHEN c.is_playoffs = 0 AND COALESCE(m.ignored_due_ban, 0) = 0
+                THEN m.match_id
+            END) AS regular_total,
+            COUNT(DISTINCT CASE
+                WHEN c.is_playoffs = 1 AND COALESCE(m.ignored_due_ban, 0) = 0
+                THEN m.match_id
+            END) AS playoff_total
         FROM championships c
         LEFT JOIN matches m ON m.championship_id = c.championship_id
         WHERE c.season = :season
@@ -294,6 +300,7 @@ async def _compute_season_divisions(season: int) -> List[Dict[str, Any]]:
     )
     total_map = await count_total_matches_by_championship_ids(
         championship_ids=champ_ids,
+        include_ignored=False,
     )
     
     # Separate regular divisions from playoffs
