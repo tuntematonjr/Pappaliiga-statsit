@@ -524,6 +524,35 @@ window.LeaderboardView = {
                             </div>
                         </div>
                     </article>
+                    <article class="elo-explainer__card">
+                        <h4>Mitä divisioonakerroin tarkoittaa</h4>
+                        <div class="elo-explainer__rows">
+                            <div class="elo-explainer__row">
+                                <span>Perusajatus</span>
+                                <code>Divisioonakerroin kertoo, kuinka "painava" tietyn kauden tietyn divisioonan ottelu on Elo-laskennassa.</code>
+                            </div>
+                            <div class="elo-explainer__row">
+                                <span>Mistä se tulee</span>
+                                <code>Kerroin muodostuu kahdesta osasta: mitä data näyttää juuri sillä kaudella, ja mitä divisioonanumero ennakkoon vihjaa tasosta.</code>
+                            </div>
+                            <div class="elo-explainer__row">
+                                <span>Jos kerroin on yli 1.00</span>
+                                <code>Malli pitää tätä divisioonaa kauden keskitasoa kovempana, joten hyvä tai huono ottelu liikuttaa Eloa enemmän.</code>
+                            </div>
+                            <div class="elo-explainer__row">
+                                <span>Jos kerroin on alle 1.00</span>
+                                <code>Malli pitää tätä divisioonaa kauden keskitasoa helpompana, joten sama ottelu vaikuttaa Eloon hillitymmin.</code>
+                            </div>
+                            <div class="elo-explainer__row">
+                                <span>Miksi mukana on divisioonanumero</span>
+                                <code>Pelkkä data voi heilahdella pienellä samplella, joten mallissa on mukana myös ennakko-oletus siitä, että ylemmät divisioonat ovat yleensä kovempia.</code>
+                            </div>
+                            <div class="elo-explainer__row">
+                                <span>Esimerkki</span>
+                                <code>Jos sama ottelu tuottaisi raakamuutoksen +20, kerroin 1.25 nostaisi sen noin +25:een ja kerroin 0.85 laskisi sen noin +17:ään.</code>
+                            </div>
+                        </div>
+                    </article>
                 </div>
                 <div class="elo-explainer__grid">
                     <article class="elo-explainer__card">
