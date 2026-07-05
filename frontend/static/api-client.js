@@ -100,6 +100,9 @@
         playersList: query => [
             `/api/players${query}`
         ],
+        seasonsElo: query => [
+            `/api/seasons-elo${query}`
+        ],
         playerBundle: (playerId, championshipId = null) => {
             const champParam = championshipId ? `?championship_id=${encodeURIComponent(championshipId)}` : '';
             return [
@@ -863,6 +866,28 @@
             return {
                 seasons: ensureSnakeCaseDeep(payload.seasons ?? []),
                 players: ensureSnakeCaseDeep(payload.players ?? []),
+                elo_config: ensureSnakeCaseDeep(payload.elo_config ?? {}),
+            };
+        }
+
+        async getSeasonsElo(params = {}) {
+            const queryParams = {
+                season: params.season ?? params.seasonId ?? null,
+                division: params.division ?? null,
+                limit: params.limit ?? null,
+                include_seasons: params.includeSeasons ?? params.include_seasons ?? null,
+                include_config: params.includeConfig ?? params.include_config ?? null,
+            };
+            const query = buildQueryString(queryParams);
+            const routes = buildRouteCandidates('seasonsElo', query);
+            const result = await fetchWithFallback(routes, {
+                persistCache: false,
+            });
+            const payload = result?.data ?? result ?? {};
+            return {
+                seasons: ensureSnakeCaseDeep(payload.seasons ?? []),
+                players: ensureSnakeCaseDeep(payload.players ?? []),
+                elo_config: ensureSnakeCaseDeep(payload.elo_config ?? {}),
             };
         }
 

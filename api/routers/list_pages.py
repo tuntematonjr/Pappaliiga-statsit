@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from api.services import seasons_service, teams_service, players_service, matches_service
+from api.services import elo_service, seasons_service, teams_service, players_service, matches_service
 
 router = APIRouter()
 
@@ -50,6 +50,45 @@ async def get_seasons_players(
         "ok": True,
         "seasons": seasons_result if not isinstance(seasons_result, Exception) else [],
         "players": players_result if not isinstance(players_result, Exception) else [],
+    }
+
+
+@router.get("/seasons-elo")
+async def get_seasons_elo(
+    season: Optional[int] = Query(None),
+    division: Optional[int] = Query(None),
+    limit: int = Query(2000, ge=1, le=10000),
+    include_seasons: bool = Query(True),
+    include_config: bool = Query(True),
+) -> Dict[str, Any]:
+    """Return seasons list and current player Elo leaderboard in a single response."""
+    seasons_task = (
+        asyncio.create_task(seasons_service.get_seasons_list())
+        if include_seasons else None
+    )
+    # Elo remains all-time; optional season filters only participants included in that season.
+    leaderboard_task = asyncio.create_task(
+        elo_service.get_elo_leaderboard(
+            division=division,
+            participation_season=season,
+            limit=limit,
+        )
+    )
+    gathered = await asyncio.gather(
+        *(task for task in (seasons_task, leaderboard_task) if task is not None),
+        return_exceptions=True,
+    )
+    if include_seasons:
+        seasons_result, leaderboard_result = gathered
+    else:
+        seasons_result = []
+        leaderboard_result = gathered[0] if gathered else []
+
+    return {
+        "ok": True,
+        "seasons": seasons_result if not isinstance(seasons_result, Exception) else [],
+        "players": leaderboard_result if not isinstance(leaderboard_result, Exception) else [],
+        "elo_config": elo_service.get_public_elo_config() if include_config else {},
     }
 
 

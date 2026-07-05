@@ -37,6 +37,11 @@ const router = createRouter({
             component: window.PlayersView
         },
         {
+            path: '/elo',
+            name: 'elo',
+            component: window.LeaderboardView
+        },
+        {
             path: '/debug',
             name: 'debug',
             component: window.DebugView

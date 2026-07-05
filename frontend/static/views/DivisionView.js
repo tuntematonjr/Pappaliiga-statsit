@@ -1,6 +1,7 @@
 const DIVISION_METRIC_SCHEMA = [
     { id: 'teams', key: ['team_count', 'teams.length', 'aggregates.team_count'], label: 'Joukkueet', digits: 0 },
     { id: 'players', key: ['player_count', 'aggregates.player_count'], label: 'Pelaajat', digits: 0 },
+    { id: 'avg_elo', key: ['aggregates.avg_elo', 'avg_elo'], label: 'Avg Elo', digits: 1 },
     { id: 'matches', key: ['aggregates.played_matches', 'aggregates.matches_played', 'played_matches', 'matches_played'], label: 'Ottelut', digits: 0 },
     { id: 'maps', key: ['aggregates.maps_played_total', 'maps_played_total', 'maps_played'], label: 'Karttoja pelattu', digits: 0 },
     { id: 'rounds', key: ['aggregates.rounds_played_total', 'rounds_played_total', 'rounds'], label: 'Erää pelattu', digits: 0 },

@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 
 
 from db_async import compute_player_map_deltas_async, query_async
+from api.services import elo_service
 
 from api.exceptions import NotFoundError
 from api.services.cache_helpers import (
@@ -590,6 +591,15 @@ async def list_players(
             row.setdefault("faceit_url", None)
             if not row.get("nickname"):
                 row["nickname"] = str(row.get("player_id") or "")
+        elo_rows = await elo_service.get_elo_leaderboard(
+            limit=max(limit, len(rows) or 0),
+        )
+        elo_by_player_id = {str(row.get("player_id")): row for row in elo_rows}
+        for row in rows:
+            elo_row = elo_by_player_id.get(str(row.get("player_id")))
+            row["current_elo"] = float(elo_row.get("current_elo") or 1000.0) if elo_row else 1000.0
+            row["last_elo_delta"] = float(elo_row.get("last_elo_delta") or 0.0) if elo_row else 0.0
+            row["elo_matches_processed"] = int(elo_row.get("matches_processed") or 0) if elo_row else 0
         return rows
 
     cached_value, _ = await GLOBAL_CACHE.get_or_set(cache_key, _compute)

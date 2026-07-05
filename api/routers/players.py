@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from api.exceptions import NotFoundError
 from api.models import CamelModel
-from api.services import players_service
+from api.services import elo_service, players_service
 
 router = APIRouter()
 
@@ -20,6 +20,41 @@ class PlayerInfo(CamelModel):
     avatar: Optional[str]
     faceit_url: Optional[str]
     championship_id: Optional[str] = None
+    current_elo: Optional[float] = None
+    last_elo_delta: Optional[float] = None
+    elo_matches_processed: Optional[int] = None
+
+
+class PlayerEloSummary(CamelModel):
+    player_id: str
+    current_elo: float
+    last_elo_delta: float
+    matches_processed: int
+    initial_elo: float
+    last_match_id: Optional[str] = None
+    last_finished_at: Optional[int] = None
+    last_championship_id: Optional[str] = None
+    last_division_num: Optional[int] = None
+    last_season: Optional[int] = None
+    last_division_multiplier: Optional[float] = None
+
+
+class PlayerEloHistoryPoint(CamelModel):
+    match_id: str
+    championship_id: str
+    season: int
+    division_num: int
+    finished_at: int
+    team_id: Optional[str] = None
+    team_name: Optional[str] = None
+    opponent_team_id: Optional[str] = None
+    opponent_team_name: Optional[str] = None
+    elo_before: float
+    elo_after: float
+    elo_delta: float
+    division_multiplier: float
+    result: int
+    metrics: Dict[str, float]
 
 
 class PlayerSeasonStats(CamelModel):
@@ -136,6 +171,8 @@ class PlayerBundleResponse(CamelModel):
     selected_season: Optional[PlayerSeasonStats] = None
     map_stats: List[PlayerMapStatsWithDelta] = []
     progression: List[PlayerSeasonProgressPoint] = []
+    elo_summary: Optional[PlayerEloSummary] = None
+    elo_history: List[PlayerEloHistoryPoint] = []
 
 
 @router.get("", response_model=List[PlayerInfo])
@@ -185,9 +222,12 @@ async def get_player_bundle(
 
     map_stats: List[PlayerMapStatsWithDelta] = []
     progression: List[PlayerSeasonProgressPoint] = []
+    elo_summary: Optional[PlayerEloSummary] = None
+    elo_history: List[PlayerEloHistoryPoint] = []
     if selected_row is not None:
         # map_stats and progression are independent — run in parallel.
-        map_result, prog_result = await asyncio.gather(
+        selected_championship_id = selected_row.championship_id
+        map_result, prog_result, elo_bundle_result = await asyncio.gather(
             players_service.fetch_player_map_stats(selected_row.championship_id, player_id),
             players_service.fetch_player_season_progression(
                 player_id,
@@ -195,6 +235,7 @@ async def get_player_bundle(
                 selected_row.division_num,
                 championship_id=selected_row.championship_id,
             ),
+            elo_service.get_player_elo_bundle(player_id, limit=50),
             return_exceptions=True,
         )
         map_stats = (
@@ -207,6 +248,22 @@ async def get_player_bundle(
             if not isinstance(prog_result, Exception)
             else []
         )
+        if isinstance(elo_bundle_result, tuple):
+            elo_summary_result, elo_history_result = elo_bundle_result
+            elo_summary = (
+                PlayerEloSummary(**elo_summary_result)
+                if isinstance(elo_summary_result, dict)
+                else None
+            )
+            elo_history = (
+                [PlayerEloHistoryPoint(**row) for row in elo_history_result]
+                if isinstance(elo_history_result, list)
+                else []
+            )
+    else:
+        elo_summary_result, _ = await elo_service.get_player_elo_bundle(player_id, limit=0)
+        if elo_summary_result:
+            elo_summary = PlayerEloSummary(**elo_summary_result)
 
     return PlayerBundleResponse(
         player=PlayerInfo(**player_row),
@@ -215,4 +272,6 @@ async def get_player_bundle(
         selected_season=selected_row,
         map_stats=map_stats,
         progression=progression,
+        elo_summary=elo_summary,
+        elo_history=elo_history,
     )

@@ -13,7 +13,7 @@ from db_async import (
 from division_naming import build_division_name
 
 from api.exceptions import NotFoundError
-from api.services import team_status_service
+from api.services import elo_service, team_status_service
 from api.services.player_counts import get_player_counts
 from api.services.season_aggregates import dedupe_team_total
 from api.services.cache_helpers import (
@@ -686,11 +686,19 @@ async def _compute_division_details(championship_id: str, season: int, division_
     leaders_task = asyncio.create_task(
         _get_division_leaders(championship_id, season, division_num, bool(champ["is_playoff"]))
     )
+    elo_rows_task = asyncio.create_task(
+        elo_service.get_elo_leaderboard(
+            participation_season=season,
+            division=division_num,
+            limit=5000,
+        )
+    )
 
-    map_stats, aggregates, leaders = await asyncio.gather(
+    map_stats, aggregates, leaders, elo_rows = await asyncio.gather(
         map_stats_task,
         aggregates_task,
         leaders_task,
+        elo_rows_task,
     )
 
     # Ensure aggregate fields the frontend expects are present
@@ -702,6 +710,17 @@ async def _compute_division_details(championship_id: str, season: int, division_
         aggregates["matches_played"] = aggregates["played_matches"]
     if aggregates.get("total_matches") is None and aggregates.get("matches_played") is not None:
         aggregates["total_matches"] = aggregates["matches_played"]
+
+    # Division summary card: average current Elo among players who participated
+    # in this season+division (Elo itself remains all-time by design).
+    elo_values = [
+        float(row.get("current_elo") or 0.0)
+        for row in (elo_rows or [])
+        if row.get("current_elo") is not None
+    ]
+    if elo_values:
+        aggregates["avg_elo"] = round(sum(elo_values) / len(elo_values), 1)
+
     # Active team count (excludes banned/quit) so the frontend card shows the correct number
     aggregates["team_count"] = sum(
         1 for t in teams

@@ -716,6 +716,10 @@ function buildIndexGrid(count, maxTicks = 10) {
     return indices;
 }
 
+function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
 window.PlayerView = {
     name: 'PlayerView',
     components: {
@@ -748,6 +752,11 @@ window.PlayerView = {
             trendChartHeight: 140,
             playerTrendHover: {
                 key: null,
+                index: null,
+                x: 0,
+                y: 0
+            },
+            eloTrendHover: {
                 index: null,
                 x: 0,
                 y: 0
@@ -814,6 +823,108 @@ window.PlayerView = {
         selectedSeasonStats() {
             if (!this.selectedSeasonId) return null;
             return this.allSeasonsRaw.find(item => String(item.championship_id) === String(this.selectedSeasonId)) || null;
+        },
+        selectedBundleData() {
+            const selectedKey = this.selectedSeasonId ? String(this.selectedSeasonId) : '__default__';
+            const selected = this.playerState?.bundle?.[selectedKey]?.data || null;
+            if (selected) return selected;
+            return this.playerState?.bundle?.__default__?.data || null;
+        },
+        eloSummary() {
+            const summary = this.selectedBundleData?.elo_summary || this.selectedBundleData?.eloSummary || null;
+            return summary && typeof summary === 'object' ? summary : null;
+        },
+        eloHistory() {
+            const rows = this.selectedBundleData?.elo_history || this.selectedBundleData?.eloHistory || [];
+            return Array.isArray(rows) ? rows : [];
+        },
+        eloCards() {
+            if (!this.eloSummary) return [];
+            return [
+                { key: 'current_elo', label: 'Current Elo', value: Number(this.eloSummary.current_elo || 1000).toFixed(0) },
+                { key: 'last_delta', label: 'Viimeisin muutos', value: this.formatSignedNumber(this.eloSummary.last_elo_delta, 1) },
+                { key: 'matches', label: 'Ottelut', value: String(Number(this.eloSummary.matches_processed || 0)) },
+                { key: 'division_multiplier', label: 'Viimeisin divarikerto', value: Number(this.eloSummary.last_division_multiplier || 1).toFixed(2) }
+            ];
+        },
+        eloHistoryPreview() {
+            return [...this.eloHistory].slice(-6).reverse();
+        },
+        eloTrendChart() {
+            const rows = [...this.eloHistory]
+                .filter(row => row && Number.isFinite(Number(row.elo_after)) && Number.isFinite(Number(row.finished_at)))
+                .sort((a, b) => Number(a.finished_at || 0) - Number(b.finished_at || 0));
+            if (!rows.length) return null;
+
+            const width = this.trendChartWidth || 640;
+            const height = 170;
+            const padding = { left: 46, right: 40, top: 16, bottom: 30 };
+            const plotWidth = width - padding.left - padding.right;
+            const plotHeight = height - padding.top - padding.bottom;
+            const xFor = idx => padding.left + (rows.length <= 1 ? 0 : (idx / (rows.length - 1)) * plotWidth);
+
+            const values = rows.map(row => Number(row.elo_after || 1000));
+            const rawMin = Math.min(...values);
+            const rawMax = Math.max(...values);
+            const span = Math.max(1, rawMax - rawMin);
+            const yMin = Math.max(0, rawMin - Math.max(15, span * 0.22));
+            const yMax = rawMax + Math.max(15, span * 0.22);
+            const yFor = value => padding.top + ((yMax - value) / Math.max(1e-6, (yMax - yMin))) * plotHeight;
+
+            const points = rows.map((row, idx) => ({
+                id: `elo-${row.match_id || idx}`,
+                index: idx,
+                x: xFor(idx),
+                y: yFor(Number(row.elo_after || 1000)),
+                eloAfter: Number(row.elo_after || 1000),
+                eloDelta: Number(row.elo_delta || 0),
+                divisionMultiplier: Number(row.division_multiplier || 1),
+                divisionNum: Number(row.division_num || 0),
+                season: Number(row.season || 0),
+                finishedAt: Number(row.finished_at || 0),
+                label: this.formatUnixDate(row.finished_at),
+            }));
+
+            const path = points
+                .map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+                .join(' ');
+
+            const labelIndices = buildIndexGrid(points.length, Math.min(6, points.length));
+            const gridIndices = buildIndexGrid(points.length, 12);
+
+            return {
+                key: 'elo-trend',
+                title: 'Elo kehitys',
+                label: 'Elo',
+                width,
+                height,
+                padding,
+                plotWidth,
+                plotHeight,
+                series: [{
+                    key: 'elo_after',
+                    label: 'Elo',
+                    color: '#60a5fa',
+                    decimals: 0,
+                    percent: false,
+                    path,
+                    points,
+                    latest: points[points.length - 1] || null,
+                }],
+                points,
+                ticks: [yMin, (yMin + yMax) / 2, yMax].map(value => ({ value, y: yFor(value) })),
+                gridLines: gridIndices.map(index => ({ index, x: xFor(index) })),
+                xLabels: labelIndices.map(index => ({
+                    index,
+                    x: xFor(index),
+                    label: this.formatUnixDate(points[index].finishedAt),
+                })),
+                divisionLines: [],
+                refY: yFor((yMin + yMax) / 2),
+                showXAxis: true,
+                lineClass: 'trend-line--adr',
+                pointClass: 'trend-point--adr',
+            };
         },
         selectedScopeRawSeasons() {
             return this.selectedSeasonStats ? [this.selectedSeasonStats] : [];
@@ -1429,6 +1540,16 @@ window.PlayerView = {
         heroTeamAvatarSrc() {
             return this.proxyAvatar(this.heroTeamAvatar);
         },
+        formatSignedNumber(value, decimals = 1) {
+            const numeric = Number(value || 0);
+            const prefix = numeric > 0 ? '+' : '';
+            return `${prefix}${numeric.toFixed(decimals)}`;
+        },
+        formatUnixDate(value) {
+            const numeric = Number(value || 0);
+            if (!Number.isFinite(numeric) || numeric <= 0) return '-';
+            return new Date(numeric * 1000).toLocaleDateString('fi-FI');
+        },
         handleAvatarFallback(event) {
             const fallback = this.getDefaultLogo();
             if (!event?.target || !fallback) return;
@@ -1852,6 +1973,57 @@ window.PlayerView = {
         clearPlayerTrendHover() {
             this.playerTrendHover = { key: null, index: null, x: 0, y: 0 };
         },
+        handleEloTrendHover(event, chart) {
+            if (!chart || !chart.points?.length) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const scale = rect.width ? chart.width / rect.width : 1;
+            const xView = x * scale;
+            const ratio = Math.min(1, Math.max(0, (xView - chart.padding.left) / chart.plotWidth));
+            const index = Math.round(ratio * (chart.points.length - 1));
+            const point = chart.points[index];
+            if (!point) return;
+            this.eloTrendHover = {
+                index,
+                x: point.x,
+                y: point.y,
+            };
+        },
+        clearEloTrendHover() {
+            this.eloTrendHover = { index: null, x: 0, y: 0 };
+        },
+        getEloTrendHoverPoint(chart) {
+            if (!chart || !Number.isInteger(this.eloTrendHover.index)) return null;
+            return chart.points?.[this.eloTrendHover.index] || null;
+        },
+        eloTrendTooltipStyle(chart, point) {
+            if (!chart || !point) return {};
+            const margin = 8;
+            const pointerGap = 12;
+            const tooltipWidth = 260;
+            const tooltipHeight = 96;
+
+            const leftPx = clamp(point.x, (tooltipWidth / 2) + margin, chart.width - (tooltipWidth / 2) - margin);
+            const hasRoomAbove = point.y >= (tooltipHeight + margin + pointerGap);
+            const translateY = hasRoomAbove ? '-100%' : '0%';
+            const rawTop = hasRoomAbove ? point.y - pointerGap : point.y + pointerGap;
+            const maxTop = Math.max(margin, chart.height - tooltipHeight - margin);
+            const topPx = clamp(rawTop, margin, maxTop);
+
+            const left = (leftPx / chart.width) * 100;
+            const top = (topPx / chart.height) * 100;
+            return {
+                left: `${left}%`,
+                top: `${top}%`,
+                transform: `translate(-50%, ${translateY})`
+            };
+        },
+        formatDivisionBadge(value) {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) return '-';
+            if (numeric === 0) return 'M';
+            return numeric > 0 ? `D${numeric}` : '-';
+        },
         getPlayerTrendHoverPoint(chart) {
             if (!chart || this.playerTrendHover.key !== chart.key) return null;
             const idx = this.playerTrendHover.index;
@@ -1877,11 +2049,24 @@ window.PlayerView = {
         },
         trendTooltipStyle(chart, point) {
             if (!chart || !point) return {};
-            const left = (point.x / chart.width) * 100;
-            const top = (point.y / chart.height) * 100;
+            const margin = 8;
+            const pointerGap = 12;
+            const tooltipWidth = 260;
+            const tooltipHeight = 150;
+
+            const leftPx = clamp(point.x, (tooltipWidth / 2) + margin, chart.width - (tooltipWidth / 2) - margin);
+            const hasRoomAbove = point.y >= (tooltipHeight + margin + pointerGap);
+            const translateY = hasRoomAbove ? '-100%' : '0%';
+            const rawTop = hasRoomAbove ? point.y - pointerGap : point.y + pointerGap;
+            const maxTop = Math.max(margin, chart.height - tooltipHeight - margin);
+            const topPx = clamp(rawTop, margin, maxTop);
+
+            const left = (leftPx / chart.width) * 100;
+            const top = (topPx / chart.height) * 100;
             return {
                 left: `${left}%`,
-                top: `${top}%`
+                top: `${top}%`,
+                transform: `translate(-50%, ${translateY})`
             };
         },
         playerTrendValueLabel(chart) {
@@ -2022,6 +2207,149 @@ window.PlayerView = {
                         </button>
                     </div>
                     <p v-if="!seasonOptions.length" class="player-empty">Ei kausia saatavilla.</p>
+                </section>
+
+                <section v-if="eloSummary" class="glass-card player-elo-panel">
+                    <div class="section-heading section-heading--split">
+                        <div class="section-heading__main">
+                            <h3 class="section-title titleUnderline">Pelaaja Elo</h3>
+                            <span class="section-sub">Painot ja kertoimet tulevat keskitetysti Elo-configista.</span>
+                        </div>
+                    </div>
+                    <stat-panel :items="eloCards" :columns="4"></stat-panel>
+                    <div v-if="eloTrendChart" class="performance-trends performance-trends--single">
+                        <div class="trend-chart trend-chart--elo">
+                            <div class="trend-chart__header">
+                                <div class="trend-chart__title">Elo kehitys</div>
+                                <div class="trend-chart__legend" v-if="eloTrendChart.series && eloTrendChart.series.length">
+                                    <span class="trend-chart__legend-item">
+                                        <span class="trend-chart__legend-dot" :style="{ backgroundColor: eloTrendChart.series[0].color }"></span>
+                                        <span class="trend-chart__legend-label">Elo {{ Math.round(eloTrendChart.series[0]?.latest?.eloAfter || 1000) }}</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div
+                                class="trend-chart__plot"
+                                @mousemove="handleEloTrendHover($event, eloTrendChart)"
+                                @mouseleave="clearEloTrendHover"
+                            >
+                                <svg
+                                    class="trend-chart__svg"
+                                    :viewBox="'0 0 ' + eloTrendChart.width + ' ' + eloTrendChart.height"
+                                    width="100%"
+                                    :height="eloTrendChart.height"
+                                    preserveAspectRatio="none"
+                                    role="img"
+                                    aria-label="Elo trendi"
+                                >
+                                    <g class="trend-grid">
+                                        <line
+                                            v-for="line in eloTrendChart.gridLines"
+                                            :key="'ev-' + line.index"
+                                            class="trend-grid__line trend-grid__line--vertical"
+                                            :x1="line.x"
+                                            :x2="line.x"
+                                            :y1="eloTrendChart.padding.top"
+                                            :y2="eloTrendChart.height - eloTrendChart.padding.bottom"
+                                        />
+                                        <line
+                                            v-for="tick in eloTrendChart.ticks"
+                                            :key="'eh-' + tick.y"
+                                            class="trend-grid__line"
+                                            :x1="eloTrendChart.padding.left"
+                                            :x2="eloTrendChart.width - eloTrendChart.padding.right"
+                                            :y1="tick.y"
+                                            :y2="tick.y"
+                                        />
+                                    </g>
+                                    <line
+                                        class="trend-ref-line"
+                                        :x1="eloTrendChart.padding.left"
+                                        :x2="eloTrendChart.width - eloTrendChart.padding.right"
+                                        :y1="eloTrendChart.refY"
+                                        :y2="eloTrendChart.refY"
+                                    />
+                                    <path
+                                        class="trend-line"
+                                        :class="eloTrendChart.lineClass"
+                                        :style="{ stroke: eloTrendChart.series[0].color }"
+                                        :d="eloTrendChart.series[0].path"
+                                        fill="none"
+                                    />
+                                    <circle
+                                        v-for="point in eloTrendChart.series[0].points"
+                                        :key="point.id"
+                                        class="trend-point"
+                                        :class="eloTrendChart.pointClass"
+                                        :cx="point.x"
+                                        :cy="point.y"
+                                        r="2"
+                                        :style="{ fill: eloTrendChart.series[0].color }"
+                                    >
+                                        <title>{{ point.label }} · Elo {{ Math.round(point.eloAfter) }}</title>
+                                    </circle>
+                                    <circle
+                                        v-if="eloTrendChart.series[0].latest"
+                                        class="trend-point trend-point--latest"
+                                        :class="eloTrendChart.pointClass"
+                                        :cx="eloTrendChart.series[0].latest.x"
+                                        :cy="eloTrendChart.series[0].latest.y"
+                                        r="4"
+                                        :style="{ fill: eloTrendChart.series[0].color }"
+                                    />
+                                    <circle
+                                        v-if="getEloTrendHoverPoint(eloTrendChart)"
+                                        class="trend-point trend-point--hover"
+                                        :class="eloTrendChart.pointClass"
+                                        :cx="getEloTrendHoverPoint(eloTrendChart).x"
+                                        :cy="getEloTrendHoverPoint(eloTrendChart).y"
+                                        r="4"
+                                        :style="{ fill: eloTrendChart.series[0].color }"
+                                    />
+                                    <g class="trend-axis trend-axis--y">
+                                        <text
+                                            v-for="tick in eloTrendChart.ticks"
+                                            :key="'eylab-' + tick.y"
+                                            class="trend-axis__label"
+                                            :x="eloTrendChart.padding.left - 6"
+                                            :y="tick.y + 4"
+                                            text-anchor="end"
+                                        >{{ Math.round(tick.value) }}</text>
+                                    </g>
+                                    <g class="trend-axis trend-axis--x">
+                                        <line
+                                            class="trend-axis__baseline"
+                                            :x1="eloTrendChart.padding.left"
+                                            :x2="eloTrendChart.width - eloTrendChart.padding.right"
+                                            :y1="eloTrendChart.height - eloTrendChart.padding.bottom"
+                                            :y2="eloTrendChart.height - eloTrendChart.padding.bottom"
+                                        />
+                                        <text
+                                            v-for="label in eloTrendChart.xLabels"
+                                            :key="'ex-' + label.index"
+                                            class="trend-axis__label trend-axis__label--x"
+                                            :x="label.x"
+                                            :y="eloTrendChart.height - 6"
+                                            text-anchor="middle"
+                                        >{{ label.label }}</text>
+                                    </g>
+                                </svg>
+                                <div
+                                    v-if="getEloTrendHoverPoint(eloTrendChart)"
+                                    class="trend-tooltip"
+                                    :style="eloTrendTooltipStyle(eloTrendChart, getEloTrendHoverPoint(eloTrendChart))"
+                                >
+                                    <div class="trend-tooltip__title">Elo {{ Math.round(getEloTrendHoverPoint(eloTrendChart).eloAfter) }}</div>
+                                    <div class="trend-tooltip__meta">Päivä: {{ getEloTrendHoverPoint(eloTrendChart).label }}</div>
+                                    <div class="trend-tooltip__meta">Kausi {{ getEloTrendHoverPoint(eloTrendChart).season }} · {{ formatDivisionBadge(getEloTrendHoverPoint(eloTrendChart).divisionNum) }}</div>
+                                    <div class="trend-tooltip__value">
+                                        Muutos {{ formatSignedNumber(getEloTrendHoverPoint(eloTrendChart).eloDelta, 1) }}
+                                        <span class="trend-tooltip__delta"> · Div kerroin {{ Number(getEloTrendHoverPoint(eloTrendChart).divisionMultiplier || 1).toFixed(3) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <section v-if="comparePlayer" class="player-compare-workspace glass-card">
