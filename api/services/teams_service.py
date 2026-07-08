@@ -77,6 +77,13 @@ async def fetch_team_season_stats(team_id: str) -> list[dict[str, Any]]:
                    bc.is_playoffs,
                    COALESCE(tst.maps_played, 0) AS maps_played,
                    COALESCE(tst.matches_played, 0) AS matches_played,
+                   COALESCE((
+                       SELECT COUNT(*)
+                       FROM matches m
+                       WHERE m.championship_id = bc.championship_id
+                         AND (m.team1_id = :team_id OR m.team2_id = :team_id)
+                         AND COALESCE(m.is_forfeit, 0) = 0
+                   ), 0) AS actual_matches_played,
                    COALESCE(tst.matches_won, 0) AS wins,
                    GREATEST(
                        CAST(COALESCE(tst.matches_played, 0) AS SIGNED) - CAST(COALESCE(tst.matches_won, 0) AS SIGNED),
@@ -102,6 +109,9 @@ async def fetch_team_season_stats(team_id: str) -> list[dict[str, Any]]:
         processed = []
         for row in rows:
             data = dict(row)
+            actual_matches_played = int(data.get("actual_matches_played") or 0)
+            if data.get("is_playoffs") and actual_matches_played <= 0:
+                continue
             data["name"] = build_division_name(
                 data.get("season"),
                 data.get("division_num"),

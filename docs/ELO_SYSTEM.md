@@ -9,7 +9,7 @@ The first Elo release tracks only individual player Elo.
 - Division strength is included immediately and calculated dynamically per season.
 - A new player does not automatically start from a flat `1000` anymore:
 	- if the same season + division already has Elo-rated players, the new player starts from that pool's average Elo
-	- if the season + division is still empty, the new player starts from a rank-based bootstrap anchored around `1000`
+	- if the season + division is still empty, the new player starts from a division bootstrap where top division is always `3000` and bottom division is always `500` (linear between)
 - Elo is continuous across seasons and shown as current overall Elo.
 - Separate season/championship Elo views are intentionally disabled.
 - Division strength is included immediately and calculated dynamically per season.
@@ -30,14 +30,21 @@ The following values are intended to be edited by hand without touching Elo serv
 When a player has no prior Elo history:
 
 - if there are already players with Elo in the same season + division, the player starts from that average Elo
-- otherwise the player starts from a rank-based bootstrap derived from division number
+- otherwise the player starts from a season-aware linear division bootstrap
 
 Relevant config:
 
-- `INITIAL_ELO_BOOTSTRAP.rank_reference_division`: division used as the neutral reference point
-- `INITIAL_ELO_BOOTSTRAP.rank_step_points`: Elo offset applied per division step
+- `INITIAL_ELO_BOOTSTRAP.top_initial_elo`: initial Elo for the top division in a season
+- `INITIAL_ELO_BOOTSTRAP.bottom_initial_elo`: initial Elo for the bottom division in a season
 - `INITIAL_ELO_BOOTSTRAP.min_initial_elo`: lower clamp for bootstrap Elo
 - `INITIAL_ELO_BOOTSTRAP.max_initial_elo`: upper clamp for bootstrap Elo
+
+Bootstrap behavior:
+
+- top division in a season always maps to `top_initial_elo` (currently `3000`)
+- bottom division in a season always maps to `bottom_initial_elo` (currently `500`)
+- divisions between are linearly interpolated
+- if a season has only one division, that division is treated as top division
 
 ### Outcome weights
 
@@ -101,13 +108,13 @@ Implementation summary:
 - Keep bootstrap values conservative so division information does not dominate both the starting Elo and the match delta too strongly.
 - If lower divisions still rate too highly, increase `sensitivity` or lower `min_multiplier`.
 - If top divisions separate too aggressively, reduce `sensitivity` or lower `max_multiplier`.
-- If new players settle too slowly, raise `start_multiplier` or `rank_step_points` carefully.
-- If new players overshoot too easily, reduce `start_multiplier`, tighten `MIN_ELO_DELTA` / `MAX_ELO_DELTA`, or lower `rank_step_points`.
+- If new players settle too slowly, raise `start_multiplier` carefully.
+- If new players overshoot too easily, reduce `start_multiplier`, tighten `MIN_ELO_DELTA` / `MAX_ELO_DELTA`, or narrow the top-bottom bootstrap gap.
 
 ## Validation Checklist
 
 - A new player with no prior Elo starts from same-season same-division average Elo when that pool exists.
-- A new player in an empty season + division starts from rank-based bootstrap, not a flat hardcoded `1000`.
+- A new player in an empty season + division starts from season-aware linear bootstrap, not a flat hardcoded `1000`.
 - Division multipliers should differ across seasons when player level gaps differ.
 - Division multipliers should reflect both observed stat gaps and the configured rank prior blend.
 - The first 10 maps should move Elo clearly more than later maps.

@@ -25,6 +25,7 @@
             state[playerId] = {
                 profile: createSegment(),
                 seasons: createSegment(),
+                elo: createSegment(),
                 maps: {},
                 progression: {}
             };
@@ -64,6 +65,10 @@
         );
         const mapStats = Array.isArray(payload.map_stats || payload.mapStats) ? (payload.map_stats || payload.mapStats) : [];
         const progression = Array.isArray(payload.progression) ? payload.progression : [];
+        const eloSummary = payload.elo_summary || payload.eloSummary || null;
+        const eloHistory = Array.isArray(payload.elo_history || payload.eloHistory)
+            ? (payload.elo_history || payload.eloHistory)
+            : [];
 
         if (profile) {
             entry.profile.data = profile;
@@ -84,6 +89,15 @@
             progressionEntry.data = progression;
             progressionEntry.error = null;
             progressionEntry.fetchedAt = now();
+        }
+
+        if (eloSummary || eloHistory.length) {
+            entry.elo.data = {
+                elo_summary: eloSummary,
+                elo_history: eloHistory
+            };
+            entry.elo.error = null;
+            entry.elo.fetchedAt = now();
         }
     }
 
@@ -179,6 +193,34 @@
                     const progressionEntry = ensureProgressionEntry(entry, championshipId);
                     progressionEntry.error = error?.message || 'Pelaajan kehitystrendin lataus epäonnistui';
                     throw error;
+                }
+            },
+            async fetchElo(playerId, options = {}) {
+                if (!playerId) return null;
+                const entry = this.ensureEntry(playerId);
+                entry.elo = entry.elo || createSegment();
+                const segment = entry.elo;
+                const { force = false, limit = 50 } = options;
+
+                if (segment.loading) {
+                    return segment.data;
+                }
+                if (!force && isFresh(segment)) {
+                    return segment.data;
+                }
+
+                segment.loading = true;
+                segment.error = null;
+                try {
+                    const data = await window.apiClient.getPlayerElo(playerId, { limit });
+                    segment.data = data || {};
+                    segment.fetchedAt = now();
+                    return segment.data;
+                } catch (error) {
+                    segment.error = error?.message || 'Pelaajan Elo-tietojen lataus epäonnistui';
+                    throw error;
+                } finally {
+                    segment.loading = false;
                 }
             }
         }

@@ -10,25 +10,26 @@ DEFAULT_INITIAL_ELO = 1000.0
 INITIAL_ELO = DEFAULT_INITIAL_ELO
 
 # Kun kausi+divisioona on täysin tyhjä (ei yhtään olemassa olevaa Eloa),
-# uuden pelaajan base Elo bootstrappaa rank-pohjaisella offsetilla.
-# Kaavan ankkuri on 1000, jotta baseline pysyy helposti tulkittavana.
+# uuden pelaajan base Elo bootstrappaa divisioonan suhteellisen sijainnin mukaan.
+# Kauden ylin divisioona saa aina top_initial_elo-arvon ja alin
+# bottom_initial_elo-arvon. Väliin jäävät lineaarisesti.
 INITIAL_ELO_BOOTSTRAP: Dict[str, float] = {
-    "rank_reference_division": 10.0,
-    "rank_step_points": 16.0,
-    "min_initial_elo": 850.0,
-    "max_initial_elo": 1150.0,
+    "top_initial_elo": 3000.0,
+    "bottom_initial_elo": 500.0,
+    "min_initial_elo": 500.0,
+    "max_initial_elo": 3000.0,
 }
 
 # Kuinka aggressiivisesti ottelu liikuttaa Eloa peruspainolla.
-BASE_K_FACTOR = 24.0
+BASE_K_FACTOR = 30.0
 
 # Rajat yhden ottelun Elo-muutokselle ennen tallennusta.
-MAX_ELO_DELTA = 45.0
-MIN_ELO_DELTA = -45.0
+MAX_ELO_DELTA = 65.0
+MIN_ELO_DELTA = -55.0
 
 # Ottelun lopputuloksen vaikutus kokonaisimpactiin.
 OUTCOME_WEIGHTS: Dict[str, float] = {
-    "win_bonus": 0.15,
+    "win_bonus": 0.22,
     "loss_penalty": -0.15,
     "draw_bonus": 0.0,
 }
@@ -124,9 +125,26 @@ def k_factor_for_matches(matches_played: int) -> float:
     return k_factor_for_maps(matches_played)
 
 
-def bootstrap_initial_elo_for_division(division_num: int) -> float:
+def bootstrap_initial_elo_for_division(
+    division_num: int,
+    *,
+    season_min_division: int = 0,
+    season_max_division: int | None = None,
+) -> float:
     division = max(0, int(division_num))
-    rank_reference = float(INITIAL_ELO_BOOTSTRAP["rank_reference_division"])
-    rank_step_points = float(INITIAL_ELO_BOOTSTRAP["rank_step_points"])
-    raw = DEFAULT_INITIAL_ELO + ((rank_reference - float(division)) * rank_step_points)
+    top_initial_elo = float(INITIAL_ELO_BOOTSTRAP["top_initial_elo"])
+    bottom_initial_elo = float(INITIAL_ELO_BOOTSTRAP["bottom_initial_elo"])
+
+    min_division = int(season_min_division)
+    max_division = int(season_max_division) if season_max_division is not None else division
+    if max_division < min_division:
+        min_division, max_division = max_division, min_division
+
+    # Yksidivarisessa kaudessa ainoa divisioona käsitellään ylimpänä.
+    if max_division <= min_division:
+        return clamp_initial_elo(top_initial_elo)
+
+    normalized = (float(division) - float(min_division)) / (float(max_division) - float(min_division))
+    normalized = max(0.0, min(1.0, normalized))
+    raw = top_initial_elo + (normalized * (bottom_initial_elo - top_initial_elo))
     return clamp_initial_elo(raw)

@@ -103,12 +103,23 @@
         seasonsElo: query => [
             `/api/seasons-elo${query}`
         ],
-        playerBundle: (playerId, championshipId = null) => {
-            const champParam = championshipId ? `?championship_id=${encodeURIComponent(championshipId)}` : '';
+        playerBundle: (playerId, championshipId = null, includeElo = false) => {
+            const params = new URLSearchParams();
+            if (championshipId) {
+                params.set('championship_id', championshipId);
+            }
+            if (includeElo) {
+                params.set('include_elo', '1');
+            }
+            const query = params.toString();
+            const suffix = query ? `?${query}` : '';
             return [
-                `/api/players/${playerId}/bundle${champParam}`
+                `/api/players/${playerId}/bundle${suffix}`
             ];
         },
+        playerElo: (playerId, limit = 50) => [
+            `/api/players/${playerId}/elo?limit=${Number(limit) || 50}`
+        ],
         teamMatchPlayerStats: (teamId, championshipId) => [
             `/api/teams/${teamId}/match-player-stats/${championshipId}`
         ],
@@ -1432,13 +1443,32 @@
             }
             const encPlayerId = encodeURIComponent(playerId);
             const encChampionshipId = championshipId ? encodeURIComponent(championshipId) : null;
-            const routes = buildRouteCandidates('playerBundle', encPlayerId, encChampionshipId);
+            const includeElo = options.includeElo === true;
+            const routes = buildRouteCandidates('playerBundle', encPlayerId, encChampionshipId, includeElo);
             try {
                 const result = await fetchWithFallback(routes, options);
                 return result?.data ?? result ?? {};
             } catch (error) {
                 if (isDev) {
                     console.warn('[apiClient] playerBundle endpoint failed', error);
+                }
+                throw error;
+            }
+        }
+
+        async getPlayerElo(playerId, options = {}) {
+            if (!playerId) {
+                throw new Error('playerId is required');
+            }
+            const encPlayerId = encodeURIComponent(playerId);
+            const limit = Number(options.limit ?? 50) || 50;
+            const routes = buildRouteCandidates('playerElo', encPlayerId, limit);
+            try {
+                const result = await fetchWithFallback(routes, options);
+                return result?.data ?? result ?? {};
+            } catch (error) {
+                if (isDev) {
+                    console.warn('[apiClient] playerElo endpoint failed', error);
                 }
                 throw error;
             }

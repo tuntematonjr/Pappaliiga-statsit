@@ -141,12 +141,20 @@ def _resolve_new_player_initial_elo(
     season_num: int,
     division_num: int,
     season_division_elo_pool: dict[tuple[int, int], dict[str, float]],
+    season_division_bounds: dict[int, tuple[int, int]],
 ) -> float:
     pool_key = (season_num, division_num)
     existing_elos = list((season_division_elo_pool.get(pool_key) or {}).values())
     if existing_elos:
         return float(sum(existing_elos) / max(1, len(existing_elos)))
-    return float(bootstrap_initial_elo_for_division(division_num))
+    min_division, max_division = season_division_bounds.get(season_num, (0, 0))
+    return float(
+        bootstrap_initial_elo_for_division(
+            division_num,
+            season_min_division=min_division,
+            season_max_division=max_division,
+        )
+    )
 
 
 async def _fetch_match_rows(
@@ -236,6 +244,21 @@ def _build_elo_state(
     history_player_ids: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     dynamic_multipliers = _compute_dynamic_division_multipliers(match_rows)
+    season_division_bounds: dict[int, tuple[int, int]] = {}
+
+    for row in match_rows:
+        season_num = int(row.get("season") or 0)
+        division_num = int(row.get("division_num") or 0)
+        existing_bounds = season_division_bounds.get(season_num)
+        if existing_bounds is None:
+            season_division_bounds[season_num] = (division_num, division_num)
+            continue
+        current_min, current_max = existing_bounds
+        season_division_bounds[season_num] = (
+            min(current_min, division_num),
+            max(current_max, division_num),
+        )
+
     summaries: dict[str, dict[str, Any]] = {}
     histories: dict[str, list[dict[str, Any]]] = defaultdict(list)
     season_division_elo_pool: dict[tuple[int, int], dict[str, float]] = defaultdict(dict)
@@ -256,6 +279,7 @@ def _build_elo_state(
                 season_num=season_num,
                 division_num=division_num,
                 season_division_elo_pool=season_division_elo_pool,
+                season_division_bounds=season_division_bounds,
             )
             initial_elo = elo_before
 

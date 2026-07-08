@@ -1230,14 +1230,19 @@ window.TeamDetail = {
             const seasons = Array.isArray(this.pageData?.seasons) ? this.pageData.seasons : [];
             const normalized = seasons.map(season => {
                 const value = season.championshipId;
+                const matchesPlayed = toNumber(season.matchesPlayed ?? season.matches_played ?? 0);
+                const mapsPlayed = toNumber(season.mapsPlayed ?? season.maps_played ?? 0);
                 return {
                     value: value ? String(value) : null,
                     label: season.name || `Kausi ${season.season} · Div ${season.divisionNum}`,
                     season: toNumber(season.season),
                     division: season.divisionNum,
-                    isPlayoffs: season.isPlayoffs
+                    isPlayoffs: season.isPlayoffs,
+                    matchesPlayed,
+                    mapsPlayed,
+                    hasActivity: matchesPlayed > 0 || mapsPlayed > 0
                 };
-            }).filter(option => option.value);
+            }).filter(option => option.value && (!option.isPlayoffs || option.hasActivity));
             return normalized.sort((a, b) => {
                 const seasonDiff = (b.season || 0) - (a.season || 0);
                 if (seasonDiff !== 0) return seasonDiff;

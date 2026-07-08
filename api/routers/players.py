@@ -175,6 +175,11 @@ class PlayerBundleResponse(CamelModel):
     elo_history: List[PlayerEloHistoryPoint] = []
 
 
+class PlayerEloResponse(CamelModel):
+    elo_summary: Optional[PlayerEloSummary] = None
+    elo_history: List[PlayerEloHistoryPoint] = []
+
+
 @router.get("", response_model=List[PlayerInfo])
 async def list_players(
     season: Optional[int] = Query(None, description="Season filter"),
@@ -193,6 +198,7 @@ async def list_players(
 async def get_player_bundle(
     player_id: str,
     championship_id: Optional[str] = Query(None, description="Optional selected championship id"),
+    include_elo: bool = Query(False, description="Include Elo summary and history in bundle"),
 ):
     # fetch_player and fetch_player_season_stats are both cached — run in parallel.
     try:
@@ -227,7 +233,7 @@ async def get_player_bundle(
     if selected_row is not None:
         # map_stats and progression are independent — run in parallel.
         selected_championship_id = selected_row.championship_id
-        map_result, prog_result, elo_bundle_result = await asyncio.gather(
+        map_result, prog_result = await asyncio.gather(
             players_service.fetch_player_map_stats(selected_row.championship_id, player_id),
             players_service.fetch_player_season_progression(
                 player_id,
@@ -235,7 +241,6 @@ async def get_player_bundle(
                 selected_row.division_num,
                 championship_id=selected_row.championship_id,
             ),
-            elo_service.get_player_elo_bundle(player_id, limit=50),
             return_exceptions=True,
         )
         map_stats = (
@@ -248,22 +253,13 @@ async def get_player_bundle(
             if not isinstance(prog_result, Exception)
             else []
         )
-        if isinstance(elo_bundle_result, tuple):
-            elo_summary_result, elo_history_result = elo_bundle_result
-            elo_summary = (
-                PlayerEloSummary(**elo_summary_result)
-                if isinstance(elo_summary_result, dict)
-                else None
-            )
-            elo_history = (
-                [PlayerEloHistoryPoint(**row) for row in elo_history_result]
-                if isinstance(elo_history_result, list)
-                else []
-            )
-    else:
-        elo_summary_result, _ = await elo_service.get_player_elo_bundle(player_id, limit=0)
+    if include_elo:
+        limit = 50 if selected_row is not None else 0
+        elo_summary_result, elo_history_result = await elo_service.get_player_elo_bundle(player_id, limit=limit)
         if elo_summary_result:
             elo_summary = PlayerEloSummary(**elo_summary_result)
+        if selected_row is not None and isinstance(elo_history_result, list):
+            elo_history = [PlayerEloHistoryPoint(**row) for row in elo_history_result]
 
     return PlayerBundleResponse(
         player=PlayerInfo(**player_row),
@@ -272,6 +268,25 @@ async def get_player_bundle(
         selected_season=selected_row,
         map_stats=map_stats,
         progression=progression,
+        elo_summary=elo_summary,
+        elo_history=elo_history,
+    )
+
+
+@router.get("/{player_id}/elo", response_model=PlayerEloResponse, response_model_by_alias=False)
+async def get_player_elo(
+    player_id: str,
+    limit: int = Query(50, ge=0, le=200, description="Maximum number of Elo history points"),
+):
+    try:
+        await players_service.fetch_player(player_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    elo_summary_result, elo_history_result = await elo_service.get_player_elo_bundle(player_id, limit=limit)
+    elo_summary = PlayerEloSummary(**elo_summary_result) if elo_summary_result else None
+    elo_history = [PlayerEloHistoryPoint(**row) for row in (elo_history_result or [])]
+    return PlayerEloResponse(
         elo_summary=elo_summary,
         elo_history=elo_history,
     )

@@ -255,12 +255,23 @@ var Pinia=function(t,e){"use strict";let n;const i=t=>n=t,s=Symbol();function o(
         seasonsElo: query => [
             `/api/seasons-elo${query}`
         ],
-        playerBundle: (playerId, championshipId = null) => {
-            const champParam = championshipId ? `?championship_id=${encodeURIComponent(championshipId)}` : '';
+        playerBundle: (playerId, championshipId = null, includeElo = false) => {
+            const params = new URLSearchParams();
+            if (championshipId) {
+                params.set('championship_id', championshipId);
+            }
+            if (includeElo) {
+                params.set('include_elo', '1');
+            }
+            const query = params.toString();
+            const suffix = query ? `?${query}` : '';
             return [
-                `/api/players/${playerId}/bundle${champParam}`
+                `/api/players/${playerId}/bundle${suffix}`
             ];
         },
+        playerElo: (playerId, limit = 50) => [
+            `/api/players/${playerId}/elo?limit=${Number(limit) || 50}`
+        ],
         teamMatchPlayerStats: (teamId, championshipId) => [
             `/api/teams/${teamId}/match-player-stats/${championshipId}`
         ],
@@ -1584,13 +1595,32 @@ var Pinia=function(t,e){"use strict";let n;const i=t=>n=t,s=Symbol();function o(
             }
             const encPlayerId = encodeURIComponent(playerId);
             const encChampionshipId = championshipId ? encodeURIComponent(championshipId) : null;
-            const routes = buildRouteCandidates('playerBundle', encPlayerId, encChampionshipId);
+            const includeElo = options.includeElo === true;
+            const routes = buildRouteCandidates('playerBundle', encPlayerId, encChampionshipId, includeElo);
             try {
                 const result = await fetchWithFallback(routes, options);
                 return result?.data ?? result ?? {};
             } catch (error) {
                 if (isDev) {
                     console.warn('[apiClient] playerBundle endpoint failed', error);
+                }
+                throw error;
+            }
+        }
+
+        async getPlayerElo(playerId, options = {}) {
+            if (!playerId) {
+                throw new Error('playerId is required');
+            }
+            const encPlayerId = encodeURIComponent(playerId);
+            const limit = Number(options.limit ?? 50) || 50;
+            const routes = buildRouteCandidates('playerElo', encPlayerId, limit);
+            try {
+                const result = await fetchWithFallback(routes, options);
+                return result?.data ?? result ?? {};
+            } catch (error) {
+                if (isDev) {
+                    console.warn('[apiClient] playerElo endpoint failed', error);
                 }
                 throw error;
             }
@@ -4584,6 +4614,7 @@ if (document.readyState === 'loading') {
             state[playerId] = {
                 profile: createSegment(),
                 seasons: createSegment(),
+                elo: createSegment(),
                 maps: {},
                 progression: {}
             };
@@ -4623,6 +4654,10 @@ if (document.readyState === 'loading') {
         );
         const mapStats = Array.isArray(payload.map_stats || payload.mapStats) ? (payload.map_stats || payload.mapStats) : [];
         const progression = Array.isArray(payload.progression) ? payload.progression : [];
+        const eloSummary = payload.elo_summary || payload.eloSummary || null;
+        const eloHistory = Array.isArray(payload.elo_history || payload.eloHistory)
+            ? (payload.elo_history || payload.eloHistory)
+            : [];
 
         if (profile) {
             entry.profile.data = profile;
@@ -4643,6 +4678,15 @@ if (document.readyState === 'loading') {
             progressionEntry.data = progression;
             progressionEntry.error = null;
             progressionEntry.fetchedAt = now();
+        }
+
+        if (eloSummary || eloHistory.length) {
+            entry.elo.data = {
+                elo_summary: eloSummary,
+                elo_history: eloHistory
+            };
+            entry.elo.error = null;
+            entry.elo.fetchedAt = now();
         }
     }
 
@@ -4738,6 +4782,34 @@ if (document.readyState === 'loading') {
                     const progressionEntry = ensureProgressionEntry(entry, championshipId);
                     progressionEntry.error = error?.message || 'Pelaajan kehitystrendin lataus epäonnistui';
                     throw error;
+                }
+            },
+            async fetchElo(playerId, options = {}) {
+                if (!playerId) return null;
+                const entry = this.ensureEntry(playerId);
+                entry.elo = entry.elo || createSegment();
+                const segment = entry.elo;
+                const { force = false, limit = 50 } = options;
+
+                if (segment.loading) {
+                    return segment.data;
+                }
+                if (!force && isFresh(segment)) {
+                    return segment.data;
+                }
+
+                segment.loading = true;
+                segment.error = null;
+                try {
+                    const data = await window.apiClient.getPlayerElo(playerId, { limit });
+                    segment.data = data || {};
+                    segment.fetchedAt = now();
+                    return segment.data;
+                } catch (error) {
+                    segment.error = error?.message || 'Pelaajan Elo-tietojen lataus epäonnistui';
+                    throw error;
+                } finally {
+                    segment.loading = false;
                 }
             }
         }
@@ -13809,14 +13881,19 @@ window.TeamDetail = {
             const seasons = Array.isArray(this.pageData?.seasons) ? this.pageData.seasons : [];
             const normalized = seasons.map(season => {
                 const value = season.championshipId;
+                const matchesPlayed = toNumber(season.matchesPlayed ?? season.matches_played ?? 0);
+                const mapsPlayed = toNumber(season.mapsPlayed ?? season.maps_played ?? 0);
                 return {
                     value: value ? String(value) : null,
                     label: season.name || `Kausi ${season.season} · Div ${season.divisionNum}`,
                     season: toNumber(season.season),
                     division: season.divisionNum,
-                    isPlayoffs: season.isPlayoffs
+                    isPlayoffs: season.isPlayoffs,
+                    matchesPlayed,
+                    mapsPlayed,
+                    hasActivity: matchesPlayed > 0 || mapsPlayed > 0
                 };
-            }).filter(option => option.value);
+            }).filter(option => option.value && (!option.isPlayoffs || option.hasActivity));
             return normalized.sort((a, b) => {
                 const seasonDiff = (b.season || 0) - (a.season || 0);
                 if (seasonDiff !== 0) return seasonDiff;
@@ -22694,6 +22771,7 @@ window.PlayerView = {
             seasonAveragesBySeason: {},
             inFlightLoads: {
                 bootstrap: {},
+                elo: {},
                 mapStats: {},
                 progression: {},
                 divisionAverages: {},
@@ -22744,6 +22822,9 @@ window.PlayerView = {
         seasonsSegment() {
             return this.playerState?.seasons || createSegment();
         },
+        eloSegment() {
+            return this.playerState?.elo || createSegment();
+        },
         mapStatsSegment() {
             if (!this.selectedSeasonId) return createSegment();
             return this.playerState?.maps?.[this.selectedSeasonId] || createSegment();
@@ -22786,12 +22867,28 @@ window.PlayerView = {
             return this.playerState?.bundle?.__default__?.data || null;
         },
         eloSummary() {
-            const summary = this.selectedBundleData?.elo_summary || this.selectedBundleData?.eloSummary || null;
+            const summary =
+                this.eloSegment?.data?.elo_summary
+                || this.eloSegment?.data?.eloSummary
+                || this.selectedBundleData?.elo_summary
+                || this.selectedBundleData?.eloSummary
+                || null;
             return summary && typeof summary === 'object' ? summary : null;
         },
         eloHistory() {
-            const rows = this.selectedBundleData?.elo_history || this.selectedBundleData?.eloHistory || [];
+            const rows =
+                this.eloSegment?.data?.elo_history
+                || this.eloSegment?.data?.eloHistory
+                || this.selectedBundleData?.elo_history
+                || this.selectedBundleData?.eloHistory
+                || [];
             return Array.isArray(rows) ? rows : [];
+        },
+        eloLoading() {
+            return Boolean(this.eloSegment?.loading);
+        },
+        eloError() {
+            return this.eloSegment?.error || null;
         },
         eloCards() {
             if (!this.eloSummary) return [];
@@ -23620,9 +23717,25 @@ window.PlayerView = {
                     if (this.selectedSeasonId) {
                         await this.playerStore.fetchBundle(this.playerId, this.selectedSeasonId, { force: true });
                     }
+                    // Fetch Elo separately so the rest of the page can render first.
+                    this.loadElo({ force: false });
                     this.syncRouteBreadcrumbContext();
                 } catch (error) {
                     console.error('Player bootstrap failed', error);
+                }
+            });
+        },
+        async loadElo(options = {}) {
+            if (!this.playerStore || !this.playerId) return;
+            const key = String(this.playerId);
+            return this.runInFlightLoad('elo', key, async () => {
+                try {
+                    await this.playerStore.fetchElo(this.playerId, {
+                        force: options.force === true,
+                        limit: Number(options.limit ?? 50) || 50,
+                    });
+                } catch (error) {
+                    console.error('Player Elo load failed', error);
                 }
             });
         },
@@ -24164,13 +24277,16 @@ window.PlayerView = {
                     <p v-if="!seasonOptions.length" class="player-empty">Ei kausia saatavilla.</p>
                 </section>
 
-                <section v-if="eloSummary" class="glass-card player-elo-panel">
+                <section v-if="eloSummary || eloLoading || eloError" class="glass-card player-elo-panel">
                     <div class="section-heading section-heading--split">
                         <div class="section-heading__main">
                             <h3 class="section-title titleUnderline">Pelaaja Elo</h3>
                             <span class="section-sub">Painot ja kertoimet tulevat keskitetysti Elo-configista.</span>
                         </div>
                     </div>
+                    <div v-if="eloLoading && !eloSummary" class="player-empty">Ladataan Elo-tietoja...</div>
+                    <div v-else-if="eloError && !eloSummary" class="player-empty">Elo-tietojen lataus epäonnistui.</div>
+                    <template v-else>
                     <stat-panel :items="eloCards" :columns="4"></stat-panel>
                     <div v-if="eloTrendChart" class="performance-trends performance-trends--single">
                         <div class="trend-chart trend-chart--elo">
@@ -24305,6 +24421,7 @@ window.PlayerView = {
                             </div>
                         </div>
                     </div>
+                    </template>
                 </section>
 
                 <section v-if="comparePlayer" class="player-compare-workspace glass-card">

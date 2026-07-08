@@ -739,6 +739,7 @@ window.PlayerView = {
             seasonAveragesBySeason: {},
             inFlightLoads: {
                 bootstrap: {},
+                elo: {},
                 mapStats: {},
                 progression: {},
                 divisionAverages: {},
@@ -789,6 +790,9 @@ window.PlayerView = {
         seasonsSegment() {
             return this.playerState?.seasons || createSegment();
         },
+        eloSegment() {
+            return this.playerState?.elo || createSegment();
+        },
         mapStatsSegment() {
             if (!this.selectedSeasonId) return createSegment();
             return this.playerState?.maps?.[this.selectedSeasonId] || createSegment();
@@ -831,12 +835,28 @@ window.PlayerView = {
             return this.playerState?.bundle?.__default__?.data || null;
         },
         eloSummary() {
-            const summary = this.selectedBundleData?.elo_summary || this.selectedBundleData?.eloSummary || null;
+            const summary =
+                this.eloSegment?.data?.elo_summary
+                || this.eloSegment?.data?.eloSummary
+                || this.selectedBundleData?.elo_summary
+                || this.selectedBundleData?.eloSummary
+                || null;
             return summary && typeof summary === 'object' ? summary : null;
         },
         eloHistory() {
-            const rows = this.selectedBundleData?.elo_history || this.selectedBundleData?.eloHistory || [];
+            const rows =
+                this.eloSegment?.data?.elo_history
+                || this.eloSegment?.data?.eloHistory
+                || this.selectedBundleData?.elo_history
+                || this.selectedBundleData?.eloHistory
+                || [];
             return Array.isArray(rows) ? rows : [];
+        },
+        eloLoading() {
+            return Boolean(this.eloSegment?.loading);
+        },
+        eloError() {
+            return this.eloSegment?.error || null;
         },
         eloCards() {
             if (!this.eloSummary) return [];
@@ -1665,9 +1685,25 @@ window.PlayerView = {
                     if (this.selectedSeasonId) {
                         await this.playerStore.fetchBundle(this.playerId, this.selectedSeasonId, { force: true });
                     }
+                    // Fetch Elo separately so the rest of the page can render first.
+                    this.loadElo({ force: false });
                     this.syncRouteBreadcrumbContext();
                 } catch (error) {
                     console.error('Player bootstrap failed', error);
+                }
+            });
+        },
+        async loadElo(options = {}) {
+            if (!this.playerStore || !this.playerId) return;
+            const key = String(this.playerId);
+            return this.runInFlightLoad('elo', key, async () => {
+                try {
+                    await this.playerStore.fetchElo(this.playerId, {
+                        force: options.force === true,
+                        limit: Number(options.limit ?? 50) || 50,
+                    });
+                } catch (error) {
+                    console.error('Player Elo load failed', error);
                 }
             });
         },
@@ -2209,13 +2245,16 @@ window.PlayerView = {
                     <p v-if="!seasonOptions.length" class="player-empty">Ei kausia saatavilla.</p>
                 </section>
 
-                <section v-if="eloSummary" class="glass-card player-elo-panel">
+                <section v-if="eloSummary || eloLoading || eloError" class="glass-card player-elo-panel">
                     <div class="section-heading section-heading--split">
                         <div class="section-heading__main">
                             <h3 class="section-title titleUnderline">Pelaaja Elo</h3>
                             <span class="section-sub">Painot ja kertoimet tulevat keskitetysti Elo-configista.</span>
                         </div>
                     </div>
+                    <div v-if="eloLoading && !eloSummary" class="player-empty">Ladataan Elo-tietoja...</div>
+                    <div v-else-if="eloError && !eloSummary" class="player-empty">Elo-tietojen lataus epäonnistui.</div>
+                    <template v-else>
                     <stat-panel :items="eloCards" :columns="4"></stat-panel>
                     <div v-if="eloTrendChart" class="performance-trends performance-trends--single">
                         <div class="trend-chart trend-chart--elo">
@@ -2350,6 +2389,7 @@ window.PlayerView = {
                             </div>
                         </div>
                     </div>
+                    </template>
                 </section>
 
                 <section v-if="comparePlayer" class="player-compare-workspace glass-card">
