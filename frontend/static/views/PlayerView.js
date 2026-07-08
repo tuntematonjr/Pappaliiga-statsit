@@ -2249,7 +2249,7 @@ window.PlayerView = {
                     <div class="section-heading section-heading--split">
                         <div class="section-heading__main">
                             <h3 class="section-title titleUnderline">Pelaaja Elo</h3>
-                            <span class="section-sub">Painot ja kertoimet tulevat keskitetysti Elo-configista.</span>
+                            <span class="section-sub">Painot ja kertoimet tulevat keskitetysti Elo-configista. HUOM: TÄMÄ ELO-MALLI ON TÄYSIN KEKSITTY JA KOKEELLINEN. Tämä ei tässä vaiheessa todista pelaajan todellista tasoa varmasti. Arvot ovat vain suuntaa antava debug-malli. </span>
                         </div>
                     </div>
                     <div v-if="eloLoading && !eloSummary" class="player-empty">Ladataan Elo-tietoja...</div>
