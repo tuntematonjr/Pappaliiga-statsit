@@ -734,6 +734,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
         "season": champ["season"],
         "division_num": champ["division_num"],
         "is_playoff": bool(champ["is_playoff"]),
+        "elo_enabled": elo_service.is_elo_enabled(),
         "teams": teams,
         "excluded_team_ids": list(excluded),
         "excluded_teams": list(excluded_lookup.values()),

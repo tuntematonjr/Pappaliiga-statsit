@@ -3,6 +3,10 @@ from __future__ import annotations
 import math
 from typing import Dict
 
+# Master switch for the entire Elo system.
+# Set to True to enable Elo calculations and Elo API payloads.
+ELO_SYSTEM_ENABLED = False
+
 # Faceit-tyylinen lähtötaso kaikille uusille pelaajille.
 DEFAULT_INITIAL_ELO = 1000.0
 

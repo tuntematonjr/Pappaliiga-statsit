@@ -438,9 +438,9 @@
         };
     }
 
-    function shouldRetry(status, error) {
+    function shouldRetry(status, error, context = {}) {
         if (error && error.name === 'AbortError') {
-            return true;
+            return Boolean(context.abortedByTimeout);
         }
         if (!status) {
             return true;
@@ -613,16 +613,33 @@
             } catch (error) {
                 clearTimeout(timeoutId);
                 lastError = error;
+                const isAbortError = error && error.name === 'AbortError';
+                const abortedByTimeout = controller.signal.aborted && !(options.signal && options.signal.aborted);
+                const abortedByCaller = Boolean(options.signal && options.signal.aborted);
+
+                if (isAbortError && abortedByCaller) {
+                    // Caller intentionally cancelled this request (e.g. route change).
+                    throw error;
+                }
+
                 if (isDev) {
-                    console.warn(`[apiClient] request error ${target.displayPath}`, {
+                    const logPayload = {
                         requestId,
                         attempt,
                         requestUrl: target.url,
                         error,
+                        abortedByTimeout,
+                        abortedByCaller,
                         message: error?.message || String(error || '')
-                    });
+                    };
+                    if (isAbortError && !abortedByTimeout) {
+                        console.debug(`[apiClient] request aborted ${target.displayPath}`, logPayload);
+                    } else {
+                        console.warn(`[apiClient] request error ${target.displayPath}`, logPayload);
+                    }
                 }
-                if (attempt < retries && shouldRetry(error.status, error)) {
+
+                if (attempt < retries && shouldRetry(error.status, error, { abortedByTimeout })) {
                     await sleep(Math.pow(2, attempt) * 150);
                     continue;
                 }
@@ -1446,7 +1463,10 @@
             const includeElo = options.includeElo === true;
             const routes = buildRouteCandidates('playerBundle', encPlayerId, encChampionshipId, includeElo);
             try {
-                const result = await fetchWithFallback(routes, options);
+                const result = await fetchWithFallback(routes, {
+                    ...options,
+                    timeoutMs: options.timeoutMs || 20000,
+                });
                 return result?.data ?? result ?? {};
             } catch (error) {
                 if (isDev) {

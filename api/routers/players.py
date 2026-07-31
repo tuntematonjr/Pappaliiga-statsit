@@ -171,11 +171,13 @@ class PlayerBundleResponse(CamelModel):
     selected_season: Optional[PlayerSeasonStats] = None
     map_stats: List[PlayerMapStatsWithDelta] = []
     progression: List[PlayerSeasonProgressPoint] = []
+    elo_enabled: bool = True
     elo_summary: Optional[PlayerEloSummary] = None
     elo_history: List[PlayerEloHistoryPoint] = []
 
 
 class PlayerEloResponse(CamelModel):
+    elo_enabled: bool = True
     elo_summary: Optional[PlayerEloSummary] = None
     elo_history: List[PlayerEloHistoryPoint] = []
 
@@ -268,6 +270,7 @@ async def get_player_bundle(
         selected_season=selected_row,
         map_stats=map_stats,
         progression=progression,
+        elo_enabled=elo_service.is_elo_enabled(),
         elo_summary=elo_summary,
         elo_history=elo_history,
     )
@@ -287,6 +290,7 @@ async def get_player_elo(
     elo_summary = PlayerEloSummary(**elo_summary_result) if elo_summary_result else None
     elo_history = [PlayerEloHistoryPoint(**row) for row in (elo_history_result or [])]
     return PlayerEloResponse(
+        elo_enabled=elo_service.is_elo_enabled(),
         elo_summary=elo_summary,
         elo_history=elo_history,
     )

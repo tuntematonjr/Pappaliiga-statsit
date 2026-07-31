@@ -834,6 +834,17 @@ window.PlayerView = {
             if (selected) return selected;
             return this.playerState?.bundle?.__default__?.data || null;
         },
+        eloEnabled() {
+            const bundleFlag = this.selectedBundleData?.elo_enabled;
+            if (bundleFlag !== undefined && bundleFlag !== null) {
+                return Boolean(bundleFlag);
+            }
+            const segmentFlag = this.eloSegment?.data?.elo_enabled;
+            if (segmentFlag !== undefined && segmentFlag !== null) {
+                return Boolean(segmentFlag);
+            }
+            return true;
+        },
         eloSummary() {
             const summary =
                 this.eloSegment?.data?.elo_summary
@@ -1686,7 +1697,9 @@ window.PlayerView = {
                         await this.playerStore.fetchBundle(this.playerId, this.selectedSeasonId, { force: true });
                     }
                     // Fetch Elo separately so the rest of the page can render first.
-                    this.loadElo({ force: false });
+                    if (this.eloEnabled) {
+                        this.loadElo({ force: false });
+                    }
                     this.syncRouteBreadcrumbContext();
                 } catch (error) {
                     console.error('Player bootstrap failed', error);
@@ -1695,6 +1708,7 @@ window.PlayerView = {
         },
         async loadElo(options = {}) {
             if (!this.playerStore || !this.playerId) return;
+            if (!this.eloEnabled) return;
             const key = String(this.playerId);
             return this.runInFlightLoad('elo', key, async () => {
                 try {
@@ -2245,7 +2259,7 @@ window.PlayerView = {
                     <p v-if="!seasonOptions.length" class="player-empty">Ei kausia saatavilla.</p>
                 </section>
 
-                <section v-if="eloSummary || eloLoading || eloError" class="glass-card player-elo-panel">
+                <section v-if="eloEnabled && (eloSummary || eloLoading || eloError)" class="glass-card player-elo-panel">
                     <div class="section-heading section-heading--split">
                         <div class="section-heading__main">
                             <h3 class="section-title titleUnderline">Pelaaja Elo</h3>

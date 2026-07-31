@@ -9,6 +9,7 @@ from elo_config import (
     DEFAULT_INITIAL_ELO,
     DYNAMIC_DIVISION_ELO,
     DYNAMIC_K_FACTOR,
+    ELO_SYSTEM_ENABLED,
     INITIAL_ELO_BOOTSTRAP,
     INITIAL_ELO,
     MAX_ELO_DELTA,
@@ -23,6 +24,10 @@ from elo_config import (
 )
 
 from api.services.cache_helpers import GLOBAL_CACHE, get_global_revision
+
+
+def is_elo_enabled() -> bool:
+    return bool(ELO_SYSTEM_ENABLED)
 
 
 def _safe_div(numerator: float, denominator: float) -> float:
@@ -384,6 +389,8 @@ async def _get_cached_player_elo_index(player_id: str) -> dict[str, Any]:
 
 
 async def get_player_elo_summary(player_id: str) -> dict[str, Any] | None:
+    if not is_elo_enabled():
+        return None
     elo_index = await _get_cached_player_elo_index(player_id)
     summary = dict((elo_index.get("summaries") or {}).get(player_id) or {})
     if not summary:
@@ -402,6 +409,8 @@ async def get_player_elo_history(
     *,
     limit: int = 50,
 ) -> list[dict[str, Any]]:
+    if not is_elo_enabled():
+        return []
     elo_index = await _get_cached_player_elo_index(player_id)
     history = list((elo_index.get("histories") or {}).get(player_id, []))
     if limit > 0:
@@ -414,6 +423,8 @@ async def get_player_elo_bundle(
     *,
     limit: int = 50,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    if not is_elo_enabled():
+        return None, []
     elo_index = await _get_cached_player_elo_index(player_id)
     summary = dict((elo_index.get("summaries") or {}).get(player_id) or {})
     if not summary:
@@ -437,6 +448,8 @@ async def get_elo_leaderboard(
     participation_season: Optional[int] = None,
     limit: int = 2000,
 ) -> list[dict[str, Any]]:
+    if not is_elo_enabled():
+        return []
     # Always compute Elo and dynamic division multipliers from full history.
     # Endpoint filters are only for deciding which players are displayed.
     elo_index = await _get_cached_elo_summary_index()
@@ -473,6 +486,7 @@ async def get_elo_leaderboard(
 def get_public_elo_config() -> dict[str, Any]:
     """Return frontend-safe Elo config snapshot for transparent UI explanation."""
     return {
+        "enabled": is_elo_enabled(),
         "initial_elo": DEFAULT_INITIAL_ELO,
         "base_k_factor": BASE_K_FACTOR,
         "min_elo_delta": MIN_ELO_DELTA,

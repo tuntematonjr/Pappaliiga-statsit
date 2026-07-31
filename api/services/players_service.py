@@ -594,9 +594,15 @@ async def list_players(
         elo_rows = await elo_service.get_elo_leaderboard(
             limit=max(limit, len(rows) or 0),
         )
+        elo_enabled = elo_service.is_elo_enabled()
         elo_by_player_id = {str(row.get("player_id")): row for row in elo_rows}
         for row in rows:
             elo_row = elo_by_player_id.get(str(row.get("player_id")))
+            if not elo_enabled:
+                row["current_elo"] = None
+                row["last_elo_delta"] = None
+                row["elo_matches_processed"] = None
+                continue
             row["current_elo"] = float(elo_row.get("current_elo") or 1000.0) if elo_row else 1000.0
             row["last_elo_delta"] = float(elo_row.get("last_elo_delta") or 0.0) if elo_row else 0.0
             row["elo_matches_processed"] = int(elo_row.get("matches_processed") or 0) if elo_row else 0

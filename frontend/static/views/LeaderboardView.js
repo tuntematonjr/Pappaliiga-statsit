@@ -1,4 +1,5 @@
 const DEFAULT_ELO_CONFIG = Object.freeze({
+    enabled: true,
     initial_elo: 1000.0,
     base_k_factor: 24.0,
     min_elo_delta: -45.0,
@@ -95,17 +96,27 @@ window.LeaderboardView = {
         };
     },
     computed: {
+        eloEnabled() {
+            return this.effectiveEloConfig?.enabled !== false;
+        },
         tableColumns() {
-            return [
+            const baseColumns = [
                 { key: 'rank', label: '#', sortable: true, numeric: true, width: '70px', align: 'center' },
                 { key: 'nickname', label: 'Pelaaja', sortable: true, width: 'minmax(220px, 1.8fr)', align: 'left', colClass: 'col-name' },
                 { key: 'last_team_name', label: 'Joukkue', sortable: true, width: 'minmax(180px, 1.4fr)', align: 'left' },
-                { key: 'current_elo', label: 'Elo', sortable: true, numeric: true, width: '110px', align: 'center' },
-                { key: 'last_division_multiplier', label: 'Div kerroin', sortable: true, numeric: true, width: '120px', align: 'center' },
-                { key: 'last_elo_delta', label: 'Viimeisin', sortable: true, numeric: true, width: '110px', align: 'center' },
                 { key: 'matches_processed', label: 'Ottelut', sortable: true, numeric: true, width: '100px', align: 'center' },
                 { key: 'last_division_num', label: 'Div', sortable: true, numeric: true, width: '90px', align: 'center' },
                 { key: 'last_season', label: 'Kausi', sortable: true, numeric: true, width: '90px', align: 'center' },
+            ];
+            if (!this.eloEnabled) {
+                return baseColumns;
+            }
+            return [
+                ...baseColumns.slice(0, 3),
+                { key: 'current_elo', label: 'Elo', sortable: true, numeric: true, width: '110px', align: 'center' },
+                { key: 'last_division_multiplier', label: 'Div kerroin', sortable: true, numeric: true, width: '120px', align: 'center' },
+                { key: 'last_elo_delta', label: 'Viimeisin', sortable: true, numeric: true, width: '110px', align: 'center' },
+                ...baseColumns.slice(3),
             ];
         },
         selectedSeasonLabel() {
@@ -127,6 +138,7 @@ window.LeaderboardView = {
             }));
         },
         eloFormulas() {
+            if (!this.eloEnabled) return [];
             const formulas = this.effectiveEloConfig?.formulas || {};
             return [
                 { key: 'stat_score', label: 'Tilastopisteet', value: formulas.stat_score || '-' },
@@ -177,6 +189,7 @@ window.LeaderboardView = {
             };
         },
         eloConfigRows() {
+            if (!this.eloEnabled) return [];
             const cfg = this.effectiveEloConfig || DEFAULT_ELO_CONFIG;
             const outcome = cfg.outcome_weights || {};
             const dynDiv = cfg.dynamic_division_elo || {};
@@ -258,7 +271,7 @@ window.LeaderboardView = {
                 this.applyLeaderboardBundle(bundle);
             } catch (error) {
                 if (requestToken !== this.loadToken) return;
-                this.error = error?.message || 'Elo-listan lataus epäonnistui';
+                this.error = error?.message || 'Pelaajalistan lataus epäonnistui';
             } finally {
                 if (requestToken === this.loadToken) {
                     this.loading = false;
@@ -298,7 +311,7 @@ window.LeaderboardView = {
                 this.applyLeaderboardBundle(bundle);
             } catch (error) {
                 if (requestToken !== this.loadToken) return;
-                this.error = error?.message || 'Elo-listan lataus epäonnistui';
+                this.error = error?.message || 'Pelaajalistan lataus epäonnistui';
             } finally {
                 if (requestToken === this.loadToken) {
                     this.loading = false;
@@ -308,6 +321,9 @@ window.LeaderboardView = {
         sortPlayers(players) {
             const rows = Array.isArray(players) ? [...players] : [];
             return rows.sort((a, b) => {
+                if (!this.eloEnabled) {
+                    return this.getPlayerName(a).localeCompare(this.getPlayerName(b), 'fi');
+                }
                 const eloDiff = Number(b.current_elo || 1000) - Number(a.current_elo || 1000);
                 if (eloDiff !== 0) return eloDiff;
                 const matchesDiff = Number(b.matches_processed || 0) - Number(a.matches_processed || 0);
@@ -337,6 +353,7 @@ window.LeaderboardView = {
             return season?.label || season?.name || `Kausi ${this.getSeasonId(season)}`;
         },
         formatElo(value) {
+            if (value == null) return '-';
             return Number(value || 1000).toFixed(0);
         },
         formatDelta(value) {
@@ -366,6 +383,9 @@ window.LeaderboardView = {
         buildExportFileName() {
             const seasonPart = this.selectedSeasonId ? `season-${this.selectedSeasonId}` : 'all-seasons';
             const stamp = new Date().toISOString().slice(0, 10);
+            if (!this.eloEnabled) {
+                return `players-${seasonPart}-${stamp}.csv`;
+            }
             return `elo-leaderboard-${seasonPart}-${stamp}.csv`;
         },
         exportLeaderboardCsv() {
@@ -374,31 +394,55 @@ window.LeaderboardView = {
                 return;
             }
 
-            const headers = [
-                'Rank',
-                'Player',
-                'Team',
-                'Current Elo',
-                'Division Multiplier',
-                'Last Elo Delta',
-                'Matches',
-                'Division',
-                'Season',
-                'Player ID'
-            ];
+            const headers = this.eloEnabled
+                ? [
+                    'Rank',
+                    'Player',
+                    'Team',
+                    'Current Elo',
+                    'Division Multiplier',
+                    'Last Elo Delta',
+                    'Matches',
+                    'Division',
+                    'Season',
+                    'Player ID'
+                ]
+                : [
+                    'Rank',
+                    'Player',
+                    'Team',
+                    'Matches',
+                    'Division',
+                    'Season',
+                    'Player ID'
+                ];
 
-            const csvRows = rows.map(row => [
-                row.rank,
-                this.getPlayerName(row),
-                this.formatTeam(row.last_team_name),
-                this.formatElo(row.current_elo),
-                this.formatMultiplier(row.last_division_multiplier),
-                this.formatDelta(row.last_elo_delta),
-                Number(row.matches_processed || 0),
-                this.formatDivision(row.last_division_num),
-                row.last_season || '-',
-                this.getPlayerId(row) || ''
-            ]);
+            const csvRows = rows.map(row => {
+                if (!this.eloEnabled) {
+                    return [
+                        row.rank,
+                        this.getPlayerName(row),
+                        this.formatTeam(row.last_team_name),
+                        Number(row.matches_processed || 0),
+                        this.formatDivision(row.last_division_num),
+                        row.last_season || '-',
+                        this.getPlayerId(row) || ''
+                    ];
+                }
+
+                return [
+                    row.rank,
+                    this.getPlayerName(row),
+                    this.formatTeam(row.last_team_name),
+                    this.formatElo(row.current_elo),
+                    this.formatMultiplier(row.last_division_multiplier),
+                    this.formatDelta(row.last_elo_delta),
+                    Number(row.matches_processed || 0),
+                    this.formatDivision(row.last_division_num),
+                    row.last_season || '-',
+                    this.getPlayerId(row) || ''
+                ];
+            });
 
             const csvContent = [
                 headers.map(value => this.csvSafe(value)).join(','),
@@ -425,8 +469,11 @@ window.LeaderboardView = {
     template: `
         <section class="players-view">
             <header class="teams-view__header">
-                <h1 class="title-accent titleUnderlinePage">Pelaaja Elo</h1>
-                <p class="teams-view__meta">{{ filteredPlayers.length }} / {{ players.length }} pelaajaa · {{ selectedSeasonLabel }} · Nykyhetken Elo</p>
+                <h1 class="title-accent titleUnderlinePage">{{ eloEnabled ? 'Pelaaja Elo' : 'Pelaajat' }}</h1>
+                <p class="teams-view__meta">
+                    {{ filteredPlayers.length }} / {{ players.length }} pelaajaa · {{ selectedSeasonLabel }}
+                    <template v-if="eloEnabled"> · Nykyhetken Elo</template>
+                </p>
                 <div class="teams-view__filters">
                     <select v-model="selectedSeasonId" class="teams-view__season">
                         <option value="">Kaikki kaudet</option>
@@ -456,14 +503,14 @@ window.LeaderboardView = {
                 </div>
             </header>
 
-            <section class="elo-warning-banner" aria-live="polite">
+            <section v-if="eloEnabled" class="elo-warning-banner" aria-live="polite">
                 <strong>HUOM: TÄMÄ ELO-MALLI ON TÄYSIN KEKSITTY JA KOKEELLINEN.</strong>
                 <span>
                     Tämä ei tässä vaiheessa todista pelaajan todellista tasoa varmasti. Arvot ovat vain suuntaa antava debug-malli.
                 </span>
             </section>
 
-            <section class="elo-explainer glass-card">
+            <section v-if="eloEnabled" class="elo-explainer glass-card">
                 <h3 class="title-accent titleUnderlineCard">Miten Elo lasketaan</h3>
                 <p class="elo-explainer__intro">
                     Alla on ensin ihmiskielinen selite mallista, ja sen jälkeen tekninen kaava- sekä config-osio suoraan backendin Elo-configista.
@@ -578,7 +625,7 @@ window.LeaderboardView = {
 
             <loading-spinner
                 v-if="loading"
-                message="Elo-listaa ladataan..."
+                message="Pelaajalistaa ladataan..."
             ></loading-spinner>
             <error-message
                 v-else-if="error"
@@ -589,7 +636,7 @@ window.LeaderboardView = {
                 <sortable-table
                     :columns="tableColumns"
                     :data="tableRows"
-                    :default-sort="{ column: 'current_elo', order: 'desc', numeric: true }"
+                    :default-sort="eloEnabled ? { column: 'current_elo', order: 'desc', numeric: true } : { column: 'nickname', order: 'asc', numeric: false }"
                     :sticky-header="true"
                     :compact="true"
                     :mobile-column-limit="4"

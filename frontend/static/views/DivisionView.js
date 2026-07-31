@@ -437,6 +437,9 @@ window.DivisionView = {
         divisionDetails() {
             return this.divisionState.details.data;
         },
+        eloEnabled() {
+            return this.divisionDetails?.elo_enabled !== false;
+        },
         divisionLoading() {
             return this.divisionState.details.loading;
         },
@@ -671,7 +674,10 @@ window.DivisionView = {
                 ...aggregates,
                 aggregates
             };
-            return buildMetricCards(source, DIVISION_METRIC_SCHEMA);
+            const metricSchema = this.eloEnabled
+                ? DIVISION_METRIC_SCHEMA
+                : DIVISION_METRIC_SCHEMA.filter(metric => metric.id !== 'avg_elo');
+            return buildMetricCards(source, metricSchema);
         },
         derivedAggregates() {
             const details = this.divisionDetails || {};
