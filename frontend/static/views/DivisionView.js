@@ -96,8 +96,6 @@ const SANKARI_CARD_GROUPS = [
                 description: 'Hiipii selkään kuin LAN-illan viimeinen yllätys.<br>Eniten puukko tappoja.',
                 metricKey: 'knifeKills',
                 requirePositive: true,
-                showWhenEmpty: true,
-                placeholderNames: ['Bot Allu', 'Bot Bob', 'Bot Pete', 'Bot Tuntematon'],
                 sortDirection: 'desc',
                 maxEntries: 4
             },
@@ -107,8 +105,6 @@ const SANKARI_CARD_GROUPS = [
                 description: 'Salama ei aina iske kahdesti, mutta Zeus kyllä.<br>Eniten zeus tappoja.',
                 metricKey: 'zeusKills',
                 requirePositive: true,
-                showWhenEmpty: true,
-                placeholderNames: ['Bot Allu', 'Bot Bob', 'Bot Pete', 'Bot Tuntematon'],
                 sortDirection: 'desc',
                 maxEntries: 4
             }
@@ -238,6 +234,19 @@ const SANKARI_CARD_GROUPS = [
             }
         ]
     }
+];
+
+const SANKARI_PLACEHOLDER_NAMES = [
+    'Bot Allu',
+    'Bot Bob',
+    'Bot Pete',
+    'Bot Tuntematon',
+    'Bot Cultti',
+    'Bot Beizi',
+    'Bot B0rje',
+    'Bot Igor',
+    'Bot BottiB',
+    'Bot NuoriOsuja'
 ];
 
 const SANKARI_METRIC_META = {
@@ -385,8 +394,6 @@ window.DivisionView = {
         return {
             divisionStore,
             upcomingStore,
-            mapColumns: DIVISION_MAP_COLUMNS,
-            matchViewMode: 'upcoming',
             divisionMatches: [],
             divisionMatchesLoading: false,
             divisionMatchesError: null,
@@ -396,8 +403,6 @@ window.DivisionView = {
             replay2StatusByMatch: {},
             playedRowsPrefetching: false,
             playedRowsPrefetchKey: '',
-            mapCatalog: [],
-            mapCatalogLoaded: false,
             quickLinks: [
                 { id: 'upcoming', label: 'Tulevat ottelut' },
                 { id: 'summary', label: 'Tilastot' },
@@ -1593,12 +1598,12 @@ window.DivisionView = {
             return sorted.slice(0, limit);
         },
         buildSankariPlaceholderEntries(card) {
-            if (!card || !Array.isArray(card.placeholderNames) || !card.placeholderNames.length) {
+            const names = this.getPlaceholderNames(card);
+            if (!names.length) {
                 return [];
             }
             const limit = Number(card.maxEntries) || 4;
-            const names = this.getPlaceholderNames(card).slice(0, limit);
-            return names.map((name, idx) => ({
+            return names.slice(0, limit).map((name, idx) => ({
                 id: `${card.id || 'sankari'}-placeholder-${idx}`,
                 nickname: name || 'Bot Tuntematon',
                 teamName: 'Pappaliiga Botit',
@@ -1613,7 +1618,8 @@ window.DivisionView = {
         mergeSankariEntriesWithPlaceholders(card, entries) {
             const baseEntries = Array.isArray(entries) ? entries : [];
             const limit = Number(card?.maxEntries) || 4;
-            if (!card || !Array.isArray(card.placeholderNames) || !card.placeholderNames.length) {
+            const placeholders = this.buildSankariPlaceholderEntries(card);
+            if (!placeholders.length) {
                 return baseEntries.slice(0, limit);
             }
             if (baseEntries.length >= limit) {
@@ -1621,11 +1627,16 @@ window.DivisionView = {
             }
             const missing = limit - baseEntries.length;
             if (missing <= 0) return baseEntries.slice(0, limit);
-            const placeholders = this.buildSankariPlaceholderEntries(card).slice(0, missing);
-            return [...baseEntries, ...placeholders].slice(0, limit);
+            return [...baseEntries, ...placeholders.slice(0, missing)].slice(0, limit);
         },
         getPlaceholderNames(card) {
-            if (!card || !card.id || !Array.isArray(card.placeholderNames)) {
+            if (!card || !card.id) {
+                return [];
+            }
+            const sourceNames = Array.isArray(card.placeholderNames) && card.placeholderNames.length
+                ? card.placeholderNames
+                : SANKARI_PLACEHOLDER_NAMES;
+            if (!sourceNames.length) {
                 return [];
             }
             const key = String(card.id);
@@ -1633,7 +1644,7 @@ window.DivisionView = {
             if (Array.isArray(cached) && cached.length) {
                 return cached;
             }
-            const shuffled = [...card.placeholderNames];
+            const shuffled = [...sourceNames];
             for (let i = shuffled.length - 1; i > 0; i -= 1) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
