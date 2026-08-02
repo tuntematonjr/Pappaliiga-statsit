@@ -18159,7 +18159,7 @@ window.HomeView = {
                             id="season-explorer-heading"
                             class="title-accent titleUnderlineSection"
                         >
-                            Kausiselain
+                            Kaudet ja divisioonat
                         </h2>
                     </div>
                 </header>
