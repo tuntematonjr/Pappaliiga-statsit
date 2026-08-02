@@ -412,6 +412,7 @@ window.DivisionView = {
                 { id: 'heroes', label: 'Sankarit' }
             ],
             activeTeamChipId: null,
+            matchViewMode: 'upcoming',
             sankariPlaceholderOrderCache: {},
             divisionLoadToken: 0,
             upcomingLoadToken: 0,
