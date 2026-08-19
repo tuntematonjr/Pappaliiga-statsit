@@ -7,6 +7,25 @@ from api.services import seasons_service
 from api.services.cache_helpers import get_season_revision, select_season_cache
 
 
+def resolve_display_winner_team(season_stats: Dict[str, Any], winners: List[Dict[str, Any]], row: Dict[str, Any]) -> str | None:
+    """Only expose a final season winner once the season is actually finished."""
+    played = _as_int(season_stats.get("matches_played"))
+    total = _as_int(season_stats.get("matches_total"))
+    if total > 0 and played < total:
+        return None
+
+    winner = row.get("mvp_team")
+    if winner:
+        return str(winner)
+
+    if winners and isinstance(winners[0], dict):
+        winner_name = winners[0].get("team_name")
+        if winner_name:
+            return str(winner_name)
+
+    return None
+
+
 def _as_int(value: Any, default: int = 0) -> int:
     """Best effort integer conversion to avoid Pydantic validation errors."""
     try:
@@ -116,9 +135,7 @@ async def _compute_divisions(season_id: int) -> List[Dict[str, Any]]:
         playoff_stats = row.get("playoffs") or {}
         winners = row.get("winners") or []
         playoff_winner_team = playoff_stats.get("winner")
-        meta_winner_team = row.get("mvp_team") or (
-            winners[0].get("team_name") if winners and isinstance(winners[0], dict) else None
-        )
+        display_winner_team = resolve_display_winner_team(season_stats, winners, row)
 
         result.append(
             {
@@ -140,7 +157,7 @@ async def _compute_divisions(season_id: int) -> List[Dict[str, Any]]:
                     "playoff_championship_id": playoff_stats.get("playoff_championship_id"),
                 },
                 "meta": {
-                    "winner_team": meta_winner_team,
+                    "winner_team": display_winner_team,
                     "mvp_player": row.get("best_player"),
                 },
             }

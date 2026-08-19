@@ -822,7 +822,11 @@
             },
             winnerRows() {
                 const rows = [];
-                const regularSeasonWinner = this.division.season.winner || this.division.mvpTeam || null;
+                const seasonFinished = Boolean(
+                    this.division.season?.matchesTotal > 0 &&
+                    this.division.season?.matchesPlayed >= this.division.season?.matchesTotal
+                );
+                const regularSeasonWinner = seasonFinished ? (this.division.season.winner || this.division.mvpTeam || null) : null;
                 const playoffWinner = this.division.playoffs.winner || null;
                 const playoffsFinished = Boolean(
                     this.division.playoffs?.isFinished ||
