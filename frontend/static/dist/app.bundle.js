@@ -12862,24 +12862,32 @@ function scheduledMatchTsSeconds(match) {
             }
         }
     }
-    return coerceEpochSeconds(
-        match?.scheduled_ts
-        ?? match?.scheduledTs
-        ?? match?.scheduled_at
-        ?? match?.scheduledAt
-        ?? match?.scheduled
-        ?? match?.finished_ts
-        ?? match?.finishedTs
-        ?? match?.finished_at
-        ?? match?.finishedAt
-        ?? match?.start_ts
-        ?? match?.startTs
-        ?? match?.start_at
-        ?? match?.startAt
-        ?? match?.date
-        ?? match?.datetime
-        ?? match?.ts
-    );
+    // Backend already resolves the best-available timestamp into `ts`; only fall back to
+    // the individual date fields when it's missing/zero (unset backend timestamp columns
+    // are stored as 0, not null, so a plain ?? chain would pick them up incorrectly).
+    const candidates = [
+        match?.ts,
+        match?.scheduled_ts,
+        match?.scheduledTs,
+        match?.scheduled_at,
+        match?.scheduledAt,
+        match?.scheduled,
+        match?.finished_ts,
+        match?.finishedTs,
+        match?.finished_at,
+        match?.finishedAt,
+        match?.start_ts,
+        match?.startTs,
+        match?.start_at,
+        match?.startAt,
+        match?.date,
+        match?.datetime
+    ];
+    for (const candidate of candidates) {
+        const seconds = coerceEpochSeconds(candidate);
+        if (seconds !== null) return seconds;
+    }
+    return null;
 }
 
 function formatNumber(value, decimals = 0) {

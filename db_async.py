@@ -3251,7 +3251,7 @@ async def get_team_matches_mirror_async(
         m.match_id, m.championship_id, m.team1_id, m.team2_id,
         m.best_of, m.status, m.is_forfeit, m.winner_team_id,
         m.scheduled_at,
-        COALESCE(m.started_at, m.scheduled_at, m.configured_at, 0) AS ts,
+        COALESCE(NULLIF(m.started_at, 0), NULLIF(m.scheduled_at, 0), NULLIF(m.configured_at, 0), NULLIF(m.finished_at, 0), 0) AS ts,
         CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN 1 ELSE 0 END AS played
       FROM matches m
       WHERE m.championship_id = :champ AND (:team = m.team1_id OR :team = m.team2_id){excl_clause}

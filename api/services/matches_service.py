@@ -187,7 +187,7 @@ async def get_match_details(match_id: str) -> dict[str, Any]:
                m.best_of,
                m.status,
                m.finished_at,
-               COALESCE(m.started_at, m.scheduled_at, m.configured_at, m.activity_ts, m.finished_at, 0) AS ts,
+               COALESCE(NULLIF(m.started_at, 0), NULLIF(m.scheduled_at, 0), NULLIF(m.configured_at, 0), NULLIF(m.finished_at, 0), NULLIF(m.activity_ts, 0), 0) AS ts,
                m.team1_id,
                m.team2_id,
                m.is_forfeit,
