@@ -372,6 +372,7 @@ async def fetch_team_matches(team_id: str, championship_id: Optional[str] = None
             "t2_avatar": right.get("avatar"),
             "faceit_url": match.get("faceit_url"),
             "is_forfeit": match.get("is_forfeit"),
+            "ignored_due_ban": match.get("ignored_due_ban"),
             "winner_team_id": match.get("winner_team_id"),
             "maps": match.get("maps", [])
         })

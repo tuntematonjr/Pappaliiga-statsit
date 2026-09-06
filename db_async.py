@@ -3249,7 +3249,7 @@ async def get_team_matches_mirror_async(
     WITH my_matches AS (
       SELECT
         m.match_id, m.championship_id, m.team1_id, m.team2_id,
-        m.best_of, m.status, m.is_forfeit, m.winner_team_id,
+                m.best_of, m.status, m.is_forfeit, m.ignored_due_ban, m.winner_team_id,
         m.scheduled_at,
         COALESCE(NULLIF(m.started_at, 0), NULLIF(m.scheduled_at, 0), NULLIF(m.configured_at, 0), NULLIF(m.finished_at, 0), 0) AS ts,
         CASE WHEN NULLIF(m.finished_at, 0) IS NOT NULL THEN 1 ELSE 0 END AS played
@@ -3259,7 +3259,7 @@ async def get_team_matches_mirror_async(
     mp AS (
       SELECT
         mm.match_id, mm.team1_id, mm.team2_id,
-        mm.best_of, mm.status, mm.is_forfeit AS match_is_forfeit, mm.winner_team_id AS match_winner_team_id,
+                mm.best_of, mm.status, mm.is_forfeit AS match_is_forfeit, mm.ignored_due_ban, mm.winner_team_id AS match_winner_team_id,
         mm.ts, mm.played, mm.scheduled_at,
         ma.round_index, ma.map_name, ma.score_team1, ma.score_team2, ma.winner_team_id AS map_winner_team_id,
         COALESCE(ma.is_forfeit, 0) AS map_is_forfeit,
@@ -3289,7 +3289,7 @@ async def get_team_matches_mirror_async(
     )
     SELECT
       mp.match_id, mp.ts, mp.status, mp.best_of, mp.played, mp.scheduled_at,
-      mp.match_is_forfeit, mp.match_winner_team_id,
+            mp.match_is_forfeit, mp.ignored_due_ban, mp.match_winner_team_id,
       mp.team1_id, mp.team2_id,
       COALESCE(tc1.team_name, t1.name) AS team1_name,
       COALESCE(tc2.team_name, t2.name) AS team2_name,
@@ -3338,6 +3338,7 @@ async def get_team_matches_mirror_async(
                 "scheduled_at": r.get("scheduled_at"),
                 "played": int(r["played"] or 0),
                 "is_forfeit": bool(r["match_is_forfeit"]),
+                "ignored_due_ban": bool(r["ignored_due_ban"]),
                 "winner_team_id": r["match_winner_team_id"],
                 "left": {"team_id": team_id, "team_name": my_name or "", "avatar": (r["t1_avatar"] if me_on_left else r["t2_avatar"])},
                 "right": {"team_id": opp_id, "team_name": opp_name or "", "avatar": opp_avatar},

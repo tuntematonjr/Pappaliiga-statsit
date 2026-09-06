@@ -102,6 +102,7 @@ class MatchFull(CamelModel):
     best_of: int
     played: int
     is_forfeit: Optional[bool] = None
+    ignored_due_ban: Optional[bool] = None
     winner_team_id: Optional[str] = None
     team1_id: str
     team2_id: str

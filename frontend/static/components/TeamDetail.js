@@ -951,6 +951,7 @@ function normalizeMatch(match, teamId = null) {
     const bestOf = toNumber(match.bestOf);
     const matchWinnerId = match.winnerTeamId || null;
     const matchIsForfeit = !!match.isForfeit;
+    const ignoredDueBan = !!match.ignoredDueBan;
     const rawMaps = Array.isArray(match.maps) ? match.maps : [];
     const left = match.left || {
         team_id: match.team1Id,
@@ -1044,6 +1045,7 @@ function normalizeMatch(match, teamId = null) {
         played,
         forfeitedMaps,
         isForfeit: matchIsForfeit,
+        ignoredDueBan,
         winnerTeamId: matchWinnerId,
         teamScore,
         oppScore,
@@ -1392,7 +1394,7 @@ window.TeamDetail = {
         },
         seasonSnapshotStats() {
             const s = this.teamStats || {};
-            const playedMatches = this.matchesList.filter(m => m.played);
+            const playedMatches = this.matchesList.filter(m => m.played && !m.ignoredDueBan);
             const upcomingMatches = this.matchesList.length - playedMatches.length;
             const matchWins = playedMatches.filter(m => getMatchResult(m) === 'win').length;
             const matchLosses = playedMatches.filter(m => getMatchResult(m) === 'loss').length;
@@ -1469,7 +1471,7 @@ window.TeamDetail = {
                         sub: '',
                         tone: 'stat-primary',
                         tooltip: mapsPlayed > 0
-                            ? 'Voitetut kartat / pelatut kartat. Luovutukset mukana.'
+                            ? 'Voitetut kartat / pelatut kartat. Tavalliset luovutukset ovat mukana; bänni- ja lopetusottelut eivät.'
                             : missingTip,
                         trendValue: mapsPlayed > 0 ? mapWinRate : null,
                         divAvg: divAvgs.avgMapWinRate || null,
@@ -1482,7 +1484,7 @@ window.TeamDetail = {
                         value: formatNumber(roundsDiff),
                         sub: `${formatNumber(roundsWon)}–${formatNumber(roundsLost)}`,
                         tone: 'stat-primary',
-                        tooltip: 'Voitetut erät − hävityt erät. Luovutukset mukana (13–0/0–13).',
+                        tooltip: 'Voitetut erät miinus hävityt erät. Tavallinen luovutus on 13–0 tai 0–13; bänni- ja keskeyttäneet joukkueet eivät sisälly tilastoihin.',
                         trendValue: roundsDiff,
                         divAvg: divAvgs.avgRoundDiff || null,
                         trendTooltip: `Verrattuna divisioonan kauden keskiarvoon · ${formatNumber(divAvgs.avgRoundDiff || 0, 1)}`,
@@ -4102,7 +4104,12 @@ window.TeamDetail = {
                                             <td>BO{{ match.bestOf }}</td>
                                             <td>
                                                 <span
-                                                    v-if="match.played && isForfeitOnlyMatch(match)"
+                                                    v-if="match.ignoredDueBan"
+                                                    class="match-status-badge match-status-badge--ignored"
+                                                    title="Ottelua ei lasketa tilastoihin, koska joukkue on lopettanut tai bännätty kesken kauden."
+                                                >Ei tilastoissa</span>
+                                                <span
+                                                    v-else-if="match.played && isForfeitOnlyMatch(match)"
                                                     :class="matchScoreClass(match)"
                                                 >{{ forfeitScoreLabel(match) }}</span>
                                                 <span
@@ -4113,7 +4120,7 @@ window.TeamDetail = {
                                             </td>
                                             <td>
                                                 <span
-                                                    v-if="match.played"
+                                                    v-if="match.played && !match.ignoredDueBan"
                                                     :class="match.roundDiff >= 0 ? 'stat-positive' : 'stat-negative'"
                                                 >{{ match.roundDiff }}</span>
                                                 <span v-else class="cell-muted">-</span>
