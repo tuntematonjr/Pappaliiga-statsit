@@ -3788,6 +3788,7 @@ if (document.readyState === 'loading') {
             fetchedAt: null,
             stats: {},
             rawStats: null,
+            mapStats: [],
             divisions: [],
             rawDivisions: [],
             divisionsMeta: null,
@@ -3894,6 +3895,7 @@ if (document.readyState === 'loading') {
                     const normalizedSummary = normalizeSummary(summaryData);
                     const normalizedStats = normalizedSummary.aggregates || {};
                     const normalizedRaw = normalizedSummary.raw;
+                    const mapStats = Array.isArray(homeData.map_stats) ? homeData.map_stats : [];
 
                     // Populate lifetime summary from bundle so ensureSummary() skips a separate fetch
                     if (homeData.lifetime_summary && !this.lifetimeSummary) {
@@ -3938,6 +3940,7 @@ if (document.readyState === 'loading') {
                         fetchedAt: Date.now(),
                         stats,
                         rawStats: normalizedRaw,
+                        mapStats,
                         rawDivisions: finalRawDivisions,
                         divisionsMeta,
                         divisions: finalDivisions,
@@ -6975,6 +6978,8 @@ const SM_SCOUT_MAP_COLUMNS_DIVISION = [
     { key: 'decov', label: 'Decider', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series', mobilePriority: 5 }
 ];
 
+const SM_SCOUT_MAP_COLUMNS_SEASON = SM_SCOUT_MAP_COLUMNS_DIVISION.filter(column => column.key !== 'pickMatchup');
+
 const SM_SCOUT_MAP_COLUMNS_PLAYER = [
     { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px', group: 'map', mobilePinned: true, mobilePriority: 1 },
     { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played', group: 'usage', mobilePriority: 2 },
@@ -7069,6 +7074,7 @@ window.SharedMapPerformanceTable = {
         },
         resolvedScoutColumns() {
             if (this.variant === 'division') return SM_SCOUT_MAP_COLUMNS_DIVISION;
+            if (this.variant === 'season') return SM_SCOUT_MAP_COLUMNS_SEASON;
             if (this.variant === 'player') return SM_SCOUT_MAP_COLUMNS_PLAYER;
             return this.SCOUT_MAP_COLUMNS;
         },
@@ -7359,7 +7365,7 @@ window.SharedMapPerformanceTable = {
                     </button>
                 </div>
             </div>
-            <div>
+            <div v-if="variant !== 'season' && variant !== 'division'">
                 <button type="button" class="btn-reset-sort" @click="resetMapSort">Nollaa lajittelu</button>
             </div>
 
@@ -7370,10 +7376,11 @@ window.SharedMapPerformanceTable = {
                     :header-groups="scoutHeaderGroups"
                     :data="scoutMapRows"
                     :default-sort="scoutMapDefaultSort"
-                    :mobile-column-limit="variant === 'division' ? 5 : (variant === 'player' ? 6 : 6)"
+                    :mobile-column-limit="(variant === 'division' || variant === 'season') ? 5 : 6"
                     :sticky-header="true"
                     :compact="true"
                     class="map-summary-table"
+                    :class="'map-summary-table--' + variant"
                 >
                     <template #cell-mapName="{ row }">
                         <div class="map-name">
@@ -13033,16 +13040,20 @@ const PERFORMANCE_TREND_METRICS = [
     }
 ];
 
-function beautifyMapName(raw) {
+function beautifyTeamDetailMapName(raw) {
     if (!raw) return 'Kartta';
     const value = String(raw).trim();
     const lower = value.toLowerCase();
-    if (lower === 'forfeit') return null; // never display forfeit as a map
+    if (isForfeitMapName(value)) return null;
     const core = lower.startsWith('de_') ? lower.slice(3) : lower;
-    if (core === 'forfeit') return null; // also catch de_forfeit
     const parts = core.split(/[_-]/).filter(Boolean);
     if (!parts.length) return value;
     return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+
+function isForfeitMapName(raw) {
+    const value = String(raw || '').trim().toLowerCase();
+    return value === 'forfeit' || value === 'de_forfeit';
 }
 
 function mapKey(name) {
@@ -13077,11 +13088,8 @@ function normalizeMap(entry) {
         || entry.map_name
         || entry.map
         || 'Kartta';
-    const lowerRaw = String(rawName || '').toLowerCase();
-    if (lowerRaw === 'forfeit') {
-        return null; // never include forfeit entries as maps
-    }
-    const beautified = beautifyMapName(rawName) || rawName;
+    if (isForfeitMapName(rawName)) return null;
+    const beautified = beautifyTeamDetailMapName(rawName) || rawName;
     const games = toNumber(entry.games);
     const played = games || toNumber(entry.played);
     const wins = toNumber(entry.wins);
@@ -13354,7 +13362,7 @@ function buildLineupRows(items = [], matches = [], teamId = null) {
             lineupMaps.set(bucketKey, {
                 matchId,
                 roundIndex,
-                mapName: beautifyMapName(item?.mapName || item?.map_name) || 'Kartta',
+                mapName: beautifyTeamDetailMapName(item?.mapName || item?.map_name) || 'Kartta',
                 players: new Map(),
                 rows: []
             });
@@ -13653,7 +13661,7 @@ function normalizeMatch(match, teamId = null) {
             }
         }
         const rawMapName = m.map || `Map ${idx + 1}`;
-        const displayName = beautifyMapName(rawMapName);
+        const displayName = beautifyTeamDetailMapName(rawMapName);
         if (!displayName) return;
         let scoreFor = toNumber(m.rf ?? 0);
         let scoreAgainst = toNumber(m.ra ?? 0);
@@ -13780,7 +13788,7 @@ function recomputeMapDerived(entry) {
 
 function normalizeVeto(entry) {
     if (!entry) return null;
-    const pretty = beautifyMapName(entry.mapName);
+    const pretty = beautifyTeamDetailMapName(entry.mapName);
     return {
         mapName: pretty || 'Kartta',
         timesPicked: toNumber(entry.timesPicked),
@@ -14301,14 +14309,14 @@ window.TeamDetail = {
             const pickLookup = {};
             const playedLookup = {};
             this.mapStats.forEach(row => {
-                if (!row.mapName || row.mapName.toLowerCase() === 'forfeit') return;
+                if (!row.mapName || isForfeitMapName(row.mapName)) return;
                 pickLookup[mapKey(row.mapName)] = normalizePercent(row.pickRate) || 0;
                 playedLookup[mapKey(row.mapName)] = toNumber(row.games || row.played || 0);
                 pool.set(mapKey(row.mapName), { mapName: row.mapName });
             });
             this.matchesList.forEach(match => {
                 (match.maps || []).forEach(map => {
-                    const name = beautifyMapName(map.mapName);
+                    const name = beautifyTeamDetailMapName(map.mapName || map.map_name);
                     if (!name) return;
                     const key = mapKey(name);
                     playedLookup[key] = (playedLookup[key] || 0) + 1;
@@ -14317,8 +14325,7 @@ window.TeamDetail = {
             });
             this.vetoByMatch.forEach(entry => {
                 entry.steps.forEach(step => {
-                    const stepLower = (step.mapName || '').toLowerCase();
-                    if (!step.mapName || stepLower === 'forfeit' || stepLower === 'kartta') return;
+                    if (!step.mapName || isForfeitMapName(step.mapName) || step.mapName.toLowerCase() === 'kartta') return;
                     const key = mapKey(step.mapName);
                     if (!pool.has(key)) pool.set(key, { mapName: step.mapName });
                 });
@@ -14389,7 +14396,7 @@ window.TeamDetail = {
                     // Find map winner if this map was played
                     let mapWinnerLabel = '';
                     const matchMaps = Array.isArray(match.maps) ? match.maps : [];
-                    const playedMap = matchMaps.find(m => mapKey(beautifyMapName(m.map || m.mapName)) === key);
+                    const playedMap = matchMaps.find(m => mapKey(beautifyTeamDetailMapName(m.map || m.mapName)) === key);
                     if (playedMap) {
                         const mapWinnerId = playedMap.winner_team_id || playedMap.winnerTeamId;
                         if (mapWinnerId) {
@@ -14950,10 +14957,10 @@ window.TeamDetail = {
         vetoHistory() {
             const raw = Array.isArray(this.seasonData?.vetoHistory) ? this.seasonData.vetoHistory : [];
             return raw
-                .filter(entry => (entry.mapName || '').trim().toLowerCase() !== 'forfeit')
+                .filter(entry => !isForfeitMapName(entry.mapName ?? entry.map_name))
                 .map(entry => ({
                     matchId: entry.matchId,
-                    mapName: beautifyMapName(entry.mapName) || 'Kartta',
+                    mapName: beautifyTeamDetailMapName(entry.mapName ?? entry.map_name) || 'Kartta',
                     status: (entry.status || '').toLowerCase(),
                     selectedByTeamId: entry.selectedByTeamId,
                     selectedByTeamName: entry.selectedByTeamName,
@@ -15989,7 +15996,7 @@ window.TeamDetail = {
                 const actor = step.selectedByTeamId
                     ? (String(step.selectedByTeamId) === String(this.teamId) ? 'team' : 'opponent')
                     : 'system';
-                const mapName = beautifyMapName(step.mapName) || 'Kartta';
+                const mapName = beautifyTeamDetailMapName(step.mapName) || 'Kartta';
                 const actorTeamId = step.selectedByTeamId
                     || (actor === 'team' ? this.teamId : (actor === 'opponent' ? match?.opponent?.team_id : null));
                 return {
@@ -17134,7 +17141,7 @@ window.TeamDetail = {
 /* === /static/views/HomeView.js === */
 /**
  * The backend contract for these metrics is shared by:
- *   - StatsSummaryResponse (/api/stats/summary/season/:id) for the selected season row
+ *   - the selected-season payload from /api/home-page/:id
  *   - StatsSummaryResponse (/api/stats/summary/all) for the global row
  * Cards resolve their values via the following field priorities:
  *   1. Divisioonia → summary_totals.divisions → divisions → total_divisions
@@ -17388,6 +17395,7 @@ function emptySeasonState() {
         loading: false,
         error: null,
         stats: {},
+        mapStats: [],
         progress: {
             overall: { played: 0, total: 0, percent: 0 },
             regular: { played: 0, total: 0, percent: 0 },
@@ -17465,6 +17473,9 @@ window.HomeView = {
         },
         get SummaryStatCard() {
             return window.SummaryStatCard;
+        },
+        get SharedMapPerformanceTable() {
+            return window.SharedMapPerformanceTable;
         }
     },
     data() {
@@ -17475,6 +17486,7 @@ window.HomeView = {
             homeStore,
             divisionFilter: 'all',
             divisionSearch: '',
+            showSeasonMapStats: false,
             seasonTeamCount: null,
             seasonTeamCountKey: null,
             globalTeamCount: null,
@@ -17583,6 +17595,9 @@ window.HomeView = {
         },
         seasonDivisions() {
             return Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
+        },
+        seasonMapStats() {
+            return Array.isArray(this.seasonState.mapStats) ? this.seasonState.mapStats : [];
         },
         seasonTitle() {
             const season = this.selectedSeason;
@@ -18241,6 +18256,23 @@ window.HomeView = {
                                     :value="metric.value"
                                 ></summary-stat-card>
                             </div>
+                            <section class="season-map-stats" :aria-label="seasonTitle + ' karttatilastot'">
+                                <button
+                                    type="button"
+                                    class="btn-primary season-map-stats-toggle"
+                                    :aria-expanded="showSeasonMapStats ? 'true' : 'false'"
+                                    @click="showSeasonMapStats = !showSeasonMapStats"
+                                >{{ showSeasonMapStats ? 'Piilota karttatilastot' : 'Näytä karttatilastot' }}</button>
+                                <shared-map-performance-table
+                                    v-if="showSeasonMapStats"
+                                    :map-stats="seasonMapStats"
+                                    :title="seasonTitle + ' karttatilastot'"
+                                    subtitle-summary="Koko kauden pelatut kartat, pickit ja bannit"
+                                    :show-panel-container="true"
+                                    variant="season"
+                                    :allow-view-toggle="false"
+                                ></shared-map-performance-table>
+                            </section>
                         </template>
                         <div
                             v-else

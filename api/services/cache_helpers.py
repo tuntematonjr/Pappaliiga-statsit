@@ -63,6 +63,8 @@ async def get_season_revision(season: int) -> Optional[str]:
                 COALESCE((SELECT MAX(updated_at) FROM player_season_totals WHERE season = :season), '1970-01-01 00:00:00'),
                 COALESCE((SELECT MAX(updated_at) FROM team_map_season_totals WHERE season = :season), '1970-01-01 00:00:00'),
                 COALESCE((SELECT MAX(updated_at) FROM player_map_season_totals WHERE season = :season), '1970-01-01 00:00:00'),
+                COALESCE((SELECT MAX(updated_at) FROM player_stats WHERE season = :season), '1970-01-01 00:00:00'),
+                COALESCE((SELECT MAX(created_at) FROM map_votes WHERE season = :season), '1970-01-01 00:00:00'),
                 COALESCE((SELECT MAX(updated_at) FROM championships WHERE season = :season), '1970-01-01 00:00:00'),
                 COALESCE((
                     SELECT MAX(cts.updated_at)

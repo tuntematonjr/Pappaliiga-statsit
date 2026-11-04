@@ -1,6 +1,6 @@
 /**
  * The backend contract for these metrics is shared by:
- *   - StatsSummaryResponse (/api/stats/summary/season/:id) for the selected season row
+ *   - the selected-season payload from /api/home-page/:id
  *   - StatsSummaryResponse (/api/stats/summary/all) for the global row
  * Cards resolve their values via the following field priorities:
  *   1. Divisioonia → summary_totals.divisions → divisions → total_divisions
@@ -254,6 +254,7 @@ function emptySeasonState() {
         loading: false,
         error: null,
         stats: {},
+        mapStats: [],
         progress: {
             overall: { played: 0, total: 0, percent: 0 },
             regular: { played: 0, total: 0, percent: 0 },
@@ -331,6 +332,9 @@ window.HomeView = {
         },
         get SummaryStatCard() {
             return window.SummaryStatCard;
+        },
+        get SharedMapPerformanceTable() {
+            return window.SharedMapPerformanceTable;
         }
     },
     data() {
@@ -341,6 +345,7 @@ window.HomeView = {
             homeStore,
             divisionFilter: 'all',
             divisionSearch: '',
+            showSeasonMapStats: false,
             seasonTeamCount: null,
             seasonTeamCountKey: null,
             globalTeamCount: null,
@@ -449,6 +454,9 @@ window.HomeView = {
         },
         seasonDivisions() {
             return Array.isArray(this.seasonState.divisions) ? this.seasonState.divisions : [];
+        },
+        seasonMapStats() {
+            return Array.isArray(this.seasonState.mapStats) ? this.seasonState.mapStats : [];
         },
         seasonTitle() {
             const season = this.selectedSeason;
@@ -1107,6 +1115,23 @@ window.HomeView = {
                                     :value="metric.value"
                                 ></summary-stat-card>
                             </div>
+                            <section class="season-map-stats" :aria-label="seasonTitle + ' karttatilastot'">
+                                <button
+                                    type="button"
+                                    class="btn-primary season-map-stats-toggle"
+                                    :aria-expanded="showSeasonMapStats ? 'true' : 'false'"
+                                    @click="showSeasonMapStats = !showSeasonMapStats"
+                                >{{ showSeasonMapStats ? 'Piilota karttatilastot' : 'Näytä karttatilastot' }}</button>
+                                <shared-map-performance-table
+                                    v-if="showSeasonMapStats"
+                                    :map-stats="seasonMapStats"
+                                    :title="seasonTitle + ' karttatilastot'"
+                                    subtitle-summary="Koko kauden pelatut kartat, pickit ja bannit"
+                                    :show-panel-container="true"
+                                    variant="season"
+                                    :allow-view-toggle="false"
+                                ></shared-map-performance-table>
+                            </section>
                         </template>
                         <div
                             v-else

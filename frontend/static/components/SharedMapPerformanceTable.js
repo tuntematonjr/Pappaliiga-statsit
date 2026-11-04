@@ -143,6 +143,8 @@ const SM_SCOUT_MAP_COLUMNS_DIVISION = [
     { key: 'decov', label: 'Decider', sortable: true, numeric: true, colClass: 'mono-num col-decov', group: 'series', mobilePriority: 5 }
 ];
 
+const SM_SCOUT_MAP_COLUMNS_SEASON = SM_SCOUT_MAP_COLUMNS_DIVISION.filter(column => column.key !== 'pickMatchup');
+
 const SM_SCOUT_MAP_COLUMNS_PLAYER = [
     { key: 'mapName', label: 'Kartta', sortable: true, colClass: 'col-name col-map-name', width: '200px', group: 'map', mobilePinned: true, mobilePriority: 1 },
     { key: 'played', label: 'Pelattu', sortable: true, numeric: true, colClass: 'mono-num col-played', group: 'usage', mobilePriority: 2 },
@@ -237,6 +239,7 @@ window.SharedMapPerformanceTable = {
         },
         resolvedScoutColumns() {
             if (this.variant === 'division') return SM_SCOUT_MAP_COLUMNS_DIVISION;
+            if (this.variant === 'season') return SM_SCOUT_MAP_COLUMNS_SEASON;
             if (this.variant === 'player') return SM_SCOUT_MAP_COLUMNS_PLAYER;
             return this.SCOUT_MAP_COLUMNS;
         },
@@ -527,7 +530,7 @@ window.SharedMapPerformanceTable = {
                     </button>
                 </div>
             </div>
-            <div>
+            <div v-if="variant !== 'season' && variant !== 'division'">
                 <button type="button" class="btn-reset-sort" @click="resetMapSort">Nollaa lajittelu</button>
             </div>
 
@@ -538,10 +541,11 @@ window.SharedMapPerformanceTable = {
                     :header-groups="scoutHeaderGroups"
                     :data="scoutMapRows"
                     :default-sort="scoutMapDefaultSort"
-                    :mobile-column-limit="variant === 'division' ? 5 : (variant === 'player' ? 6 : 6)"
+                    :mobile-column-limit="(variant === 'division' || variant === 'season') ? 5 : 6"
                     :sticky-header="true"
                     :compact="true"
                     class="map-summary-table"
+                    :class="'map-summary-table--' + variant"
                 >
                     <template #cell-mapName="{ row }">
                         <div class="map-name">

@@ -373,6 +373,7 @@
             fetchedAt: null,
             stats: {},
             rawStats: null,
+            mapStats: [],
             divisions: [],
             rawDivisions: [],
             divisionsMeta: null,
@@ -479,6 +480,7 @@
                     const normalizedSummary = normalizeSummary(summaryData);
                     const normalizedStats = normalizedSummary.aggregates || {};
                     const normalizedRaw = normalizedSummary.raw;
+                    const mapStats = Array.isArray(homeData.map_stats) ? homeData.map_stats : [];
 
                     // Populate lifetime summary from bundle so ensureSummary() skips a separate fetch
                     if (homeData.lifetime_summary && !this.lifetimeSummary) {
@@ -523,6 +525,7 @@
                         fetchedAt: Date.now(),
                         stats,
                         rawStats: normalizedRaw,
+                        mapStats,
                         rawDivisions: finalRawDivisions,
                         divisionsMeta,
                         divisions: finalDivisions,

@@ -679,7 +679,7 @@ async def _compute_division_details(championship_id: str, season: int, division_
     )
     division_player_count = len(unique_player_ids)
 
-    map_stats_task = asyncio.create_task(_get_division_map_stats(championship_id, season, division_num))
+    map_stats_task = asyncio.create_task(_get_division_map_stats(championship_id))
     aggregates_task = asyncio.create_task(
         _get_division_aggregates(championship_id, season, division_num, bool(champ["is_playoff"]))
     )
@@ -748,13 +748,43 @@ async def _compute_division_details(championship_id: str, season: int, division_
     }
 
 
-async def _get_division_map_stats(championship_id: str, season: int, division_num: int) -> List[Dict[str, Any]]:
+async def _get_division_map_stats(championship_id: str) -> List[Dict[str, Any]]:
+    return await _get_map_stats(championship_id=championship_id)
+
+
+async def get_season_map_stats(season: int) -> List[Dict[str, Any]]:
+    """Return map performance aggregated across regular season and playoffs."""
+    cache, ttl_seconds = select_season_cache(season)
+    if cache is not None:
+        revision = await get_season_revision(season)
+        cache_key = ("season-map-stats", season, revision)
+        cached_value, _ = await cache.get_or_set(
+            cache_key,
+            lambda: _get_map_stats(season=season),
+            ttl_seconds=ttl_seconds,
+        )
+        return cached_value
+
+    return await _get_map_stats(season=season)
+
+
+async def _get_map_stats(
+    *,
+    championship_id: str | None = None,
+    season: int | None = None,
+) -> List[Dict[str, Any]]:
+    if (championship_id is None) == (season is None):
+        raise ValueError("Provide exactly one of championship_id or season")
+
     primary_rows = await query_async(
         """
         WITH division_matches AS (
             SELECT match_id, team1_id, team2_id
-        FROM matches
-        WHERE championship_id = :champ_id
+            FROM matches m
+            JOIN championships c ON c.championship_id = m.championship_id
+            WHERE (:championship_id IS NULL OR c.championship_id = :championship_id)
+              AND (:season IS NULL OR c.season = :season)
+              AND COALESCE(m.ignored_due_ban, 0) = 0
         ),
         division_maps AS (
             SELECT
@@ -770,10 +800,23 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
             WHERE m.map_name IS NOT NULL
               AND m.is_forfeit = 0
         ),
+        all_maps AS (
+            SELECT map_key, MIN(map_name) AS map_name
+            FROM (
+                SELECT map_key, map_name FROM division_maps
+                UNION ALL
+                SELECT REPLACE(LOWER(v.map_name), 'de_', ''), CONCAT('de_', REPLACE(LOWER(v.map_name), 'de_', ''))
+                FROM map_votes v
+                JOIN division_matches dm ON dm.match_id = v.match_id
+                WHERE v.map_name IS NOT NULL
+                  AND LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto')
+            ) src
+            GROUP BY map_key
+        ),
         player_totals AS (
             SELECT
                 dm.map_key,
-                dm.map_name,
+                MIN(dm.map_name) AS map_name,
                 COUNT(DISTINCT dm.map_id) AS maps_played,
                 SUM(ps.kills) AS kills,
                 SUM(ps.deaths) AS deaths,
@@ -799,7 +842,7 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
                 ps.map_id = dm.map_id
                 AND ps.is_forfeit_map = 0
             )
-            GROUP BY dm.map_key, dm.map_name
+            GROUP BY dm.map_key
         ),
         round_totals AS (
             SELECT
@@ -835,9 +878,6 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
                 ) AS decov
             FROM map_votes v
             JOIN division_matches dm ON dm.match_id = v.match_id
-                        JOIN division_maps dmp
-                            ON dmp.match_id = v.match_id
-                         AND dmp.map_key = REPLACE(LOWER(v.map_name), 'de_', '')
             WHERE v.map_name IS NOT NULL
               AND LOWER(v.status) IN ('banned','ban','drop','removed','remove','veto','decider','overflow')
             GROUP BY REPLACE(LOWER(v.map_name), 'de_', '')
@@ -897,10 +937,10 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
             GROUP BY pe.map_key
         )
         SELECT
-            pt.map_name,
+            am.map_name,
             mc.pretty_name,
             mc.image_sm,
-            pt.maps_played,
+            COALESCE(pt.maps_played, 0) AS maps_played,
             COALESCE(mvt.banned, 0) AS banned,
             COALESCE(mvt.ban1, 0) AS ban1,
             COALESCE(mvt.ban2, 0) AS ban2,
@@ -929,14 +969,15 @@ async def _get_division_map_stats(championship_id: str, season: int, division_nu
             COALESCE(pt.ace, 0) AS ace,
             COALESCE(pt.pistol_kills, 0) AS pistol_kills,
             COALESCE(pt.clutch_kills, 0) AS clutch_kills
-        FROM player_totals pt
-        LEFT JOIN round_totals rt ON rt.map_key = pt.map_key
-        LEFT JOIN map_vote_totals mvt ON mvt.map_key = pt.map_key
-        LEFT JOIN map_pick_totals mpt ON mpt.map_key = pt.map_key
-        LEFT JOIN maps_catalog mc ON mc.map_id = pt.map_name
-        ORDER BY pt.maps_played DESC, pt.map_name
+        FROM all_maps am
+        LEFT JOIN player_totals pt ON pt.map_key = am.map_key
+        LEFT JOIN round_totals rt ON rt.map_key = am.map_key
+        LEFT JOIN map_vote_totals mvt ON mvt.map_key = am.map_key
+        LEFT JOIN map_pick_totals mpt ON mpt.map_key = am.map_key
+        LEFT JOIN maps_catalog mc ON mc.map_id = am.map_name
+        ORDER BY COALESCE(pt.maps_played, 0) DESC, am.map_name
         """,
-        {"champ_id": championship_id},
+        {"championship_id": championship_id, "season": season},
     )
 
     def _build_result(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

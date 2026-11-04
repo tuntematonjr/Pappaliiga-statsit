@@ -358,16 +358,20 @@ const PERFORMANCE_TREND_METRICS = [
     }
 ];
 
-function beautifyMapName(raw) {
+function beautifyTeamDetailMapName(raw) {
     if (!raw) return 'Kartta';
     const value = String(raw).trim();
     const lower = value.toLowerCase();
-    if (lower === 'forfeit') return null; // never display forfeit as a map
+    if (isForfeitMapName(value)) return null;
     const core = lower.startsWith('de_') ? lower.slice(3) : lower;
-    if (core === 'forfeit') return null; // also catch de_forfeit
     const parts = core.split(/[_-]/).filter(Boolean);
     if (!parts.length) return value;
     return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+}
+
+function isForfeitMapName(raw) {
+    const value = String(raw || '').trim().toLowerCase();
+    return value === 'forfeit' || value === 'de_forfeit';
 }
 
 function mapKey(name) {
@@ -402,11 +406,8 @@ function normalizeMap(entry) {
         || entry.map_name
         || entry.map
         || 'Kartta';
-    const lowerRaw = String(rawName || '').toLowerCase();
-    if (lowerRaw === 'forfeit') {
-        return null; // never include forfeit entries as maps
-    }
-    const beautified = beautifyMapName(rawName) || rawName;
+    if (isForfeitMapName(rawName)) return null;
+    const beautified = beautifyTeamDetailMapName(rawName) || rawName;
     const games = toNumber(entry.games);
     const played = games || toNumber(entry.played);
     const wins = toNumber(entry.wins);
@@ -679,7 +680,7 @@ function buildLineupRows(items = [], matches = [], teamId = null) {
             lineupMaps.set(bucketKey, {
                 matchId,
                 roundIndex,
-                mapName: beautifyMapName(item?.mapName || item?.map_name) || 'Kartta',
+                mapName: beautifyTeamDetailMapName(item?.mapName || item?.map_name) || 'Kartta',
                 players: new Map(),
                 rows: []
             });
@@ -978,7 +979,7 @@ function normalizeMatch(match, teamId = null) {
             }
         }
         const rawMapName = m.map || `Map ${idx + 1}`;
-        const displayName = beautifyMapName(rawMapName);
+        const displayName = beautifyTeamDetailMapName(rawMapName);
         if (!displayName) return;
         let scoreFor = toNumber(m.rf ?? 0);
         let scoreAgainst = toNumber(m.ra ?? 0);
@@ -1105,7 +1106,7 @@ function recomputeMapDerived(entry) {
 
 function normalizeVeto(entry) {
     if (!entry) return null;
-    const pretty = beautifyMapName(entry.mapName);
+    const pretty = beautifyTeamDetailMapName(entry.mapName);
     return {
         mapName: pretty || 'Kartta',
         timesPicked: toNumber(entry.timesPicked),
@@ -1626,14 +1627,14 @@ window.TeamDetail = {
             const pickLookup = {};
             const playedLookup = {};
             this.mapStats.forEach(row => {
-                if (!row.mapName || row.mapName.toLowerCase() === 'forfeit') return;
+                if (!row.mapName || isForfeitMapName(row.mapName)) return;
                 pickLookup[mapKey(row.mapName)] = normalizePercent(row.pickRate) || 0;
                 playedLookup[mapKey(row.mapName)] = toNumber(row.games || row.played || 0);
                 pool.set(mapKey(row.mapName), { mapName: row.mapName });
             });
             this.matchesList.forEach(match => {
                 (match.maps || []).forEach(map => {
-                    const name = beautifyMapName(map.mapName);
+                    const name = beautifyTeamDetailMapName(map.mapName || map.map_name);
                     if (!name) return;
                     const key = mapKey(name);
                     playedLookup[key] = (playedLookup[key] || 0) + 1;
@@ -1642,8 +1643,7 @@ window.TeamDetail = {
             });
             this.vetoByMatch.forEach(entry => {
                 entry.steps.forEach(step => {
-                    const stepLower = (step.mapName || '').toLowerCase();
-                    if (!step.mapName || stepLower === 'forfeit' || stepLower === 'kartta') return;
+                    if (!step.mapName || isForfeitMapName(step.mapName) || step.mapName.toLowerCase() === 'kartta') return;
                     const key = mapKey(step.mapName);
                     if (!pool.has(key)) pool.set(key, { mapName: step.mapName });
                 });
@@ -1714,7 +1714,7 @@ window.TeamDetail = {
                     // Find map winner if this map was played
                     let mapWinnerLabel = '';
                     const matchMaps = Array.isArray(match.maps) ? match.maps : [];
-                    const playedMap = matchMaps.find(m => mapKey(beautifyMapName(m.map || m.mapName)) === key);
+                    const playedMap = matchMaps.find(m => mapKey(beautifyTeamDetailMapName(m.map || m.mapName)) === key);
                     if (playedMap) {
                         const mapWinnerId = playedMap.winner_team_id || playedMap.winnerTeamId;
                         if (mapWinnerId) {
@@ -2275,10 +2275,10 @@ window.TeamDetail = {
         vetoHistory() {
             const raw = Array.isArray(this.seasonData?.vetoHistory) ? this.seasonData.vetoHistory : [];
             return raw
-                .filter(entry => (entry.mapName || '').trim().toLowerCase() !== 'forfeit')
+                .filter(entry => !isForfeitMapName(entry.mapName ?? entry.map_name))
                 .map(entry => ({
                     matchId: entry.matchId,
-                    mapName: beautifyMapName(entry.mapName) || 'Kartta',
+                    mapName: beautifyTeamDetailMapName(entry.mapName ?? entry.map_name) || 'Kartta',
                     status: (entry.status || '').toLowerCase(),
                     selectedByTeamId: entry.selectedByTeamId,
                     selectedByTeamName: entry.selectedByTeamName,
@@ -3314,7 +3314,7 @@ window.TeamDetail = {
                 const actor = step.selectedByTeamId
                     ? (String(step.selectedByTeamId) === String(this.teamId) ? 'team' : 'opponent')
                     : 'system';
-                const mapName = beautifyMapName(step.mapName) || 'Kartta';
+                const mapName = beautifyTeamDetailMapName(step.mapName) || 'Kartta';
                 const actorTeamId = step.selectedByTeamId
                     || (actor === 'team' ? this.teamId : (actor === 'opponent' ? match?.opponent?.team_id : null));
                 return {
