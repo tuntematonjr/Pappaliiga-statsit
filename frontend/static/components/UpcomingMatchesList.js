@@ -58,6 +58,9 @@
         const isPlayoffs = Boolean(raw.is_playoffs ?? raw.isPlayoffs ?? raw.is_playoff ?? raw.isPlayoff);
         const status = raw.status ?? null;
         const scheduledTs = getScheduledTs(raw);
+        const startedTs = coerceEpochMs(raw.started_at ?? raw.startedAt);
+        const team1Score = Number(raw.team1_score ?? raw.team1Score ?? 0);
+        const team2Score = Number(raw.team2_score ?? raw.team2Score ?? 0);
         const team1 = normalizeTeam(
             raw.team1 || {
                 team_id: raw.team1_id ?? raw.team1Id ?? null,
@@ -86,6 +89,9 @@
             isPlayoffs,
             status,
             scheduledTs,
+            startedTs,
+            team1Score: Number.isFinite(team1Score) ? team1Score : 0,
+            team2Score: Number.isFinite(team2Score) ? team2Score : 0,
             team1,
             team2,
             faceitUrl
@@ -133,6 +139,7 @@
             emptyMessage: { type: String, default: 'Ei tulevia otteluita.' },
             showDivision: { type: Boolean, default: false },
             showFaceit: { type: Boolean, default: true },
+            showScore: { type: Boolean, default: false },
             showHeader: { type: Boolean, default: true },
             compact: { type: Boolean, default: false },
             groupByDayDivision: { type: Boolean, default: false },
@@ -308,6 +315,10 @@
                     name: 'team-detail',
                     params: { championshipId: item.championshipId, teamId: team.id }
                 };
+            },
+            scoreLabel(match) {
+                if (!this.showScore) return 'vs';
+                return `${match.team1Score} - ${match.team2Score}`;
             }
         },
         template: `
@@ -356,7 +367,7 @@
                                                 >{{ match.team1.name }}</router-link>
                                                 <span v-else class="upcoming-match-card__team-name">{{ match.team1.name }}</span>
                                             </div>
-                                            <span class="upcoming-match-card__vs">vs</span>
+                                            <span class="upcoming-match-card__vs">{{ scoreLabel(match) }}</span>
                                             <div class="upcoming-match-card__team upcoming-match-card__team--right">
                                                 <img :src="resolveAvatar(match.team2.avatar)" :alt="match.team2.name" class="upcoming-match-card__logo">
                                                 <router-link
@@ -402,7 +413,7 @@
                                     >{{ match.team1.name }}</router-link>
                                     <span v-else class="upcoming-match-card__team-name">{{ match.team1.name }}</span>
                                 </div>
-                                <span class="upcoming-match-card__vs">vs</span>
+                                <span class="upcoming-match-card__vs">{{ scoreLabel(match) }}</span>
                                 <div class="upcoming-match-card__team upcoming-match-card__team--right">
                                     <img :src="resolveAvatar(match.team2.avatar)" :alt="match.team2.name" class="upcoming-match-card__logo">
                                     <router-link

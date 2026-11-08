@@ -12,7 +12,11 @@ window.UpcomingMatchesView = {
             seasonsStore,
             upcomingStore,
             limit: 50,
-            groupedViewEnabled: true
+            groupedViewEnabled: true,
+            viewMode: 'upcoming',
+            liveMatches: [],
+            liveLoading: false,
+            liveError: null
         };
     },
     computed: {
@@ -47,6 +51,9 @@ window.UpcomingMatchesView = {
                 return { data: [], loading: false, error: null };
             }
             return this.upcomingStore.getEntryForParams(this.upcomingParams);
+        },
+        showingUpcoming() {
+            return this.viewMode === 'upcoming';
         }
     },
     watch: {
@@ -58,7 +65,6 @@ window.UpcomingMatchesView = {
         }
     },
     mounted() {
-        // Load seasons + upcoming in a single bundle call
         this._loadBundle().catch(err => {
             console.error('[UpcomingMatchesView] bundle fetch failed', err);
         });
@@ -66,7 +72,6 @@ window.UpcomingMatchesView = {
     methods: {
         async _loadBundle() {
             if (!window.apiClient || typeof window.apiClient.getSeasonsUpcoming !== 'function') {
-                // Fallback: let the store watchers handle individual fetches
                 if (this.seasonsStore && !this.seasonsLoaded) {
                     this.seasonsStore.fetchSeasons().catch(() => {});
                 }
@@ -82,8 +87,7 @@ window.UpcomingMatchesView = {
                     this.seasonsStore.seedSeasons(bundle.seasons);
                 }
                 if (this.upcomingStore && typeof this.upcomingStore.seedUpcoming === 'function') {
-                    const params = { ...this.upcomingParams };
-                    this.upcomingStore.seedUpcoming(params, bundle.upcoming);
+                    this.upcomingStore.seedUpcoming({ ...this.upcomingParams }, bundle.upcoming);
                 }
             } catch (err) {
                 console.warn('[UpcomingMatchesView] bundle fetch failed, falling back', err);
@@ -100,6 +104,27 @@ window.UpcomingMatchesView = {
                 console.error('[UpcomingMatchesView] upcoming fetch failed', error);
             }
         },
+        async selectView(viewMode) {
+            this.viewMode = viewMode;
+            if (viewMode === 'live' && !this.liveMatches.length && !this.liveLoading) {
+                await this.loadLiveMatches();
+            }
+        },
+        async loadLiveMatches() {
+            this.liveLoading = true;
+            this.liveError = null;
+            try {
+                if (!window.apiClient || typeof window.apiClient.getLiveMatches !== 'function') {
+                    throw new Error('Live-otteluiden rajapintaa ei ole saatavilla.');
+                }
+                this.liveMatches = await window.apiClient.getLiveMatches();
+            } catch (err) {
+                console.error('[UpcomingMatchesView] live match fetch failed', err);
+                this.liveError = err?.message || 'Live-otteluiden haku epäonnistui.';
+            } finally {
+                this.liveLoading = false;
+            }
+        },
         toggleGrouping() {
             this.groupedViewEnabled = !this.groupedViewEnabled;
         }
@@ -108,20 +133,35 @@ window.UpcomingMatchesView = {
         <div class="upcoming-view">
             <header class="upcoming-view__header">
                 <h1 class="title-accent titleUnderlinePage">Tulevat ottelut</h1>
-                <p class="upcoming-view__subtitle">{{ currentSeasonLabel }}</p>
+                <p class="upcoming-view__subtitle">{{ showingUpcoming ? currentSeasonLabel : 'Käynnissä olevat ottelut Faceitista' }}</p>
                 <div class="upcoming-view__controls">
-                    <button type="button" class="btn-secondary upcoming-view__toggle" @click="toggleGrouping">
-                        {{ groupedViewEnabled ? 'Nayta vain aikajarjestys' : 'Nayta paiva- ja divisioonaryhmittely' }}
-                    </button>
+                    <button
+                        type="button"
+                        class="btn-secondary upcoming-view__toggle"
+                        :class="{ 'is-active': showingUpcoming }"
+                        @click="selectView('upcoming')"
+                    >Tulevat ottelut</button>
+                    <button
+                        type="button"
+                        class="btn-secondary upcoming-view__toggle"
+                        :class="{ 'is-active': !showingUpcoming }"
+                        @click="selectView('live')"
+                    >Käynnissä nyt</button>
+                    <button
+                        v-if="showingUpcoming"
+                        type="button"
+                        class="btn-secondary upcoming-view__toggle"
+                        @click="toggleGrouping"
+                    >{{ groupedViewEnabled ? 'Nayta vain aikajarjestys' : 'Nayta paiva- ja divisioonaryhmittely' }}</button>
                 </div>
             </header>
 
             <loading-spinner
-                v-if="!currentSeasonId"
+                v-if="showingUpcoming && !currentSeasonId"
                 message="Kautta haetaan..."
             ></loading-spinner>
             <upcoming-matches-list
-                v-else
+                v-else-if="showingUpcoming"
                 :title="'Tulevat ottelut'"
                 :subtitle="currentSeasonLabel"
                 :items="upcomingState.data"
@@ -134,7 +174,16 @@ window.UpcomingMatchesView = {
                 :show-header="false"
                 empty-message="Tälle kaudelle ei löytynyt tulevia otteluita."
             ></upcoming-matches-list>
-
+            <upcoming-matches-list
+                v-else
+                :title="'Käynnissä olevat ottelut'"
+                :items="liveMatches"
+                :loading="liveLoading"
+                :error="liveError"
+                :show-score="true"
+                :show-header="false"
+                empty-message="Pappaliigassa ei ole juuri nyt käynnissä olevia Faceit-otteluita."
+            ></upcoming-matches-list>
         </div>
     `
 };

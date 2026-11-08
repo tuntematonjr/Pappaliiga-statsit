@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Query, Response
 
 from api.models import CamelModel, PaginationMeta
-from api.services import matches_service
+from api.services import live_matches_service, matches_service
 
 router = APIRouter()
 
@@ -57,6 +57,30 @@ class UpcomingMatchSummary(CamelModel):
 class UpcomingMatchListResponse(CamelModel):
     items: List[UpcomingMatchSummary]
     meta: PaginationMeta
+
+
+class LiveMatchTeam(CamelModel):
+    id: Optional[str] = None
+    name: str
+    avatar: Optional[str] = None
+
+
+class LiveMatchSummary(CamelModel):
+    match_id: str
+    championship_id: Optional[str] = None
+    championship_name: str
+    status: Optional[str] = None
+    scheduled_at: Optional[int] = None
+    started_at: Optional[int] = None
+    faceit_url: Optional[str] = None
+    team1: LiveMatchTeam
+    team2: LiveMatchTeam
+    team1_score: int = 0
+    team2_score: int = 0
+
+
+class LiveMatchListResponse(CamelModel):
+    items: List[LiveMatchSummary]
 
 
 class DemoLinkItem(CamelModel):
@@ -127,6 +151,13 @@ async def get_upcoming_matches(
         items=[UpcomingMatchSummary(**row) for row in items],
         meta=PaginationMeta(total=total, limit=limit, offset=offset),
     )
+
+
+@router.get("/live", response_model=LiveMatchListResponse)
+async def get_live_matches():
+    """Return ongoing Pappaliiga Faceit matches, refreshed at most every five minutes."""
+    items = await live_matches_service.get_live_organization_matches()
+    return LiveMatchListResponse(items=[LiveMatchSummary(**item) for item in items])
 
 
 @router.get("/{match_id}/demos", response_model=DemoListResponse)

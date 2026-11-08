@@ -937,6 +937,12 @@
             };
         }
 
+        async getLiveMatches() {
+            const result = await fetchJson('/matches/live');
+            const payload = result?.data ?? result ?? {};
+            return ensureSnakeCaseDeep(payload.items ?? []);
+        }
+
         async getSeasons(options = {}) {
             const routes = buildRouteCandidates('seasons');
             const result = await fetchWithFallback(routes, options);

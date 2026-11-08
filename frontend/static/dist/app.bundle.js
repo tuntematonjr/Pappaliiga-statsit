@@ -1089,6 +1089,12 @@ var Pinia=function(t,e){"use strict";let n;const i=t=>n=t,s=Symbol();function o(
             };
         }
 
+        async getLiveMatches() {
+            const result = await fetchJson('/matches/live');
+            const payload = result?.data ?? result ?? {};
+            return ensureSnakeCaseDeep(payload.items ?? []);
+        }
+
         async getSeasons(options = {}) {
             const routes = buildRouteCandidates('seasons');
             const result = await fetchWithFallback(routes, options);
@@ -12296,6 +12302,9 @@ window.PlayoffBracket = {
         const isPlayoffs = Boolean(raw.is_playoffs ?? raw.isPlayoffs ?? raw.is_playoff ?? raw.isPlayoff);
         const status = raw.status ?? null;
         const scheduledTs = getScheduledTs(raw);
+        const startedTs = coerceEpochMs(raw.started_at ?? raw.startedAt);
+        const team1Score = Number(raw.team1_score ?? raw.team1Score ?? 0);
+        const team2Score = Number(raw.team2_score ?? raw.team2Score ?? 0);
         const team1 = normalizeTeam(
             raw.team1 || {
                 team_id: raw.team1_id ?? raw.team1Id ?? null,
@@ -12324,6 +12333,9 @@ window.PlayoffBracket = {
             isPlayoffs,
             status,
             scheduledTs,
+            startedTs,
+            team1Score: Number.isFinite(team1Score) ? team1Score : 0,
+            team2Score: Number.isFinite(team2Score) ? team2Score : 0,
             team1,
             team2,
             faceitUrl
@@ -12371,6 +12383,7 @@ window.PlayoffBracket = {
             emptyMessage: { type: String, default: 'Ei tulevia otteluita.' },
             showDivision: { type: Boolean, default: false },
             showFaceit: { type: Boolean, default: true },
+            showScore: { type: Boolean, default: false },
             showHeader: { type: Boolean, default: true },
             compact: { type: Boolean, default: false },
             groupByDayDivision: { type: Boolean, default: false },
@@ -12546,6 +12559,10 @@ window.PlayoffBracket = {
                     name: 'team-detail',
                     params: { championshipId: item.championshipId, teamId: team.id }
                 };
+            },
+            scoreLabel(match) {
+                if (!this.showScore) return 'vs';
+                return `${match.team1Score} - ${match.team2Score}`;
             }
         },
         template: `
@@ -12594,7 +12611,7 @@ window.PlayoffBracket = {
                                                 >{{ match.team1.name }}</router-link>
                                                 <span v-else class="upcoming-match-card__team-name">{{ match.team1.name }}</span>
                                             </div>
-                                            <span class="upcoming-match-card__vs">vs</span>
+                                            <span class="upcoming-match-card__vs">{{ scoreLabel(match) }}</span>
                                             <div class="upcoming-match-card__team upcoming-match-card__team--right">
                                                 <img :src="resolveAvatar(match.team2.avatar)" :alt="match.team2.name" class="upcoming-match-card__logo">
                                                 <router-link
@@ -12640,7 +12657,7 @@ window.PlayoffBracket = {
                                     >{{ match.team1.name }}</router-link>
                                     <span v-else class="upcoming-match-card__team-name">{{ match.team1.name }}</span>
                                 </div>
-                                <span class="upcoming-match-card__vs">vs</span>
+                                <span class="upcoming-match-card__vs">{{ scoreLabel(match) }}</span>
                                 <div class="upcoming-match-card__team upcoming-match-card__team--right">
                                     <img :src="resolveAvatar(match.team2.avatar)" :alt="match.team2.name" class="upcoming-match-card__logo">
                                     <router-link
@@ -19731,7 +19748,11 @@ window.UpcomingMatchesView = {
             seasonsStore,
             upcomingStore,
             limit: 50,
-            groupedViewEnabled: true
+            groupedViewEnabled: true,
+            viewMode: 'upcoming',
+            liveMatches: [],
+            liveLoading: false,
+            liveError: null
         };
     },
     computed: {
@@ -19766,6 +19787,9 @@ window.UpcomingMatchesView = {
                 return { data: [], loading: false, error: null };
             }
             return this.upcomingStore.getEntryForParams(this.upcomingParams);
+        },
+        showingUpcoming() {
+            return this.viewMode === 'upcoming';
         }
     },
     watch: {
@@ -19777,7 +19801,6 @@ window.UpcomingMatchesView = {
         }
     },
     mounted() {
-        // Load seasons + upcoming in a single bundle call
         this._loadBundle().catch(err => {
             console.error('[UpcomingMatchesView] bundle fetch failed', err);
         });
@@ -19785,7 +19808,6 @@ window.UpcomingMatchesView = {
     methods: {
         async _loadBundle() {
             if (!window.apiClient || typeof window.apiClient.getSeasonsUpcoming !== 'function') {
-                // Fallback: let the store watchers handle individual fetches
                 if (this.seasonsStore && !this.seasonsLoaded) {
                     this.seasonsStore.fetchSeasons().catch(() => {});
                 }
@@ -19801,8 +19823,7 @@ window.UpcomingMatchesView = {
                     this.seasonsStore.seedSeasons(bundle.seasons);
                 }
                 if (this.upcomingStore && typeof this.upcomingStore.seedUpcoming === 'function') {
-                    const params = { ...this.upcomingParams };
-                    this.upcomingStore.seedUpcoming(params, bundle.upcoming);
+                    this.upcomingStore.seedUpcoming({ ...this.upcomingParams }, bundle.upcoming);
                 }
             } catch (err) {
                 console.warn('[UpcomingMatchesView] bundle fetch failed, falling back', err);
@@ -19819,6 +19840,27 @@ window.UpcomingMatchesView = {
                 console.error('[UpcomingMatchesView] upcoming fetch failed', error);
             }
         },
+        async selectView(viewMode) {
+            this.viewMode = viewMode;
+            if (viewMode === 'live' && !this.liveMatches.length && !this.liveLoading) {
+                await this.loadLiveMatches();
+            }
+        },
+        async loadLiveMatches() {
+            this.liveLoading = true;
+            this.liveError = null;
+            try {
+                if (!window.apiClient || typeof window.apiClient.getLiveMatches !== 'function') {
+                    throw new Error('Live-otteluiden rajapintaa ei ole saatavilla.');
+                }
+                this.liveMatches = await window.apiClient.getLiveMatches();
+            } catch (err) {
+                console.error('[UpcomingMatchesView] live match fetch failed', err);
+                this.liveError = err?.message || 'Live-otteluiden haku epäonnistui.';
+            } finally {
+                this.liveLoading = false;
+            }
+        },
         toggleGrouping() {
             this.groupedViewEnabled = !this.groupedViewEnabled;
         }
@@ -19827,20 +19869,35 @@ window.UpcomingMatchesView = {
         <div class="upcoming-view">
             <header class="upcoming-view__header">
                 <h1 class="title-accent titleUnderlinePage">Tulevat ottelut</h1>
-                <p class="upcoming-view__subtitle">{{ currentSeasonLabel }}</p>
+                <p class="upcoming-view__subtitle">{{ showingUpcoming ? currentSeasonLabel : 'Käynnissä olevat ottelut Faceitista' }}</p>
                 <div class="upcoming-view__controls">
-                    <button type="button" class="btn-secondary upcoming-view__toggle" @click="toggleGrouping">
-                        {{ groupedViewEnabled ? 'Nayta vain aikajarjestys' : 'Nayta paiva- ja divisioonaryhmittely' }}
-                    </button>
+                    <button
+                        type="button"
+                        class="btn-secondary upcoming-view__toggle"
+                        :class="{ 'is-active': showingUpcoming }"
+                        @click="selectView('upcoming')"
+                    >Tulevat ottelut</button>
+                    <button
+                        type="button"
+                        class="btn-secondary upcoming-view__toggle"
+                        :class="{ 'is-active': !showingUpcoming }"
+                        @click="selectView('live')"
+                    >Käynnissä nyt</button>
+                    <button
+                        v-if="showingUpcoming"
+                        type="button"
+                        class="btn-secondary upcoming-view__toggle"
+                        @click="toggleGrouping"
+                    >{{ groupedViewEnabled ? 'Nayta vain aikajarjestys' : 'Nayta paiva- ja divisioonaryhmittely' }}</button>
                 </div>
             </header>
 
             <loading-spinner
-                v-if="!currentSeasonId"
+                v-if="showingUpcoming && !currentSeasonId"
                 message="Kautta haetaan..."
             ></loading-spinner>
             <upcoming-matches-list
-                v-else
+                v-else-if="showingUpcoming"
                 :title="'Tulevat ottelut'"
                 :subtitle="currentSeasonLabel"
                 :items="upcomingState.data"
@@ -19853,7 +19910,16 @@ window.UpcomingMatchesView = {
                 :show-header="false"
                 empty-message="Tälle kaudelle ei löytynyt tulevia otteluita."
             ></upcoming-matches-list>
-
+            <upcoming-matches-list
+                v-else
+                :title="'Käynnissä olevat ottelut'"
+                :items="liveMatches"
+                :loading="liveLoading"
+                :error="liveError"
+                :show-score="true"
+                :show-header="false"
+                empty-message="Pappaliigassa ei ole juuri nyt käynnissä olevia Faceit-otteluita."
+            ></upcoming-matches-list>
         </div>
     `
 };
