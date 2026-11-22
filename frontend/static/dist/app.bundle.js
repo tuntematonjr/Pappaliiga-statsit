@@ -19753,7 +19753,6 @@ window.UpcomingMatchesView = {
             upcomingStore,
             limit: 50,
             groupedViewEnabled: true,
-            viewMode: 'upcoming',
             liveMatches: [],
             liveLoading: false,
             liveError: null
@@ -19792,6 +19791,9 @@ window.UpcomingMatchesView = {
             }
             return this.upcomingStore.getEntryForParams(this.upcomingParams);
         },
+        viewMode() {
+            return this.$route.query.view === 'live' ? 'live' : 'upcoming';
+        },
         showingUpcoming() {
             return this.viewMode === 'upcoming';
         }
@@ -19801,6 +19803,14 @@ window.UpcomingMatchesView = {
             immediate: true,
             handler() {
                 this.loadUpcoming();
+            }
+        },
+        viewMode: {
+            immediate: true,
+            handler(viewMode) {
+                if (viewMode === 'live' && !this.liveMatches.length && !this.liveLoading) {
+                    this.loadLiveMatches();
+                }
             }
         }
     },
@@ -19845,10 +19855,16 @@ window.UpcomingMatchesView = {
             }
         },
         async selectView(viewMode) {
-            this.viewMode = viewMode;
-            if (viewMode === 'live' && !this.liveMatches.length && !this.liveLoading) {
-                await this.loadLiveMatches();
+            if (viewMode === this.viewMode) {
+                if (viewMode === 'live' && !this.liveMatches.length && !this.liveLoading) {
+                    await this.loadLiveMatches();
+                }
+                return;
             }
+            const query = { ...this.$route.query };
+            if (viewMode === 'live') query.view = 'live';
+            else delete query.view;
+            await this.$router.push({ path: this.$route.path, query, hash: this.$route.hash });
         },
         async loadLiveMatches() {
             this.liveLoading = true;
