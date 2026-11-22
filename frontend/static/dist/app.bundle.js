@@ -1090,7 +1090,9 @@ var Pinia=function(t,e){"use strict";let n;const i=t=>n=t,s=Symbol();function o(
         }
 
         async getLiveMatches() {
-            const result = await fetchJson('/matches/live');
+            const result = await fetchJson('/matches/live', {
+                timeoutMs: Math.max(DEFAULTS.timeoutMs, 60000)
+            });
             const payload = result?.data ?? result ?? {};
             return ensureSnakeCaseDeep(payload.items ?? []);
         }
@@ -12390,6 +12392,7 @@ window.PlayoffBracket = {
             showWeekSeparators: { type: Boolean, default: true },
             separatorGranularity: { type: String, default: 'week' }
         },
+        emits: ['retry'],
         computed: {
             normalizedItems() {
                 if (!Array.isArray(this.items)) return [];
@@ -12581,6 +12584,7 @@ window.PlayoffBracket = {
                 <error-message
                     v-else-if="error"
                     :message="error"
+                    @retry="$emit('retry')"
                 ></error-message>
 
                 <div v-else>
@@ -19903,6 +19907,7 @@ window.UpcomingMatchesView = {
                 :items="upcomingState.data"
                 :loading="upcomingState.loading"
                 :error="upcomingState.error"
+                @retry="loadUpcoming"
                 :show-division="true"
                 :group-by-day-division="groupedViewEnabled"
                 :show-week-separators="!groupedViewEnabled"
@@ -19916,6 +19921,7 @@ window.UpcomingMatchesView = {
                 :items="liveMatches"
                 :loading="liveLoading"
                 :error="liveError"
+                @retry="loadLiveMatches"
                 :show-score="true"
                 :show-header="false"
                 empty-message="Pappaliigassa ei ole juuri nyt käynnissä olevia Faceit-otteluita."

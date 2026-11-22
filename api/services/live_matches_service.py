@@ -75,6 +75,9 @@ async def get_live_organization_matches() -> list[dict[str, Any]]:
             championship_id = championship.get("championship_id") or championship.get("id")
             if not championship_id:
                 return "", "", []
+            status = championship.get("status") or championship.get("state")
+            if isinstance(status, str) and status.strip().lower() in {"finished", "cancelled", "canceled"}:
+                return "", "", []
             championship_name = str(championship.get("name") or "Pappaliiga")
             async with semaphore:
                 matches = await get_championship_matches_async(

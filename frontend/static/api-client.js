@@ -938,7 +938,9 @@
         }
 
         async getLiveMatches() {
-            const result = await fetchJson('/matches/live');
+            const result = await fetchJson('/matches/live', {
+                timeoutMs: Math.max(DEFAULTS.timeoutMs, 60000)
+            });
             const payload = result?.data ?? result ?? {};
             return ensureSnakeCaseDeep(payload.items ?? []);
         }

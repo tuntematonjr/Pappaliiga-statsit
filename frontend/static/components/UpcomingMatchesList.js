@@ -146,6 +146,7 @@
             showWeekSeparators: { type: Boolean, default: true },
             separatorGranularity: { type: String, default: 'week' }
         },
+        emits: ['retry'],
         computed: {
             normalizedItems() {
                 if (!Array.isArray(this.items)) return [];
@@ -337,6 +338,7 @@
                 <error-message
                     v-else-if="error"
                     :message="error"
+                    @retry="$emit('retry')"
                 ></error-message>
 
                 <div v-else>

@@ -46,3 +46,6 @@ Controls:
 ## Notes
 - Cache is process-local and resets on restart.
 - Designed for single-process behavior (no distributed invalidation).
+- Live Faceit matches use a separate five-minute cache. Cold refreshes skip
+  championships explicitly marked finished or cancelled; unknown statuses are
+  still queried. The browser allows at least 60 seconds per live request.
